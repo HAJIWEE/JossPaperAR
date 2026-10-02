@@ -54,3 +54,7 @@ The machine-readable-verdict habit (`aim-check` / `render-check` from the retire
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) — branching, commits, check requirements, and the doc conventions (ADRs, session log, Jira-first issue tracking).
 
+## Licence
+
+[MIT](LICENSE) — © 2026 Gwee Jia Han. Chosen to match the stack (React, React Native, and Expo are all MIT); commercial use, forking, and private modification are all permitted. The concept board, ADRs, and design assets are covered by the same licence unless stated otherwise; third-party spike images (`spike/test-images/`) remain under their own CC licences and are internal evaluation material only.
+
