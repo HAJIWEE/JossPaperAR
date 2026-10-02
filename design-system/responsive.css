@@ -1,0 +1,245 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   JOSS PAPER AR · Responsive foundation — fluid type · safe areas · breakpoints
+   Written 2026-09-30 · SCRUM-45 (the responsive / safe-area criterion).
+   Link order in the build: tokens.css first, then this file. Both ship with
+   every build; neither is a migration target from the retired prototype.
+
+   WHY THIS FILE EXISTS
+   --------------------
+   The Penpot boards are drawn on a fixed 390×844 canvas — 131 of 135 boards.
+   That canvas is a design REFERENCE, never a runtime assumption. The retired
+   prototype shows the failure mode: 470 hardcoded px values, 43
+   position:absolute declarations, 38 translate transforms, 0
+   clamp()/min()/max(), 0 safe-area insets, and 1 media query (a height tweak)
+   — a layout that could only ever be one size, whose "notch" was a decorative
+   div. This file is the opposite: the real build inherits these tokens, and
+   any screen built from them survives
+
+     · 320 → 480 px widths       (no fixed 390 assumption)
+     · notch / gesture insets    (env(safe-area-inset-*); resolved by the OS)
+     · system font scaling ×1.5  (N11 / doc 14 — the accessibility floor)
+
+   MEASURED GROUND TRUTH — Penpot census 2026-09-30, read from the file
+   --------------------------------------------------------------------
+   · boards         131 × 390×844 · 4 × 390×620. The 620s are scroll-viewport
+                    crops of the League list, not a device → the reference
+                    frame is 390×844 and nothing else.
+   · gutter         sheet · title relX = 20 on every sampled EN sheet.
+   · top chrome     first text row at y 36–40 (Capture 36 · League/Store 40).
+   · tab bar        nav · tabbar (bg) spans y 764→844 (80 px, full-bleed);
+                    the last nav label bottom is y 826 → 18 px clearance.
+   · system chrome  no status bar / notch / home-indicator art is drawn at
+                    all — insets are entirely the build's responsibility.
+   · type           2,427 text shapes · 55 size/weight combos · 9→90 px.
+                    families: sourcesanspro 2229 · Noto Serif SC 190 ·
+                    Noto Sans SC 8.
+   · line height    1.2 on ~2,100 single-line UI shapes; 1.5 where text wraps.
+
+   THE THREE RULES THIS FILE ENCODES
+   ---------------------------------
+   1. FLUID DISPLAY TYPE — hero/title sizes clamp() between 320 px and 480 px
+      viewports, anchored so the exact design size renders at the 390 px
+      reference (verified by design-system/responsive-check.js).
+   2. FIXED SMALL TYPE — 9–13 px copy renders at its designed size on every
+      device, expressed in rem so system font scaling still multiplies it.
+      Shrinking small text on small phones is an accessibility anti-pattern,
+      and this audience is 40–50s eyes.
+   3. SAFE AREAS BY PATTERN — top spacing is max(design, inset) so chrome never
+      collides but also never drifts; bottom chrome stacks (design + inset)
+      because the tab bar is an anchored surface whose height must grow over
+      the home-indicator zone. Every env() falls back to 0, so on a plain
+      rectangular screen both patterns render the design value exactly.
+
+   HOW TO VERIFY
+   -------------
+     node design-system/responsive-check.js
+       recomputes every clamp() at the 390 px reference (must equal the design
+       px), asserts the invariants below, and scans the build stylesheet once
+       one exists. Do not edit a value here without re-running it — the check
+       re-derives, never trusts, the numbers in these comments.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root{
+  /* ── Viewport contract ───────────────────────────────────────────────────
+     The build's viewport meta must be:
+       <meta name="viewport" content="width=device-width, initial-scale=1,
+             viewport-fit=cover">
+     viewport-fit=cover is what makes env(safe-area-inset-*) non-zero on iOS.
+     NEVER add user-scalable=no / maximum-scale=1: pinch-zoom and system font
+     scaling are accessibility features, not bugs. In RN/Expo the equivalents
+     are react-native-safe-area-context (insets) and allowFontScaling (on).  */
+
+  /* App column cap. Beyond 480 px (open foldables, tablets, desktop preview)
+     the column stops growing and centres — it does not stretch. Deliberately
+     rem, not px: at ×1.5 font scaling the cap becomes 720 px, so bigger text
+     gets a wider column instead of a cramped one. */
+  --content-max:30rem;
+
+  /* ── Fluid type — display sizes ──────────────────────────────────────────
+     clamp(min @320px, slope, max @480px). Each slope is chosen so the token
+     renders EXACTLY at its design size on the 390 px reference — the number
+     in the trailing comment. Anchors recomputed by responsive-check.js. */
+  --fs-hero:clamp(4rem, 0.5714rem + 17.1429vw, 5.7143rem);       /* 76 @390 — reward total, score pop */
+  --fs-display:clamp(2.125rem, 0.4107rem + 8.5714vw, 2.9821rem); /* 40 @390 — splash logo, big glyph art */
+  --fs-title-hero:clamp(1.625rem, 0.4821rem + 5.7143vw, 2.1964rem);  /* 30 @390 — onboarding headline */
+  --fs-title-page:clamp(1.4375rem, 0.5804rem + 4.2857vw, 1.8661rem); /* 26 @390 — page title */
+  --fs-title-screen:clamp(1.3125rem, 0.4554rem + 4.2857vw, 1.7411rem); /* 24 @390 — capture / screen title */
+  --fs-title-sheet:clamp(1.1875rem, 0.6161rem + 2.8571vw, 1.4732rem);  /* 21 @390 — sheet & dialog title */
+  --fs-title-row:clamp(1rem, 0.7143rem + 1.4286vw, 1.1429rem);  /* 17 @390 — row title, large button label */
+  --fs-body-lg:clamp(0.875rem, 0.5893rem + 1.4286vw, 1.0179rem); /* 15 @390 — prominent body, values */
+
+  /* ── Fixed type — small copy ─────────────────────────────────────────────
+     rem, not px, so system font scaling multiplies them (the ×1.5 floor).
+     Fixed, not clamp(), because these already render correctly at 320 px and
+     shrinking small text on small phones is exactly the anti-pattern to
+     avoid. The census collapses 13/13.5 → one step, 12/12.5 → one, 10/10.5 →
+     one, 9/9.5 → one: do not add one-off sizes back into components. */
+  --fs-body:0.8125rem;    /* 13 px — chips, dense rows, primary body */
+  --fs-body-sm:0.75rem;   /* 12 px — the single most-used size: captions, nav labels, hints */
+  --fs-label:0.6875rem;   /* 11 px — uppercase field labels (SURNAME · GIVEN NAME…) */
+  --fs-caption:0.625rem;  /* 10 px — preview captions, fine print */
+  --fs-micro:0.5625rem;   /*  9 px — nav subtext only; never body copy */
+
+  /* ── Line height ─────────────────────────────────────────────────────────
+     Unitless, forever: unitless line-heights survive font scaling, px ones
+     do not. Census: 1.2 for single-line UI, 1.5 wherever text wraps. */
+  --lh-tight:1.2;
+  --lh-text:1.5;
+
+  /* ── Families (from the design file) ─────────────────────────────────────
+     Display = Noto Serif SC (the 190 serif shapes: logos, tablet lettering,
+     CJK titles); body = Source Sans Pro (2,229 shapes). The CJK fallbacks
+     matter — 姓/氏 glyphs must never fall through to a random default.
+     Subset the CJK in the build: NFR §3, a full CJK font alone blows the
+     download budget. */
+  --font-body:'Source Sans 3','Source Sans Pro','Noto Sans SC','PingFang SC','Microsoft YaHei',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-display:'Noto Serif SC','Songti SC','STSong','SimSun',Georgia,serif;
+
+  /* ── Glyph sizes (art — NOT text) ────────────────────────────────────────
+     Emoji/glyph buttons and chevrons. Deliberately px: icons must not scale
+     with system font size — a glyph that grows ×1.5 bursts its button. In RN
+     set maxFontSizeMultiplier={1} on glyph Text. */
+  --icon-nav:19px;      /* nav · tab icons 🏮🏆👤 — 150 census shapes */
+  --icon-ctl:20px;      /* ⚡ 🖼 capture controls */
+  --icon-hud:24px;      /* ‹ back, ⌃ chevrons in HUDs */
+  --icon-carousel:26px; /* ‹ › carousel arrows */
+  --icon-hero:40px;     /* 📷 🏆 empty-state glyphs */
+
+  /* ── Safe areas ──────────────────────────────────────────────────────────
+     Every inset resolves to 0 px on devices without one, so the rules below
+     render the design values exactly on a plain rectangular screen. */
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-right:env(safe-area-inset-right,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+  --safe-left:env(safe-area-inset-left,0px);
+
+  /* ── Screen gutters & chrome (all measured — see header) ─────────────────
+     gutter: 16 @320 → 19.5 @390 (measured 20, −0.5 px) → 24 @480.
+     top: max(), so chrome keeps the design position (40) on a notch-less
+     device and clears a 47 px notch when one exists. Adding instead of
+     max() would push every header visibly off-design — the 40 px gap is
+     clearance from the edge, not stacking room.
+     tab bar: STACKS on purpose — the bar is anchored to the bottom, its
+     background bleeds under the home indicator, and its height grows so the
+     labels keep their measured 18 px clearance above the gesture zone. */
+  --pad-screen-x:clamp(1rem, 5vw, 1.5rem);
+  --pad-screen-top:max(40px, var(--safe-top));
+  --pad-tabbar-end:calc(18px + var(--safe-bottom));
+  --tabbar-h:5rem;   /* nav · tabbar (bg) = 80 px, full-bleed */
+
+  /* ── Touch targets ───────────────────────────────────────────────────────
+     WCAG 2.2 AA asks 24×24 px minimum; this app holds 44×44 as its own bar
+     (40–50s hands — the prototype's shrine tablets measured 32 px wide).
+     Where the artwork is smaller, grow the HIT area with an invisible rect,
+     never the drawing. Keep ≥8 px between separate targets. */
+  --touch-target:44px;
+  --touch-gap:8px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   BASE — the element rules the build starts from
+   ───────────────────────────────────────────────────────────────────────── */
+html{
+  /* No font-size lock here on purpose: the default 16 px root IS the user's
+     setting, and every rem above is designed to follow it. */
+  background:var(--paper);
+}
+*,*::before,*::after{box-sizing:border-box}
+body{
+  margin:0;
+  margin-inline:auto;
+  max-width:var(--content-max);   /* ≥480 px: centre the column, do not stretch */
+  min-height:100vh;               /* fallback for engines without dvh */
+  min-height:100dvh;              /* …and the real value: URL-bar-proof */
+  background:var(--paper);
+  color:var(--ink-text);
+  font-family:var(--font-body);
+  font-size:100%;
+  line-height:var(--lh-tight);
+  overflow-wrap:break-word;       /* long Romanised names in chips — CJK unaffected */
+  text-size-adjust:100%;
+  -webkit-text-size-adjust:100%;  /* no auto text inflation on orientation change */
+  -webkit-tap-highlight-color:transparent; /* the app draws its own pressed states */
+}
+button,a,[role="button"],input,select,textarea{
+  font:inherit; color:inherit;    /* controls inherit the SCALED text size — ×1.5 must reach them */
+  touch-action:manipulation;      /* removes the 300 ms double-tap-zoom delay */
+}
+img{display:block; max-width:100%; height:auto}
+:focus-visible{outline:2px solid var(--azurite-deep); outline-offset:2px}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   BREAKPOINTS — the only one that earns its keep
+   Fluid tokens make width queries unnecessary by design: nothing here may
+   re-state a size at a width. Reach for a media query only when a STATE
+   changes, never a measurement.
+   ───────────────────────────────────────────────────────────────────────── */
+@media (max-height:700px){
+  /* Short viewports are a real state — the 390×620 scroll crops prove the
+     design thinks in them. Compress chrome before content scrolls: lift the
+     top less, tighten the tab bar. Starting values; audit on the Tier F
+     device (doc 14 §1) at the repo+CI milestone. */
+  :root{--pad-screen-top:max(24px, var(--safe-top)); --tabbar-h:4.25rem}
+}
+/* Deliberately absent:
+   · ≥412 px — nothing to do; the clamps breathe and the column caps at 480.
+   · landscape — out of MVP scope. The ritual surfaces assume portrait;
+     declare that in Expo (expo-screen-orientation) rather than letting the
+     layout stretch sideways. Revisit with real designs, not with a query. */
+
+/* ─────────────────────────────────────────────────────────────────────────
+   PATTERNS — copy these shapes into the build; they encode the rules
+   ─────────────────────────────────────────────────────────────────────────
+   Full-screen paper surface:
+
+     .screen{
+       min-height:100vh; min-height:100dvh;
+       padding:var(--pad-screen-top) var(--pad-screen-x)
+               calc(var(--tabbar-h) + var(--safe-bottom));
+     }
+
+   Bottom tab bar — background bleeds UNDER the home indicator, labels never:
+
+     .tabbar{
+       position:fixed; inset:auto 0 0 0;
+       padding-bottom:var(--pad-tabbar-end);
+     }
+
+   Immersive camera chrome — same top rule, insets only for chrome:
+
+     .camera-chrome{padding-top:var(--pad-screen-top)}   /* max(40, inset) */
+
+   Any tappable artwork smaller than 44×44 — grow the hit area, not the art:
+
+     .tablet-hit{position:absolute; inset:-6px}          /* invisible rect */
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ── Reduced motion — the ritual animates fire; honour the setting ─────── */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:0.01ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:0.01ms!important;
+    scroll-behavior:auto!important;
+  }
+}
+

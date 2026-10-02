@@ -1,0 +1,112 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   JOSS PAPER AR · Design Tokens — accessible layer
+   Derived from the locked SCRUM-6 palette (styles.css :root), 2026-09-28.
+
+   WHY THIS FILE EXISTS
+   --------------------
+   The Penpot accessibility sweep found 130 low-contrast text findings across
+   135 boards. Chasing them shape-by-shape would have been wasted effort, because
+   every one of them traces back to four colour pairings — and those pairings are
+   the *locked SCRUM-6 palette itself*. Sampling the prototype CSS against the
+   same rule found 11 of 19 real pairings failing. So the defect is in the token
+   layer, not in the artwork: fix it once here and both the design file and the
+   real build inherit the fix.
+
+   THE RULE THAT SHAPES THIS FILE
+   ------------------------------
+   A colour can be perfectly good as a border or a fill and still fail as text.
+   `--gold-deep` is fine as `border-color` on .league-row.is-you and fails at
+   2.67:1 as `.mini-rank` text. So tokens are split by ROLE, not renamed wholesale:
+
+     --<colour>          brand value, unchanged. Decorative: borders, fills,
+                         strokes, gradients. Never use for text on cream.
+     --<colour>-text     verified ≥4.5:1 on EVERY cream surface below. Use for
+                         text and icons that sit on paper.
+     --on-<colour>       verified ≥4.5:1 for cream content sitting ON that
+                         colour used as a fill (avatar discs, badges).
+
+   Every ratio quoted here was computed with the WCAG 2.x relative-luminance
+   formula and machine-verified. Do not edit a value without re-running
+   `node design-system/contrast-check.js` — it asserts each pair below.
+   (Path corrected 2026-09-29: the checker moved out of the retired
+   `prototype/` folder alongside this file.)
+
+   Cream surfaces, DARKEST (hardest to pass on) first:
+     #EAE2D2  --paper-deep            #F5F0E8  --paper
+     #F8F1DC  .league-row.in-zone     #FBF7EE  .league-row
+     #FDF8E7  .league-row.is-you
+   Every brand colour here is darker than every cream, so contrast shrinks as the
+   background darkens and #EAE2D2 is the binding surface — not the lightest one.
+   (#4A6FA5 reads 4.81 on #FDF8E7 but only 3.97 on #EAE2D2.) Each -text token is
+   therefore qualified against all five, and the ratio quoted is the worst.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root{
+  /* ── Brand palette (SCRUM-6, locked) — DECORATIVE USE ONLY ─────────────── */
+  --cinnabar:#C23B22;  --cinnabar-soft:#D9644B;  --cinnabar-deep:#9A2B18;
+  --gold:#D4AF37;      --gold-bright:#F0C75E;    --gold-deep:#A8862A;
+  --azurite:#4A6FA5;   --azurite-light:#8FB0D0;  --azurite-deep:#31506F;
+  --malachite:#0E9B78; --malachite-deep:#07795C;
+  --jade-facet:#23B98F;
+  --ink:#1A1A1A;       --ink-soft:#4A463F;
+
+  /* Backfilled from the Penpot sweep — NOT part of locked SCRUM-6. The streak
+     calendar paints its day numbers in a muted grey-beige that had no token at
+     all: it lived only as a raw hex in the design file, which is precisely why
+     nothing caught it at 2.52:1. Tokenised here so the lint can see it.
+     Decorative only, like every brand value above. */
+  --muted:#A39D92;
+
+  /* ── Surfaces ─────────────────────────────────────────────────────────── */
+  --paper:#F5F0E8;      --paper-deep:#EAE2D2;   --paper-edge:#D9CFBA;
+  --surface-row:#FBF7EE;      /* .league-row            */
+  --surface-row-zone:#F8F1DC; /* .league-row.in-zone    */
+  --surface-row-you:#FDF8E7;  /* .league-row.is-you     */
+  --surface-camera:#121418;   /* #screen-burn — dark; brand gold passes here  */
+
+  /* ── Text on cream — each ≥4.5:1 on EVERY cream surface ───────────────── */
+  /* Each is the LIGHTEST hue-preserving shade of its brand colour (RGB scaled
+     toward black, so the hue survives) that clears AA body text. The ratio
+     shown is the worst across all five creams, which lands on --paper-deep.
+     "was" = the brand value measured on that same binding surface.           */
+  --gold-text:#7B621F;        /* worst 4.52 · was --gold-deep   @ 2.67       */
+  --gold-bright-text:#77632F; /* worst 4.52 · was --gold-bright @ 1.25       */
+  --malachite-text:#0A7359;   /* worst 4.52 · was --malachite   @ 2.73       */
+  --azurite-text:#446698;     /* worst 4.53 · was --azurite     @ 3.97 (near) */
+  --cinnabar-text:#B73820;    /* worst 4.53 · was --cinnabar    @ 4.14 (near) */
+  --ink-text:#1A1A1A;         /* worst 13.52 · unchanged, already passing    */
+  --ink-soft-text:#4A463F;    /* verify before use on any NEW surface        */
+  --muted-text:#69655E;       /* worst 4.50 · was --muted       @ 2.09       */
+
+  /* --azurite and --cinnabar are near-misses (3.97, 4.14) — a shade darker is
+     all they need, so their -text tokens are visually almost identical to the
+     brand colour. --gold, --gold-bright and --malachite are not: those need a
+     real change, which is why the Penpot sweep found them in such volume.    */
+
+  /* ── Cream content ON a brand-colour fill ─────────────────────────────── */
+  /* The cream glyph is fixed at #FFF8E8. Where the brand colour is too light
+     to carry it, the FILL darkens — the glyph does not. This keeps the
+     cream-on-colour look and means one glyph token serves every disc.       */
+  --on-color-cream:#FFF8E8;
+
+  /* Avatar discs. Four brand colours already carry the cream glyph:
+       #4A6FA5 4.83 · #C23B22 5.03 · #31506F 7.91 · #9A2B18 7.26 · #07795C 5.09
+     These four did not, so the disc value is darkened to the lightest shade
+     of itself that reaches 4.5:1:                                            */
+  --disc-gold:#887023;        /* 4.52 · was #D4AF37 @ 1.99 — the worst in app */
+  --disc-gold-deep:#8B6F23;   /* 4.51 · was #A8862A @ 3.25                   */
+  --disc-malachite:#0C8265;   /* 4.51 · was #0E9B78 @ 3.32                   */
+  --disc-jade-facet:#188164;  /* 4.55 · was #23B98F @ 2.36                   */
+
+  /* ── Faceted fills ────────────────────────────────────────────────────── */
+  /* .tier-badge text is 11px/800 — that is BODY text (large = ≥24px, or
+     ≥18.66px bold), so it needs 4.5:1 at EVERY point of the gradient, not
+     just at its darkest stop. The original facet-jade swept #23B98F (2.36)
+     → #0E9B78 (3.32) → #07795C (5.09), so the light stops failed even though
+     the dark one passed. A gradient cannot be fixed by picking one colour;
+     every stop has to clear the bar.                                       */
+  --facet-jade-a11y:conic-gradient(from 80deg,
+      var(--disc-jade-facet) 0 25%,
+      var(--disc-malachite)  25% 55%,
+      var(--malachite-deep)  55% 78%,
+      var(--disc-malachite)  78% 100%);
+}

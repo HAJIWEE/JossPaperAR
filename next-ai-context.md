@@ -1,0 +1,145 @@
+# 🤖 Context for Next AI Session — Joss Paper AR
+
+> **Newest first.** This file is the **live hand-off** — current state, what's next, and the open questions.
+> **History has moved out:** the full session log (S2 → S26), the superseded review queues and the dated change log now live in **[[completed-work-archive]]**. Open work lives in **[[follow-up-items]]**.
+> **Read at session start:** *Quick Reference → Start Here → Open follow-ups*. Everything after that is stable reference material.
+
+---
+
+## 📌 Quick Reference
+
+- **Project** — Joss Paper AR, an AR app that replaces physical joss-paper burning with a digital ritual
+- **Last session** — **S26 · 2026-10-02**: SCRUM-8 ✅ Done (planning) → **ADR-003** (non-AR AR) + **doc 17** (AR-fire PoC plan); execution filed as **SCRUM-51**
+- **Current phase** — style locked · **Penpot design signed off, 153 boards** · stack locked (**ADR-001**) · architecture authoritative (**07 v2.8**) · **no app repo yet**
+- **Active sprint** — **SCRUM Sprint 1** (2026-10-02 → 2026-10-16)
+- **Next milestone** — **repo + CI (SCRUM-15)**: almost all remaining engineering is queued behind it
+- **Design source of truth** — **Penpot** (PM decision 2026-09-28): file `JossPaperAR`, page *"New-user tutorial · Core loop"*, **153 boards**, EN + 中文, wired
+- **ADRs accepted (5)** — `001` platform+backend · `002` Path C · `003` non-AR AR · `005` integrity · `007` privacy → [[AppDesignConceptBoard/ADRs/README|ADR register]] (open: `004` identity · `006` burn limits · `008` ad posture)
+- **User role** — Product Manager/Project Manager, AI vibe-coding · hobby project with family-legacy vision, no timeline pressure
+- **JIRA** — SCRUM → https://hajiwee9411.atlassian.net
+- **Index** — [[AppDesignConceptBoard/README|App Design Concept Board]] · [[project-costs]] · [[completed-work-archive|archive]] · [[follow-up-items|open items]]
+
+---
+
+## 🚩 Start Here — Current State & What's Next
+
+### What exists
+
+- **Style locked** — low-poly 3D × ink brush, fidelity **variant D** (37 faces = 31 body + 6 wheel), fixed palette + type stack → [[AppDesignConceptBoard/01-joss-paper-styles]] · [[AppDesignConceptBoard/ADRs/ADR-002-path-c-describe-then-generate|ADR-002]]
+- **Prototype v4** — the full core loop, machine-checked (144 markup + 20 render + 16 aim assertions). ⚠️ **Retired 2026-09-28** — it is a *spec*, not code; Penpot governs the design.
+- **Penpot design signed off** — **153 boards**, EN + 中文, wired: core loop · splash/store/collection · altar family · boot flow · app mark · customization system · privacy/consent · economy flows · clan block
+- **Decisions closed** — miss → rethrow (never the top tier) · altar-first Home sizing · tablet naming as-built · platform **Option A** (ADR-001) · **Path C** cartoonization (ADR-002) · **non-AR AR** (ADR-003) · integrity (ADR-005) · privacy (ADR-007)
+- **Architecture authoritative** — [[AppDesignConceptBoard/07-system-architecture]] **v2.8**: service boundaries, the capture → cartoonize → burn → award → league API sketch, ~20-table data model
+- **Specs written** — economy `10` · integrity `11` · security/legal `12` · privacy `13` · NFRs `14` · clan `15` · cultural consultation `16` · AR-fire PoC `17`
+- **Spike executed** — style-D: 133 runs ≈ **US$4.49** of the US$20 cap → Path C locked
+
+### What's next — ENGINEERING (the critical path)
+
+1. **SCRUM-15 — repo + CI.** This is the gate: the AR-fire spike (SCRUM-51), the vertical slice (SCRUM-17) and every device check all need a real build first.
+2. **SCRUM-46 — clan build** (backend + frontend): doc 15 §9 = the schema, §10 = open build items (Book window hide-vs-purge · anti-abuse rate limits).
+3. **SCRUM-50 — QR invite** (generation · scanner · deep links) — `clans.code` capability, payload = the invite deep link; architecture already in 07 §4.6.
+4. **ADR-006 + ADR-008** still to write *from* [[AppDesignConceptBoard/10-economy-spec]] (burn-limit semantics · ad posture — ADR-008 is a product question: may ads ever enter the ritual flow?).
+5. **SCRUM-51 — AR-fire spike**, blocked by SCRUM-15 + the floor-device purchase (doc 14 §1, ~S$100–150).
+6. **SCRUM-49 — cultural consultation**, parked until the app is functional.
+7. **SCRUM-43** (legal long-tail, awareness only) · **SCRUM-47** (ancestor slots, Low).
+
+### What's next — DESIGN (awaiting PM)
+
+- **🟡 PM whole-file visual review** — the 47 boards changed by the S21 contrast tranche still need an eyeball; until then the **colour hold on `SCRUM-42` and `SCRUM-33` STAYS**.
+- **🟡 Save a named Penpot version** — must be done **in the Penpot UI** (File → Version history); the plugin API exposes undo blocks only.
+- **🟡 Two design decisions from the S19 economy boards** (Decision A · Decision B) — see *What needs you (PM)* below.
+- **Home clan card** — the signed-off Home layout has no free band, so "Home → clan card → invite surface" needs a Home design pass → feeds **SCRUM-46**.
+- **Tap-target / proportion pass** — grow the touch area with an invisible rect rather than the artwork (40–50s hands); decision was closed S9, execution pending.
+
+### Open questions
+
+- **Home feel** — meditative shrine vs festive celebration.
+- **Prep tasks** (user, ~10 min before a session): which phone/platform do you actually carry? · who in the family would pilot it, and are they comfortable entering ancestors' names? · may ads ever appear inside the ritual flow? · optional 5–10 joss-paper photos.
+
+---
+
+## 🕐 Recent sessions (one line each)
+
+| # | Date | What landed |
+|---|---|---|
+| **26** | 2026-10-02 | **SCRUM-8 ✅ Done (planning)** → **[[AppDesignConceptBoard/ADRs/ADR-003-non-ar-ar-mvp-ar-framework\|ADR-003]]** (non-AR AR; ARKit/ARCore/Unity rejected) + **[[AppDesignConceptBoard/17-ar-fire-spike-plan\|doc 17]]** AR-fire PoC plan; execution → **SCRUM-51** |
+| **25** | 2026-10-02 | **SCRUM-48 clan boards ✅ Done (PM-marked)** — 22 boards (`EN · 0e Clan` + `ZH · 0e 宗族`), both rows wired (96 interactions); boot hand-off `0d3` → fork rewired; boards **131 → 153**; doc 15 → **v0.3** |
+| **24** | 2026-10-01 | **SCRUM-24 ✅ Done (planning)** → doc **16** cultural consultation (advisor list · bilingual 10-question sheet · change policy · outcome template); execution → **SCRUM-49**; found the ZH copy mixing scripts |
+| **23** | 2026-09-30 | **SCRUM-22 ✅ Done** → doc **15** clan model (clan-scoped offerings · no non-clan altar · roles Head/Elder/Member · cap 10) + 07 → **v2.7**; filed SCRUM-46/47/48 |
+| **22** | 2026-09-30 | **SCRUM-45 responsive criterion ✅ Done** → `design-system/responsive.css` + `responsive-check.js` **21/21**; `contrast-check.js` **22/22** |
+| **21** | 2026-09-29 | **SCRUM-45 contrast tranche 2 ✅ complete** — 132 AA failures cleared by 120 shape edits; re-audit `clip 0 · occl 14 · lowc 0 · lowcAA 0 · largeLow 0`; Penpot `revn 229` |
+
+> Sessions **2 → 20**, plus every older working note, are in **[[completed-work-archive]]**.
+
+---
+
+## 🩹 What needs you (PM)
+
+> A subset of **[[follow-up-items]]** (the master open list) — the items that need a *decision or an eyeball*, not more build time.
+
+- [ ] **Whole-file visual review of the 47 boards changed by the S21 contrast tranche** → this releases the **colour hold on `SCRUM-42` / `SCRUM-33`** (both stay In Review until then).
+- [ ] **Save a named Penpot version** — File → Version history, **in the Penpot UI** (the plugin API exposes undo blocks only, no version endpoint).
+- [ ] **⚠️ Decision A** — Reward's *"Return to Shrine"* now routes through the `5b` ad card but *"View League"* still skips it. Should both exits pass it?
+- [ ] **⚠️ Decision B** — a credits chip was added to both **signed-off** Capture boards (tap → cash shop); confirm the visual change to signed-off boards.
+- [ ] **Confirm the boot-flow wiring** — `0b2 permissions → 0b3 privacy notice → 1a`. The file's real wiring had `0b2 → 1a` directly; the file beat the ticket — confirm that is intended.
+- [ ] 👁 **Re-check `EN · 3d` (Transform / failed) for the obscured icon** — the S21 full-file re-audit reports `clip 0` / `occl 14 (swatch-only)`, so only re-test if it is still visible to the eye.
+- [ ] **Buy the Tier F floor device** — 1 of 3 (Galaxy A05s · Redmi A5 · Nokia C-series, ~S$100–150) when repo+CI lands; it becomes SCRUM-15's named CI phone (doc 14 §1).
+- [ ] **ADR-008 — may ads ever enter the ritual flow?** A product call, not a technical one; it blocks ADR-008.
+- [ ] **Tap targets on Home for 40–50s hands** — decision closed S9 (grow the hit area with an invisible rect, not the artwork); execution pending.
+
+---
+
+## 📘 Stable reference
+
+> Unchanged standing material — design system, working notes, decisions, priorities. Detail lives in the concept-board docs.
+## 🧭 The Design System (locked)
+- **Boards**: 390×844 · **Fonts**: display **Noto Serif SC**, body **Noto Sans SC** (both cover CJK + Latin)
+- **Background rule (S14b)** — **only the Splash is dark** (`#1b1613` + black vignette); every other screen sits on paper `#f5f0e8` with the gold radial wash (the Home halo's gradient) — cloning a Splash board brings the dark with it, so re-set the fill and delete the vignette layer
+- **App mark (S14c)** — **AR framing brackets over the joss sheet**: bright-gold sheet, **cinnabar-framed foil square** with the stamped diamond, three **embers rising**; brackets ink on paper, cream on cinnabar/ink. The mark alone sits on the Splash (above the wordmark, 190 px) and top-centre on Onboarding (76 px); the **tile** (rounded square, radius 46/200) is the launcher face. Spec board: `ICON · app mark + tile` (tile variants paper · cinnabar · ink + the 64 / 32 / 24 px ladder). **No lanterns** anywhere (removed S14c/14d)
+- **Header mark (S14d)** — the app mark **replaces the "Joss / Paper AR / JOSS PAPER AR" labels**: **44 px of ink at (20, 54)** — solved from the mark's own 17/200 inset so the ink lands **exactly on the 20 px page margin** and matches the settings button (326, 54, 44, 44) — on the 12 Home-family boards (the secondary screens keep their back-button + screen-title header). The header is now language-neutral — one less translated string per row; the simplified no-embers variant keeps the sheet square and everything concentric
+- **Palette**: cinnabar `#C23B22` (deep `#9A2B18` · soft `#D9644B`) · gold `#D4AF37` (bright `#F0C75E` · deep `#A8862A`) · azurite `#4A6FA5` · malachite `#0E9B78` · ink `#1A1A1A` · rice paper `#F5F0E8` (deep `#EAE2D2`) · dark screens `#121418`
+- **♿ Accessible text tokens (S20 cont., applied in Penpot S21) — `design-system/tokens.css`, machine-checked 21/21**: the brand palette above is for **fills**, not text. Tokens are split by *role* — `--<colour>` keeps the brand value for decorative use, `--<colour>-text` is verified ≥4.5:1 on **all five creams**, and `--disc-<colour>` darkens the *fill* so the cream avatar glyph `#FFF8E8` never has to change. **Text:** `--gold-text #7B621F` 4.52 · `--gold-bright-text #77632F` 4.52 · `--malachite-text #0A7359` 4.52 · `--azurite-text #446698` 4.53 · `--cinnabar-text #B73820` 4.53 · `--ink-text #1A1A1A` 13.52 · `--muted-text #69655E` 4.50 *(added S21)*. **Discs:** `--disc-gold #887023` 4.52 · `--disc-gold-deep #8B6F23` 4.51 · `--disc-malachite #0C8265` 4.51 · `--disc-jade-facet #188164` 4.55; `--azurite`/`--cinnabar` and their `-deep` variants already carry the glyph unmodified (4.83–7.91). ⚠️ **the brand values all fail as text** — on `#EAE2D2`: `#A8862A` 2.67 · `#F0C75E` 1.25 · `#0E9B78` 2.73 · `#C23B22` 4.14 · `#A39D92` 2.09. ✅ **RESOLVED in Session 21 tranche 2 (2026-09-29) — Penpot now uses these tokens for ALL text.** The 4 tranche-1 swaps were driven by the audit's `lowc` findings, so they cleared only the pairs below 3.0; tranche 2 then cleared the remaining **132** AA body-text failures via **120 shape edits** (`--gold-text` 112 · `--cinnabar-text` 4 · `--malachite-text` 2 · `--disc-malachite` 6 · `--disc-gold-deep` 2), leaving brand gold **`#a8862a` at 0 residual text usage** and the palette internally consistent. Verified live: **`clip 0 · occl 14 · lowc 0 · lowcAA 0 · largeLow 0`** over 2,453 text shapes; every body text is now ≥4.51. ⚠️ **The audit's `lowc` bucket is still `<3.0` — read `lowcAA` (4.5), never `lowc`, as the AA signal.** The 4 legitimate large-text passes (`logo · Joss` 40/800 · `miss · glyph` 90/700, cinnabar on near-black) were deliberately left at `#c23b22`; darkening them would make light-on-dark *worse*. Decorative brand fills remain (234 / 50) and are correct — the ratios above are the record of why they must never be used for text. Tracked in **`SCRUM-45`** (colour complete; responsive/safe-area criterion still open).
+- **EN ↔ ZH copy pairs (as shipped)** — Shrine/神龛 · League/联赛 · Profile/我的 · Make an Offering/献供 · Use this offering/使用此供品 · Retry/重试 · Offering Complete/礼成 · Tribute League/供奉联赛 · Jade Tier/翡翠段位 · Bullseye·Devout·Graze·Miss / 正中·虔誠·擦邊·偏失 · **Add an ancestor/添加祖先 · Edit ancestor/编辑祖先 · Place on altar/安放 · Remove/移走 · Tablet preview/牌位预览 · SURNAME ＊/姓氏 ＊ · GIVEN NAME (OPTIONAL)/名字（选填） · RELATIONSHIP/称谓 · Grandfather·Grandmother·Father·Mother / 祖父·祖母·父亲·母亲 (S12)**
+- **Ancestor-sheet pattern (S12)** — bottom sheet 400→844 on paper `#F5F0E8` + ink top rule, scrim `#1A1A1A` @42%, grab + ✕, chips (selected = gold bg + gold-deep border), live tablet preview 96 wide, actions pinned at the bottom; the hint teaches 姓＋氏 fallback; state boards: `1` empty · `1b` partial carousel · `1c` full · `1s` add · `1s2` edit
+- **Altar customization space (S14e)** — the **nameplate plaque above the tablet is removed** from all Home-family boards, and the space (Home y 206–248) is **reserved**: clean breathing room now, purchasable nameplates / plaques / decorations later (monetization). The altar's base is just the table + offerings + the warm halo
+- **Decoration store (S14h)** — the store has two categories behind a **350×38 segmented switcher (Offerings | Decorations)**; `EN/ZH · 7b` carries the decoration catalogue: **春联 / Spring Couplets · 鍾馗像 / Zhong Kui Print · 门神 / Door Gods · 灯笼 / Lanterns** + **新春套装 / Festive Set** (the four, wealth-bundle pattern); metas read *Decoration · permanent* / 装饰 · 永久 — no base value, since decorations never burn: they're a **points sink**. Reusable art: `storage.ART.decorCouplets` · `decorZhongKui` · `decorDoorGods` · `decorLanterns` · `decorFestiveSet`
+- **Decoration slots (S14j)** — **6 slots in the temple zone, three categories**: **top** = top-left 66×66 · top-middle 154×46 · top-right 66×66 (灯笼 in the squares, 横批 in the wide slot) · **side** = side-left / side-right 46×160 (春联 — 门神 is the alternative) · **background** = 190×320 centred **behind the tablet** (鍾馗像 · screens · scrolls). Board `EN/ZH · 1f Home / customize · 6 slots` shows the dashed grid + category labels + *Tap a slot to place a decoration* / 轻点格子，安放装饰; `1d`/`1e` place pieces in the slots
+- **One set per category (S14k)** — the bundle **keeps both** overlapping sets (春联 + 门神 in the 新春套装) but the **display shows one per category**; the other stays owned-but-not-displayed and can be switched free. Built as `EN/ZH · 1f2 Home / customize · choose a set` — the side slots highlighted + a picker sheet (Side decorations / 侧边装饰 · two option rows with Equipped/展示中 vs Owned/已拥有 · **Equip this set / 展示此套**). Generalises to every category: top · side · background
+- **Home layout (S14f/S14g)** — the **CTA is pinned to the bottom** (y 676; 22 px above the dock); the league position lives as a **9 px gold-deep subtext on the League tab** (**#4**, y 824); and **the whole temple scene is the customization zone** — a dashed zone (14, 206 → 362×450) drawn **behind** the temple art and labelled *Everything here is customizable* / 此处一切皆可自定义. In the product **everything inside is replaceable**: backdrop/niche · frame · table · offerings · nameplate · tablet finish (the dashed zone + chip are review annotations and come off once the customization system is specced)
+- **Offering icons (S13)** — one shared set, flat low-poly + ink outline + soft ground shadow: **joss-paper stack** (gold sheet, red-framed foil square, tie) · **LBMA-tapered gold bar** (trapezoid: wider base, narrower top) · **modern house** · **smartphone**; the **wealth bundle is the four composed into one**; drawn **72 px** tall in store cards, **78 px** in the collection, **220×106** as the featured bundle
+
+## 🔧 Working Notes (tools & practice)
+- **Penpot MCP** — changes apply live, but **autosave can lag**: save named versions at milestones (`file.saveVersion`); keep the tab awake; `export_shape` can be flaky (retry with the tab focused); the plugin's **`storage` helpers can reset** between sessions — re-seed `C` / `F` / makers if `storage.mkSvg` etc. are missing; for symbols, prefer **vector icons** over font glyphs (fallback fonts sit off-centre)
+- **Penpot cloning gotchas (S12)** — `clone()` **copies interactions and text wrapping**: rewire every cloned layer that already meant something else (a cloned CTA label quietly kept "→ Capture", ZH chip labels kept "→ EN Home"), and **reflow cloned text** (set the box first, then re-set the characters — `chars + ' '` then back) or a long string wraps against the clone's old, narrow box; hit-testing does **not** fall through to shapes underneath, so every clickable surface needs its own link — put taps on **invisible rects above the art** (the ≥44 px habit) and keep the button **labels** wired too
+- **SVG art in Penpot (S13)** — `createShapeFromSvg` ignores the SVG's width/height and lands at **viewBox size** (call `resize()` after), and shapes appended to a board take **absolute page coordinates** (add the board's x/y — the Store sits at x 3040); emit plain primitives from JS with transforms/rotations **baked into the point lists** and avoid `opacity`/`rgba()` — the whole icon set is stored as `storage.ART` builders
+- **Prototype checks** (`prototype/tools/`) — `validate-fidelity.js` (markup) · `render-check.js` (real pixels + tap probes) · `aim-check.js` (four scripted throws). ⚠️ **the prototype is retired** — these are kept as the *pattern* for the real build's automated viewport/layout checks, not as a live gate
+- **Design-system checks** (`design-system/`) — `contrast-check.js` (WCAG checker + CSS lint) against `tokens.css`. Run `node design-system/contrast-check.js --only=tokens` (expect **21/21**) and the full run before claiming a color change is safe. The lint targets the future real build stylesheet and **reports `skipped` when it does not exist** — never a false green; point it with `--css=path/to/styles.css` once the build CSS exists
+- **Cartoonization target D** — 3D-consistent faceting, ~37 faces, one ink weight, wheels round on all four corners — the spec for the first real AI experiment
+
+---
+
+## 🎯 What We've Decided (stable)
+- **Core concept** — burial of valuables → burning joss paper → **AR abstraction**; **audience**: late 40s–50s, family-legacy vision
+- **MVP features** — AR fire + throw accuracy · object capture & **cartoonization (KEY)** · location-based value · Tribute Points + league · streaks · burn limits · **alternative (standard) items**
+- **Deferred** — Virtual Temple · advanced AR fire collection/exchange · battle pass · social features
+- **Closed decisions** — rethrow penalty (S9) · altar-first Home sizing (iterate later) · tablet naming as-built · fidelity **D** (S5/6) · aim bands & pay (S8) · **location-value hidden (S11)** · **chips are state, not navigation · full = 4 tablets, ＋ hidden · the carousel dims its forward chevron at the edge (S12)** · **store: base value = 1.2 × redemption price (S13d) — 400/480 · 600/720 · 800/960 · House 1,440 · bundle 2,000/2,400; the 20% Store-Point accrual is intended (it keeps the store a sink, so photo capture stays the cheap path)**
+
+## 🔑 Key Technical Priorities
+1. **Cartoonization** — first real build against **D** (SCRUM-6/7)
+2. **AR fire** — fixed position + aiming throw ✅ **decided (ADR-003, SCRUM-8, S26)** — PoC plan = [[AppDesignConceptBoard/17-ar-fire-spike-plan|doc 17]] (spike deferred to repo+CI + floor device)
+3. **Points / league** — ledger + Duolingo-style cohorts (SCRUM-11)
+4. **Location value** — GPS/triangulation, ~4-block privacy, decay on repeat (SCRUM-12)
+
+## 💰 Monetization
+MVP free + family-safe ads (never inside the ritual flow) → advertising revenue → cash shop / battle pass (the shop screens are now in design: SCRUM-32)
+
+## 📚 Resources to Explore
+Existing joss-paper designs & cartoon styles · AI cartoonization APIs (background removal, style transfer) · AR frameworks & tutorials · Pokémon GO AR patterns · Duolingo league mechanics · family-oriented ad platforms
+
+## ⚠️ Important Context
+Software developer (not a mobile specialist) · AI vibe-coding · no timeline pressure — hobby project with family-legacy vision · cultural sensitivity is non-negotiable · competition & progression drive engagement
+**💳 Standing cost commitments** (see [[project-costs]] — all costs in SGD @ Mastercard rate): **ClinePass bills monthly on the 22nd** → dated Jira action items **SCRUM-39** (22 Oct) · **SCRUM-40** (22 Nov) = log the actual charge in `project-costs.md` + create the next month's item; **SCRUM-41** (due 2026-10-06) = log the approved style-D spike spend (US$10–20). *If a date has passed unactioned, handle it first — then roll the calendar forward.*
+
+---
+
+*Purpose: context hand-off for the next AI session. Session history, superseded review queues and the dated change log moved to [[completed-work-archive]] (2026-10-02, S26); open work lives in [[follow-up-items]].*

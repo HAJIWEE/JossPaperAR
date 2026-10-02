@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Joss Paper AR — Car Fidelity A/B/C + Hybrid D (Session 5)</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  /* ── Fidelity-test page (page-local; reuses styles.css tokens) ── */
+  .jump a{font:inherit; font-size:12px; padding:7px 13px; border-radius:999px; cursor:pointer;
+    border:1px solid rgba(245,240,232,.25); background:rgba(245,240,232,.06);
+    color:#EDE6D8; text-decoration:none; transition:.2s}
+  .jump a:hover{border-color:var(--gold); color:var(--gold-bright)}
+
+  .ft-wrap{width:min(1100px,100%); display:flex; flex-direction:column; gap:16px}
+  .ft-card{background:rgba(245,240,232,.05); border:1px solid rgba(245,240,232,.14);
+    border-radius:18px; padding:18px}
+  .ft-card h3{font-family:var(--font-display); font-size:17px; color:var(--paper); letter-spacing:.3px}
+  .ft-sub{margin-top:7px; font-size:12.5px; line-height:1.55; color:#C9BFA9}
+  .ft-sub b{color:var(--gold-bright); font-weight:600}
+
+  .ft-grid{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px}
+  @media (max-width:1000px){ .ft-grid{grid-template-columns:repeat(2,1fr)} }
+  @media (max-width:700px){ .ft-grid{grid-template-columns:1fr} }
+
+  .ft-card.is-variant{cursor:pointer; transition:border-color .2s, background .2s, transform .15s}
+  .ft-card.is-variant:hover{border-color:rgba(212,175,55,.5)}
+  .ft-card.is-variant:active{transform:translateY(1px)}
+  .ft-card.is-picked{border-color:var(--gold); background:rgba(212,175,55,.11)}
+
+  .ft-head{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap}
+  .ft-grade{font-family:var(--font-display); font-size:22px; color:var(--gold-bright); line-height:1}
+  .ft-name{font-size:14.5px; font-weight:700; color:var(--paper)}
+  .ft-badges{display:flex; gap:6px; flex-wrap:wrap; margin-top:10px}
+  .ft-badge{font-size:11px; padding:3px 9px; border-radius:999px;
+    border:1px solid rgba(245,240,232,.22); color:#DCD3C0; white-space:nowrap}
+  .ft-badge.is-key{border-color:rgba(212,175,55,.5); color:var(--gold-bright)}
+
+  /* rice-paper stage, like the app screens */
+  .ft-stage{background:var(--paper); border:2.5px solid var(--ink); border-radius:14px;
+    padding:10px; display:flex; align-items:center; justify-content:center; margin-top:12px}
+  .ft-stage svg{display:block; width:100%; height:auto}
+  .ft-stage.is-flame{background:radial-gradient(circle at 50% 68%, #FFF3D6 0%, #FFD98A 22%,
+    #FF9A3C 46%, #E5531F 70%, #7A1F0B 100%); border-color:#5C1F14}
+  .ft-sizes{display:flex; gap:12px; align-items:flex-end; margin-top:12px}
+  .ft-size{flex:1; min-width:0; text-align:center}
+  .ft-size .cap{font-size:10.5px; color:#A99F8B; margin-top:6px; letter-spacing:.2px}
+  .ft-size .ft-stage{margin-top:0; padding:8px; min-width:0}
+  .ft-size.w-burn svg{width:100%; max-width:150px}
+  .ft-size.w-sm svg{width:100%; max-width:96px}
+
+  .ft-tiny-row{display:flex; gap:26px; justify-content:center; align-items:flex-end;
+    margin-top:16px; flex-wrap:wrap}
+  .ft-tiny-row figure{text-align:center}
+  .ft-tiny-row .ft-stage{width:96px; padding:6px}
+  .ft-tiny-row svg{width:72px}
+  .ft-tiny-row figcaption{margin-top:7px; font-size:11px; color:#A99F8B; letter-spacing:.4px}
+
+  .ft-notes{margin-top:12px; padding-left:17px; font-size:12.5px; line-height:1.6; color:#C9BFA9}
+  .ft-notes li{margin-bottom:3px}
+  .ft-pipe{margin-top:10px; font-size:11.5px; color:#A99F8B; line-height:1.5;
+    border-top:1px dashed rgba(245,240,232,.16); padding-top:9px}
+  .ft-pipe b{color:#DCD3C0; font-weight:600}
+
+  .ft-swapbar{display:flex; gap:8px; align-items:center; justify-content:center; margin-top:12px}
+  .ft-swapbar button{font:inherit; font-size:12px; padding:7px 15px; border-radius:999px; cursor:pointer;
+    border:1px solid rgba(245,240,232,.25); background:rgba(245,240,232,.06); color:#EDE6D8; transition:.2s}
+  .ft-swapbar button:hover{border-color:var(--gold); color:var(--gold-bright)}
+  .ft-swapbar button.is-on{border-color:var(--gold); color:var(--gold-bright); background:rgba(212,175,55,.16)}
+  .ft-swapstage{display:flex; gap:18px; align-items:center; justify-content:center; margin-top:14px; flex-wrap:wrap}
+  .ft-swapstage .ft-stage{width:230px; margin-top:0}
+  .ft-swapstage .cap{font-size:10.5px; color:#A99F8B; margin-top:6px; text-align:center}
+
+  .ft-verdict{margin-top:12px; font-size:13px; color:var(--paper); text-align:center;
+    min-height:20px; line-height:1.5}
+  .ft-verdict b{color:var(--gold-bright)}
+  .ft-foot{font-size:11.5px; color:#8C8371; text-align:center; line-height:1.6; padding-bottom:10px}
+  .ft-foot code{font-size:11px; color:#C9BFA9}
+</style>
+</head>
+<body>
+<header class="proto-head">
+  <h1><span class="zh">金纸</span> Car Cartoonization — Fidelity A/B/C + Hybrid D</h1>
+  <p class="tagline">One car, built as a real <b>3D mesh</b> and rendered through an <b>orthographic camera</b> (no perspective, so nothing foreshortens). Every variant shares that one mesh. Only the <b>mesh resolution</b>, the <b>outline weight</b> and <b>which parts stay detailed</b> change.</p>
+  <div class="style-chip">✦ Session 6 · the reference is now a smooth render of that same mesh, and the cartoons are its low-poly versions — <b>D</b> (your Session-5 pick) is pre-selected</div>
+  <nav class="jump" aria-label="Navigation">
+    <a href="index.html">← Back to prototype</a>
+  </nav>
+</header>
+
+<!-- BEGIN GENERATED CARS — shapes come from tools/gen-car-3d.js; edit the generator, not this block -->
+<svg width="0" height="0" style="position:absolute; overflow:hidden" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="gFlank" gradientUnits="userSpaceOnUse" x1="0" y1="31.8" x2="0" y2="-139.3"><stop offset="0" stop-color="#22384F"/><stop offset="0.13" stop-color="#3C5D80"/><stop offset="0.25" stop-color="#6E93B8"/><stop offset="0.33" stop-color="#DCE7F1"/><stop offset="0.41" stop-color="#8FB0D0"/><stop offset="0.63" stop-color="#A9C4DC"/><stop offset="1" stop-color="#CFDCE8"/></linearGradient><linearGradient id="gTop" gradientUnits="userSpaceOnUse" x1="0" y1="31.8" x2="0" y2="-139.3"><stop offset="0.3" stop-color="#8FB0D0"/><stop offset="0.46" stop-color="#A9C4DC"/><stop offset="0.7" stop-color="#DCE7F1"/><stop offset="1" stop-color="#EDF3F8"/></linearGradient><linearGradient id="gNose" gradientUnits="userSpaceOnUse" x1="0" y1="31.8" x2="0" y2="-139.3"><stop offset="0" stop-color="#31506F"/><stop offset="0.3" stop-color="#4A6FA5"/><stop offset="0.52" stop-color="#7FA3C6"/><stop offset="0.72" stop-color="#5B82AF"/><stop offset="1" stop-color="#8FB0D0"/></linearGradient><linearGradient id="gGlass" gradientUnits="userSpaceOnUse" x1="0" y1="31.8" x2="0" y2="-139.3"><stop offset="0" stop-color="#141E26"/><stop offset="0.3" stop-color="#22323F"/><stop offset="0.4" stop-color="#7FA3C6"/><stop offset="0.46" stop-color="#26384A"/><stop offset="0.78" stop-color="#3C5D80"/><stop offset="1" stop-color="#7FA3C6"/></linearGradient><linearGradient id="gTyre" gradientUnits="userSpaceOnUse" x1="0" y1="31.8" x2="0" y2="-139.3"><stop offset="0" stop-color="#191D20"/><stop offset="0.45" stop-color="#2E3438"/><stop offset="1" stop-color="#454C52"/></linearGradient><linearGradient id="gRim" gradientUnits="userSpaceOnUse" x1="0" y1="31.8" x2="0" y2="-139.3"><stop offset="0" stop-color="#7E6016"/><stop offset="0.3" stop-color="#D4AF37"/><stop offset="0.5" stop-color="#F7EBB4"/><stop offset="0.72" stop-color="#B08A24"/><stop offset="1" stop-color="#D4AF37"/></linearGradient><linearGradient id="gBack" gradientUnits="userSpaceOnUse" x1="0" y1="-144.3" x2="0" y2="36.8"><stop offset="0" stop-color="#EDF2F7"/><stop offset="0.42" stop-color="#DDE3E8"/><stop offset="0.62" stop-color="#C9CFD3"/><stop offset="1" stop-color="#B9BFC3"/></linearGradient><radialGradient id="gGlow" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0.55"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></radialGradient><radialGradient id="gShade" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1A1A1A" stop-opacity="0.44"/><stop offset="0.55" stop-color="#1A1A1A" stop-opacity="0.24"/><stop offset="1" stop-color="#1A1A1A" stop-opacity="0"/></radialGradient><filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="3" seed="7"/><feColorMatrix type="saturate" values="0"/></filter>
+    <g id="carPhotoCar" data-variant="photo-car" data-profile-pts="29" data-dev="0.36" data-wheel-centres="-78,-35.4 0.4,-50.2 -7.5,-10.3 71,-25" data-cutout="1"><polygon points="78.8,26.6 86.5,24.2 90.4,20.7 90.4,16.2 86.4,11 78.6,5.2 67.4,-0.9 53.3,-7 36.8,-12.9 18.7,-18.2 -0.1,-22.9 -19,-26.6 -37.1,-29.2 -53.5,-30.5 -67.6,-30.7 -78.8,-29.5 -86.5,-27.1 -90.4,-23.6 -90.4,-19.1 -86.4,-13.9 -78.6,-8.1 -67.4,-2 -53.3,4.1 -36.8,10 -18.7,15.3 0.1,20 19,23.7 37.1,26.3 53.5,27.6 67.6,27.8" fill="url(#gShade)" data-notface="1"/><polygon points="-29.2,-119.7 -28.9,-121.2 -32.4,-110.8 -32.6,-109.6" fill="url(#gFlank)"/><polygon points="-19.5,-72.9 -18.9,-73.2 -17.3,-85.9 -17.9,-85.3" fill="url(#gNose)"/><polygon points="-21.2,-120.6 -20.7,-122.1 -28.9,-121.2 -29.2,-119.7" fill="url(#gTop)"/><polygon points="-34.5,-70.2 -19.5,-72.9 -17.9,-85.3 -33,-82.8" fill="url(#gNose)"/><polygon points="-17.9,-85.3 -17.3,-85.9 -12.9,-95.6 -13.6,-94.8" fill="url(#gNose)"/><polygon points="-36.2,-118.6 -21.2,-120.6 -29.2,-119.7 -44.4,-117.7" fill="url(#gTop)"/><polygon points="-33,-82.8 -17.9,-85.3 -13.6,-94.8 -28.5,-92.4" fill="url(#gNose)"/><polygon points="-28.5,-92.4 -13.6,-94.8 -7.1,-99.8 -21.9,-97.5" fill="url(#gNose)"/><polygon points="-83,-61 -34.5,-70.2 -33,-82.8 -81.5,-73.7" fill="url(#gNose)"/><polygon points="-84.8,-109.5 -36.2,-118.6 -44.4,-117.7 -92.9,-108.6" fill="url(#gTop)"/><polygon points="-81.5,-73.7 -33,-82.8 -28.5,-92.4 -77.1,-83.3" fill="url(#gNose)"/><polygon points="-77.1,-83.3 -28.5,-92.4 -21.9,-97.5 -70.5,-88.4" fill="url(#gNose)"/><polygon points="-96.3,-58.4 -83,-61 -81.5,-73.7 -94.8,-70.9" fill="url(#gNose)"/><polygon points="-98,-106.1 -84.8,-109.5 -92.9,-108.6 -106.1,-105.2" fill="url(#gTop)"/><polygon points="-99.8,-58 -96.3,-58.4 -94.8,-70.9 -98.3,-70.7" fill="url(#gFlank)"/><polygon points="-94.8,-70.9 -81.5,-73.7 -77.1,-83.3 -90.4,-80.3" fill="url(#gNose)"/><polygon points="-98.3,-70.7 -94.8,-70.9 -90.4,-80.3 -93.8,-80.4" fill="url(#gFlank)"/><polygon points="-90.4,-80.3 -77.1,-83.3 -70.5,-88.4 -83.9,-85.3" fill="url(#gNose)"/><polygon points="-93.8,-80.4 -90.4,-80.3 -83.9,-85.3 -87.1,-85.6" fill="url(#gFlank)"/><polygon points="80.3,-84.4 83.4,-85 -20.7,-122.1 -21.2,-120.6" fill="url(#gTop)"/><polygon points="66.7,-81.9 80.3,-84.4 -21.2,-120.6 -36.2,-118.6" fill="url(#gTop)"/><polygon points="-87.1,-85.6 -83.9,-85.3 -76.3,-85.2 -79.2,-85.4" fill="#2d3237"/><polygon points="49.3,-48.4 51.6,-48.1 53.2,-60.8 50.8,-60.8" fill="url(#gNose)"/><polygon points="63.6,-113.3 67.8,-114 7.8,-135.3 5.7,-133.9" fill="url(#gTop)"/><polygon points="35.3,-45.3 49.3,-48.4 50.8,-60.8 36.9,-57.9" fill="url(#gNose)"/><polygon points="50.8,-60.8 53.2,-60.8 57.6,-70.5 55.2,-70.3" fill="url(#gNose)"/><polygon points="18.2,-72.8 66.7,-81.9 -36.2,-118.6 -84.8,-109.5" fill="url(#gTop)"/><polygon points="36.9,-57.9 50.8,-60.8 55.2,-70.3 41.3,-67.5" fill="url(#gNose)"/><polygon points="55.2,-70.3 57.6,-70.5 64.3,-75.7 61.7,-75.3" fill="url(#gNose)"/><polygon points="41.3,-67.5 55.2,-70.3 61.7,-75.3 47.9,-72.6" fill="url(#gNose)"/><polygon points="-13.2,-36.2 35.3,-45.3 36.9,-57.9 -11.7,-48.8" fill="url(#gNose)"/><polygon points="-4.4,-100.5 63.6,-113.3 5.7,-133.9 -62.2,-121.1" fill="url(#gTop)"/><polygon points="3.4,-70 18.2,-72.8 -84.8,-109.5 -98,-106.1" fill="url(#gTop)"/><polygon points="-11.7,-48.8 36.9,-57.9 41.3,-67.5 -7.2,-58.4" fill="url(#gNose)"/><polygon points="2.5,-69.8 3.4,-70 -98,-106.1 -101.6,-106.9" fill="url(#gTop)"/><polygon points="-114.5,-63.2 -99.8,-58 -98.3,-70.7 -93.8,-80.4 -87.1,-85.6 -79.2,-85.4 -71.4,-80 -64.7,-70.1 -60.2,-57.2 -58.7,-43.3 -29.3,-32.8 -27.7,-45.6 -23.3,-55.3 -16.6,-60.4 -8.7,-60.3 -0.8,-54.8 5.8,-44.9 10.3,-32.1 11.9,-18.2 30.1,-11.7 33.6,-16.2 33,-43.5 31.3,-53.8 24.2,-61.1 2.5,-69.8 -101.6,-106.9 -109.8,-106 -113.3,-95.6 -114.5,-82.5" fill="url(#gFlank)"/><polygon points="-7.2,-58.4 41.3,-67.5 47.9,-72.6 -0.6,-63.5" fill="url(#gNose)"/><polygon points="75.5,-84.8 80.1,-84.4 67.8,-114 63.6,-113.3" fill="url(#gGlass)"/><polygon points="-27.5,-33.9 -13.2,-36.2 -11.7,-48.8 -26,-46.4" fill="url(#gNose)"/><polygon points="5.7,-70.4 -6.6,-100 -66.6,-121.3 -74.8,-99.1" fill="url(#gGlass)"/><polygon points="-29.3,-32.8 -27.5,-33.9 -26,-46.4 -27.7,-45.6" fill="url(#gNose)"/><polygon points="-6.6,-100 -4.4,-100.5 -62.2,-121.1 -66.6,-121.3" fill="url(#gTop)"/><polygon points="-26,-46.4 -11.7,-48.8 -7.2,-58.4 -21.7,-55.8" fill="url(#gNose)"/><polygon points="-36.4,-85.3 -36.4,-108.9 -32.2,-107.5 -32.2,-83.8" fill="url(#gFlank)"/><polygon points="-27.7,-45.6 -26,-46.4 -21.7,-55.8 -23.3,-55.3" fill="url(#gNose)"/><polygon points="101.5,-76 105.1,-76.3 83.4,-85 80.3,-84.4" fill="url(#gTop)"/><polygon points="-21.7,-55.8 -7.2,-58.4 -0.6,-63.5 -15.2,-60.8" fill="url(#gNose)"/><polygon points="88.3,-73.3 101.5,-76 80.3,-84.4 66.7,-81.9" fill="url(#gTop)"/><polygon points="-23.3,-55.3 -21.7,-55.8 -15.2,-60.8 -16.6,-60.4" fill="url(#gNose)"/><polygon points="7.5,-72 75.5,-84.8 63.6,-113.3 -4.4,-100.5" fill="url(#gGlass)"/><polygon points="107.2,-27.8 111,-26.9 114.5,-31.5 110.6,-32.2" fill="url(#gFlank)"/><polygon points="94.1,-24.4 107.2,-27.8 110.6,-32.2 97.6,-28.9" fill="url(#gNose)"/><polygon points="108.3,-68.8 112.2,-69 105.1,-76.3 101.5,-76" fill="url(#gTop)"/><polygon points="110.6,-32.2 114.5,-31.5 113.9,-58.7 110.1,-58.8" fill="url(#gFlank)"/><polygon points="110.1,-58.8 113.9,-58.7 112.2,-69 108.3,-68.8" fill="url(#gFlank)"/><polygon points="95.3,-66 108.3,-68.8 101.5,-76 88.3,-73.3" fill="url(#gTop)"/><polygon points="97.6,-28.9 110.6,-32.2 110.1,-58.8 97,-55.8" fill="url(#gNose)"/><polygon points="97,-55.8 110.1,-58.8 108.3,-68.8 95.3,-66" fill="url(#gNose)"/><polygon points="39.7,-64.2 88.3,-73.3 66.7,-81.9 18.2,-72.8" fill="url(#gTop)"/><polygon points="5.7,-70.4 7.5,-72 -4.4,-100.5 -6.6,-100" fill="url(#gGlass)"/><polygon points="45.6,-15.2 94.1,-24.4 97.6,-28.9 49,-19.7" fill="url(#gNose)"/><polygon points="46.7,-56.9 95.3,-66 88.3,-73.3 39.7,-64.2" fill="url(#gTop)"/><polygon points="49,-19.7 97.6,-28.9 97,-55.8 48.5,-46.7" fill="url(#gNose)"/><polygon points="24.6,-61.5 39.7,-64.2 18.2,-72.8 3.4,-70" fill="url(#gTop)"/><polygon points="48.5,-46.7 97,-55.8 95.3,-66 46.7,-56.9" fill="url(#gNose)"/><polygon points="24.2,-61.1 24.6,-61.5 3.4,-70 2.5,-69.8" fill="url(#gTop)"/><polygon points="30.3,-13.3 45.6,-15.2 49,-19.7 33.8,-17.7" fill="url(#gNose)"/><polygon points="31.5,-54.3 46.7,-56.9 39.7,-64.2 24.6,-61.5" fill="url(#gTop)"/><polygon points="33.8,-17.7 49,-19.7 48.5,-46.7 33.2,-44.3" fill="url(#gNose)"/><polygon points="33.2,-44.3 48.5,-46.7 46.7,-56.9 31.5,-54.3" fill="url(#gNose)"/><polygon points="31.3,-53.8 31.5,-54.3 24.6,-61.5 24.2,-61.1" fill="url(#gTop)"/><polygon points="33.6,-16.2 33.8,-17.7 33.2,-44.3 33,-43.5" fill="url(#gNose)"/><polygon points="33,-43.5 33.2,-44.3 31.5,-54.3 31.3,-53.8" fill="url(#gNose)"/><polygon points="93,-47 112.5,-50.6 111.3,-64.6 91.9,-60.9" fill="#d6b776"/><polygon points="56.1,-37.9 91.7,-44.6 90.4,-60.6 54.8,-53.9" fill="#282f33"/><polygon points="58.5,-42.3 89.2,-48.1 89,-51.5 58.2,-45.8" fill="url(#gRim)"/><polygon points="58,-47.7 88.8,-53.5 88.5,-57 57.7,-51.2" fill="url(#gRim)"/><polygon points="54.2,-39.7 34.8,-36 33.6,-50 53,-53.6" fill="#d6b776"/><polygon points="2.5,-69.8 3.4,-70 -98,-106.1 -101.6,-106.9" fill="#FFFFFF" fill-opacity="0.18"/><polygon points="24.2,-61.1 24.6,-61.5 3.4,-70 2.5,-69.8" fill="#FFFFFF" fill-opacity="0.18"/><polygon points="31.3,-53.8 31.5,-54.3 24.6,-61.5 24.2,-61.1" fill="#FFFFFF" fill-opacity="0.18"/><polygon points="18.1,-43.9 17.5,-51.6 15.7,-59.2 12.9,-66.2 9.3,-72.1 5,-76.5 0.4,-79.2 -4.1,-79.8 -8.4,-78.4 -12,-75.1 -14.8,-70.1 -16.6,-63.7 -17.2,-56.5 -16.6,-48.7 -14.8,-41.1 -12,-34.1 -8.4,-28.2 -4.1,-23.8 0.4,-21.2 5,-20.6 9.3,-21.9 12.9,-25.2 15.7,-30.2 17.5,-36.6" fill="url(#gTyre)"/><polygon points="88.6,-18.8 88,-26.5 86.2,-34.1 83.4,-41.1 79.8,-47 75.5,-51.4 71,-54 66.4,-54.7 62.2,-53.3 58.5,-50 55.7,-45 53.9,-38.6 53.3,-31.3 53.9,-23.6 55.7,-16 58.5,-9 62.2,-3.1 66.4,1.3 71,3.9 75.5,4.6 79.8,3.2 83.4,-0.1 86.2,-5.1 88,-11.5" fill="url(#gTyre)"/><polygon points="-60.4,-29.1 -61,-36.9 -62.8,-44.5 -65.6,-51.5 -69.2,-57.4 -73.5,-61.8 -78,-64.4 -82.6,-65 -86.8,-63.7 -90.5,-60.4 -93.3,-55.3 -95.1,-49 -95.7,-41.7 -95.1,-34 -93.3,-26.4 -90.5,-19.4 -86.8,-13.5 -82.6,-9.1 -78,-6.4 -73.5,-5.8 -69.2,-7.2 -65.6,-10.5 -62.8,-15.5 -61,-21.9" fill="url(#gTyre)"/><polygon points="-65.6,-30.3 -66,-36.3 -67.4,-42.2 -69.6,-47.7 -72.4,-52.3 -75.8,-55.7 -79.3,-57.8 -82.9,-58.3 -86.2,-57.2 -89.1,-54.6 -91.2,-50.7 -92.6,-45.8 -93.1,-40.1 -92.6,-34.1 -91.2,-28.1 -89.1,-22.7 -86.2,-18.1 -82.9,-14.6 -79.3,-12.6 -75.8,-12.1 -72.4,-13.2 -69.6,-15.7 -67.4,-19.6 -66,-24.6" fill="url(#gTyre)"/><polygon points="-71.4,-32.3 -72,-37.6 -73.7,-42.4 -76.3,-46.1 -79.3,-48.2 -82.4,-48.3 -84.9,-46.4 -86.7,-42.8 -87.3,-38 -86.7,-32.8 -84.9,-28 -82.4,-24.2 -79.3,-22.1 -76.3,-22 -73.7,-24 -72,-27.6" fill="url(#gRim)"/><polygon points="-76.6,-34.2 -77,-36.6 -78,-38.5 -79.3,-39.6 -80.7,-39.5 -81.7,-38.2 -82,-36.1 -81.7,-33.8 -80.7,-31.8 -79.3,-30.7 -78,-30.9 -77,-32.1" fill="url(#gRim)"/><polygon points="10.1,-4 9.5,-11.7 7.8,-19.3 5,-26.3 1.3,-32.2 -2.9,-36.7 -7.5,-39.3 -12.1,-39.9 -16.3,-38.5 -20,-35.2 -22.8,-30.2 -24.5,-23.9 -25.1,-16.6 -24.5,-8.9 -22.8,-1.2 -20,5.8 -16.3,11.7 -12.1,16.1 -7.5,18.7 -2.9,19.3 1.3,17.9 5,14.6 7.8,9.6 9.5,3.3" fill="url(#gTyre)"/><polygon points="5,-5.1 4.5,-11.2 3.1,-17.1 0.9,-22.6 -1.9,-27.2 -5.2,-30.6 -8.8,-32.7 -12.4,-33.1 -15.7,-32.1 -18.5,-29.5 -20.7,-25.6 -22.1,-20.6 -22.5,-14.9 -22.1,-8.9 -20.7,-3 -18.5,2.5 -15.7,7.1 -12.4,10.5 -8.8,12.6 -5.2,13.1 -1.9,12 0.9,9.4 3.1,5.5 4.5,0.5" fill="url(#gTyre)"/><polygon points="-0.9,-7.2 -1.5,-12.4 -3.2,-17.3 -5.8,-21 -8.8,-23.1 -11.8,-23.2 -14.4,-21.3 -16.1,-17.7 -16.7,-12.9 -16.1,-7.7 -14.4,-2.8 -11.8,0.9 -8.8,3 -5.8,3.1 -3.2,1.2 -1.5,-2.4" fill="url(#gRim)"/><polygon points="-6.1,-9.1 -6.5,-11.4 -7.4,-13.4 -8.8,-14.5 -10.1,-14.4 -11.1,-13.1 -11.5,-11 -11.1,-8.7 -10.1,-6.7 -8.8,-5.6 -7.4,-5.7 -6.5,-7" fill="url(#gRim)"/></g>
+    <g id="carPhoto" data-variant="photo" data-profile-pts="29" data-dev="0.36" data-wheel-centres="-78,-35.4 0.4,-50.2 -7.5,-10.3 71,-25"><rect x="-123.5" y="-144.3" width="247" height="181.1" fill="url(#gBack)" data-notface="1"/><ellipse cx="0" cy="-86.4" rx="142" ry="89.7" fill="url(#gGlow)" data-notface="1"/><use href="#carPhotoCar"/><rect x="-123.5" y="-144.3" width="247" height="181.1" filter="url(#grain)" opacity="0.05" data-notface="1"/></g>
+    <g id="carA" data-variant="A" data-profile-pts="28" data-dev="0.83" data-wheel-centres="-78,-35.4 0.4,-50.2 -7.5,-10.3 71,-25"><polygon points="78.8,26.6 86.5,24.2 90.4,20.7 90.4,16.2 86.4,11 78.6,5.2 67.4,-0.9 53.3,-7 36.8,-12.9 18.7,-18.2 -0.1,-22.9 -19,-26.6 -37.1,-29.2 -53.5,-30.5 -67.6,-30.7 -78.8,-29.5 -86.5,-27.1 -90.4,-23.6 -90.4,-19.1 -86.4,-13.9 -78.6,-8.1 -67.4,-2 -53.3,4.1 -36.8,10 -18.7,15.3 0.1,20 19,23.7 37.1,26.3 53.5,27.6 67.6,27.8" fill="#1A1A1A" fill-opacity="0.15" data-notface="1"/><polygon points="18.1,-43.9 15.7,-59.2 9.3,-72.1 0.4,-79.2 -8.4,-78.4 -14.8,-70.1 -17.2,-56.5 -14.8,-41.1 -8.4,-28.2 0.4,-21.2 9.3,-21.9 15.7,-30.2" fill="#2b3034" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="88.6,-18.8 86.2,-34.1 79.8,-47 71,-54 62.2,-53.3 55.7,-45 53.3,-31.3 55.7,-16 62.2,-3.1 71,3.9 79.8,3.2 86.2,-5.1" fill="#2b3034" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-33,-96.3 -33.6,-97.7 -33.6,-78.4 -33,-77.8" fill="#657b8f" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-31.9,-108.8 -32.4,-110.8 -33.6,-97.7 -33,-96.3" fill="#6e869d" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-28.5,-118.6 -28.9,-121.2 -32.4,-110.8 -31.9,-108.8" fill="#84a2bf" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-19,-72.8 -18.9,-73.2 -17.3,-85.9 -17.5,-85" fill="#2d3237" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-20.7,-119.5 -20.7,-122.1 -28.9,-121.2 -28.5,-118.6" fill="#bed1e4" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-94.4,-58.6 -19,-72.8 -17.5,-85 -92.9,-70.8" fill="#4f5e6c" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-96.1,-105.3 -20.7,-119.5 -28.5,-118.6 -103.9,-104.5" fill="#99b7d4" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-92.9,-70.8 -17.5,-85 -13.2,-94.2 -88.6,-80.1" fill="#2d3237" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-88.6,-80.1 -13.2,-94.2 -6.9,-99.2 -82.3,-85" fill="#2d3237" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-99.8,-58 -94.4,-58.6 -92.9,-70.8 -98.3,-70.7" fill="#92b2d1" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-98.3,-70.7 -92.9,-70.8 -88.6,-80.1 -93.8,-80.4" fill="#677c91" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-93.8,-80.4 -88.6,-80.1 -82.3,-85 -87.1,-85.6" fill="#2d3237" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-87.1,-85.6 -82.3,-85 -74.7,-84.8 -79.2,-85.4" fill="#2d3237" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="99.4,-75.8 105.1,-76.3 -20.7,-122.1 -20.7,-119.5" fill="#c6d6e7" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="48.4,-48.8 51.6,-48.1 53.2,-60.8 49.9,-61" fill="#6b8298" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="62.5,-113.1 67.8,-114 7.8,-135.3 6.1,-133.2" fill="#ccdcea" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="49.9,-61 53.2,-60.8 57.6,-70.5 54.1,-70.2" fill="#384149" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="54.1,-70.2 57.6,-70.5 64.3,-75.7 60.5,-75.2" fill="#2d3237" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="24,-61.6 99.4,-75.8 -20.7,-119.5 -96.1,-105.3" fill="#aec6dd" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-27,-34.6 48.4,-48.8 49.9,-61 -25.5,-46.8" fill="#4f5e6c" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-4.7,-100.5 62.5,-113.1 6.1,-133.2 -61,-120.6" fill="#c0d4e5" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-25.5,-46.8 49.9,-61 54.1,-70.2 -21.3,-56.1" fill="#2d3237" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-114.5,-63.2 -99.8,-58 -98.3,-70.7 -93.8,-80.4 -87.1,-85.6 -79.2,-85.4 -71.4,-80 -64.7,-70.1 -60.2,-57.2 -58.7,-43.3 -29.3,-32.8 -27.7,-45.6 -23.3,-55.3 -16.6,-60.4 -8.7,-60.3 -0.8,-54.8 5.8,-44.9 10.3,-32.1 11.9,-18.2 30.1,-11.7 33.6,-16.2 33,-43.5 31.3,-53.8 24.2,-61.1 -101.6,-106.9 -109.8,-106 -113.3,-95.6 -114.5,-82.5" fill="#92b2d1" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-21.3,-56.1 54.1,-70.2 60.5,-75.2 -14.9,-61" fill="#2d3237" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="74.1,-85.4 80.1,-84.4 67.8,-114 62.5,-113.1" fill="#babfc3" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="24.2,-61.1 24,-61.6 -96.1,-105.3 -101.6,-106.9" fill="#89a8c7" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="5.7,-70.4 -6.6,-100 -66.6,-121.3 -74.8,-99.1" fill="#293845" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-29.3,-32.8 -27,-34.6 -25.5,-46.8 -27.7,-45.6" fill="#2f353b" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-6.6,-100 -4.7,-100.5 -61,-120.6 -66.6,-121.3" fill="#b2cae0" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-36.4,-85.3 -36.4,-108.9 -32.2,-107.5 -32.2,-83.8" fill="#92b2d1" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-27.7,-45.6 -25.5,-46.8 -21.3,-56.1 -23.3,-55.3" fill="#2d3237" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-23.3,-55.3 -21.3,-56.1 -14.9,-61 -16.6,-60.4" fill="#2d3237" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="6.9,-72.7 74.1,-85.4 62.5,-113.1 -4.7,-100.5" fill="#5b6771" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="105.1,-28.6 111,-26.9 114.5,-31.5 108.4,-32.9" fill="#617589" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="106.2,-68.8 112.2,-69 105.1,-76.3 99.4,-75.8" fill="#dfe8f1" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="108.4,-32.9 114.5,-31.5 113.9,-58.7 107.9,-59" fill="#a5c0d9" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="107.9,-59 113.9,-58.7 112.2,-69 106.2,-68.8" fill="#b6cce1" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="5.7,-70.4 6.9,-72.7 -4.7,-100.5 -6.6,-100" fill="#1f2a32" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="29.7,-14.4 105.1,-28.6 108.4,-32.9 33,-18.8" fill="#2d3237" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="30.8,-54.6 106.2,-68.8 99.4,-75.8 24,-61.6" fill="#bacee2" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="33,-18.8 108.4,-32.9 107.9,-59 32.5,-44.8" fill="#6d849b" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="32.5,-44.8 107.9,-59 106.2,-68.8 30.8,-54.6" fill="#8babca" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="31.3,-53.8 30.8,-54.6 24,-61.6 24.2,-61.1" fill="#576979" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-60.4,-29.1 -62.8,-44.5 -69.2,-57.4 -78,-64.4 -86.8,-63.7 -93.3,-55.3 -95.7,-41.7 -93.3,-26.4 -86.8,-13.5 -78,-6.4 -69.2,-7.2 -62.8,-15.5" fill="#343a3e" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-71,-32.9 -73,-41.8 -78,-47 -83,-45.4 -85.1,-37.9 -83,-29 -78,-23.8 -73,-25.4" fill="#d5b13d" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-75.6,-34.6 -76.8,-38.4 -79.2,-39.3 -80.4,-36.3 -79.2,-32.4 -76.8,-31.6" fill="#f0dd9d"/><polygon points="10.1,-4 7.8,-19.3 1.3,-32.2 -7.5,-39.3 -16.3,-38.5 -22.8,-30.2 -25.1,-16.6 -22.8,-1.2 -16.3,11.7 -7.5,18.7 1.3,17.9 7.8,9.6" fill="#343a3e" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-0.4,-7.8 -2.5,-16.7 -7.5,-21.9 -12.5,-20.3 -14.6,-12.8 -12.5,-3.9 -7.5,1.3 -2.5,-0.3" fill="#d5b13d" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="-5.1,-9.4 -6.3,-13.3 -8.7,-14.1 -9.9,-11.1 -8.7,-7.3 -6.3,-6.5" fill="#f0dd9d"/><polygon points="93,-47 112.5,-50.6 111.3,-64.6 91.9,-60.9" fill="#d6b776" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="56.1,-37.9 91.7,-44.6 90.4,-60.6 54.8,-53.9" fill="#282f33" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="58.5,-42.3 89.2,-48.1 89,-51.5 58.2,-45.8" fill="#aaafb5" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="58,-47.7 88.8,-53.5 88.5,-57 57.7,-51.2" fill="#aaafb5" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/><polygon points="54.2,-39.7 34.8,-36 33.6,-50 53,-53.6" fill="#d6b776" stroke="#1A1A1A" stroke-width="2.5" stroke-linejoin="round"/></g>
+    <g id="carB" data-variant="B" data-profile-pts="18" data-dev="2.73" data-wheel-centres="-78,-35.4 0.4,-50.2 -7.5,-10.3 71,-25"><polygon points="78.8,26.6 86.5,24.2 90.4,20.7 90.4,16.2 86.4,11 78.6,5.2 67.4,-0.9 53.3,-7 36.8,-12.9 18.7,-18.2 -0.1,-22.9 -19,-26.6 -37.1,-29.2 -53.5,-30.5 -67.6,-30.7 -78.8,-29.5 -86.5,-27.1 -90.4,-23.6 -90.4,-19.1 -86.4,-13.9 -78.6,-8.1 -67.4,-2 -53.3,4.1 -36.8,10 -18.7,15.3 0.1,20 19,23.7 37.1,26.3 53.5,27.6 67.6,27.8" fill="#1A1A1A" fill-opacity="0.15" data-notface="1"/><polygon points="18.1,-43.9 12.9,-66.2 0.4,-79.2 -12,-75.1 -17.2,-56.5 -12,-34.1 0.4,-21.2 12.9,-25.2" fill="#2b3034" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="88.6,-18.8 83.4,-41.1 71,-54 58.5,-50 53.3,-31.3 58.5,-9 71,3.9 83.4,-0.1" fill="#2b3034" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-31.9,-108.8 -32.4,-110.8 -33.6,-78.4 -33,-77.8" fill="#697f94" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-28.5,-118.6 -28.9,-121.2 -32.4,-110.8 -31.9,-108.8" fill="#84a2bf" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-20.7,-119.5 -20.7,-122.1 -28.9,-121.2 -28.5,-118.6" fill="#bed1e4" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-96.1,-105.3 -20.7,-119.5 -28.5,-118.6 -103.9,-104.5" fill="#99b7d4" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-94.4,-58.6 -19,-72.8 -13.2,-94.2 -88.6,-80.1" fill="#343b42" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-88.6,-80.1 -13.2,-94.2 0.7,-99 -74.7,-84.8" fill="#2d3237" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-99.8,-58 -94.4,-58.6 -88.6,-80.1 -93.8,-80.4" fill="#7d99b4" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-93.8,-80.4 -88.6,-80.1 -74.7,-84.8 -79.2,-85.4" fill="#2d3237" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="99.4,-75.8 105.1,-76.3 -20.7,-122.1 -20.7,-119.5" fill="#c6d6e7" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="48.4,-48.8 51.6,-48.1 57.6,-70.5 54.1,-70.2" fill="#556676" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="54.1,-70.2 57.6,-70.5 72.2,-75.5 68,-75" fill="#2d3237" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="24,-61.6 99.4,-75.8 -20.7,-119.5 -96.1,-105.3" fill="#aec6dd" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-6.6,-100 67.8,-114 7.8,-135.3 -66.6,-121.3" fill="#c0d4e5" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-27,-34.6 48.4,-48.8 54.1,-70.2 -21.3,-56.1" fill="#343b42" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-114.5,-63.2 -99.8,-58 -93.8,-80.4 -79.2,-85.4 -64.7,-70.1 -58.7,-43.3 -29.3,-32.8 -23.3,-55.3 -8.7,-60.3 5.8,-44.9 11.9,-18.2 30.1,-11.7 33.6,-16.2 31.3,-53.8 24.2,-61.1 -101.6,-106.9 -109.8,-106 -113.3,-95.6" fill="#92b2d1" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-21.3,-56.1 54.1,-70.2 68,-75 -7.4,-60.8" fill="#2d3237" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="24.2,-61.1 24,-61.6 -96.1,-105.3 -101.6,-106.9" fill="#89a8c7" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="5.7,-70.4 -6.6,-100 -66.6,-121.3 -74.8,-99.1" fill="#293845" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-36.4,-85.3 -36.4,-108.9 -32.2,-107.5 -32.2,-83.8" fill="#92b2d1" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-29.3,-32.8 -27,-34.6 -21.3,-56.1 -23.3,-55.3" fill="#2d3237" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="5.7,-70.4 80.1,-84.4 67.8,-114 -6.6,-100" fill="#5b6771" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="105.1,-28.6 111,-26.9 114.5,-31.5 108.4,-32.9" fill="#617589" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="106.2,-68.8 112.2,-69 105.1,-76.3 99.4,-75.8" fill="#dfe8f1" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="108.4,-32.9 114.5,-31.5 112.2,-69 106.2,-68.8" fill="#aac3db" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="29.7,-14.4 105.1,-28.6 108.4,-32.9 33,-18.8" fill="#2d3237" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="30.8,-54.6 106.2,-68.8 99.4,-75.8 24,-61.6" fill="#bacee2" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="33,-18.8 108.4,-32.9 106.2,-68.8 30.8,-54.6" fill="#7690a9" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="31.3,-53.8 30.8,-54.6 24,-61.6 24.2,-61.1" fill="#576979" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-60.4,-29.1 -65.6,-51.5 -78,-64.4 -90.5,-60.4 -95.7,-41.7 -90.5,-19.4 -78,-6.4 -65.6,-10.5" fill="#343a3e" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-71,-32.9 -74.5,-44.2 -81.6,-46.7 -85.1,-37.9 -81.6,-26.6 -74.5,-24.1" fill="#d5b13d" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="10.1,-4 5,-26.3 -7.5,-39.3 -20,-35.2 -25.1,-16.6 -20,5.8 -7.5,18.7 5,14.6" fill="#343a3e" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-0.4,-7.8 -4,-19.1 -11,-21.6 -14.6,-12.8 -11,-1.5 -4,1" fill="#d5b13d" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="93,-47 112.5,-50.6 111.3,-64.6 91.9,-60.9" fill="#d6b776" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="56.1,-37.9 91.7,-44.6 90.4,-60.6 54.8,-53.9" fill="#282f33" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="54.2,-39.7 34.8,-36 33.6,-50 53,-53.6" fill="#d6b776" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/></g>
+    <g id="carC" data-variant="C" data-profile-pts="16" data-dev="5.62" data-wheel-centres="-78,-35.4 0.4,-50.2 -7.5,-10.3 71,-25"><polygon points="78.8,26.6 86.5,24.2 90.4,20.7 90.4,16.2 86.4,11 78.6,5.2 67.4,-0.9 53.3,-7 36.8,-12.9 18.7,-18.2 -0.1,-22.9 -19,-26.6 -37.1,-29.2 -53.5,-30.5 -67.6,-30.7 -78.8,-29.5 -86.5,-27.1 -90.4,-23.6 -90.4,-19.1 -86.4,-13.9 -78.6,-8.1 -67.4,-2 -53.3,4.1 -36.8,10 -18.7,15.3 0.1,20 19,23.7 37.1,26.3 53.5,27.6 67.6,27.8" fill="#1A1A1A" fill-opacity="0.15" data-notface="1"/><polygon points="18.1,-43.9 16.7,-55.5 12.9,-66.2 7.2,-74.5 0.4,-79.2 -6.3,-79.4 -12,-75.1 -15.8,-67.1 -17.2,-56.5 -15.8,-44.9 -12,-34.1 -6.3,-25.8 0.4,-21.2 7.2,-21 12.9,-25.2 16.7,-33.3" fill="#2b3034" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/><polygon points="88.6,-18.8 87.3,-30.3 83.4,-41.1 77.7,-49.4 71,-54 64.2,-54.2 58.5,-50 54.7,-41.9 53.3,-31.3 54.7,-19.8 58.5,-9 64.2,-0.7 71,3.9 77.7,4.1 83.4,-0.1 87.3,-8.2" fill="#2b3034" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/><polygon points="-99.8,-58 -18.9,-73.2 -12.9,-95.6 -93.8,-80.4" fill="#343b42" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/><polygon points="-93.8,-80.4 -12.9,-95.6 1.7,-100.6 -79.2,-85.4" fill="#2d3237" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/><polygon points="24.2,-61.1 105.1,-76.3 -20.7,-122.1 -101.6,-106.9" fill="#aec6dd" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/><polygon points="-6.6,-100 67.8,-114 7.8,-135.3 -66.6,-121.3" fill="#c0d4e5" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/><polygon points="-29.3,-32.8 51.6,-48.1 57.6,-70.5 -23.3,-55.3" fill="#343b42" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/><polygon points="-114.5,-63.2 -99.8,-58 -93.8,-80.4 -79.2,-85.4 -64.7,-70.1 -58.7,-43.3 -29.3,-32.8 -23.3,-55.3 -8.7,-60.3 5.8,-44.9 11.9,-18.2 33.6,-16.2 31.3,-53.8 24.2,-61.1 -101.6,-106.9 -113.3,-95.6" fill="#92b2d1" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/><polygon points="-23.3,-55.3 57.6,-70.5 72.2,-75.5 -8.7,-60.3" fill="#2d3237" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/><polygon points="5.7,-70.4 -6.6,-100 -66.6,-121.3 -74.8,-99.1" fill="#293845" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/><polygon points="5.7,-70.4 80.1,-84.4 67.8,-114 -6.6,-100" fill="#5b6771" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/><polygon points="31.3,-53.8 112.2,-69 105.1,-76.3 24.2,-61.1" fill="#bacee2" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/><polygon points="33.6,-16.2 114.5,-31.5 112.2,-69 31.3,-53.8" fill="#7690a9" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/><polygon points="-60.4,-29.1 -61.7,-40.7 -65.6,-51.5 -71.3,-59.8 -78,-64.4 -84.8,-64.6 -90.5,-60.4 -94.3,-52.3 -95.7,-41.7 -94.3,-30.1 -90.5,-19.4 -84.8,-11.1 -78,-6.4 -71.3,-6.2 -65.6,-10.5 -61.7,-18.5" fill="#343a3e" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/><polygon points="-71,-32.9 -71.9,-39 -74.5,-44.2 -78,-47 -81.6,-46.7 -84.1,-43.4 -85.1,-37.9 -84.1,-31.8 -81.6,-26.6 -78,-23.8 -74.5,-24.1 -71.9,-27.4" fill="#d5b13d" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/><polygon points="10.1,-4 8.8,-15.6 5,-26.3 -0.7,-34.7 -7.5,-39.3 -14.2,-39.5 -20,-35.2 -23.8,-27.2 -25.1,-16.6 -23.8,-5 -20,5.8 -14.2,14.1 -7.5,18.7 -0.7,18.9 5,14.6 8.8,6.6" fill="#343a3e" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/><polygon points="-0.4,-7.8 -1.4,-13.9 -4,-19.1 -7.5,-21.9 -11,-21.6 -13.6,-18.3 -14.6,-12.8 -13.6,-6.7 -11,-1.5 -7.5,1.3 -4,1 -1.4,-2.3" fill="#d5b13d" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/><polygon points="93,-47 112.5,-50.6 111.3,-64.6 91.9,-60.9" fill="#d6b776" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/><polygon points="54.2,-39.7 34.8,-36 33.6,-50 53,-53.6" fill="#d6b776" stroke="#1A1A1A" stroke-width="7" stroke-linejoin="round"/></g>
+    <g id="carD" data-variant="D" data-profile-pts="18" data-dev="2.73" data-wheel-centres="-78,-35.4 0.4,-50.2 -7.5,-10.3 71,-25"><polygon points="78.8,26.6 86.5,24.2 90.4,20.7 90.4,16.2 86.4,11 78.6,5.2 67.4,-0.9 53.3,-7 36.8,-12.9 18.7,-18.2 -0.1,-22.9 -19,-26.6 -37.1,-29.2 -53.5,-30.5 -67.6,-30.7 -78.8,-29.5 -86.5,-27.1 -90.4,-23.6 -90.4,-19.1 -86.4,-13.9 -78.6,-8.1 -67.4,-2 -53.3,4.1 -36.8,10 -18.7,15.3 0.1,20 19,23.7 37.1,26.3 53.5,27.6 67.6,27.8" fill="#1A1A1A" fill-opacity="0.15" data-notface="1"/><polygon points="18.1,-43.9 16.7,-55.5 12.9,-66.2 7.2,-74.5 0.4,-79.2 -6.3,-79.4 -12,-75.1 -15.8,-67.1 -17.2,-56.5 -15.8,-44.9 -12,-34.1 -6.3,-25.8 0.4,-21.2 7.2,-21 12.9,-25.2 16.7,-33.3" fill="#2b3034" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="88.6,-18.8 87.3,-30.3 83.4,-41.1 77.7,-49.4 71,-54 64.2,-54.2 58.5,-50 54.7,-41.9 53.3,-31.3 54.7,-19.8 58.5,-9 64.2,-0.7 71,3.9 77.7,4.1 83.4,-0.1 87.3,-8.2" fill="#2b3034" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-31.9,-108.8 -32.4,-110.8 -33.6,-78.4 -33,-77.8" fill="#697f94" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-28.5,-118.6 -28.9,-121.2 -32.4,-110.8 -31.9,-108.8" fill="#84a2bf" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-20.7,-119.5 -20.7,-122.1 -28.9,-121.2 -28.5,-118.6" fill="#bed1e4" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-96.1,-105.3 -20.7,-119.5 -28.5,-118.6 -103.9,-104.5" fill="#99b7d4" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-94.4,-58.6 -19,-72.8 -13.2,-94.2 -88.6,-80.1" fill="#343b42" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-88.6,-80.1 -13.2,-94.2 0.7,-99 -74.7,-84.8" fill="#2d3237" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-99.8,-58 -94.4,-58.6 -88.6,-80.1 -93.8,-80.4" fill="#7d99b4" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-93.8,-80.4 -88.6,-80.1 -74.7,-84.8 -79.2,-85.4" fill="#2d3237" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="99.4,-75.8 105.1,-76.3 -20.7,-122.1 -20.7,-119.5" fill="#c6d6e7" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="48.4,-48.8 51.6,-48.1 57.6,-70.5 54.1,-70.2" fill="#556676" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="54.1,-70.2 57.6,-70.5 72.2,-75.5 68,-75" fill="#2d3237" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="24,-61.6 99.4,-75.8 -20.7,-119.5 -96.1,-105.3" fill="#aec6dd" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-6.6,-100 67.8,-114 7.8,-135.3 -66.6,-121.3" fill="#c0d4e5" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-27,-34.6 48.4,-48.8 54.1,-70.2 -21.3,-56.1" fill="#343b42" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-114.5,-63.2 -99.8,-58 -93.8,-80.4 -79.2,-85.4 -64.7,-70.1 -58.7,-43.3 -29.3,-32.8 -23.3,-55.3 -8.7,-60.3 5.8,-44.9 11.9,-18.2 30.1,-11.7 33.6,-16.2 31.3,-53.8 24.2,-61.1 -101.6,-106.9 -109.8,-106 -113.3,-95.6" fill="#92b2d1" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-21.3,-56.1 54.1,-70.2 68,-75 -7.4,-60.8" fill="#2d3237" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="24.2,-61.1 24,-61.6 -96.1,-105.3 -101.6,-106.9" fill="#89a8c7" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="5.7,-70.4 -6.6,-100 -66.6,-121.3 -74.8,-99.1" fill="#293845" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-36.4,-85.3 -36.4,-108.9 -32.2,-107.5 -32.2,-83.8" fill="#92b2d1" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-29.3,-32.8 -27,-34.6 -21.3,-56.1 -23.3,-55.3" fill="#2d3237" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="5.7,-70.4 80.1,-84.4 67.8,-114 -6.6,-100" fill="#5b6771" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="105.1,-28.6 111,-26.9 114.5,-31.5 108.4,-32.9" fill="#617589" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="106.2,-68.8 112.2,-69 105.1,-76.3 99.4,-75.8" fill="#dfe8f1" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="108.4,-32.9 114.5,-31.5 112.2,-69 106.2,-68.8" fill="#aac3db" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="29.7,-14.4 105.1,-28.6 108.4,-32.9 33,-18.8" fill="#2d3237" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="30.8,-54.6 106.2,-68.8 99.4,-75.8 24,-61.6" fill="#bacee2" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="33,-18.8 108.4,-32.9 106.2,-68.8 30.8,-54.6" fill="#7690a9" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="31.3,-53.8 30.8,-54.6 24,-61.6 24.2,-61.1" fill="#576979" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-60.4,-29.1 -61.7,-40.7 -65.6,-51.5 -71.3,-59.8 -78,-64.4 -84.8,-64.6 -90.5,-60.4 -94.3,-52.3 -95.7,-41.7 -94.3,-30.1 -90.5,-19.4 -84.8,-11.1 -78,-6.4 -71.3,-6.2 -65.6,-10.5 -61.7,-18.5" fill="#343a3e" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-71,-32.9 -71.9,-39 -74.5,-44.2 -78,-47 -81.6,-46.7 -84.1,-43.4 -85.1,-37.9 -84.1,-31.8 -81.6,-26.6 -78,-23.8 -74.5,-24.1 -71.9,-27.4" fill="#d5b13d" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="10.1,-4 8.8,-15.6 5,-26.3 -0.7,-34.7 -7.5,-39.3 -14.2,-39.5 -20,-35.2 -23.8,-27.2 -25.1,-16.6 -23.8,-5 -20,5.8 -14.2,14.1 -7.5,18.7 -0.7,18.9 5,14.6 8.8,6.6" fill="#343a3e" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="-0.4,-7.8 -1.4,-13.9 -4,-19.1 -7.5,-21.9 -11,-21.6 -13.6,-18.3 -14.6,-12.8 -13.6,-6.7 -11,-1.5 -7.5,1.3 -4,1 -1.4,-2.3" fill="#d5b13d" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="93,-47 112.5,-50.6 111.3,-64.6 91.9,-60.9" fill="#d6b776" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="56.1,-37.9 91.7,-44.6 90.4,-60.6 54.8,-53.9" fill="#282f33" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/><polygon points="54.2,-39.7 34.8,-36 33.6,-50 53,-53.6" fill="#d6b776" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round"/></g>
+  </defs>
+</svg>
+<!-- END GENERATED CARS -->
+
+<main class="ft-wrap">
+
+  <!-- ═══════════ squint test ═══════════ -->
+  <section class="ft-card">
+    <h3>Squint test · 一眼认出</h3>
+    <p class="ft-sub">Look at these at <b>72 px</b> — roughly how big your offering is inside the flame.
+      Ask two questions: which one still reads as <b>a car</b>, which still reads as <b>your car</b>,
+      and does <b>D</b> keep B's recognisability while getting C's clean wheels?</p>
+    <div class="ft-tiny-row">
+      <figure>
+        <div class="ft-stage"><svg viewBox="-121.5 -142.3 243 177.1"><use href="#carPhoto"/></svg></div>
+        <figcaption>PHOTO · reference (smooth)</figcaption>
+      </figure>
+      <figure>
+        <div class="ft-stage"><svg viewBox="-121.5 -142.3 243 177.1"><use href="#carA"/></svg></div>
+        <figcaption>A · high fidelity</figcaption>
+      </figure>
+      <figure>
+        <div class="ft-stage"><svg viewBox="-121.5 -142.3 243 177.1"><use href="#carB"/></svg></div>
+        <figcaption>B · low-poly (current)</figcaption>
+      </figure>
+      <figure>
+        <div class="ft-stage"><svg viewBox="-121.5 -142.3 243 177.1"><use href="#carC"/></svg></div>
+        <figcaption>C · bold paper</figcaption>
+      </figure>
+      <figure>
+        <div class="ft-stage"><svg viewBox="-121.5 -142.3 243 177.1"><use href="#carD"/></svg></div>
+        <figcaption>D · hybrid (your pick)</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ═══════════ blink comparator ═══════════ -->
+  <section class="ft-card">
+    <h3>Blink comparator · 反复对比</h3>
+    <p class="ft-sub">Toggle between the four without moving your eyes — mesh-resolution differences land immediately this way,
+      and you can see each one against the fire background it will actually be thrown into.
+      <b>B ↔ D</b> is the interesting one: identical body, different wheel roundness.</p>
+    <div class="ft-swapbar" role="group" aria-label="Choose which variant to display">
+      <button data-swap="carA">A · High fidelity</button>
+      <button data-swap="carB">B · Low-poly (current)</button>
+      <button data-swap="carC">C · Bold paper</button>
+      <button data-swap="carD" class="is-on">D · Hybrid (your pick)</button>
+    </div>
+    <div class="ft-swapstage">
+      <div>
+        <div class="ft-stage"><svg viewBox="-121.5 -142.3 243 177.1"><use id="swapFull" href="#carD"/></svg></div>
+        <p class="cap">at burn size (230 px)</p>
+      </div>
+      <div>
+        <div class="ft-stage is-flame"><svg viewBox="-121.5 -142.3 243 177.1"><use id="swapFlame" href="#carD"/></svg></div>
+        <p class="cap">in the flame (120 px)</p>
+      </div>
+    </div>
+  </section>
+<!-- ═══════════ the four fidelity levels ═══════════ -->
+  <section class="ft-grid">
+
+    <article class="ft-card is-variant" data-variant="A" tabindex="0" role="button" aria-pressed="false">
+      <div class="ft-head"><span class="ft-grade">A</span><span class="ft-name">High fidelity</span></div>
+      <div class="ft-badges">
+        <span class="ft-badge is-key">56 facets</span>
+        <span class="ft-badge">48 body · 8 wheel</span>
+        <span class="ft-badge">outline 2.5</span>
+        <span class="ft-badge">profile 28 pts · dev 0.8</span>
+      </div>
+      <div class="ft-stage"><svg viewBox="-121.5 -142.3 243 177.1" role="img" aria-label="Car cartoonised at high fidelity"><use href="#carA"/></svg></div>
+      <div class="ft-sizes">
+        <div class="ft-size w-burn">
+          <div class="ft-stage"><svg viewBox="-121.5 -142.3 243 177.1"><use href="#carA"/></svg></div>
+          <p class="cap">burn size · 150 px</p>
+        </div>
+        <div class="ft-size w-sm">
+          <div class="ft-stage is-flame"><svg viewBox="-121.5 -142.3 243 177.1"><use href="#carA"/></svg></div>
+          <p class="cap">in flame · 96 px</p>
+        </div>
+      </div>
+      <ul class="ft-notes">
+        <li>A 28-point side profile, so the <b>wheel arches stay round</b> and the body's chamfer carries a long highlight — this is the mesh the photo was rendered from.</li>
+        <li>Keeps every part: grille with two chrome bars, both headlights, B-pillar, tyre sidewall and hub bolts.</li>
+        <li>Risk: the most facets also means the most "3D render". May lose the hand-made joss-paper craft feel.</li>
+        <li>Silhouette drift from the dense outline: <b>0.8 units</b> worst case — the shape is essentially intact.</li>
+      </ul>
+      <p class="ft-pipe"><b>Implied pipeline</b> · img2img with shape-locking control at a tight tolerance, then a low-poly pass
+        that is allowed to keep the arches round. Heaviest compute, most predictable identity.</p>
+    </article>
+
+    <article class="ft-card is-variant" data-variant="B" tabindex="0" role="button" aria-pressed="false">
+      <div class="ft-head"><span class="ft-grade">B</span><span class="ft-name">Low-poly (current build)</span></div>
+      <div class="ft-badges">
+        <span class="ft-badge is-key">37 facets</span>
+        <span class="ft-badge">31 body · 6 wheel</span>
+        <span class="ft-badge">outline 4</span>
+        <span class="ft-badge">profile 18 pts · dev 2.7</span>
+      </div>
+      <div class="ft-stage"><svg viewBox="-121.5 -142.3 243 177.1" role="img" aria-label="Car cartoonised in the current low-poly style"><use href="#carB"/></svg></div>
+      <div class="ft-sizes">
+        <div class="ft-size w-burn">
+          <div class="ft-stage"><svg viewBox="-121.5 -142.3 243 177.1"><use href="#carB"/></svg></div>
+          <p class="cap">burn size · 150 px</p>
+        </div>
+        <div class="ft-size w-sm">
+          <div class="ft-stage is-flame"><svg viewBox="-121.5 -142.3 243 177.1"><use href="#carB"/></svg></div>
+          <p class="cap">in flame · 96 px</p>
+        </div>
+      </div>
+      <ul class="ft-notes">
+        <li>An 18-point profile: the arches straighten into cuts and every panel keeps a chamfer, so facet shading does the work.</li>
+        <li>Drops the chrome bars and the hub bolts and flattens the wheels to 8-gon discs — 37 faces for the whole car.</li>
+        <li>Silhouette drift <b>2.7 units</b>: the arch corners visibly straighten; the overall outline holds.</li>
+        <li>Risk: it is exactly the middle — arguably neither detailed enough to preserve <em>your</em> car, nor bold enough to feel like paper.</li>
+      </ul>
+      <p class="ft-pipe"><b>Implied pipeline</b> · img2img + a stronger low-poly simplification. Moderate compute, needs a fidelity guardrail.</p>
+    </article>
+    <article class="ft-card is-variant" data-variant="C" tabindex="0" role="button" aria-pressed="false">
+      <div class="ft-head"><span class="ft-grade">C</span><span class="ft-name">Bold joss-paper</span></div>
+      <div class="ft-badges">
+        <span class="ft-badge is-key">19 facets</span>
+        <span class="ft-badge">13 body · 6 wheel</span>
+        <span class="ft-badge">outline 7</span>
+        <span class="ft-badge">profile 16 pts · dev 5.6</span>
+      </div>
+      <div class="ft-stage"><svg viewBox="-121.5 -142.3 243 177.1" role="img" aria-label="Car cartoonised in a bold joss-paper style"><use href="#carC"/></svg></div>
+      <div class="ft-sizes">
+        <div class="ft-size w-burn">
+          <div class="ft-stage"><svg viewBox="-121.5 -142.3 243 177.1"><use href="#carC"/></svg></div>
+          <p class="cap">burn size · 150 px</p>
+        </div>
+        <div class="ft-size w-sm">
+          <div class="ft-stage is-flame"><svg viewBox="-121.5 -142.3 243 177.1"><use href="#carC"/></svg></div>
+          <p class="cap">in flame · 96 px</p>
+        </div>
+      </div>
+      <ul class="ft-notes">
+        <li>A 16-point profile and no cross-section rings at all, so the body is one flat slab swept once — 19 faces, no chamfers.</li>
+        <li>It spends its whole budget on the <b>tyres</b>: 16-sided discs where A and B use 8–12, so the wheels are genuinely round.</li>
+        <li>Trim details are gone (no grille, no bars, no pillar) — the identity now rides on the outline and the silhouette alone.</li>
+        <li>Heaviest outline, so it survives at 72 px and on a busy flame background better than the others — and it still reads as <b>printed paper</b> rather than a render.</li>
+        <li>Risk: this is the vase failure mode. At a glance it may read as <em>a</em> car rather than <em>your</em> car.</li>
+      </ul>
+      <p class="ft-pipe"><b>Implied pipeline</b> · strong stylisation / a fine-tuned joss-paper model with little shape control.
+        Cheapest and most consistent, but identity loss is the thing to watch.</p>
+    </article>
+
+    <article class="ft-card is-variant is-picked" data-variant="D" tabindex="0" role="button" aria-pressed="true">
+      <div class="ft-head"><span class="ft-grade">D</span><span class="ft-name">Hybrid — B's body, C's wheels</span></div>
+      <div class="ft-badges">
+        <span class="ft-badge is-key">37 facets</span>
+        <span class="ft-badge">31 body · 6 wheel</span>
+        <span class="ft-badge">outline 4</span>
+        <span class="ft-badge is-key">same faces as B · 226 pts vs 182</span>
+      </div>
+      <div class="ft-stage"><svg viewBox="-121.5 -142.3 243 177.1" role="img" aria-label="Car combining the low-poly body with bold round wheels"><use href="#carD"/></svg></div>
+      <div class="ft-sizes">
+        <div class="ft-size w-burn">
+          <div class="ft-stage"><svg viewBox="-121.5 -142.3 243 177.1"><use href="#carD"/></svg></div>
+          <p class="cap">burn size · 150 px</p>
+        </div>
+        <div class="ft-size w-sm">
+          <div class="ft-stage is-flame"><svg viewBox="-121.5 -142.3 243 177.1"><use href="#carD"/></svg></div>
+          <p class="cap">in flame · 96 px</p>
+        </div>
+      </div>
+      <ul class="ft-notes">
+        <li>Your pick, rebuilt in 3D: <b>B's body kept face-for-face</b> — same 31 body faces, same straightened arches, same outline weight 4 —
+          with <b>C's wheels</b> swapped in: 16-sided discs and hubs, so the tyre is round instead of B's 8-gon.</li>
+        <li>Same <b>37-face</b> budget as B — only the vertex count rises (226 vs 182), because the far-side wheels are modelled too — a 3/4 view shows four wheel positions, not two. Nothing got more detailed; the
+          <b>shape language</b> changed: round where it buys legibility, faceted where it carries identity.</li>
+        <li>Why it should hold up: at 72 px the silhouette and the greenhouse are what make it <em>your</em> car, while a wheel only
+          has to read as "wheel" — and a round disc reads faster than a faceted one.</li>
+        <li>Trade-off to watch: a round disc inside B's angular arch can read as pasted-on. The disc keeps C's <em>shape</em> at B's
+          outline weight (4), not C's 7, so one line weight still runs across the whole car.</li>
+        <li>Trade-off to watch: this is the first <b>mixed</b> fidelity target, so the pipeline needs a per-region rule
+          (wheels round, body faceted) instead of one global stylisation strength.</li>
+      </ul>
+      <p class="ft-pipe"><b>Implied pipeline</b> · shape-locking img2img at B's mesh tolerance, plus a per-region guardrail
+        (mask / inpaint) that forces the wheels to stay round. A little more plumbing than one global strength —
+        but the cheapest way to simplify without spending identity.</p>
+    </article>
+
+  </section>
+
+  <p class="ft-verdict" id="ftVerdict">Session-5 pick recorded: <b>D · Hybrid — B's body with C's wheels</b>. Tap any card to re-record; nothing is saved.</p>
+
+  <p class="ft-foot">
+    Method: one car, defined once as a low-poly <b>3D mesh</b> in <code>tools/gen-car-3d.js</code>, projected through a fixed
+    <b>orthographic camera</b> (yaw −36°, pitch 15°) — no perspective, so nothing foreshortens — then back-face culled,
+    depth-sorted and flat-shaded into SVG. Every variant is that <i>same mesh</i>: a Douglas-Peucker simplification of one
+    dense side profile (tolerance 1.1 · 3.1 · 7.4 model units), so no variant was drawn independently and the drift is
+    measured rather than eyeballed. Palette locked as before (cinnabar · gold · azurite · ink · rice paper).
+    <b>Facets</b> = polygons actually rendered after culling, split <b>body + wheel</b> (all four wheel positions — the far pair is visible through the arch openings); the contact shadow and the photo's
+    backdrop/grain are marked non-faces and excluded. So: A 56 (48+8) · B 37 (31+6) · C 19 (13+6) · D 37 (31+6).
+    <b>Profile pts</b> = vertices in the simplified side outline; <b>dev</b> = the worst gap between that outline and the
+    dense one, in model units (the car is 252 long and 122 tall, so dev 2.7 is about a tyre's tread depth).<br>
+    <b>D</b> stays the Session-5 pick — B's body kept face-for-face with C's wheels swapped in. In mesh terms it spends the
+    same 37 faces as B and only raises the wheel's segment count, which is why B and D read as one car at two wheel
+    resolutions. Rebuild the prototype entry point at <code>index.html</code> · spec check in <code>README.md</code>.
+  </p>
+
+</main>
+
+<script>
+  /* ── pick a variant (no persistence — review only) ── */
+  const verdict = document.getElementById('ftVerdict');
+  const cards = Array.from(document.querySelectorAll('.ft-card.is-variant'));
+  const NAMES = {
+    A: 'A · High fidelity — the photo\u2019s shading survives, but it is closest to a 3D render',
+    B: 'B · Low-poly (current build) — the baseline from Session 4',
+    C: 'C · Bold joss-paper — most like a printed offering, biggest identity risk',
+    D: 'D · Hybrid — B\u2019s body with C\u2019s wheels (your pick)'
+  };
+  cards.forEach(card => {
+    const pick = () => {
+      cards.forEach(c => {
+        const on = c === card;
+        c.classList.toggle('is-picked', on);
+        c.setAttribute('aria-pressed', String(on));
+      });
+      verdict.innerHTML = 'Your pick: <b>' + NAMES[card.dataset.variant] + '</b>';
+    };
+    card.addEventListener('click', pick);
+    card.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); }
+    });
+  });
+
+  /* ── blink comparator ── */
+  const swapBtns = Array.from(document.querySelectorAll('.ft-swapbar button'));
+  const swapUses = ['swapFull', 'swapFlame'].map(id => document.getElementById(id));
+  swapBtns.forEach(btn => btn.addEventListener('click', () => {
+    swapBtns.forEach(b => b.classList.toggle('is-on', b === btn));
+    swapUses.forEach(u => {
+      u.setAttribute('href', '#' + btn.dataset.swap);
+      u.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#' + btn.dataset.swap);
+    });
+  }));
+</script>
+
+</body>
+</html>
