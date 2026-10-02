@@ -3,7 +3,7 @@
 > An AR app that replaces physical joss-paper burning with a digital ritual — capture an object, cartoonize it, throw it onto the fire, earn Tribute Points.
 > Hobby project, family-legacy vision, no timeline pressure.
 
-**Status:** 📐 design signed off · 📝 specs + ADRs written · 💻 **engineering starting (repo + CI, SCRUM-15)** — the app itself is not scaffolded yet.
+**Status:** 📐 design signed off · 📝 specs + ADRs written · 💻 **engineering started — repo + CI ✅ (SCRUM-15), Expo app scaffolded (single repo)** · next: SCRUM-17 vertical slice
 
 ## Where things live
 
@@ -20,26 +20,35 @@
 
 ## Development environment
 
-**Requirements:** Node.js ≥ 20 (CI uses 22). No other tooling is needed *yet* — the checks below are plain Node scripts with no dependencies.
+**Requirements:** Node.js ≥ 20 with npm (CI uses Node 22). The app is a single-repo **Expo (SDK 57) / React Native + TypeScript** project at the repository root (stack: ADR-001 — Expo/RN + Supabase + hosted AI APIs).
 
 ```bash
 git clone https://github.com/HAJIWEE/JossPaperAR.git
 cd JossPaperAR
+npm install
 
-# accessibility gate (WCAG contrast on tokens + decorative-token lint)
-node design-system/contrast-check.js        # expect: all 22 contrast checks passed
-
-# responsive foundation gate (type scale, safe areas, touch targets)
-node design-system/responsive-check.js      # expect: all 21 responsive checks passed
+npx expo start          # dev server — scan the QR with the Expo Go app
+npm run typecheck       # tsc --noEmit
 ```
 
-Both scripts report `skipped` (never a false green) for the build-stylesheet scan until the real app stylesheet exists — point them at it with `--css=path/to/styles.css`.
+**Checks** (plain Node scripts, no dependencies — all run in CI):
 
-**The Expo/React Native app does not exist yet** (stack locked in ADR-001: Expo/RN + Supabase + hosted AI APIs). When it lands, its setup steps belong here — see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the conventions it must follow.
+```bash
+node design-system/contrast-check.js        # expect: all 22 contrast checks passed
+node design-system/responsive-check.js      # expect: all 21 responsive checks passed
+npx expo-doctor                             # expect: 21/21 checks passed
+```
+
+Both design-system scripts report `skipped` (never a false green) for the build-stylesheet scan until the app stylesheet exists — point them at it with `--css=path/to/styles.css`.
 
 ## CI
 
-GitHub Actions (`.github/workflows/ci.yml`) runs the design-system checks on every push and pull request to `main`. The machine-readable-verdict habit (`aim-check` / `render-check` from the retired prototype) is the pattern the real build's checks will follow.
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request to `main`:
+
+1. **Design-system checks** — `contrast-check.js` + `responsive-check.js`
+2. **App checks** — `npm run typecheck` + `npx expo-doctor`
+
+The machine-readable-verdict habit (`aim-check` / `render-check` from the retired prototype) is the pattern the real build's checks will follow.
 
 ## Contributing
 
