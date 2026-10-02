@@ -7,8 +7,8 @@
 ## 🎯 Immediate Actions (Next 1–2 Weeks)
 
 ### 🔴 On the critical path
-- [ ] **`SCRUM-15` — repo + CI + dev environment.** Almost everything below is queued behind it: `SCRUM-46`, `SCRUM-50`, `SCRUM-51`, and every device check.
-- [ ] **Buy the Tier F floor device** — 1 of 3 (Galaxy A05s · Redmi A5 · Nokia C-series, ~S$100–150) → becomes the named CI phone (doc 14 §1).
+- [x] **`SCRUM-15` — repo + CI + dev environment** ✅ **Done 2026-10-02** — GitHub repo + CI (design-system + app checks, all green) · Expo SDK 57 scaffolded **single-repo** · README + CONTRIBUTING + `.env.example` · MIT licence · PRs #1–#3. Unblocked: `SCRUM-46`, `SCRUM-50`, `SCRUM-51`.
+- [ ] **`SCRUM-52` — Buy the Tier F floor device** — 1 of 3 (Galaxy A05s · Redmi A5 · Nokia C-series, ~S$100–150) → becomes the named CI phone (doc 14 §1) · blocks `SCRUM-51` + device checks in `SCRUM-17`.
 
 ### 🖌️ Design — PM review & decisions
 - [ ] **Whole-file visual review of the 47 boards** changed by the S21 contrast tranche → this releases the **colour hold on `SCRUM-42` / `SCRUM-33`** (both stay In Review until then).

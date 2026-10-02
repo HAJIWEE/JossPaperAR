@@ -10,9 +10,9 @@
 
 - **Project** — Joss Paper AR, an AR app that replaces physical joss-paper burning with a digital ritual
 - **Last session** — **S26 · 2026-10-02**: SCRUM-8 ✅ Done (planning) → **ADR-003** (non-AR AR) + **doc 17** (AR-fire PoC plan); execution filed as **SCRUM-51**
-- **Current phase** — style locked · **Penpot design signed off, 153 boards** · stack locked (**ADR-001**) · architecture authoritative (**07 v2.8**) · **no app repo yet**
+- **Current phase** — style locked · **Penpot design signed off, 153 boards** · stack locked (**ADR-001**) · architecture authoritative (**07 v2.8**) · **repo + CI live, Expo SDK 57 scaffolded at repo root (single repo)**
 - **Active sprint** — **SCRUM Sprint 1** (2026-10-02 → 2026-10-16)
-- **Next milestone** — **repo + CI (SCRUM-15)**: almost all remaining engineering is queued behind it
+- **Next milestone** — **SCRUM-17 vertical slice** (camera → cartoonize → burn → award → persist): the repo gate (**SCRUM-15 ✅ Done**) is cleared; `SCRUM-52` (floor device) is the remaining hardware gate for `SCRUM-51`
 - **Design source of truth** — **Penpot** (PM decision 2026-09-28): file `JossPaperAR`, page *"New-user tutorial · Core loop"*, **153 boards**, EN + 中文, wired
 - **ADRs accepted (5)** — `001` platform+backend · `002` Path C · `003` non-AR AR · `005` integrity · `007` privacy → [[AppDesignConceptBoard/ADRs/README|ADR register]] (open: `004` identity · `006` burn limits · `008` ad posture)
 - **User role** — Product Manager/Project Manager, AI vibe-coding · hobby project with family-legacy vision, no timeline pressure
@@ -35,7 +35,7 @@
 
 ### What's next — ENGINEERING (the critical path)
 
-1. **SCRUM-15 — repo + CI.** This is the gate: the AR-fire spike (SCRUM-51), the vertical slice (SCRUM-17) and every device check all need a real build first.
+1. **SCRUM-17 — vertical slice** (camera → cartoonize → burn → award → persist): the repo gate (**SCRUM-15 ✅ Done 2026-10-02** — repo + CI + Expo scaffold + MIT licence, PRs #1–#3) is cleared. Hardware gate = **SCRUM-52** (floor device), which also blocks the AR-fire spike (**SCRUM-51**).
 2. **SCRUM-46 — clan build** (backend + frontend): doc 15 §9 = the schema, §10 = open build items (Book window hide-vs-purge · anti-abuse rate limits).
 3. **SCRUM-50 — QR invite** (generation · scanner · deep links) — `clans.code` capability, payload = the invite deep link; architecture already in 07 §4.6.
 4. **ADR-006 + ADR-008** still to write *from* [[AppDesignConceptBoard/10-economy-spec]] (burn-limit semantics · ad posture — ADR-008 is a product question: may ads ever enter the ritual flow?).
