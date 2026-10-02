@@ -1,0 +1,36 @@
+# ── Node ────────────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ── Env / secrets — never commit real keys ─────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Expo / React Native (once the app is scaffolded — ADR-001) ──────────────
+.expo/
+dist/
+web-build/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# ── Build output ────────────────────────────────────────────────────────────
+build/
+dist/
+
+# ── Editors / OS ────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# ── Logs ────────────────────────────────────────────────────────────────────
+*.log
