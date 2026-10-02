@@ -26,9 +26,11 @@ GitHub Issues are enabled but are *not* the tracker — file work in Jira and re
 ```bash
 node design-system/contrast-check.js     # expect: all 22 contrast checks passed
 node design-system/responsive-check.js   # expect: all 21 responsive checks passed
+npm run typecheck                        # tsc --noEmit
+npx expo-doctor                          # expect: 21/21 checks passed
 ```
 
-CI (`.github/workflows/ci.yml`) runs both on every push/PR to `main`, so a red PR means one of them broke.
+CI (`.github/workflows/ci.yml`) runs all of the above on every push/PR to `main`, so a red PR means one of them broke.
 
 **Colour rule the lint enforces:** decorative brand tokens (`--gold`, `--cinnabar`, …) are for borders/fills only — text must use a `-text` token from `tokens.css`. New colour pairings must clear **WCAG AA 4.5:1 on every cream surface**.
 
@@ -43,7 +45,7 @@ When the real build stylesheet exists, point both checks at it: `--css=path/to/s
 - **Specs** live as numbered docs in `AppDesignConceptBoard/` (01–17) and are authoritative over prototypes: the `prototype/` folder is **retired** — it is a spec, not code.
 - **Costs** go in `project-costs.md` (SGD, one row per actual/commitment).
 
-## 📱 Build conventions (once the app is scaffolded — ADR-001)
+## 📱 Build conventions (ADR-001 — app scaffolded, single repo)
 
 - Stack: **Expo / React Native** (Android-first, iOS deferred) + **Supabase** + hosted AI APIs.
 - **Non-AR AR** (ADR-003): `expo-camera` preview + fixed-position overlay; the fire is a ≤400 KB sprite sheet, ≥30 fps on the Tier-F floor device. Aim bands are the acceptance test, not fps.

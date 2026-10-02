@@ -31,3 +31,25 @@ jobs:
 
       - name: Responsive check (type scale · safe areas · touch targets)
         run: node design-system/responsive-check.js
+
+  app-checks:
+    name: App checks (typecheck · expo-doctor)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
+      - name: Expo doctor
+        run: npx expo-doctor
