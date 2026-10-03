@@ -91,7 +91,7 @@ captures/{user_id}/{capture_id}.jpg     raw photo   · ≤300 KB · 7-day retent
 styled/{user_id}/{capture_id}.png       styled D    · ≤150 KB sprite (14 §3)
 ```
 
-> ⚠️ **Do not create a `tributes` bucket yet.** doc 07 §3 lists one, but [[15-clan-model-and-book-of-tributes]] §7 specifies the Book of Tributes carries **no image** — so the bucket is probably dead weight. Fewer privacy surfaces is strictly better (13 §4). Confirm before creating → §9.2.
+> ✅ **Resolved — doc 07 v2.9.** §3 previously implied a `tributes` bucket, but [[15-clan-model-and-book-of-tributes]] §7 gives the Book of Tributes **no image**. The bucket is now removed from the architecture; **do not create it.** Fewer privacy surfaces is strictly better (13 §4).
 
 ### 3.4 Realtime
 
@@ -355,20 +355,50 @@ JossPaperAR/
 
 ## 9 · Inconsistencies found in doc 07 while planning this
 
-Found by mapping the build against the architecture. These are **doc 07 v2.9 tidy items** — recorded, not silently edited.
+Found by mapping the build against the architecture. **Items 1–3 were fixed in this session → doc 07 is now v2.9** (item 4 was fixed in the same PR).
 
-| # | Where | Problem | Fix |
+| # | Where | Problem | Resolution |
 |---|---|---|---|
-| **1** | §4.5 | `rpc.save_ancestor(...)` — *"CHECK ≤ 4 non-archived tablets per user"* is **stale**. Ancestors became **clan-owned** in SCRUM-22 (doc 15), with cap = `clans.ancestor_cap` (**default 10**) — §5.3 already says so. The "4" is the **altar *display* cap**, a different rule | restate: **clan-scoped, cap = `clans.ancestor_cap`**; note the display cap separately |
-| **2** | §3 (service table) | lists a **`tributes` Storage bucket**, but [[15-clan-model-and-book-of-tributes]] §7 says the Book carries **no image**, and §5.3's `tributes` table has no image column either | drop the bucket (fewer privacy surfaces), or document why it survives |
-| **3** | §6 | *"**Open for SCRUM-18**: daily quota size…"* — SCRUM-18 is **Done**; the quotas are locked in [[10-economy-spec]] §1 | strike the line, point at doc 10 |
-| **4** | README §Development environment | says **"Node.js ≥ 20"**; **SDK 57's floor is Node 22.13.x** (per the official SDK 57 table). CI already uses Node 22, so the docs are the only thing wrong | correct README to `≥ 22.13` |
+| **1** | §4.5 | `rpc.save_ancestor(...)` — *"CHECK ≤ 4 non-archived tablets per user"* was **stale**. Ancestors became **clan-owned** in SCRUM-22 (doc 15), with cap = `clans.ancestor_cap` (**default 10**) — §5.3 already said so. The "4" is the **altar *display* cap**, a different rule | ✅ **fixed (v2.9)** — restated as **clan-scoped, cap = `clans.ancestor_cap`**, with the display cap noted separately |
+| **2** | §3 (service table) | listed a **`tributes` Storage bucket**, but [[15-clan-model-and-book-of-tributes]] §7 says the Book carries **no image** (its §5.3 table has no image column either) | ✅ **fixed (v2.9)** — the bucket is gone (fewer privacy surfaces, per 13 §4) |
+| **3** | §6 | *"**Open for SCRUM-18**: daily quota size…"* — SCRUM-18 is **Done**; the quotas are locked in [[10-economy-spec]] §1 | ✅ **fixed (v2.9)** — struck, pointing at doc 10 |
+| **4** | README §Development environment | said **"Node.js ≥ 20"**; **SDK 57's floor is Node 22.13.x** (official SDK 57 table). CI already used Node 22, so only the docs were wrong | ✅ **fixed** in this PR |
 
-Items 1–3 are doc 07 edits; item 4 is a README fix. **All four are cheap and none change a decision** — but item 1 would mislead a future implementer into a 4-tablet cap, so it matters.
+**Why item 1 mattered most:** it would have led an implementer to build a **4-ancestor cap** into the schema, the RPC and the altar UI — contradicting the clan model that SCRUM-22/48/15 already locked (cap 10, and it is a future monetisation lever via SCRUM-47). A wrong cap is a data-model bug, not a typo.
 
-### 9.5 A cost/latency opportunity to log (not act on)
+### 9.5 Re-benchmark first read — `nano-banana-2-lite` vs the locked `nano-banana-2` (2026-10-03)
 
-The spike measured **p50 ≈ 13 s** and locked `nano-banana-2` (ADR-002). A newer **`google/nano-banana-2-lite`** now advertises **sub-2 s**. It is **not** a like-for-like comparison (it bills per *unit*, not per image, and ADR-002 is locked), so: **log it as an ADR-002 amendment candidate** — a 10-run micro-benchmark on both endpoints would answer it for ~US$1, and if the lite model holds style D, it is the single biggest UX improvement available to the ritual (the wait *is* the weakest moment — doc 18 R3). **Follow-up, not a unilateral change.**
+**Status: 🧪 first read, NOT a verdict.** 2 subjects × 2 models, run on the same reconstructed v3 prompt. ADR-002 remains locked; this exists so the *question* is documented with evidence rather than opinion.
+
+| Subject | Prompt (reconstructed v3 template) | Outputs |
+|---|---|---|
+| **Altar** (S16) | "a gold statue, a red candle, a white bowl…" | `nano-banana-2` → `jO7svwG8…png` · `nano-banana-2-lite` → `dw0CL75N1…png` |
+| **HDB block** (S12) | "white concrete with a green roof…" | `nano-banana-2` → `L2EOf11-…png` · `nano-banana-2-lite` → `E1UdSZIS…png` |
+
+All four saved to the **fal library** (provenance kept) so the URLs do not expire: assets `db0avccregjfqb95d6og` · `db0avckregjfk7p5d6rg` · `db0avcsregjfk7p5d6ug` · `db0avd4regjfk7p5d730`.
+
+> ⚠️ **The v3 template was reconstructed**, not lifted — the literal prompt was built inline during the S18 session and is not in the repo. It was rebuilt from the *normative* spec in [[07-system-architecture]] §4.2 + [[../spike/results/path-C/EVALUATION]] §7 (source-colour lock · top-down lighting shader · transparent glass · no ground shadow · blank warm rice-paper · coarse 40–60 facets + one ink weight + matte). **This is methodologically fine for a model-vs-model comparison** (identical prompt to both), but it means the outputs are *not* directly comparable to the S18 scorecard images.
+
+**What was measured (objective):**
+
+| # | Finding | Consequence |
+|---|---|---|
+| 1 | **API drop-in compatible** — same endpoint shape (`prompt` required), same output (`images[0].url`), same 1024×1024 PNG | a switch would be **one endpoint string** in `cartoonize-orchestrator`, no client change |
+| 2 | **Vendor latency evidence is `null`** — `p50_ms`/`p90_ms` = `null`, `sufficient_evidence: false` | the advertised **"sub-2 s" is copy, not a measurement.** The spike's **p50 ≈ 13 s** for `nano-banana-2` is likewise the only real number we own |
+| 3 | **Latency was NOT measured in this pass** — the MCP run interface returns no wall-clock | a real latency answer needs a **scripted run in the dev loop** where timing is observable (§8 PR-1's harness is the natural home) |
+| 4 | 🔴 **The price is unresolved** — `google/nano-banana-2-lite` bills **per "unit" at $1**, not per image (`nano-banana-2` = **$0.08/image**) | **cost per picture cannot be stated.** This *alone* blocks a cost-based switch |
+| 5 | Metadata differs — lite returns `width`/`height` (1024), `nano-banana-2` returns `null` for both | minor; matters only for the doc 14 §3 asset-budget check |
+| 6 | ✅ **No catastrophic failure** — all four produced plausible low-poly / ink-brush renders, warm cream background, no ground shadow, correct subject colours | the Path C *pipeline shape* survives on both models |
+
+**What was NOT measured — and must not be claimed:** whether lite holds **style D** (37 faces = 31 body + 6 wheel · one ink weight · the **untested per-region wheel rule**). That is a **human visual verdict**, exactly as the S18 spike was — and 2 subjects is a first read, not the 13-input scorecard. **The PM's eye is the instrument here, not mine.**
+
+**Verdict of this pass: keep ADR-002 exactly as it is.** The honest conclusion is *"not ruled out, not justified"*:
+
+1. 🔴 **Two hard blockers** — the billing unit is unresolved (#4) and latency is unverifiable from vendor evidence (#2). Neither can be answered by generating more images.
+2. **If both clear favourably**, a proper re-run is cheap and well-defined: **the 13 Track-A inputs · scripted wall-clock timing · the PM's scorecard** — ≈US$2, with the S18 `manifest` and `EVALUATION` sheet already in the repo as the template.
+3. **Why it is still worth pursuing:** the wait is **doc 18's R3** — the single weakest moment in the ritual (*12.6 s of AI in a solemn moment*). If lite holds D at a fraction of the latency, it is the largest UX win available to the MVP. **Logged, not acted on.**
+
+**Follow-up to file:** *(a)* ask fal for the lite billing basis + a per-image price; *(b)* if favourable, run the 13-input scripted re-benchmark.
 
 ---
 ## 10 · What I need from you — the short version
@@ -400,7 +430,8 @@ The spike measured **p50 ≈ 13 s** and locked `nano-banana-2` (ADR-002). A newe
 | §6 the setup split | ✅ 10 items I build (A–J, no account) vs 10 items you provision (#1–#10) + the unblock graph |
 | §7 repo layout | ✅ target tree |
 | §8 build sequence | ✅ PR-1 → PR-4, with the "needs you?" column |
-| §9 found inconsistencies | ✅ 4 doc-07/README fixes + 1 ADR amendment candidate (§9.5) |
+| §9 found inconsistencies | ✅ **all 4 fixed** — doc 07 → **v2.9** (items 1–3) + README (item 4) |
+| §9.5 generator re-benchmark | 🧪 **first read done** — 4 outputs × 2 subjects; **2 hard blockers found** (billing unit unresolved · latency unverifiable) → **ADR-002 stays locked** |
 | **Verification** | ✅ Path C endpoints + prices re-checked live (2026-10-03) — ADR-002's $0.09/picture **still exact** |
 
 **The plan's own summary:** doc 07 already told us *what* to build; the only expensive surprises were in the *setup* — and the audit shows **this machine can run the entire backend locally with no accounts, and the first PR needs nothing at all.** The accounts buy the *live call* and the *device truth*, not the ability to start.
