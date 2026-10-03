@@ -25,6 +25,30 @@
 > Verbatim from `next-ai-context.md`. Sessions 1–11 are compacted further down; the detail lives here.
 ### 🕐 Session Log — newest first
 
+#### 🧱 Session 27c (2026-10-03) — PR-2 landed and **APPLIED** to the hosted project: the slice schema is live (21 tables · RLS everywhere) · the CLI link fixed · the fal.ai key verified
+**Trigger:** PM — *"yes, merge PR #10 and carry on"* → later *"merge PR #11 first, update the Jira, next-ai-context and follow-up-items."*
+
+PR-1 was merged here too (**PR #9** → `5da8443`), then PR-2 (doc 19 §8) was built **and pushed to the live database** rather than merely written.
+
+1. **Deliverable — [[AppDesignConceptBoard/19-build-plan-services-api-environments|doc 19]] PR-2, applied.** `supabase init` → `config.toml`; **3 migrations** (0001 `slice_schema` · 0002 `harden_rls_helpers` · 0003 `revoke_trigger_function`); `seed.sql`. **21 tables · 25 policies · 13 indexes · 1 view · 4 helpers · 1 trigger · RLS on every table.**
+2. **Applied via `supabase db push`** to `yercgevebxvtzkgctfai` — migration versions match the filenames exactly, so there is **no drift**. Verified **on the hosted DB**, not locally: `list_tables` shows **21/21 `rls_enabled`**; **`anon` reads 0 rows** in profiles · ancestors · ledger_events · tributes · offerings_catalog; **`authenticated` INSERT into `ledger_events` → `permission denied` (42501)**, i.e. the append-only ledger holds at the **grant** level.
+3. **🔴 The `init` default contradicted a locked ADR.** `enable_anonymous_sign_ins = false` — but **ADR-004** locks anonymous device identity first. Set `true` locally; **the hosted equivalent is a Dashboard toggle with no migration** → filed as a new PM item (**doc 19 §6.2 #11**, SCRUM-56).
+4. **Four bugs caught by *running* it, not reviewing it:** (a) a corrupted first file-write had truncated `consent_records` and orphaned a fragment after the trigger → syntax error; repaired, then the **whole file structurally validated** (paren balance 0 · 21 tables closed · `$$` balanced); (b) that validation exposed a **stale duplicate index** → `relation already exists`; (c) **`revoke … from anon` does NOT stop `anon`** — `create function` grants `EXECUTE` to **PUBLIC** *and* Supabase's default privileges grant explicitly to `anon`/`authenticated`, so **two** grants had to go (hence 0002 *and* 0003); (d) **`UNIQUE (clan_id, slot, archived_at)` would not enforce "one live tablet per slot"** — Postgres treats NULLs as distinct → **partial unique index**.
+5. **Schema decisions worth their own note:** the ledger is append-only **at the grant level** (ADR-005 §8) · **`balances` uses `security_invoker = true`** (without it the view runs as its *owner* and leaks **every** user's balance past RLS) · ancestors clan-owned with cap **10** (the doc 07 v2.9 correction) enforced by a **trigger** · **PostGIS deliberately unused** · **no fabricated ancestors in seed** (forging an `auth.users` row would put fake **ancestor names** — the most sensitive column — into the DB).
+6. **Two PM actions unblocked, one discovered.** Your `supabase link` **now works** (`Finished supabase link.`; the DB password turned out to be **optional** for `link`, and is in the native keyring) — so `db push` / `pull` / `migration list` all connect. The **fal.ai key is verified**: `fal_` prefix, 72 chars, **API scope** (the 403 on the billing platform API is expected — that needs ADMIN scope, which Path C does not need). **Discovered:** the anonymous sign-ins toggle (above).
+7. **Docs:** board index · [[next-ai-context]] (S27b + S27c) · [[follow-up-items]] · doc 19 §4.3/§4.4/§6.2 · `.env.example` + a new `supabase/functions/.env.example`. **Jira:** SCRUM-57 → **Done**; SCRUM-54 → **In Progress**.
+
+#### 📋 Session 27b (2026-10-03) — the build plan (doc 19) + the first real experiment: `nano-banana-2-lite` re-benchmark
+**Trigger:** PM — *"start planning the actual building of the actual application… what i can setup vs what you need to setup for me."*
+
+1. **Deliverable — [[AppDesignConceptBoard/19-build-plan-services-api-environments|doc 19 · build plan]]** ✅: service build order · **the complete API surface** (3 Edge Fns · 11 RPCs · 2 buckets · 1 Realtime channel · the trust-boundary table) · **3-ring environments with the machine's toolchain audited** · the exact SDK-57 manifest + **4 install traps** · the **build-vs-provision split (A–J ↔ #1–#10)**.
+2. **The finding that shaped it:** services 1–7 and 9–10 need **no account at all** — they run on **Docker + Node, both already installed**. The only account gating the slice was fal.ai, and only for the live *call*.
+3. **✅ Live verification:** the ADR-002 Path C endpoints are **still live at the same prices** five months on (`moondream2` $0.01/1k chars + `nano-banana-2` $0.08/image = **$0.09/picture**, exactly ADR-002's number).
+4. **🧪 The `nano-banana-2-lite` re-benchmark (first read, NOT a verdict).** 4 outputs across 2 subjects. **ADR-002 stays locked**, because two hard blockers appeared: the lite model's **billing unit is not per-image** (cost/picture unresolvable) and **its vendor latency evidence is `null`** — so the advertised *"sub-2 s"* is copy, not a measurement. Recorded as an **ADR-002 amendment candidate**; a proper re-run (13 inputs · scripted wall-clock · PM scorecard) is defined but gated on the billing answer.
+5. **9.5 found 4 stale lines** in doc 07/README — incl. the **`save_ancestor` cap landmine** (doc claimed *"≤ 4 tablets per user"*; ancestors are clan-owned with cap 10) → **doc 07 → v2.9**.
+6. **Filed:** **SCRUM-57** (repo bootstrap, needs nothing) · **SCRUM-56** (PM provisioning) · Blocks/Relates wired. **Jira:** SCRUM-14 → Done.
+
+
 #### 📅 Session 27 (2026-10-03) — SCRUM-14 ✅ Done (planning): MVP scope + realistic timeline → doc 18; the three missing build tickets filed (SCRUM-53/54/55)
 **Trigger:** PM — *"Take a look at Scrum-14 in Sprint 1 using the Jira MCP… Lets start Scrum-14."*
 
@@ -36,7 +60,6 @@ SCRUM-14 (*"Define MVP scope and create realistic project timeline"*, raised S2,
 4. **Scope is now closed:** §2.2 is the standing answer to every "we could also…" for the next three months (Virtual Temple · AR-fire collection · battle pass · social beyond the clan · true AR · slots · store UI beyond the catalogue · the ad SDK until ADR-008).
 5. **Docs updated:** concept-board index (doc **18** row) · [[next-ai-context]] (critical path re-ordered; S27 logged) · [[follow-up-items]] (SCRUM-53/54/55 added; the SCRUM-10 milestones item closed; **Key Question 1 — timeline — answered**) · this archive. **Jira:** `SCRUM-14` → **Done (planning)**.
 
-#### 🎯 Session 26 (2026-10-02) — SCRUM-8 ✅ Done (planning): the AR framework question answered → ADR-003 (non-AR AR) + doc 17 (AR-fire PoC plan, execution deferred)
 #### 🎯 Session 26 (2026-10-02) — SCRUM-8 ✅ Done (planning): the AR framework question answered → ADR-003 (non-AR AR) + doc 17 (AR-fire PoC plan, execution deferred)
 **Trigger:** PM — *"Let's start on Scrum-8, refer to the obsidian notes for context."*
 
