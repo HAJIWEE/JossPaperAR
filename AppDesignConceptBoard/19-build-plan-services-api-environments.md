@@ -187,12 +187,26 @@ npx expo start                 # the app, against the LOCAL backend
 | Variable | Lives in | Ring 1 (local) | Ring 3 (cloud) | Secret? |
 |---|---|---|---|---|
 | `EXPO_PUBLIC_SUPABASE_URL` | app bundle | `http://localhost:54321` | project URL | no (public) |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | app bundle | local anon key | project anon key | **no — RLS is what protects it** |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | app bundle | local anon key | **publishable key** (`sb_publishable_…`) | **no — RLS is what protects it** |
 | `EXPO_PUBLIC_API_BASE_URL` | app | optional override | unused | no |
-| `SUPABASE_SERVICE_ROLE_KEY` | Edge Fn secrets **only** | `supabase/.env.local` | `supabase secrets set` | 🔴 **yes — never in the bundle** |
-| `FAL_KEY` | Edge Fn secrets **only** | `supabase/.env.local` | `supabase secrets set` | 🔴 **yes — never in the bundle** |
+| `FAL_KEY` | **Edge Fn secrets only** | `supabase/functions/.env` | `supabase secrets set --env-file …` | 🔴 **yes — never in the bundle** |
 
-The rule is already encoded in `.env.example` (written at SCRUM-15): `EXPO_PUBLIC_*` is public by definition; the AI key and the service-role key exist **only** server-side. **The build must not weaken this.**
+**⚠️ Two corrections (2026-10-03, checked against the official docs):**
+
+1. **`SUPABASE_SERVICE_ROLE_KEY` is NOT ours to set.** Supabase **injects** these into every Edge Function automatically, and any name starting with `SUPABASE_` is **reserved**:
+   `SUPABASE_URL` · `SUPABASE_DB_URL` · `SUPABASE_JWKS` · **`SUPABASE_PUBLISHABLE_KEYS`** (JSON dict — RLS applies) · **`SUPABASE_SECRET_KEYS`** (JSON dict — **bypasses RLS**); *legacy:* `SUPABASE_ANON_KEY` · `SUPABASE_SERVICE_ROLE_KEY`.
+   Earlier revisions of this doc told the PM to *"put the service-role key into Edge secrets"*. **That was wrong, and it was unnecessary work** — a function just reads `SUPABASE_SECRET_KEYS['default']` (or the legacy var) with zero setup.
+2. **Modern keys replace the legacy pair.** Supabase now issues **publishable** (`sb_publishable_…` — client-safe, replaces `anon`) and **secret** (`sb_secret_…` — bypasses RLS, replaces `service_role`); the legacy two keep working until end-2026. **This project uses the publishable key from day one** — it rotates independently and carries no legacy baggage. The `sb_secret_…` key is server-only: **never committed, never pasted into chat, never in the bundle.**
+
+**The local-vs-hosted split:**
+
+| Where | File | Loaded by |
+|---|---|---|
+| **Local** Edge Functions | `supabase/functions/.env` *(gitignored)* | automatically by `supabase start` / `functions serve` (or `--env-file`) |
+| **Hosted** Edge Functions | *(no file ships)* | `supabase secrets set --env-file supabase/functions/.env` |
+| **The app** | `.env` at the repo root *(gitignored)* | Expo — **only `EXPO_PUBLIC_*` reaches the bundle** |
+
+Both real `.env` files are gitignored; the `.env.example` templates are committed. **Neither real file may ever be committed** — the one rule the build must not weaken.
 
 ---
 ## 5 · Dependency manifest — exact, for Expo SDK 57
