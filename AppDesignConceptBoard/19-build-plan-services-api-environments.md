@@ -165,12 +165,22 @@ npx expo start                 # the app, against the LOCAL backend
 
 ### 4.3 Ring 3 — cloud services, and the *only* two that bill
 
+> ✅ **Provisioned 2026-10-03 (PM decisions).** Project `yercgevebxvtzkgctfai` ("HAJIWEE's Project") · region **`ap-southeast-1` (Singapore)** ✅ as recommended · **Postgres 17.11** · `ACTIVE_HEALTHY`. CLI **v2.119.0** logged in. Package id **`app.josspaperar`** ✅ → `app.json`.
+
 | Service | Tier | Bills? | Gates |
 |---|---|---|---|
 | **Supabase hosted** | free | no (until scale) | the slice's persist step + anything shared |
 | **fal.ai** | metered | ⚠️ **yes — ≈$0.09/picture** | the live Path C call — **the only real spend in the MVP** |
 | **EAS** | free tier | no | cloud Android builds; iOS later |
 | **Play Console** | $25 once | no (one-off) | submission only — **not now** |
+
+**What the live project already tells us (checked via MCP):**
+
+- **`pg_cron` is available** (1.6.4, not yet installed) → `weekly-roll` has its scheduler (07 §4.4). **Enable it in a migration.**
+- **`pgtap` is available** → SQL-level tests for the ledger/RLS rules are possible without adding a dependency.
+- **`postgis` is available — and we must not use it.** The location model is a **coarse geohash cell with no coordinates and no trail** (13 §2). PostGIS would make raw-geometry storage one line away; its presence is not a reason. A deliberate non-use, worth stating.
+- **`pg_partman`** is available if `ledger_events` ever needs time partitioning (not at alpha).
+- Postgres is **17**, not 15 — everything in doc 07 §5 is unaffected.
 
 ### 4.4 Environment variable matrix
 
@@ -261,14 +271,14 @@ The CI habit is **plain Node scripts with no `npm install`** (`.github/workflows
 
 | # | Item | Why | Cost | Blocks |
 |---|---|---|---|---|
-| **1** | **Supabase account + one project** → give me the **Project URL** + **anon key**; put the **service-role key** into the Edge secrets (never to me in chat) | Ring 3 — the slice's persist step and anything shared | **free** | PR-3 · PR-4 · the M1 device run |
+| ~~**1**~~ ✅ | **Supabase project** — **done 2026-10-03**: `yercgevebxvtzkgctfai` ("HAJIWEE's Project") | Ring 3 — the slice's persist step and anything shared | **free** | ~~PR-3 · PR-4 · the M1 device run~~ **unblocked** — *still need: the anon key into `.env` + the service-role key into Edge secrets* |
 | **2** | **fal.ai account + API key + a small credit top-up** | **Path C — the only metered spend.** ≈$0.09/picture → **US$10 ≈ 110 pictures**, ample for the slice | **~US$10** | the live cartoonize call |
-| **3** | **Supabase CLI login** — `supabase login` is an **interactive device-code flow** | Ring 1 — `supabase start` / `db reset` / `functions serve` | free | the local backend loop |
+| ~~**3**~~ ✅ | **Supabase CLI login** — **done 2026-10-03**: CLI **v2.119.0** at `/usr/local/bin/supabase`, logged in (verified: `supabase projects list` sees the project) | Ring 1 — `supabase start` / `db reset` / `functions serve` | free | ~~the local backend loop~~ **unblocked** |
 | **4** | **EAS login** — `npx eas-cli login`, same interactive reason | cloud Android builds; the iOS-later path | free | dev builds |
 | **5** | **Android SDK + emulator (KVM)** *or* the **Tier-F device** (SCRUM-52) | Ring 2 — emulator for speed, **device for truth** (N1) | free / ~S$100–150 | the M1 device run |
 | **6** | **A domain for invite deep links** (e.g. `josspaperar.app` — doc 07 §4.6 assumes it) | App/Universal Links, so a QR invite survives the app not being installed | ~S$15/yr | **SCRUM-50 only — not the slice** |
-| **7** | **Decide the Android package id** (`app.josspaperar` vs `sg.josspaperar` …) | baked into `app.json` + EAS; **painful to change after the first Play upload** | free | EAS build config |
-| **8** | **Decide the Supabase region** — recommend **`ap-southeast-1` (Singapore)** | SEA latency; also awkward to change later | free | project creation |
+| ~~**7**~~ ✅ | **Android package id** — **decided 2026-10-03: `app.josspaperar`** → set in `app.json` (`android.package`; `ios.bundleIdentifier` carries the same reverse-DNS as the natural pairing — trivially changeable while iOS is deferred) | baked into `app.json` + EAS; **painful to change after the first Play upload** | free | EAS build config — **resolved before any build** |
+| ~~**8**~~ ✅ | **Supabase region** — **decided 2026-10-03: `ap-southeast-1` (Singapore)**, and the live project is already there | SEA latency; awkward to change later | free | project creation — **resolved** |
 | **9** | **GitHub repo secrets** *(optional)* | lets CI run DB lint against a throwaway project | free | nice-to-have |
 | **10** | **Google Play Console** — **defer** | submission only | $25 | M4 — not now |
 
@@ -278,17 +288,20 @@ The CI habit is **plain Node scripts with no `npm install`** (`.github/workflows
 
 ```
    ┌── YOU ─────────────────────────────────────────────────────┐
-   │ #3 supabase CLI login ───────▶ local backend loop ─────────┼──▶ E · F · G (I write, you run)
-   │ #1 Supabase project ─────────▶ Ring 3 persist ─────────────┼──▶ PR-3 · PR-4 · M1 device run
-   │ #2 fal.ai key ───────────────▶ live Path C call ───────────┼──▶ the slice's cartoonize step
-   │ #5 device / emulator ────────▶ Ring 2 ─────────────────────┼──▶ N1 device verification
-   │ #6/#7/#8 decisions ──────────▶ config ─────────────────────┼──▶ SCRUM-50 · EAS · project creation
+   │ ✅ #3 supabase CLI login ────▶ local backend loop ─────────┼──▶ E · F · G (I write, you run)
+   │ ✅ #1 Supabase project ──────▶ Ring 3 persist ─────────────┼──▶ PR-3 · PR-4 · M1 device run
+   │ ⬜ #2 fal.ai key ────────────▶ live Path C call ───────────┼──▶ the slice's cartoonize step
+   │ ⬜ #5 device / emulator ─────▶ Ring 2 ─────────────────────┼──▶ N1 device verification
+   │ ✅ #7/#8 decided ──⬜ #6 ────▶ config ─────────────────────┼──▶ SCRUM-50 · EAS
    └────────────────────────────────────────────────────────────┘
+        ✅ = provisioned 2026-10-03.   Still open: #2 fal.ai · #5 device · #6 domain.
 
    ┌── ME — no dependencies at all ─────────────────────────────┐
-   │ A · B · C · D · E(migrations) · F · G · H · I · J ─────────┼──▶ PR-1 ships with no account
+   │ A · B · C · D · E(migrations) · F · G · H · I · J ─────────┼──▶ PR-1 ✅ shipped
    └────────────────────────────────────────────────────────────┘
 ```
+
+**Since the CLI is live, PR-2 (SCRUM-54a) is now fully executable** — not just writable. **One PM step still needed to deploy to the hosted project:** `supabase link --project-ref yercgevebxvtzkgctfai` asks for the **database password** (or set `SUPABASE_DB_PASSWORD`). Local `supabase start` needs no linking at all — Docker is enough. *(The anon key also has to reach `.env`; the service-role key must go only into Edge secrets — never the bundle, never chat.)*
 
 **The critical insight: the entire first PR needs nothing from you.** PR-1 (SCRUM-57) is shell + theme + domain modules + tests + CI — pure repo work, and it is the piece that makes everything after it fast.
 
