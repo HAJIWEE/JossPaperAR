@@ -32,6 +32,17 @@ jobs:
       - name: Responsive check (type scale · safe areas · touch targets)
         run: node design-system/responsive-check.js
 
+      # The RN theme mirror must match the authoritative tokens.css — a mirror
+      # without a guard is exactly the drift that bit this project once.
+      - name: Token parity (src/theme/tokens.ts ↔ design-system/tokens.css)
+        run: node src/theme/checks/parity.ts
+
+      # THE ACCEPTANCE TEST: the four aim bands + the award maths + the wallet
+      # invariant. Zero dependencies (Node 22 strips the types). This is the
+      # gate the vertical slice is graded on — not fps (doc 17 §2 A5).
+      - name: Domain checks (aim bands · award · wallet invariant · quotas)
+        run: node src/domain/checks/run.ts
+
   app-checks:
     name: App checks (typecheck · expo-doctor)
     runs-on: ubuntu-latest
