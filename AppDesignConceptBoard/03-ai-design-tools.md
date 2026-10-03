@@ -1,7 +1,7 @@
 # 🤖 03 - AI Design Tools Comparison
 
 > **Purpose**: Holistic value comparison of AI design tools for building the Joss Paper AR app's visual identity, mockups, and (potentially) in-app cartoonization.
-> **Status**: 🔄 Research In Progress — design tooling settled: **Penpot** (Session 9, replacing Figma) | **Started**: 2026-09-23
+> **Status**: ✅ **Research complete** — design tooling settled: **Penpot** (Session 9, replacing Figma) · runtime cartoonization settled: **Path C on fal.ai** ([[ADRs/ADR-002-path-c-describe-then-generate|ADR-002]] · closes **SCRUM-7**) | **Started**: 2026-09-23 · **closed**: 2026-10-02
 
 ---
 
@@ -82,7 +82,9 @@ We need AI tools for **two distinct purposes**:
 | **Leonardo AI** | Fine control + custom model training | ✅ (paid tiers) | ❌ | Popular for game assets; blocked automated research - manual check needed |
 | **Midjourney** | Aesthetic leader | ❌ (no official API) | ❌ | Great for *our* moodboards, not runtime-useable |
 
-### 🧪 Experiment Plan (Cheap & Fast)
+> **🔄 Superseded (2026-09-26):** the runtime search converged on **fal.ai as the platform** — every candidate below was evaluated there instead (Stability/OpenAI/OpenArt/Leonardo were never re-checked; ADR-001 already locks *hosted day one*). See the spike results immediately below.
+
+### 🧪 Experiment Plan (Cheap & Fast) — ✅ EXECUTED 2026-09-26
 
 1. **Pick 10 test objects** (watch, car, house, phone, handbag, gold bar, etc.)
 2. **Run each through 2-3 candidate approaches** with the same joss paper style prompt
@@ -98,6 +100,30 @@ We need AI tools for **two distinct purposes**:
 4. Moderation - what if users photograph something inappropriate? (need content filter)
 5. Offline - cache popular items? Batch processing?
 
+### 📊 Spike results (2026-09-26) — how the questions above were answered
+
+**Scope:** 15 licence-clean test images ([[../spike/test-images/MANIFEST|MANIFEST]]) · **133 runs ≈ US$4.49** of the approved US$20 cap · full write-up `spike/results/RESULTS.md` · scorecard `spike/results/path-C/EVALUATION.md`.
+
+| Endpoint (fal.ai) | Role | Cost/image | Latency (p50 / p90) | Verdict |
+|---|---|---|---|---|
+| `bytedance/seedream/v4.5/edit` | stylizer | $0.040 | **34.2s / 54.6s** | 🏆 Tier-1 fidelity winner — **rejected on latency** |
+| `nano-banana-2/edit` + `nano-banana-2` **t2i** | stylizer | $0.080 | 11.8s / 21.6s (edit) · 11.5s (t2i) | ✅ **chosen stylizer** (ADR-002) |
+| `flux-pro/kontext` | stylizer | $0.040 | 9.8s | ❌ fidelity below D |
+| `image-editing/cartoonify` / `cartoonify` (3D) | stylizer | $0.040 / $0.100 | 11.7s / 10.7–58.4s ⚠️ | ❌ high variance, not D |
+| **`birefnet/v2`** | **background removal** | ≈$0.0015/img (0.0008/compute-s) | 1.0s | ✅ stage ① + post-stylize re-cut in the *edit* path — **dropped under Path C** (clean by construction) |
+| `moondream2/visual-query` | identify | $0.01/query | 1.1s | ✅ **chosen stage ①** — must be **closed-set** (Track B: zero-shot called joss paper "packaged snacks") |
+| `hunyuan-3d` (geometry) | image→3D | $0.015/mesh | minutes | ❌ reserve only (Path B) |
+
+**Decision → [[ADRs/ADR-002-path-c-describe-then-generate|ADR-002]] ✅ Accepted (2026-09-26):** **Path C — describe-then-generate** = `moondream2` identify → `nano-banana-2` t2i from the normative style-D template. **≈ US$0.09/picture steady-state (≤$0.13 with retries) · p50 ≈ 13s · clean background by construction** — the pipeline makes **no background-removal call at all**; the edit path (incl. birefnet) is retained as the documented fallback. Scorecard: **13/13 pass** after the correction loop (3/13 needed ≥1 targeted retry).
+
+### ✅ Open questions — answered
+
+1. **Per-image cost** → **≈ US$0.09** steady-state / ≤$0.13 worst-case (ADR-002 §5) ≈ **$90 per 1,000 captures** — the measured input to the economy/quota model (**SCRUM-18** ✅ Done).
+2. **Latency budget** → measured **p50 ≈ 13s** (1.1s identify + 11.5s generate), above the 3–10s assumption → accepted as a **loading-ritual wait**; seedream's 34s/54.6s killed the cheaper option.
+3. **Style consistency** → the **v3 template is normative** (source-exact colours · top-down lighting · transparent glass · no ground shadow · coarse low-poly + one ink weight) + the **mandatory closed-set catalogue short-circuit** (Track B) for culturally specific store offerings.
+4. **Moderation** → **provider-side gate before stylization**: `captures.status: pending → styled | rejected` (**S5** in doc 12 · posture in doc 13 §6); a rejected capture generates nothing and is purged inside the 7-day raw-photo window.
+5. **Offline** → **queue + idempotent replay**, not a cached pipeline: captures persist in local SQLite and replay on reconnect (doc 14 **N6** / 07 §7 Q1); shrine browse assets cached inside the 64 MB cache ceiling (**N8**).
+
 ---
 
 ## 🧮 Holistic Value Summary
@@ -109,7 +135,7 @@ We need AI tools for **two distinct purposes**:
 | UI design & wireframes | **Penpot (free)** | $0 | Open-source, MCP-wired into our AI workflow, SVG/CSS-native hand-off |
 | Quick assets & marketing | **Canva Free/Pro** | Free → low monthly | Fast, templates, easy for non-designers |
 | Style exploration (moodboards) | **Canva AI / Adobe Firefly / OpenArt** | Bundled / free credits | Test style directions fast (Penpot carries no built-in image gen) |
-| Runtime cartoonization | **TBD after experiments** (Stability API vs OpenAI vs custom LoRA) | Pay-per-image | Must balance quality, cost, control |
+| Runtime cartoonization | **Path C — `moondream2` → `nano-banana-2` t2i on fal.ai** ([[ADRs/ADR-002-path-c-describe-then-generate\|ADR-002]]) | **≈ US$0.09/picture** | Measured in the spike: holds style D, clean background by construction, p50 ≈ 13s |
 
 ### Budget-Friendly Path (Hobby Project)
 1. **Now**: Penpot (free cloud or self-host) + its free MCP server + Canva free + free AI credits → complete design phase for **$0**
@@ -144,5 +170,6 @@ We need AI tools for **two distinct purposes**:
 
 ---
 
-*Last updated: 2026-09-24 — design tooling switched Figma → Penpot (Session 9; Figma's MCP integration issues)*
+*Last updated: 2026-10-02 — **SCRUM-7 closed**: runtime experiment executed (2026-09-26, 133 runs ≈ US$4.49) → decision recorded in [[ADRs/ADR-002-path-c-describe-then-generate|ADR-002]] (Path C) and all five open questions answered above.*
+*Previous: 2026-09-24 — design tooling switched Figma → Penpot (Session 9; Figma's MCP integration issues)*
 
