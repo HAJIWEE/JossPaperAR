@@ -7,8 +7,14 @@
 ## 🎯 Immediate Actions (Next 1–2 Weeks)
 
 ### 🔴 On the critical path
+
+> **Sequenced by [[AppDesignConceptBoard/18-mvp-scope-and-timeline|doc 18]] (S27).** The scope, dependency map, estimates, milestones, risks and testing plan are locked there — this file tracks only the *actions*.
+
 - [x] **`SCRUM-15` — repo + CI + dev environment** ✅ **Done 2026-10-02** — GitHub repo + CI (design-system + app checks, all green) · Expo SDK 57 scaffolded **single-repo** · README + CONTRIBUTING + `.env.example` · MIT licence · PRs #1–#3. Unblocked: `SCRUM-46`, `SCRUM-50`, `SCRUM-51`.
-- [ ] **`SCRUM-52` — Buy the Tier F floor device** — 1 of 3 (Galaxy A05s · Redmi A5 · Nokia C-series, ~S$100–150) → becomes the named CI phone (doc 14 §1) · blocks `SCRUM-51` + device checks in `SCRUM-17`.
+- [ ] **`SCRUM-54` — Supabase backend of record** — schema (+RLS) · `cartoonize-orchestrator` · `award-service` · private buckets. **Not device-bound → start here.** Blocks the slice's persist step, the league and the grid.
+- [ ] **`SCRUM-52` — Buy the Tier F floor device** — 1 of 3 (Galaxy A05s · Redmi A5 · Nokia C-series, ~S$100–150) → becomes the named CI phone (doc 14 §1) · blocks `SCRUM-51` + the device checks in `SCRUM-53`. **A PM action.**
+- [ ] **`SCRUM-53` — Build the MVP vertical slice** (SCRUM-17 execution) — camera → cartoonize → burn → award → persist on the floor device; distinct from SCRUM-17, which only *scoped* it (Done). Acceptance test = the **four aim bands**.
+- [ ] **`SCRUM-55` — Write ADR-004 + ADR-006 + ADR-008** *from* the existing specs — decided but unrecorded; **ADR-008 (ad posture) additionally blocks the ad SDK + rewarded photo**.
 
 ### 🖌️ Design — PM review & decisions
 - [ ] **Whole-file visual review of the 47 boards** changed by the S21 contrast tranche → this releases the **colour hold on `SCRUM-42` / `SCRUM-33`** (both stay In Review until then).
@@ -47,10 +53,10 @@
 ### Technical development
 - [ ] **Port the prototype's test habit to the native app** — machine-read verdicts, a fault-tested harness, one device check per behaviour (`aim-check.js` / `render-check.js` patterns).
 - [ ] **Plan the core game loop implementation.**
-- [ ] **Execute the vertical slice (`SCRUM-17`)** — acceptance criteria are already written; the slice = camera → cartoonize → burn → award → persist, end-to-end on a real device.
-- [ ] **Run the AR-fire spike (`SCRUM-51`)** — blocked by `SCRUM-15` + the floor device; plan is [[AppDesignConceptBoard/17-ar-fire-spike-plan|doc 17]].
-- [ ] **Write `ADR-006` (burn-limit semantics) + `ADR-008` (ad posture)** from [[AppDesignConceptBoard/10-economy-spec]]; `ADR-004` (identity: anonymous first) is also decided but its record is still unwritten.
-- [ ] **Milestones plan** for SCRUM-10 (the remaining item in its chain → feeds SCRUM-14).
+- [ ] **Execute the vertical slice (`SCRUM-53`)** — SCRUM-17 wrote the acceptance criteria; the *build* is now SCRUM-53, gated by SCRUM-54 + the floor device. The slice = camera → cartoonize → burn → award → persist, end-to-end on a real device.
+- [ ] **Run the AR-fire spike (`SCRUM-51`)** — blocked by the floor device; plan is [[AppDesignConceptBoard/17-ar-fire-spike-plan|doc 17]].
+- [ ] **Write `ADR-004` (identity) + `ADR-006` (burn-limit semantics) + `ADR-008` (ad posture)** — **now filed as `SCRUM-55`**; each is written *from* the spec that already decided it ([[AppDesignConceptBoard/10-economy-spec|10]] · [[AppDesignConceptBoard/13-privacy-and-retention|13]]). ADR-008 is a product call.
+- [x] **Milestones plan** ✅ **done 2026-10-03 (S27)** — [[AppDesignConceptBoard/18-mvp-scope-and-timeline|doc 18]] (M0–M5) closes the SCRUM-10 chain item and **is** the SCRUM-14 deliverable.
 
 ### Business planning
 - [ ] **Research advertising platforms** suitable for family-oriented content → `ADR-008` depends on this.
@@ -62,7 +68,7 @@
 
 ## 🎯 Key Questions to Answer in Next Session
 
-1. **Timeline** — what's a realistic MVP timeline given the technical learning curve?
+1. **Timeline** ✅ **answered 2026-10-03 (S27)** — [[AppDesignConceptBoard/18-mvp-scope-and-timeline|doc 18]]: ~50 focused sessions to beta (≈ Feb 2027), public ≈ Qingming 2027; effort-driven, not date-driven. The one input it still needs is **D5 — your honest sessions/week**.
 2. **Validation** — what's the simplest way to test if people want this? (metrics are *defined* in `SCRUM-25` ✅ but **not yet instrumented**)
 3. **Monetization** — may ads ever appear **inside** the ritual flow? → this is `ADR-008`, a product call.
 4. **PM review** — the items under *Design — PM review & decisions* above.
@@ -94,4 +100,4 @@
 ---
 
 *Purpose: track **open** follow-up actions. Completed and superseded items → [[completed-work-archive]].*  
-*Created 2026-09-22 · **Re-scoped 2026-10-02 (Session 26)** — completed items, the duplicated `MVP Architecture` section and the dated change log archived; this file now lists open work only.*
+*Created 2026-09-22 · **Re-scoped 2026-10-02 (Session 26)** — completed items, the duplicated `MVP Architecture` section and the dated change log archived; this file now lists open work only. · **Updated 2026-10-03 (S27)** — SCRUM-14 closed → [[AppDesignConceptBoard/18-mvp-scope-and-timeline|doc 18]]; SCRUM-53/54/55 added; the critical path re-ordered.*

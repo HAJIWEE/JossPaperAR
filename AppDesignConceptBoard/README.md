@@ -42,6 +42,7 @@ We are currently focused on **two parallel tracks** (SCRUM-6 & SCRUM-9):
 | [[15-clan-model-and-book-of-tributes]] | Clan model & Book of Tributes — roles ladder · create/join/invite · shared ancestors (clan-owned, no personal altar) · EN/ZH copy C1–C17 | ✅ **Complete (S23)** — SCRUM-22 · feeds SCRUM-46/47/48 |
 | [[16-cultural-consultation-and-ritual-review]] | Cultural consultation & ritual review — advisor list · bilingual 10-question sheet · pre-decided change policy · outcome template | ✅ **Complete (S24)** — SCRUM-24 (planning; execution → SCRUM-49) |
 | [[17-ar-fire-spike-plan]] | **SCRUM-8 deliverable** — the AR-fire proof-of-concept plan: fire over a live camera on the Tier F floor device, gated by N3/N4/N10 + the aim bands; paired with [[ADRs/ADR-003-non-ar-ar-mvp-ar-framework\|ADR-003]] | 📋 **Planned (S26)** — execution deferred to repo+CI (SCRUM-15) + the floor device |
+| [[18-mvp-scope-and-timeline]] | **SCRUM-14 deliverable** — MVP scope (12 essentials vs deferred) · gates + dependency map · effort estimates · **M0–M5 timeline** · 12-risk register · T1–T4 testing plan; files the missing build tickets **SCRUM-53/54/55** | ✅ **Complete (S27)** — SCRUM-14 → Done (planning) |
 
 ---
 
@@ -97,6 +98,7 @@ These principles guide all design decisions for the app:
 
 ---
 
+*Last updated: 2026-10-03 (Session 27 — **SCRUM-14 closed (planning)**: [[AppDesignConceptBoard/18-mvp-scope-and-timeline|doc 18]] = MVP scope (12 essentials vs deferred) · gates G1–G6 + dependency map · effort estimates in focused sessions · **M0–M5 timeline** (beta ≈ Feb 2027; public ≈ Qingming 2027) · 12-risk register · T1–T4 testing plan. Filed the three tickets the critical path was missing: **SCRUM-53** (build the vertical slice) · **SCRUM-54** (Supabase backend of record) · **SCRUM-55** (ADR-004/006/008).)*
 *Last updated: 2026-10-02 (Session 26 — **SCRUM-8 closed (planning)**: [[AppDesignConceptBoard/ADRs/ADR-003-non-ar-ar-mvp-ar-framework|ADR-003]] accepted — the MVP's "AR" is *non-AR AR* (camera preview + fixed overlay; ARKit / ARCore-direct / Unity rejected), true AR deferred to four exit ramps; [[AppDesignConceptBoard/17-ar-fire-spike-plan|doc 17]] = the AR-fire PoC plan, execution deferred to the repo+CI milestone + the Tier F floor device.)*
 *Last updated: 2026-10-02 (Session 25 — **SCRUM-48 clan boards built in Penpot**: 22 new boards `EN · 0e Clan` + `ZH · 0e 宗族` (fork · create ×3 · join ×4 · invite & share · 2 states), both rows wired, boot hand-off `0d3` → fork rewired, `1s` ancestor sheet reused unmodified → **Done (PM-marked)** · rev 2 after PM review (realistic QR · clan logo centred · duplicate-name prompt removed). The per-session table above is maintained only to S18 — see [[next-ai-context]] for the full session log.)*
 *Last updated: 2026-09-26 (Session 18 — Path C locked via ADR-002, economy v1 locked + SCRUM-18 spec done, SCRUM-41 reconciled; spike closed at US$4.49/133 runs)*
