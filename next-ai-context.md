@@ -9,7 +9,7 @@
 ## 📌 Quick Reference
 
 - **Project** — Joss Paper AR, an AR app that replaces physical joss-paper burning with a digital ritual
-- **Last session** — **S27 · 2026-10-03**: SCRUM-14 ✅ Done (planning) → **doc 18** (MVP scope · dependency map · effort estimates · **M0–M5 timeline** · risk register · testing plan); filed the three tickets the critical path was missing: **SCRUM-53** (build the slice) · **SCRUM-54** (Supabase backend) · **SCRUM-55** (ADR-004/006/008). *Post-merge: stale Jira-false lines removed from the live hand-off docs (`SCRUM-42`/`SCRUM-33`/`SCRUM-45` are all Done — no colour hold remains).*
+- **Last session** — **S27b · 2026-10-03**: **build plan written** → **[[AppDesignConceptBoard/19-build-plan-services-api-environments|doc 19]]** (services · API surface · 3-ring envs · SDK-57 manifest) + the **build-vs-provision split** filed as **SCRUM-57** (repo bootstrap — startable now, needs nothing) / **SCRUM-56** (PM provisioning). Path C prices re-verified live: **ADR-002's $0.09/picture still exact.** *Earlier same day (S27): SCRUM-14 ✅ → doc 18 + SCRUM-53/54/55.*
 - **Current phase** — style locked · **Penpot design signed off, 153 boards** · stack locked (**ADR-001**) · architecture authoritative (**07 v2.8**) · **scope + timeline locked (doc 18)** · repo + CI live, Expo SDK 57 scaffolded at repo root (single repo)
 - **Active sprint** — **SCRUM Sprint 1** (2026-10-02 → 2026-10-16)
 - **Next milestone** — **SCRUM-17 vertical slice** (camera → cartoonize → burn → award → persist) — **now build-tracked as SCRUM-53**, gated by **SCRUM-54** (backend of record) + **SCRUM-52** (Tier F floor device); the AR-fire spike (**SCRUM-51**) shares the device gate
@@ -30,7 +30,7 @@
 - **Penpot design signed off** — **153 boards**, EN + 中文, wired: core loop · splash/store/collection · altar family · boot flow · app mark · customization system · privacy/consent · economy flows · clan block
 - **Decisions closed** — miss → rethrow (never the top tier) · altar-first Home sizing · tablet naming as-built · platform **Option A** (ADR-001) · **Path C** cartoonization (ADR-002) · **non-AR AR** (ADR-003) · integrity (ADR-005) · privacy (ADR-007)
 - **Architecture authoritative** — [[AppDesignConceptBoard/07-system-architecture]] **v2.8**: service boundaries, the capture → cartoonize → burn → award → league API sketch, ~20-table data model
-- **Specs written** — economy `10` · integrity `11` · security/legal `12` · privacy `13` · NFRs `14` · clan `15` · cultural consultation `16` · AR-fire PoC `17` · **MVP scope & timeline `18`**
+- **Specs written** — economy `10` · integrity `11` · security/legal `12` · privacy `13` · NFRs `14` · clan `15` · cultural consultation `16` · AR-fire PoC `17` · **MVP scope & timeline `18`** · **build plan `19`**
 - **Spike executed** — style-D: 133 runs ≈ **US$4.49** of the US$20 cap → Path C locked
 
 ### What's next — ENGINEERING (the critical path)
@@ -48,6 +48,17 @@
 9. **SCRUM-43** (legal long-tail, awareness only) · **SCRUM-47** (ancestor slots, Low).
 
 **The calendar is effort-driven, not date-driven (doc 18 §5):** ~50 focused sessions to beta; **beta ≈ Feb 2027**, **public ≈ Qingming (5 Apr) 2027** at a realistic ~4 sessions/week. No milestone may be met by cutting an acceptance criterion.
+
+**The build order is set by [[AppDesignConceptBoard/19-build-plan-services-api-environments|doc 19]] §8:**
+
+| PR | Ticket | Contents | Needs the PM? |
+|---|---|---|---|
+| **PR-1** | **SCRUM-57** | expo-router shell · theme bridge · domain modules (aim/award/catalogue) · **the T2 acceptance test** · CI · docs | ❌ **nothing — startable now** |
+| PR-2 | SCRUM-54a | Supabase config + migrations + RLS + seed | #3 CLI *(to run it)* |
+| PR-3 | SCRUM-54b | the 3 Edge Functions + RPCs + client libs | #1 Supabase · #2 fal.ai *(to call them)* |
+| PR-4 | **SCRUM-53** | the ritual screens wired end-to-end → **the slice on glass** | + #5 device |
+
+**The whole backend runs locally on Docker (already installed) — no account needed to build it.** The accounts (SCRUM-56) buy the *live AI call* and the *device truth*, not the ability to start.
 
 ### What's next — DESIGN (awaiting PM)
 
@@ -68,6 +79,7 @@
 
 | # | Date | What landed |
 |---|---|---|
+| **27b** | 2026-10-03 | **Build plan written** → **[[AppDesignConceptBoard/19-build-plan-services-api-environments\|doc 19]]**: service build order · the complete API surface (3 Edge Fns · 11 RPCs · storage · realtime · trust boundary) · 3-ring envs with the toolchain audited · SDK-57 manifest + 4 install traps · **build-vs-provision split** → **SCRUM-57** / **SCRUM-56**. **Path C prices re-verified live — ADR-002's $0.09/picture still exact.** Found 4 stale doc-07/README lines |
 | **27** | 2026-10-03 | **SCRUM-14 ✅ Done (planning)** → **[[AppDesignConceptBoard/18-mvp-scope-and-timeline\|doc 18]]**: MVP scope (12 essentials vs deferred) · gates G1–G6 + dependency map · effort in **focused sessions** (~50 to beta) · **M0–M5 timeline** (beta ≈ Feb 2027 · public ≈ Qingming 2027) · 12-risk register · T1–T4 testing plan; filed **SCRUM-53** (build the slice) · **SCRUM-54** (Supabase backend) · **SCRUM-55** (ADR-004/006/008) |
 | **26** | 2026-10-02 | **SCRUM-8 ✅ Done (planning)** → **[[AppDesignConceptBoard/ADRs/ADR-003-non-ar-ar-mvp-ar-framework\|ADR-003]]** (non-AR AR; ARKit/ARCore/Unity rejected) + **[[AppDesignConceptBoard/17-ar-fire-spike-plan\|doc 17]]** AR-fire PoC plan; execution → **SCRUM-51** |
 | **25** | 2026-10-02 | **SCRUM-48 clan boards ✅ Done (PM-marked)** — 22 boards (`EN · 0e Clan` + `ZH · 0e 宗族`), both rows wired (96 interactions); boot hand-off `0d3` → fork rewired; boards **131 → 153**; doc 15 → **v0.3** |

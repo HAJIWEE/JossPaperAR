@@ -3,7 +3,7 @@
 > An AR app that replaces physical joss-paper burning with a digital ritual — capture an object, cartoonize it, throw it onto the fire, earn Tribute Points.
 > Hobby project, family-legacy vision, no timeline pressure.
 
-**Status:** 📐 design signed off · 📝 specs + ADRs written · 💻 **engineering started — repo + CI ✅ (SCRUM-15), Expo app scaffolded (single repo)** · next: SCRUM-17 vertical slice
+**Status:** 📐 design signed off · 📝 specs + ADRs written (**docs 01–19**) · 💻 **engineering started — repo + CI ✅ (SCRUM-15), Expo app scaffolded** · **next: SCRUM-57 repo bootstrap → SCRUM-54 backend → SCRUM-53 vertical slice** (build plan → [`AppDesignConceptBoard/19-build-plan-services-api-environments.md`](AppDesignConceptBoard/19-build-plan-services-api-environments.md))
 
 ## Where things live
 
@@ -20,7 +20,7 @@
 
 ## Development environment
 
-**Requirements:** Node.js ≥ 20 with npm (CI uses Node 22). The app is a single-repo **Expo (SDK 57) / React Native + TypeScript** project at the repository root (stack: ADR-001 — Expo/RN + Supabase + hosted AI APIs).
+**Requirements:** **Node.js ≥ 22.13** with npm (Expo **SDK 57**'s floor; CI uses Node 22). The app is a single-repo **Expo (SDK 57) / React Native + TypeScript** project at the repository root (stack: ADR-001 — Expo/RN + Supabase + hosted AI APIs).
 
 ```bash
 git clone https://github.com/HAJIWEE/JossPaperAR.git
