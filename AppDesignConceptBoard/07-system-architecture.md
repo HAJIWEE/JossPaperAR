@@ -1,6 +1,6 @@
 # 07 · System architecture & data model — SCRUM-10
 
-**Status:** ✅ v2.8 — **stack LOCKED (ADR-001)** · service boundaries + API sketch + data model (session 17) · **v2.7: clan model applied (SCRUM-22)** · **v2.8: clan invitation/QR path → §4.6 (SCRUM-50)**
+**Status:** ✅ v2.9 — **stack LOCKED (ADR-001)** · service boundaries + API sketch + data model (session 17) · **v2.7: clan model applied (SCRUM-22)** · **v2.8: clan invitation/QR path → §4.6 (SCRUM-50)** · **v2.9: build-plan tidy (SCRUM-54) — `save_ancestor` cap corrected to `ancestors.ancestor_cap` · the `tributes` bucket removed · the SCRUM-18 open line struck**
 **Date:** 2026-09-26
 **Jira:** SCRUM-10 · In Progress
 **Related:** [[06-tech-stack-options]] (the stack decision this builds on) · [[05-concept-to-mvp-gap-analysis]] §8 (the brief) · [[04-ar-app-patterns]] · [[next-ai-context]]
@@ -51,7 +51,7 @@
 | 1 | **App client** (Expo/RN) | camera, capture compression, throw input + band measurement, offline queue, UI state, i18n | award maths, quota state, league ranking |
 | 2 | **Supabase Auth** | anonymous device identity → optional account (nobody in this demo gets a signup wall before the first burn) | profile content, ancestor data |
 | 3 | **Postgres (+ RLS)** | every table in §5; row-level isolation per `user_id` | file bytes (→ Storage) |
-| 4 | **Storage** | raw captures, styled results, tribute images — **private buckets**, signed URLs | catalogue (code-owned, ships in the app) |
+| 4 | **Storage** | raw captures, styled results — **private buckets**, signed URLs | catalogue (code-owned, ships in the app). ⚠️ **v2.9: no `tributes` bucket** — [[15-clan-model-and-book-of-tributes]] §7 gives the Book of Tributes **no image**, so the bucket this row previously implied does not exist |
 | 5 | **`cartoonize-orchestrator`** (Edge Fn) | quota gate → provider call → moderation → cost/latency recording → status transitions | burning, points |
 | 6 | **`award-service`** (Edge Fn) | validating a burn, computing the award, appending `ledger_events`, idempotency | UI, photos |
 | 7 | **`weekly-roll`** (Edge Fn, cron) | closing a league week, re-ranking, promotion/demotion, decay ticks | anything interactive |
@@ -92,7 +92,7 @@
 ### 4.5 Everything else (sketch only)
 - `rpc.purchase_item(item_code, idempotency_key)` — spend store points; inserts `inventory` + ledger event `purchase`.
 - `rpc.equip_decoration(slot, item_code)` — enforces the **one-set-per-category rule** (S14k) and the 6-slot grid.
-- `rpc.save_ancestor(...)` — CHECK ≤ 4 non-archived tablets per user.
+- `rpc.save_ancestor(...)` — **CHECK: the clan's ancestor count ≤ `clans.ancestor_cap` (default 10)**, clan-scoped (§5.3, [[15-clan-model-and-book-of-tributes]]). *(⚠️ corrected in v2.9: this line previously said "≤ 4 non-archived tablets per user" — that is the **altar *display*** cap, a different rule; ancestors are clan-owned, not per-user.)*
 - `rpc.delete_my_data()` — the delete-all path (privacy, SCRUM-19 — to be specified).
 
 ### 4.6 Clan invitations — one secret, three presentations (SCRUM-50 · boards = SCRUM-48)
@@ -235,7 +235,7 @@ From the machine-checked prototype (`aim-check.js`, gap-analysis §2):
 - **Award** = `400 × band × 2.0 (new-ground) + 50 (streak)` → **1,650 / 1,250 / 850 / 0**
 - **Store**: base value = `1.2 × redemption price` (400/480 · 600/720 · 800/960 · House 1,440 · bundle 2,000/2,400); **20% Store-Point accrual is intended** — it keeps the store a sink so photo capture stays the cheap path
 - **Miss → rethrow** (S9 decision) — schema impact: a miss still writes a `burns` row (band `miss`, award 0) so the rethrow is a *new* burn, not an edit
-- **Open for SCRUM-18**: daily quota size, cost/burn ceiling vs ad eCPM, decay curve shape, streak window
+- ~~**Open for SCRUM-18**: daily quota size, cost/burn ceiling vs ad eCPM, decay curve shape, streak window~~ → ✅ **all closed (SCRUM-18 ✅ Done, 2026-09-26)** — the authoritative numbers live in [[10-economy-spec]] §1 (quota · ceilings · stop rule); this section no longer holds open items
 
 ---
 
@@ -263,6 +263,7 @@ From the machine-checked prototype (`aim-check.js`, gap-analysis §2):
 
 ---
 
+*Updated 2026-10-03 (**v2.9**) — **build-plan tidy (SCRUM-54 · [[19-build-plan-services-api-environments|doc 19]] §9)**, found by mapping the build against this document: §4.5 `save_ancestor` corrected — it claimed *"≤ 4 non-archived tablets per user"*, but ancestors have been **clan-owned since SCRUM-22** with cap `clans.ancestor_cap` (default 10), which §5.3 already said; the "4" is the **altar *display*** cap, a different rule. §3's storage row dropped the implied **`tributes` bucket** ([[15-clan-model-and-book-of-tributes]] §7 gives the Book **no image**). §6's *"Open for SCRUM-18"* line struck — SCRUM-18 ✅ Done, numbers locked in [[10-economy-spec]] §1. No decision changed; three statements were made true again.*
 *Updated 2026-10-02 (**v2.8**) — **clan invitation & QR path documented (§4.6 · SCRUM-50)**: the invitation is one secret (`clans.code`, an 8-char capability, re-rollable) dressed three ways (link · QR · copy); the **QR payload is the invite deep link**; generation is **client-side** (offline, no server cost); scanning via `expo-camera` (`barcodeScannerSettings`); resolve → `preview_clan` → `join_clan` (no approval queue); privacy = code only, excluded from analytics; §5.3 `clans` note corrected (name displayed **plain** — the `#suffix` UI display was dropped in SCRUM-48 rev 2)*
 *Updated 2026-09-30 (**v2.7**) — **clan model applied (SCRUM-22 ✅ · [[15-clan-model-and-book-of-tributes]])**: §5.2/§5.3 add `clans` + `clan_members` · `ancestors` becomes **clan-owned** (no personal altar) with cap = `clans.ancestor_cap` (default 10) · `burns`/`tributes` gain `clan_id` · `tributes.visibility` default `clan` (members full · non-members anonymised) · §7 Q3 answered — the clan is the burn's addressing unit*
 *Updated 2026-09-27 (**v2.6**) — **NFRs applied (SCRUM-20)**: §7 Q1 answered (**cross-day offline queue**, rural-first) · floor pinned = Tier F (3GB / Android 11 / Android Go-class, Statcounter-grounded) · N1–N12 targets + asset budget → [[14-nfr-device-and-performance-targets]]; floor device = SCRUM-15's CI phone*
