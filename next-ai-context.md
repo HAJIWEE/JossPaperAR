@@ -1,7 +1,7 @@
 # 🤖 Context for Next AI Session — Joss Paper AR
 
 > **Newest first.** This file is the **live hand-off** — current state, what's next, and the open questions.
-> **History has moved out:** the full session log (S2 → S26), the superseded review queues and the dated change log now live in **[[completed-work-archive]]**. Open work lives in **[[follow-up-items]]**.
+> **History has moved out:** the full session log (S2 → S27), the superseded review queues and the dated change log now live in **[[completed-work-archive]]**. Open work lives in **[[follow-up-items]]**.
 > **Read at session start:** *Quick Reference → Start Here → Open follow-ups*. Everything after that is stable reference material.
 
 ---
@@ -9,11 +9,11 @@
 ## 📌 Quick Reference
 
 - **Project** — Joss Paper AR, an AR app that replaces physical joss-paper burning with a digital ritual
-- **Last session** — **S27b · 2026-10-03**: **build plan written** → **[[AppDesignConceptBoard/19-build-plan-services-api-environments|doc 19]]** (services · API surface · 3-ring envs · SDK-57 manifest) + the **build-vs-provision split** filed as **SCRUM-57** (repo bootstrap — startable now, needs nothing) / **SCRUM-56** (PM provisioning). Path C prices re-verified live: **ADR-002's $0.09/picture still exact.** *Earlier same day (S27): SCRUM-14 ✅ → doc 18 + SCRUM-53/54/55.*
-- **Current phase** — style locked · **Penpot design signed off, 153 boards** · stack locked (**ADR-001**) · architecture authoritative (**07 v2.8**) · **scope + timeline locked (doc 18)** · repo + CI live, Expo SDK 57 scaffolded at repo root (single repo)
+- **Last session** — **S27c · 2026-10-03**: **PR-2 built AND applied to the hosted project** → **PR #11** merged (`20713e9`): `supabase init` + `config.toml` + **the slice schema** (**21 tables · 25 policies · RLS on every one**) + `seed.sql`, pushed via `supabase db push` to `yercgevebxvtzkgctfai` and **verified there** — `anon` reads 0 rows everywhere, `authenticated` cannot INSERT into `ledger_events` (42501). Also: **the CLI link now works**, and **the fal.ai key is verified working**. *Earlier same day (S27b): build plan → doc 19 + SCRUM-56/57. (S27): SCRUM-14 → doc 18 + SCRUM-53/54/55.*
+- **Current phase** — style locked · **Penpot design signed off, 153 boards** · stack locked (**ADR-001**) · architecture authoritative (**07 v2.9**) · **scope + timeline locked (doc 18)** · repo + CI live (**PR-1 ✅**) · **schema live on Supabase (PR-2 ✅)** — the persist spine exists
 - **Active sprint** — **SCRUM Sprint 1** (2026-10-02 → 2026-10-16)
-- **Backend** — ✅ **provisioned 2026-10-03**: Supabase project **`yercgevebxvtzkgctfai`** · region **`ap-southeast-1` (Singapore)** · Postgres **17.11** · CLI **v2.119.0** logged in · package id **`app.josspaperar`**. `pg_cron` available (for `weekly-roll`). *Not yet linked locally — `supabase link --project-ref yercgevebxvtzkgctfai` needs the DB password.*
-- **Next milestone** — **SCRUM-17 vertical slice** (camera → cartoonize → burn → award → persist) — **now build-tracked as SCRUM-53**, gated by **SCRUM-54** (backend of record) + **SCRUM-52** (Tier F floor device); the AR-fire spike (**SCRUM-51**) shares the device gate
+- **Backend** — ✅ **live and fully verified 2026-10-03 (S27c)**: Supabase project **`yercgevebxvtzkgctfai`** · region **`ap-southeast-1` (Singapore)** · Postgres **17.11** · CLI **v2.119.0** — **logged in AND linked** (`db push`/`pull`/`migration list` all connect) · **the slice schema is applied** (3 migrations, versions matching the filenames — no drift) · buckets `captures` + `styled` (private) · package id **`app.josspaperar`** · `pg_cron` available for `weekly-roll`. ✅ **Anonymous sign-ins are ON and proven end-to-end** — a real `POST /auth/v1/signup` returned **200** with `is_anonymous: true` and a session, and with that JWT the catalogue read **5 rows** while `ledger_events` refused the write (**403**).
+- **Next milestone** — **SCRUM-17 vertical slice** (camera → cartoonize → burn → award → persist) — build-tracked as **SCRUM-53**; the backend gate (**SCRUM-54**) is now **half done** (schema ✅, RPCs/Edge Fns = PR-3), the hardware gate is **SCRUM-52** (Tier F floor device); the AR-fire spike (**SCRUM-51**) shares the device gate
 - **Design source of truth** — **Penpot** (PM decision 2026-09-28): file `JossPaperAR`, page *"New-user tutorial · Core loop"*, **153 boards**, EN + 中文, wired
 - **ADRs accepted (5)** — `001` platform+backend · `002` Path C · `003` non-AR AR · `005` integrity · `007` privacy → [[AppDesignConceptBoard/ADRs/README|ADR register]] (open: `004` identity · `006` burn limits · `008` ad posture)
 - **User role** — Product Manager/Project Manager, AI vibe-coding · hobby project with family-legacy vision, no timeline pressure
@@ -30,7 +30,7 @@
 - **Prototype v4** — the full core loop, machine-checked (144 markup + 20 render + 16 aim assertions). ⚠️ **Retired 2026-09-28** — it is a *spec*, not code; Penpot governs the design.
 - **Penpot design signed off** — **153 boards**, EN + 中文, wired: core loop · splash/store/collection · altar family · boot flow · app mark · customization system · privacy/consent · economy flows · clan block
 - **Decisions closed** — miss → rethrow (never the top tier) · altar-first Home sizing · tablet naming as-built · platform **Option A** (ADR-001) · **Path C** cartoonization (ADR-002) · **non-AR AR** (ADR-003) · integrity (ADR-005) · privacy (ADR-007)
-- **Architecture authoritative** — [[AppDesignConceptBoard/07-system-architecture]] **v2.8**: service boundaries, the capture → cartoonize → burn → award → league API sketch, ~20-table data model
+- **Architecture authoritative** — [[AppDesignConceptBoard/07-system-architecture]] **v2.9**: service boundaries, the capture → cartoonize → burn → award → league API sketch, ~20-table data model · **now realised as 21 live tables** (PR-2)
 - **Specs written** — economy `10` · integrity `11` · security/legal `12` · privacy `13` · NFRs `14` · clan `15` · cultural consultation `16` · AR-fire PoC `17` · **MVP scope & timeline `18`** · **build plan `19`**
 - **Spike executed** — style-D: 133 runs ≈ **US$4.49** of the US$20 cap → Path C locked
 
@@ -38,7 +38,7 @@
 
 > **Re-ordered by [[AppDesignConceptBoard/18-mvp-scope-and-timeline|doc 18]] (S27).** Two *one-PM-action* gates now open the path: the **floor device (SCRUM-52)** and **ADR-008**. Measure nothing on a dev machine and call it done — `N1` says a milestone completes on the named Tier-F device.
 
-1. **SCRUM-54 — Supabase backend of record** (schema · RLS · `cartoonize-orchestrator` · `award-service`). Not device-bound → **the one item that can move this fortnight**. Everything downstream (persist · ledger · league · grid) hangs off it.
+1. **SCRUM-54 — Supabase backend of record** — ✅ **schema done (PR-2, applied to hosted)**: 21 tables · 25 policies · RLS everywhere · private buckets · catalogue seeded. ⬜ **remaining = PR-3**: the 3 Edge Functions (`cartoonize-orchestrator` · `award-service` · `weekly-roll`) + the 11 RPCs + client libs. *Not device-bound → the one thing that can move this fortnight.*
 2. **SCRUM-52 — Buy the Tier F floor device** — 1 of 3 (Galaxy A05s · Redmi A5 · Nokia C-series, ~S$100–150) → the named CI phone (doc 14 §1) · gates **SCRUM-53** + **SCRUM-51**. *A PM action.*
 3. **SCRUM-53 — Build the vertical slice** (SCRUM-17 execution): camera → cartoonize → burn → award → persist on the floor device. Thin by design — one object type, a hard-coded clan. Acceptance test = the **four aim bands**, not fps.
 4. **SCRUM-51 — AR-fire spike** (doc 17, gate A1–A7), sharing the device gate.
@@ -52,14 +52,16 @@
 
 **The build order is set by [[AppDesignConceptBoard/19-build-plan-services-api-environments|doc 19]] §8:**
 
-| PR | Ticket | Contents | Needs the PM? |
+| PR | Ticket | Contents | Status |
 |---|---|---|---|
-| **PR-1** | **SCRUM-57** | expo-router shell · theme bridge · domain modules (aim/award/catalogue) · **the T2 acceptance test** · CI · docs | ❌ **nothing — startable now** |
-| PR-2 | SCRUM-54a | Supabase config + migrations + RLS + seed | #3 CLI *(to run it)* |
-| PR-3 | SCRUM-54b | the 3 Edge Functions + RPCs + client libs | #1 Supabase · #2 fal.ai *(to call them)* |
-| PR-4 | **SCRUM-53** | the ritual screens wired end-to-end → **the slice on glass** | + #5 device |
+| **PR-1** | **SCRUM-57** | expo-router shell · theme bridge · domain modules (aim/award/catalogue) · **the T2 acceptance test** · CI · docs | ✅ **merged** (PR #9) |
+| **PR-2** | SCRUM-54a | Supabase config + **migrations (21 tables · RLS) + seed** — *applied to the hosted project* | ✅ **merged** (PR #11) |
+| **PR-3** | SCRUM-54b | the 3 Edge Functions + the 11 RPCs + client libs | ⬜ **next** |
+| **PR-4** | **SCRUM-53** | the ritual screens wired end-to-end → **the slice on glass** | ⬜ needs the device |
 
-**The whole backend runs locally on Docker (already installed) — no account needed to build it.** The accounts (SCRUM-56) buy the *live AI call* and the *device truth*, not the ability to start.
+**PR-3 can be written now** — the schema is live, the fal.ai key is verified, and the CLI is linked. The only PM action left before the slice runs on the *hosted* backend is the **anonymous sign-ins toggle**.
+
+**The whole backend runs locally on Docker too — no account needed.** The accounts (SCRUM-56) bought the *live AI call* and the *device truth*, not the ability to start.
 
 ### What's next — DESIGN (awaiting PM)
 
@@ -80,6 +82,7 @@
 
 | # | Date | What landed |
 |---|---|---|
+| **27c** | 2026-10-03 | **PR-2 ✅ merged + applied to the hosted project** — the slice schema (**21 tables · 25 policies · RLS on every one**) · `config.toml` (anonymous sign-ins ON — the `init` default contradicted ADR-004; 2 private buckets with the doc 14 §3 budgets as hard guards) · 3 migrations pushed via `db push` · `seed.sql` · **verified: `anon` reads 0 rows, `authenticated` cannot write the ledger**. Also: **CLI link working** · **fal.ai key verified (API scope)**. Caught 4 bugs by *running* it |
 | **27b** | 2026-10-03 | **Build plan written** → **[[AppDesignConceptBoard/19-build-plan-services-api-environments\|doc 19]]**: service build order · the complete API surface (3 Edge Fns · 11 RPCs · storage · realtime · trust boundary) · 3-ring envs with the toolchain audited · SDK-57 manifest + 4 install traps · **build-vs-provision split** → **SCRUM-57** / **SCRUM-56**. **Path C prices re-verified live — ADR-002's $0.09/picture still exact.** Found 4 stale doc-07/README lines |
 | **27** | 2026-10-03 | **SCRUM-14 ✅ Done (planning)** → **[[AppDesignConceptBoard/18-mvp-scope-and-timeline\|doc 18]]**: MVP scope (12 essentials vs deferred) · gates G1–G6 + dependency map · effort in **focused sessions** (~50 to beta) · **M0–M5 timeline** (beta ≈ Feb 2027 · public ≈ Qingming 2027) · 12-risk register · T1–T4 testing plan; filed **SCRUM-53** (build the slice) · **SCRUM-54** (Supabase backend) · **SCRUM-55** (ADR-004/006/008) |
 | **26** | 2026-10-02 | **SCRUM-8 ✅ Done (planning)** → **[[AppDesignConceptBoard/ADRs/ADR-003-non-ar-ar-mvp-ar-framework\|ADR-003]]** (non-AR AR; ARKit/ARCore/Unity rejected) + **[[AppDesignConceptBoard/17-ar-fire-spike-plan\|doc 17]]** AR-fire PoC plan; execution → **SCRUM-51** |
@@ -89,7 +92,7 @@
 | **22** | 2026-09-30 | **SCRUM-45 responsive criterion ✅ Done** → `design-system/responsive.css` + `responsive-check.js` **21/21**; `contrast-check.js` **22/22** |
 | **21** | 2026-09-29 | **SCRUM-45 contrast tranche 2 ✅ complete** — 132 AA failures cleared by 120 shape edits; re-audit `clip 0 · occl 14 · lowc 0 · lowcAA 0 · largeLow 0`; Penpot `revn 229` |
 
-> Sessions **2 → 20**, plus every older working note, are in **[[completed-work-archive]]**.
+> Sessions **2 → 27**, plus every older working note, are in **[[completed-work-archive]]**.
 
 ---
 

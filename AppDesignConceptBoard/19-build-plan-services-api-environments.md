@@ -295,6 +295,7 @@ The CI habit is **plain Node scripts with no `npm install`** (`.github/workflows
 | ~~**8**~~ ✅ | **Supabase region** — **decided 2026-10-03: `ap-southeast-1` (Singapore)**, and the live project is already there | SEA latency; awkward to change later | free | project creation — **resolved** |
 | **9** | **GitHub repo secrets** *(optional)* | lets CI run DB lint against a throwaway project | free | nice-to-have |
 | **10** | **Google Play Console** — **defer** | submission only | $25 | M4 — not now |
+| ~~**11**~~ ✅ | **Anonymous sign-ins on the hosted project** — Dashboard → Authentication → Providers. **Set 2026-10-03 (S27c) and VERIFIED by a real sign-in.** | **ADR-004** locks anonymous device identity first, so a user burns *before* any signup wall. Locally this is `enable_anonymous_sign_ins = true` in `config.toml` (the `supabase init` default is `false` and contradicts the ADR) — on the hosted project it is a Dashboard toggle with **no** migration/SQL equivalent. **Verified:** `POST /auth/v1/signup` → **HTTP 200**, `is_anonymous: true`, `role: authenticated`, a full session issued | free | - |
 
 > **Three of these are one-time decisions that are expensive to reverse — #7 package id · #8 region · #6 domain. Five minutes each, now, saves a migration later.** The rest are logins.
 
