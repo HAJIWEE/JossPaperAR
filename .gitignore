@@ -9,6 +9,14 @@ yarn-error.log*
 .env.*
 !.env.example
 
+# ── Supabase CLI state — never commit ──────────────────────────────────────
+# `supabase link` writes its link state under .temp/, and those vectors can
+# carry connection credentials (e.g. a pooler URL). The official docs are
+# explicit: commit config.toml · migrations/ · seed.sql — NOT .temp/ or
+# .branches/, which are CLI-internal state.
+supabase/.temp/
+supabase/.branches/
+
 # ── Expo / React Native (once the app is scaffolded — ADR-001) ──────────────
 .expo/
 dist/
