@@ -9,10 +9,10 @@
 ## 📌 Quick Reference
 
 - **Project** — Joss Paper AR, an AR app that replaces physical joss-paper burning with a digital ritual
-- **Last session** — **S26 · 2026-10-02**: SCRUM-8 ✅ Done (planning) → **ADR-003** (non-AR AR) + **doc 17** (AR-fire PoC plan); execution filed as **SCRUM-51**
-- **Current phase** — style locked · **Penpot design signed off, 153 boards** · stack locked (**ADR-001**) · architecture authoritative (**07 v2.8**) · **repo + CI live, Expo SDK 57 scaffolded at repo root (single repo)**
+- **Last session** — **S27 · 2026-10-03**: SCRUM-14 ✅ Done (planning) → **doc 18** (MVP scope · dependency map · effort estimates · **M0–M5 timeline** · risk register · testing plan); filed the three tickets the critical path was missing: **SCRUM-53** (build the slice) · **SCRUM-54** (Supabase backend) · **SCRUM-55** (ADR-004/006/008)
+- **Current phase** — style locked · **Penpot design signed off, 153 boards** · stack locked (**ADR-001**) · architecture authoritative (**07 v2.8**) · **scope + timeline locked (doc 18)** · repo + CI live, Expo SDK 57 scaffolded at repo root (single repo)
 - **Active sprint** — **SCRUM Sprint 1** (2026-10-02 → 2026-10-16)
-- **Next milestone** — **SCRUM-17 vertical slice** (camera → cartoonize → burn → award → persist): the repo gate (**SCRUM-15 ✅ Done**) is cleared; `SCRUM-52` (floor device) is the remaining hardware gate for `SCRUM-51`
+- **Next milestone** — **SCRUM-17 vertical slice** (camera → cartoonize → burn → award → persist) — **now build-tracked as SCRUM-53**, gated by **SCRUM-54** (backend of record) + **SCRUM-52** (Tier F floor device); the AR-fire spike (**SCRUM-51**) shares the device gate
 - **Design source of truth** — **Penpot** (PM decision 2026-09-28): file `JossPaperAR`, page *"New-user tutorial · Core loop"*, **153 boards**, EN + 中文, wired
 - **ADRs accepted (5)** — `001` platform+backend · `002` Path C · `003` non-AR AR · `005` integrity · `007` privacy → [[AppDesignConceptBoard/ADRs/README|ADR register]] (open: `004` identity · `006` burn limits · `008` ad posture)
 - **User role** — Product Manager/Project Manager, AI vibe-coding · hobby project with family-legacy vision, no timeline pressure
@@ -30,18 +30,24 @@
 - **Penpot design signed off** — **153 boards**, EN + 中文, wired: core loop · splash/store/collection · altar family · boot flow · app mark · customization system · privacy/consent · economy flows · clan block
 - **Decisions closed** — miss → rethrow (never the top tier) · altar-first Home sizing · tablet naming as-built · platform **Option A** (ADR-001) · **Path C** cartoonization (ADR-002) · **non-AR AR** (ADR-003) · integrity (ADR-005) · privacy (ADR-007)
 - **Architecture authoritative** — [[AppDesignConceptBoard/07-system-architecture]] **v2.8**: service boundaries, the capture → cartoonize → burn → award → league API sketch, ~20-table data model
-- **Specs written** — economy `10` · integrity `11` · security/legal `12` · privacy `13` · NFRs `14` · clan `15` · cultural consultation `16` · AR-fire PoC `17`
+- **Specs written** — economy `10` · integrity `11` · security/legal `12` · privacy `13` · NFRs `14` · clan `15` · cultural consultation `16` · AR-fire PoC `17` · **MVP scope & timeline `18`**
 - **Spike executed** — style-D: 133 runs ≈ **US$4.49** of the US$20 cap → Path C locked
 
 ### What's next — ENGINEERING (the critical path)
 
-1. **SCRUM-17 — vertical slice** (camera → cartoonize → burn → award → persist): the repo gate (**SCRUM-15 ✅ Done 2026-10-02** — repo + CI + Expo scaffold + MIT licence, PRs #1–#3) is cleared. Hardware gate = **SCRUM-52** (floor device), which also blocks the AR-fire spike (**SCRUM-51**).
-2. **SCRUM-46 — clan build** (backend + frontend): doc 15 §9 = the schema, §10 = open build items (Book window hide-vs-purge · anti-abuse rate limits).
-3. **SCRUM-50 — QR invite** (generation · scanner · deep links) — `clans.code` capability, payload = the invite deep link; architecture already in 07 §4.6.
-4. **ADR-006 + ADR-008** still to write *from* [[AppDesignConceptBoard/10-economy-spec]] (burn-limit semantics · ad posture — ADR-008 is a product question: may ads ever enter the ritual flow?).
-5. **SCRUM-51 — AR-fire spike**, blocked by SCRUM-15 + the floor-device purchase (doc 14 §1, ~S$100–150).
-6. **SCRUM-49 — cultural consultation**, parked until the app is functional.
-7. **SCRUM-43** (legal long-tail, awareness only) · **SCRUM-47** (ancestor slots, Low).
+> **Re-ordered by [[AppDesignConceptBoard/18-mvp-scope-and-timeline|doc 18]] (S27).** Two *one-PM-action* gates now open the path: the **floor device (SCRUM-52)** and **ADR-008**. Measure nothing on a dev machine and call it done — `N1` says a milestone completes on the named Tier-F device.
+
+1. **SCRUM-54 — Supabase backend of record** (schema · RLS · `cartoonize-orchestrator` · `award-service`). Not device-bound → **the one item that can move this fortnight**. Everything downstream (persist · ledger · league · grid) hangs off it.
+2. **SCRUM-52 — Buy the Tier F floor device** — 1 of 3 (Galaxy A05s · Redmi A5 · Nokia C-series, ~S$100–150) → the named CI phone (doc 14 §1) · gates **SCRUM-53** + **SCRUM-51**. *A PM action.*
+3. **SCRUM-53 — Build the vertical slice** (SCRUM-17 execution): camera → cartoonize → burn → award → persist on the floor device. Thin by design — one object type, a hard-coded clan. Acceptance test = the **four aim bands**, not fps.
+4. **SCRUM-51 — AR-fire spike** (doc 17, gate A1–A7), sharing the device gate.
+5. **SCRUM-46 — clan build** (backend + frontend): doc 15 §9 = the schema, §10 = open build items (Book window hide-vs-purge · anti-abuse rate limits). Then **SCRUM-50 — QR invite** (generation · scanner · deep links) — `clans.code` capability, payload = the invite deep link; architecture in 07 §4.6.
+6. **SCRUM-11** (points/league/streaks — *spec still to write*) · **SCRUM-12** (location value) · **SCRUM-13** (fire mechanic, after the spike).
+7. **SCRUM-55 — write ADR-004 + ADR-006 + ADR-008** *from* [[AppDesignConceptBoard/10-economy-spec]]; **ADR-008 (ad posture) is a product question** and it blocks the ad SDK + the rewarded photo.
+8. **SCRUM-49 — cultural consultation**, parked until the app is functional (it is the pre-public gate, not a blocker).
+9. **SCRUM-43** (legal long-tail, awareness only) · **SCRUM-47** (ancestor slots, Low).
+
+**The calendar is effort-driven, not date-driven (doc 18 §5):** ~50 focused sessions to beta; **beta ≈ Feb 2027**, **public ≈ Qingming (5 Apr) 2027** at a realistic ~4 sessions/week. No milestone may be met by cutting an acceptance criterion.
 
 ### What's next — DESIGN (awaiting PM)
 
@@ -62,6 +68,7 @@
 
 | # | Date | What landed |
 |---|---|---|
+| **27** | 2026-10-03 | **SCRUM-14 ✅ Done (planning)** → **[[AppDesignConceptBoard/18-mvp-scope-and-timeline\|doc 18]]**: MVP scope (12 essentials vs deferred) · gates G1–G6 + dependency map · effort in **focused sessions** (~50 to beta) · **M0–M5 timeline** (beta ≈ Feb 2027 · public ≈ Qingming 2027) · 12-risk register · T1–T4 testing plan; filed **SCRUM-53** (build the slice) · **SCRUM-54** (Supabase backend) · **SCRUM-55** (ADR-004/006/008) |
 | **26** | 2026-10-02 | **SCRUM-8 ✅ Done (planning)** → **[[AppDesignConceptBoard/ADRs/ADR-003-non-ar-ar-mvp-ar-framework\|ADR-003]]** (non-AR AR; ARKit/ARCore/Unity rejected) + **[[AppDesignConceptBoard/17-ar-fire-spike-plan\|doc 17]]** AR-fire PoC plan; execution → **SCRUM-51** |
 | **25** | 2026-10-02 | **SCRUM-48 clan boards ✅ Done (PM-marked)** — 22 boards (`EN · 0e Clan` + `ZH · 0e 宗族`), both rows wired (96 interactions); boot hand-off `0d3` → fork rewired; boards **131 → 153**; doc 15 → **v0.3** |
 | **24** | 2026-10-01 | **SCRUM-24 ✅ Done (planning)** → doc **16** cultural consultation (advisor list · bilingual 10-question sheet · change policy · outcome template); execution → **SCRUM-49**; found the ZH copy mixing scripts |

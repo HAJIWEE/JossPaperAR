@@ -11,7 +11,7 @@
 |---|---|
 | 📋 Issue tracking (source of truth) | Jira → [hajiwee9411.atlassian.net](https://hajiwee9411.atlassian.net) project **SCRUM** |
 | 🎨 Design source of truth | **Penpot** — file `JossPaperAR`, page *"New-user tutorial · Core loop"*, 153 boards, EN + 中文 |
-| 🗂 Design concept board & specs | [`AppDesignConceptBoard/`](AppDesignConceptBoard/) — docs 01–17 + [`ADRs/`](AppDesignConceptBoard/ADRs/) |
+| 🗂 Design concept board & specs | [`AppDesignConceptBoard/`](AppDesignConceptBoard/) — docs 01–18 + [`ADRs/`](AppDesignConceptBoard/ADRs/) |
 | 🎨 Design system (tokens + checks) | [`design-system/`](design-system/) — `tokens.css` · `responsive.css` + the CI checks |
 | 🧪 Retired prototype (spec, not code) | [`prototype/`](prototype/) — ⚠️ retired 2026-09-28, kept as reference |
 | 🔬 Style spike results | [`spike/`](spike/) — 133 runs, Path C locked (ADR-002) |

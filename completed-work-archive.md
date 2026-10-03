@@ -9,7 +9,7 @@
 > Content is preserved **verbatim** from the source files (checkboxes, links and "TODO"-looking text are historical records — do not act on them).
 
 **Contents**
-1. **Session log** — sessions 2 → 26, newest first (was `next-ai-context.md` § Session Log)
+1. **Session log** — sessions 2 → 27, newest first (was `next-ai-context.md` § Session Log)
 2. **Superseded context sections** — the S19 review queue, the S20 open follow-up, the Sprint 0 goal
 3. **`next-ai-context.md` footer history** — the dated `*Updated…*` change log
 4. **Completed follow-up items & superseded notes** — was `follow-up-items.md` § Immediate Actions / Validation / Medium-Term / Key Questions / Resources / Notes
@@ -20,11 +20,23 @@
 
 ---
 
-## 1 · Session log — sessions 2 → 26, newest first
+## 1 · Session log — sessions 2 → 27, newest first
 
 > Verbatim from `next-ai-context.md`. Sessions 1–11 are compacted further down; the detail lives here.
 ### 🕐 Session Log — newest first
 
+#### 📅 Session 27 (2026-10-03) — SCRUM-14 ✅ Done (planning): MVP scope + realistic timeline → doc 18; the three missing build tickets filed (SCRUM-53/54/55)
+**Trigger:** PM — *"Take a look at Scrum-14 in Sprint 1 using the Jira MCP… Lets start Scrum-14."*
+
+SCRUM-14 (*"Define MVP scope and create realistic project timeline"*, raised S2, Medium) was **In Progress** in Sprint 1 with its scope input already written (S8 — `05-concept-to-mvp-gap-analysis.md`), and the 2026-09-24 note on the ticket pointed at the milestone chain *spike → vertical slice → family alpha → beta*. What was missing was the **plan itself** — and, on inspection, three tickets the critical path silently needed.
+
+1. **Deliverable — [[AppDesignConceptBoard/18-mvp-scope-and-timeline|doc 18 · MVP scope & realistic timeline]]** ✅. §1 definitions (slice / alpha / beta / deferred) · §2 **12 essentials vs 8 deferred**, each essential carrying its source doc, build site and acceptance test · §3 the **dependency map** (gates **G1–G6**, the DAG, and the same map in Jira terms) · §4 effort in **focused sessions** (the project's own measurable unit — S1→S26 ran in 11 days) with a stated pace assumption · §5 the **M0–M5 timeline** · §6 a **12-risk register** (L/I · trigger · owner) · §7 the **T1–T4 testing plan** + the acceptance tests + the three failure paths · §8 what still needs the PM (D1–D8).
+2. **The finding that mattered:** the plan's own dependency map exposed that **nothing was filed to *build* the vertical slice** (SCRUM-17 was only the *scope*, and is Done) and that **no ticket existed for the backend of record** — yet the persist step, the ledger, the league and the location grid all hang off it. **Filed: SCRUM-54** (Supabase backend: schema + RLS + `cartoonize-orchestrator` + `award-service`) · **SCRUM-53** (build the slice — thin: one object type, a hard-coded clan; acceptance test = the four aim bands) · **SCRUM-55** (write the three unwritten ADRs 004/006/008 — decided but unrecorded).
+3. **Honesty over a tidy Gantt:** the timeline is **effort-driven** — ~50 focused sessions to beta with the two calendar columns shown side by side (build pace ≈ 4 sessions/week → **beta ≈ Feb 2027 · public ≈ Qingming 2027**; the design-phase pace would be ~3× sooner). It names the two risks that can move every date (**R6 first native build · R7 the Penpot→RN screen build**) and the two *one-PM-action* gates (**SCRUM-52 device · ADR-008 ad posture**) that currently hold the path.
+4. **Scope is now closed:** §2.2 is the standing answer to every "we could also…" for the next three months (Virtual Temple · AR-fire collection · battle pass · social beyond the clan · true AR · slots · store UI beyond the catalogue · the ad SDK until ADR-008).
+5. **Docs updated:** concept-board index (doc **18** row) · [[next-ai-context]] (critical path re-ordered; S27 logged) · [[follow-up-items]] (SCRUM-53/54/55 added; the SCRUM-10 milestones item closed; **Key Question 1 — timeline — answered**) · this archive. **Jira:** `SCRUM-14` → **Done (planning)**.
+
+#### 🎯 Session 26 (2026-10-02) — SCRUM-8 ✅ Done (planning): the AR framework question answered → ADR-003 (non-AR AR) + doc 17 (AR-fire PoC plan, execution deferred)
 #### 🎯 Session 26 (2026-10-02) — SCRUM-8 ✅ Done (planning): the AR framework question answered → ADR-003 (non-AR AR) + doc 17 (AR-fire PoC plan, execution deferred)
 **Trigger:** PM — *"Let's start on Scrum-8, refer to the obsidian notes for context."*
 
