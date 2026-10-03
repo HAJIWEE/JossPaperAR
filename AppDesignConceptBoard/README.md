@@ -26,7 +26,7 @@ We are currently focused on **two parallel tracks** (SCRUM-6 & SCRUM-9):
 |------|-------------|--------|
 | [[01-joss-paper-styles]] | Traditional joss paper designs, colors, motifs & cartoon style references | ✅ Style Locked (2026-09-24) |
 | [[02-user-flow-wireframes]] | Core user flow, screen mapping & wireframe sketches | 🔄 Clickable HTML prototype built (`/prototype`) — v2 adds the ancestral altar (tablets + add-tablet), car offering & in-fire toss · **Penpot (S10–12): 26 boards — core loop, splash/store/collection, ancestor sheet + altar states, EN + 中文, wired** |
-| [[03-ai-design-tools]] | AI tools for image generation & design (pricing + capability comparison) | 🟡 Partly — design tool settled (**Penpot**, MCP-wired — Session 9); **runtime** cartoonization still TBD |
+| [[03-ai-design-tools]] | AI tools for image generation & design (pricing + capability comparison) | ✅ **Research complete** — design tool **Penpot** (S9); runtime cartoonization = **Path C on fal.ai** ([[ADRs/ADR-002-path-c-describe-then-generate\|ADR-002]]) · spike results + all 5 open questions answered in the doc · closes **SCRUM-7** |
 | [[04-ar-app-patterns]] | AR app design inspiration (Pokémon GO, Duolingo, etc.) | ✅ Draft complete — contains the key MVP call: *non-AR AR first* |
 | [[05-concept-to-mvp-gap-analysis]] | Concept vs prototype vs real MVP: every fake, every missing feature, and the decisions architecture must close | ✅ Complete (Session 8) — the Session-9 brief |
 | [[06-tech-stack-options]] | Tech stack options for SCRUM-10 — Fedora 44 + Cline + low-cost + cross-platform constraints, 4 options compared, AI pipeline research | ✅ Decided (S16) — **Option A (Expo/RN + Supabase + hosted AI) leaned**, iOS deferred, spike approved, hosted APIs day one |
