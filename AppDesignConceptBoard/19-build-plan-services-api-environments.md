@@ -165,6 +165,8 @@ npx expo start                 # the app, against the LOCAL backend
 
 ### 4.3 Ring 3 — cloud services, and the *only* two that bill
 
+> ✅ **Provisioned 2026-10-03 (PM decisions).** Project `yercgevebxvtzkgctfai` ("HAJIWEE's Project") · region **`ap-southeast-1` (Singapore)** ✅ as recommended · **Postgres 17.11** · `ACTIVE_HEALTHY`. CLI **v2.119.0** logged in. Package id **`app.josspaperar`** ✅ → `app.json`.
+
 | Service | Tier | Bills? | Gates |
 |---|---|---|---|
 | **Supabase hosted** | free | no (until scale) | the slice's persist step + anything shared |
@@ -172,17 +174,39 @@ npx expo start                 # the app, against the LOCAL backend
 | **EAS** | free tier | no | cloud Android builds; iOS later |
 | **Play Console** | $25 once | no (one-off) | submission only — **not now** |
 
+**What the live project already tells us (checked via MCP):**
+
+- **`pg_cron` is available** (1.6.4, not yet installed) → `weekly-roll` has its scheduler (07 §4.4). **Enable it in a migration.**
+- **`pgtap` is available** → SQL-level tests for the ledger/RLS rules are possible without adding a dependency.
+- **`postgis` is available — and we must not use it.** The location model is a **coarse geohash cell with no coordinates and no trail** (13 §2). PostGIS would make raw-geometry storage one line away; its presence is not a reason. A deliberate non-use, worth stating.
+- **`pg_partman`** is available if `ledger_events` ever needs time partitioning (not at alpha).
+- Postgres is **17**, not 15 — everything in doc 07 §5 is unaffected.
+
 ### 4.4 Environment variable matrix
 
 | Variable | Lives in | Ring 1 (local) | Ring 3 (cloud) | Secret? |
 |---|---|---|---|---|
 | `EXPO_PUBLIC_SUPABASE_URL` | app bundle | `http://localhost:54321` | project URL | no (public) |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | app bundle | local anon key | project anon key | **no — RLS is what protects it** |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | app bundle | local anon key | **publishable key** (`sb_publishable_…`) | **no — RLS is what protects it** |
 | `EXPO_PUBLIC_API_BASE_URL` | app | optional override | unused | no |
-| `SUPABASE_SERVICE_ROLE_KEY` | Edge Fn secrets **only** | `supabase/.env.local` | `supabase secrets set` | 🔴 **yes — never in the bundle** |
-| `FAL_KEY` | Edge Fn secrets **only** | `supabase/.env.local` | `supabase secrets set` | 🔴 **yes — never in the bundle** |
+| `FAL_KEY` | **Edge Fn secrets only** | `supabase/functions/.env` | `supabase secrets set --env-file …` | 🔴 **yes — never in the bundle** |
 
-The rule is already encoded in `.env.example` (written at SCRUM-15): `EXPO_PUBLIC_*` is public by definition; the AI key and the service-role key exist **only** server-side. **The build must not weaken this.**
+**⚠️ Two corrections (2026-10-03, checked against the official docs):**
+
+1. **`SUPABASE_SERVICE_ROLE_KEY` is NOT ours to set.** Supabase **injects** these into every Edge Function automatically, and any name starting with `SUPABASE_` is **reserved**:
+   `SUPABASE_URL` · `SUPABASE_DB_URL` · `SUPABASE_JWKS` · **`SUPABASE_PUBLISHABLE_KEYS`** (JSON dict — RLS applies) · **`SUPABASE_SECRET_KEYS`** (JSON dict — **bypasses RLS**); *legacy:* `SUPABASE_ANON_KEY` · `SUPABASE_SERVICE_ROLE_KEY`.
+   Earlier revisions of this doc told the PM to *"put the service-role key into Edge secrets"*. **That was wrong, and it was unnecessary work** — a function just reads `SUPABASE_SECRET_KEYS['default']` (or the legacy var) with zero setup.
+2. **Modern keys replace the legacy pair.** Supabase now issues **publishable** (`sb_publishable_…` — client-safe, replaces `anon`) and **secret** (`sb_secret_…` — bypasses RLS, replaces `service_role`); the legacy two keep working until end-2026. **This project uses the publishable key from day one** — it rotates independently and carries no legacy baggage. The `sb_secret_…` key is server-only: **never committed, never pasted into chat, never in the bundle.**
+
+**The local-vs-hosted split:**
+
+| Where | File | Loaded by |
+|---|---|---|
+| **Local** Edge Functions | `supabase/functions/.env` *(gitignored)* | automatically by `supabase start` / `functions serve` (or `--env-file`) |
+| **Hosted** Edge Functions | *(no file ships)* | `supabase secrets set --env-file supabase/functions/.env` |
+| **The app** | `.env` at the repo root *(gitignored)* | Expo — **only `EXPO_PUBLIC_*` reaches the bundle** |
+
+Both real `.env` files are gitignored; the `.env.example` templates are committed. **Neither real file may ever be committed** — the one rule the build must not weaken.
 
 ---
 ## 5 · Dependency manifest — exact, for Expo SDK 57
@@ -261,14 +285,14 @@ The CI habit is **plain Node scripts with no `npm install`** (`.github/workflows
 
 | # | Item | Why | Cost | Blocks |
 |---|---|---|---|---|
-| **1** | **Supabase account + one project** → give me the **Project URL** + **anon key**; put the **service-role key** into the Edge secrets (never to me in chat) | Ring 3 — the slice's persist step and anything shared | **free** | PR-3 · PR-4 · the M1 device run |
+| ~~**1**~~ ✅ | **Supabase project** — **done 2026-10-03**: `yercgevebxvtzkgctfai` ("HAJIWEE's Project") | Ring 3 — the slice's persist step and anything shared | **free** | ~~PR-3 · PR-4 · the M1 device run~~ **unblocked** — *still need: the anon key into `.env` + the service-role key into Edge secrets* |
 | **2** | **fal.ai account + API key + a small credit top-up** | **Path C — the only metered spend.** ≈$0.09/picture → **US$10 ≈ 110 pictures**, ample for the slice | **~US$10** | the live cartoonize call |
-| **3** | **Supabase CLI login** — `supabase login` is an **interactive device-code flow** | Ring 1 — `supabase start` / `db reset` / `functions serve` | free | the local backend loop |
+| ~~**3**~~ ✅ | **Supabase CLI login** — **done 2026-10-03**: CLI **v2.119.0** at `/usr/local/bin/supabase`, logged in (verified: `supabase projects list` sees the project) | Ring 1 — `supabase start` / `db reset` / `functions serve` | free | ~~the local backend loop~~ **unblocked** |
 | **4** | **EAS login** — `npx eas-cli login`, same interactive reason | cloud Android builds; the iOS-later path | free | dev builds |
 | **5** | **Android SDK + emulator (KVM)** *or* the **Tier-F device** (SCRUM-52) | Ring 2 — emulator for speed, **device for truth** (N1) | free / ~S$100–150 | the M1 device run |
 | **6** | **A domain for invite deep links** (e.g. `josspaperar.app` — doc 07 §4.6 assumes it) | App/Universal Links, so a QR invite survives the app not being installed | ~S$15/yr | **SCRUM-50 only — not the slice** |
-| **7** | **Decide the Android package id** (`app.josspaperar` vs `sg.josspaperar` …) | baked into `app.json` + EAS; **painful to change after the first Play upload** | free | EAS build config |
-| **8** | **Decide the Supabase region** — recommend **`ap-southeast-1` (Singapore)** | SEA latency; also awkward to change later | free | project creation |
+| ~~**7**~~ ✅ | **Android package id** — **decided 2026-10-03: `app.josspaperar`** → set in `app.json` (`android.package`; `ios.bundleIdentifier` carries the same reverse-DNS as the natural pairing — trivially changeable while iOS is deferred) | baked into `app.json` + EAS; **painful to change after the first Play upload** | free | EAS build config — **resolved before any build** |
+| ~~**8**~~ ✅ | **Supabase region** — **decided 2026-10-03: `ap-southeast-1` (Singapore)**, and the live project is already there | SEA latency; awkward to change later | free | project creation — **resolved** |
 | **9** | **GitHub repo secrets** *(optional)* | lets CI run DB lint against a throwaway project | free | nice-to-have |
 | **10** | **Google Play Console** — **defer** | submission only | $25 | M4 — not now |
 
@@ -278,17 +302,20 @@ The CI habit is **plain Node scripts with no `npm install`** (`.github/workflows
 
 ```
    ┌── YOU ─────────────────────────────────────────────────────┐
-   │ #3 supabase CLI login ───────▶ local backend loop ─────────┼──▶ E · F · G (I write, you run)
-   │ #1 Supabase project ─────────▶ Ring 3 persist ─────────────┼──▶ PR-3 · PR-4 · M1 device run
-   │ #2 fal.ai key ───────────────▶ live Path C call ───────────┼──▶ the slice's cartoonize step
-   │ #5 device / emulator ────────▶ Ring 2 ─────────────────────┼──▶ N1 device verification
-   │ #6/#7/#8 decisions ──────────▶ config ─────────────────────┼──▶ SCRUM-50 · EAS · project creation
+   │ ✅ #3 supabase CLI login ────▶ local backend loop ─────────┼──▶ E · F · G (I write, you run)
+   │ ✅ #1 Supabase project ──────▶ Ring 3 persist ─────────────┼──▶ PR-3 · PR-4 · M1 device run
+   │ ⬜ #2 fal.ai key ────────────▶ live Path C call ───────────┼──▶ the slice's cartoonize step
+   │ ⬜ #5 device / emulator ─────▶ Ring 2 ─────────────────────┼──▶ N1 device verification
+   │ ✅ #7/#8 decided ──⬜ #6 ────▶ config ─────────────────────┼──▶ SCRUM-50 · EAS
    └────────────────────────────────────────────────────────────┘
+        ✅ = provisioned 2026-10-03.   Still open: #2 fal.ai · #5 device · #6 domain.
 
    ┌── ME — no dependencies at all ─────────────────────────────┐
-   │ A · B · C · D · E(migrations) · F · G · H · I · J ─────────┼──▶ PR-1 ships with no account
+   │ A · B · C · D · E(migrations) · F · G · H · I · J ─────────┼──▶ PR-1 ✅ shipped
    └────────────────────────────────────────────────────────────┘
 ```
+
+**Since the CLI is live, PR-2 (SCRUM-54a) is now fully executable** — not just writable. **One PM step still needed to deploy to the hosted project:** `supabase link --project-ref yercgevebxvtzkgctfai` asks for the **database password** (or set `SUPABASE_DB_PASSWORD`). Local `supabase start` needs no linking at all — Docker is enough. *(The anon key also has to reach `.env`; the service-role key must go only into Edge secrets — never the bundle, never chat.)*
 
 **The critical insight: the entire first PR needs nothing from you.** PR-1 (SCRUM-57) is shell + theme + domain modules + tests + CI — pure repo work, and it is the piece that makes everything after it fast.
 
