@@ -43,6 +43,17 @@ jobs:
       - name: Domain checks (aim bands · award · wallet invariant · quotas)
         run: node src/domain/checks/run.ts
 
+      # SCRUM-54b (PR-3). Both are dependency-free, so they belong here:
+      #  · pathc-check   — ADR-002's LOCKED pipeline: the endpoints, the v3
+      #    template clauses, and the ABSENCE of example colours in the identify
+      #    prompt (the leak that mis-coloured five spike images)
+      #  · sql-structure — the trap-#7 gate: a truncated migration cannot pass
+      - name: Path C lock guard (ADR-002 — endpoints, template clauses, no colour leak)
+        run: node supabase/checks/pathc-check.ts
+
+      - name: Migration structure check (balanced $$, parens, closed statements)
+        run: node supabase/checks/sql-structure.js
+
   app-checks:
     name: App checks (typecheck · expo-doctor)
     runs-on: ubuntu-latest
@@ -61,6 +72,12 @@ jobs:
 
       - name: TypeScript typecheck
         run: npm run typecheck
+
+      # SCRUM-54b (PR-3) — the client libs' own harness. It imports i18n-js, so
+      # it needs node_modules and therefore belongs in this job, not the
+      # dependency-free one above.
+      - name: Client-library checks (idempotency · invites · i18n · split storage · queue)
+        run: npm run check:lib
 
       - name: Expo doctor
         run: npx expo-doctor

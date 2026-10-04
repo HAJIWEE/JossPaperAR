@@ -3,16 +3,24 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@supabase/supabase-js": "^2.117.2",
     "expo": "~57.0.26",
     "expo-constants": "~57.0.20",
+    "expo-crypto": "~57.0.3",
     "expo-linking": "~57.0.11",
+    "expo-localization": "~57.0.2",
     "expo-router": "~57.0.24",
+    "expo-secure-store": "~57.0.4",
+    "expo-sqlite": "~57.0.3",
     "expo-status-bar": "~57.0.1",
+    "i18n-js": "^4.5.3",
     "react": "19.2.3",
     "react-dom": "^19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-screens": "~4.26.0"
+    "react-native-screens": "~4.26.0",
+    "react-native-url-polyfill": "^4.0.0"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
@@ -26,7 +34,11 @@
     "typecheck": "tsc --noEmit",
     "check:tokens": "node src/theme/checks/parity.ts",
     "check:domain": "node src/domain/checks/run.ts",
-    "check": "npm run typecheck && npm run check:tokens && npm run check:domain && node design-system/contrast-check.js && node design-system/responsive-check.js",
+    "check:lib": "node src/lib/checks/run.ts",
+    "check:pathc": "node supabase/checks/pathc-check.ts",
+    "check:sql": "node supabase/checks/sql-structure.js",
+    "check:db": "bash supabase/checks/run-sql-tests.sh",
+    "check": "npm run typecheck && npm run check:tokens && npm run check:domain && npm run check:pathc && npm run check:sql && node design-system/contrast-check.js && node design-system/responsive-check.js && npm run check:lib",
     "bundle:android": "expo export --platform android --output-dir .expo/bundle-check"
   },
   "private": true

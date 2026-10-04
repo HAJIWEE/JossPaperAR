@@ -40,6 +40,7 @@
 | Date | Item | Purpose | Original | Rate | **SGD** | Status |
 |---|---|---|---|---|---|---|
 | 2026-09-25 | **Style-D fidelity spike — budget approved** (stakeholder) | Prove low-poly 3D × ink brush is achievable via hosted APIs (fal/Replicate credits) before provider lock-in | US$10–20 budget · **actual US$4.49** | 1.2771 ⚠ placeholder | **S$5.73 actual** (est. — 4.49 × 1.2771) | ✅ approved · **spent 2026-09-26** (133 runs, well under cap ✅) — *estimate; final fal invoice to reconcile at SCRUM-41 close (due 2026-10-06)* |
+| 2026-10-04 | **PR-3 live verification (SCRUM-54b)** — real fal calls against the deployed Edge Functions | Prove the locked Path C pipeline runs end-to-end on the hosted runtime, with cost/latency recorded: 7 × `moondream2` identify (~$0.01) + 4 × `nano-banana-2` 1K generate (~$0.08) | **≈ US$0.40** (est. — 0.07 + 0.32; two runs were spent discovering the PNG-size defect and the colour-rule false positive) | 1.2900 ⚠ placeholder | **≈ S$0.52** (est.) | ✅ **incurred 2026-10-04** — one run completed fully (`cost_micros: 90000`, `latency_ms: 14988`, a persisted sprite). *Placeholder rate (rule 4) — reconcile to the Mastercard rate at the next session; add to the SCRUM-41 reconciliation.* |
 
 <!-- APPEND-NEW-ONEOFF-COSTS-ABOVE -->
 

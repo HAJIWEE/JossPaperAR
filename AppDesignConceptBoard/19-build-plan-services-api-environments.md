@@ -370,7 +370,7 @@ JossPaperAR/
 |---|---|---|---|---|
 | **PR-1** | **SCRUM-57** | shell (A) · theme (B) · domain (C) · tests (D) · CI (I) · docs (J) | ❌ **nothing** | the repo can carry real code |
 | **PR-2** | SCRUM-54a | `supabase/config.toml` + migrations + RLS + seed (E) | #3 *(to *run* it)* | the local backend loop |
-| **PR-3** | SCRUM-54b | Edge Functions (F) + RPCs (G) + client libs (H) | #1 · #2 *(to call them)* | **G3 — the backend of record** |
+| **PR-3** | SCRUM-54b | Edge Functions (F) + RPCs (G) + client libs (H) | #1 · #2 *(to call them)* | **G3 — the backend of record** | ✅ **shipped 2026-10-04** — 6 migrations · 3 functions · 5 client libs · Path C lock guard · a live SQL verification. See **§12** for what building it found. |
 | **PR-4** | **SCRUM-53** | the ritual screens wired end-to-end | #1 · #2 · #5 | **G2 + M1 — the slice runs on glass** |
 
 **PR-2 through PR-4 can all be *written* before any account exists** — the accounts are needed to *run* them, and only PR-4's device run is genuinely gated by hardware.
@@ -463,6 +463,51 @@ All four saved to the **fal library** (provenance kept) so the URLs do not expir
 | **Verification** | ✅ Path C endpoints + prices re-checked live (2026-10-03) — ADR-002's $0.09/picture **still exact** |
 
 **The plan's own summary:** doc 07 already told us *what* to build; the only expensive surprises were in the *setup* — and the audit shows **this machine can run the entire backend locally with no accounts, and the first PR needs nothing at all.** The accounts buy the *live call* and the *device truth*, not the ability to start.
+
+---
+
+## 12 · What PR-3 found (2026-10-04) — the plan vs the live project
+
+PR-3 was built against the live project, and **the live project disagreed with the notes in five places.** Each was verified with a query or a real call before anything changed, and each is fixed in a migration rather than remembered.
+
+| # | What the notes said | What the project actually said | What happened |
+|---|---|---|---|
+| **1** | "private buckets `captures` + `styled` exist" (hand-off, S27c) | `select * from storage.buckets` → **0 rows**. The slice schema is tables/RLS only — **no bucket DDL was ever written** | ✅ **migration 0006** creates both at the doc 19 §3.3 limits (300 KB jpeg · 150 KB png) plus the `storage.objects` policies. Before this the orchestrator had nowhere to write a sprite. |
+| **2** | — (nobody mentioned it) | **Nothing created a `profiles` row.** No `handle_new_user` trigger exists, so an `auth.users` insert produced no profile — and every money/AI table FKs to `profiles`. **A brand-new anonymous user could not burn anything**: the ADR-004 first-run path was dead on arrival | ✅ **migration 0006** adds the auth trigger (`SECURITY DEFINER`, EXECUTE revoked from every client role — traps #1 + 0003). Proved by a real sign-in. |
+| **3** | doc 10 §7: `quotas` gains `photo_burns_used` · `store_burns_used` · `free_photos_used_month` | `quotas` has **one** counter (`burns_used`); the per-kind columns were never applied, and there is no monthly-grant column or table | The 10/20 split is **derived from `burns`** inside `submit_burn` (the authoritative record anyway); `quotas.burns_used` stays a display rollup. **doc 10 §7 is misleading** → flagged for SCRUM-18. |
+| **4** | doc 07 §4.3: new-ground comes "from `grid_cells`" | `grid_cells` is **aggregate-only and holds no identity** — it cannot answer "has THIS user burned here before?" | New-ground is read from **`cell_burns`** (the per-user decay table); doc 11 §1 allows either, so this is doc 07 naming the wrong table. `grid_cells` still receives the aggregate. |
+| **5** | doc 19 §3.2: the app calls `submit_burn` · doc 19 §3.1: `award-service` is the only money writer | A function granted to `authenticated` **cannot** be the only writer — measured, not assumed: a `SECURITY DEFINER` function granted to `authenticated` moves the advisor's `authenticated_security_definer_function_executable` count **3 → 4** | **`submit_burn` + `request_cartoonize` are `service_role`-ONLY**, so "only the award path writes money" is true **by GRANT**, and the money path adds **zero** advisor findings. The client reaches them through the two Edge Functions — the stricter of the two doc lines. |
+
+### 12.1 · The defects the verification test found (0007–0009)
+
+`supabase/tests/pr3_verification.sql` is a machine that CAN fail — and it failed three times before it passed, each time on a real bug:
+
+| Migration | Defect | Caught by |
+|---|---|---|
+| **0007** | `submit_burn` consumed a store offering's `inventory.qty` **before** the band was known, so a **miss destroyed the offering** — contradicting S9 ("the offering returns, never destroyed") | the S9 assertion |
+| **0008** | `purchase_item` asked the `balances` **view** for `sum(amount)`; the view exposes `(user_id, currency, balance)` and `amount` lives on `ledger_events`. plpgsql does not resolve columns until first execution, so 0005 applied cleanly and only failed on the first purchase | the purchase assertion |
+| **0009** | `delete_my_data`'s own VERIFY probe counted `cartoonize_jobs where user_id = …` — a column that does not exist (the table keys on `capture_id`), so the probe broke at exactly the moment it was meant to prove 0 rows | the delete assertion |
+
+### 12.2 · The new gates, and what each one cost
+
+| Gate | What it protects | Fault-tested? |
+|---|---|---|
+| `supabase/checks/sql-structure.js` | trap #7 — a truncated migration (balanced `$$`, parens, closed statements) | ✅ a truncated `create table` goes RED |
+| `supabase/checks/pathc-check.ts` | **ADR-002's lock** — endpoints, the v3 template clauses, and the ABSENCE of example colours in the identify prompt | 32 assertions |
+| `src/lib/checks/run.ts` | the client libs: idempotency keys · invite/QR payloads · EN/中文 parity · split storage · the queue's sent/dropped/retryable/stuck accounting | ✅ found a real bug: i18n-js treats `.` as a namespace separator, so flat dotted keys never resolved |
+| `supabase/tests/pr3_verification.sql` | the PR's whole DoD list, against a real database | ✅ `1650 → 1601` goes RED with the exact failure |
+
+### 12.3 · The verification, in numbers
+
+Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, not inferred:
+
+- **`supabase db push`** → all migrations applied; `migration list` shows **no drift**.
+- **The SQL verification passed**, and **the same file with one number corrupted went RED** — the harness is alive.
+- **The fixtures tear themselves down**: afterwards `profiles` · `auth.users` · `clans` · `burns` · `ledger_events` · `grid_cells` · `rate_counters` · `clan_members` · `ancestors` · `inventory` are all **0 rows**.
+- **Over the real HTTP API**, with a real anonymous session: `POST /rest/v1/rpc/submit_burn` → **403 `42501 permission denied for function submit_burn`**; `POST /rest/v1/ledger_events` → **403 `42501`**; `GET /rest/v1/profiles` as `anon` → **200 `[]`**.
+- **`get_advisors(security)`**: `authenticated_security_definer_function_executable` **3 → 7** — the four named exceptions, all inside a category the baseline already carried; `rls_enabled_no_policy` **unchanged at 4**; and **nothing in `public` is executable by `anon`** (0 functions) — trap #1's real invariant, asserted in the test.
+- **The buckets exist**: `captures` (307200 · image/jpeg) · `styled` (153600 · image/png), both private.
+- **The pg_cron question stays open**: enabling it is a SCRUM-11 step (the league has no spec yet), so it was deliberately NOT enabled here.
 
 ---
 

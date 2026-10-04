@@ -38,7 +38,29 @@ PR-1 was merged here too (**PR #9** → `5da8443`), then PR-2 (doc 19 §8) was b
 6. **Two PM actions unblocked, one discovered.** Your `supabase link` **now works** (`Finished supabase link.`; the DB password turned out to be **optional** for `link`, and is in the native keyring) — so `db push` / `pull` / `migration list` all connect. The **fal.ai key is verified**: `fal_` prefix, 72 chars, **API scope** (the 403 on the billing platform API is expected — that needs ADMIN scope, which Path C does not need). **Discovered:** the anonymous sign-ins toggle (above).
 7. **Docs:** board index · [[next-ai-context]] (S27b + S27c) · [[follow-up-items]] · doc 19 §4.3/§4.4/§6.2 · `.env.example` + a new `supabase/functions/.env.example`. **Jira:** SCRUM-57 → **Done**; SCRUM-54 → **In Progress**.
 
-#### 📋 Session 27b (2026-10-03) — the build plan (doc 19) + the first real experiment: `nano-banana-2-lite` re-benchmark
+#### 🧱 Session 28 (2026-10-04) — **PR-3: the backend of record — RPCs · Edge Functions · client libs — built, applied AND exercised against the live project**
+
+**What landed (SCRUM-54b).** Six new migrations on top of PR-2's three, all applied to `yercgevebxvtzkgctfai` with `migration list` showing **no drift**:
+
+| # | Migration | What it does |
+|---|---|---|
+| 0004 | `rpc_submit_burn` | **THE SPINE** — one transaction = one burn: server-derived band from `accuracy` (never client-sent), award clamped 0–1,650, the derived 49,500/day ceiling as a second belt, replay-safe on `idempotency_key` (checked BEFORE the 6/min limiter), append-only ledger. `SECURITY DEFINER`, **EXECUTE to `service_role` ONLY**. |
+| 0005 | `rpc_app_surface` | 10 RPCs — `request_cartoonize` · `get_league_board` (honest stub) · `create_clan` · `reroll_clan_code` · `preview_clan` · `join_clan` · `save_ancestor` · `purchase_item` · `equip_decoration` · `delete_my_data` — plus the RLS policies the INVOKER ones need and the S14k one-set-per-category trigger. |
+| 0006 | `storage_buckets_and_profile_bootstrap` | ⚠️ **THE BUCKETS DID NOT EXIST** (`storage.buckets` → 0 rows) and **nothing created a `profiles` row** — both found by querying the live project, both fixed here. |
+| 0007 | `fix_rethrow_consumption` | Found by the verification test: a MISS destroyed a store offering (S9 says it RETURNS). |
+| 0008 | `purchase_item_balances_fix` | Found by the test: `purchase_item` asked the `balances` VIEW for `sum(amount)` — the view has no such column, and plpgsql only resolves it on first execution. |
+| 0009 | `delete_my_data_verify_fix` | Found by the test: the delete's own VERIFY probe counted a column that does not exist. |
+| 0010 | `styled_bucket_webp` | Found by the first real Path C run: a 1K PNG sprite is **1.3 MB** against a 150 KB budget; 1K WebP is **49.7 KB**. |
+
+**The three Edge Functions, deployed AND run:** `award-service` (a real burn → 1,600 tribute; a replay → `idempotent_replay: true` with the same burn id; a forged `band` ignored → miss) · `cartoonize-orchestrator` (**a full Path C run: identify → zod-validate → generate → upload**, `status: 'styled'`, `cost_micros: 90000`, `latency_ms: 14988`, `retries: 0`, a persisted `.webp` sprite) · `weekly-roll` (an honest stub that refuses a user JWT with 403 and reports `status: 'stub'` to the cron's secret key).
+
+**The five client libs:** `supabase.ts` (client + the split-storage auth adapter) · `queue.ts` (pure policy) + `queue-sqlite.ts` (the durable driver) · `idempotency.ts` · `invites.ts` (link · deep link · QR payload · parser) · `i18n.ts` (EN/中文).
+
+**Four new machine-readable gates:** `check:sql` (trap #7 — a truncated migration cannot pass; fault-tested) · `check:pathc` (the ADR-002 lock: endpoints, the v3 clauses, and the ABSENCE of example colours in the identify prompt — 38 assertions) · `check:lib` (keys · invites · EN/中文 parity · split storage · the queue's accounting) · `supabase/tests/pr3_verification.sql` (the whole DoD list, run against the real database, **fault-tested red** with `1650 → 1601`).
+
+**Verified, not asserted:** a client `POST /rest/v1/rpc/submit_burn` → **403 `42501`** · a client `POST /rest/v1/ledger_events` → **403 `42501`** · `GET /rest/v1/profiles` as `anon` → **200 `[]`** · `npm run check` **EXIT=0** (typecheck · tokens · domain · Path C · SQL structure · contrast · responsive · client libs) · `npx expo-doctor` **21/21** · `npm ci --dry-run` clean · `get_advisors(security)` **no new lint categories** and **0 anon-executable functions** (the authenticated-definer count went 3 → 7 — the four documented exceptions).
+
+**Docs:** [[AppDesignConceptBoard/19-build-plan-services-api-environments|doc 19]] **§12** (five plan-vs-reality findings + the defects + the numbers) · [[next-ai-context]] (S28) · [[follow-up-items]] (SCRUM-54 → Done; the PR-3 findings list) · `.env.example`. **Jira:** SCRUM-54 → **Done** (PR-3 = SCRUM-54b).
 **Trigger:** PM — *"start planning the actual building of the actual application… what i can setup vs what you need to setup for me."*
 
 1. **Deliverable — [[AppDesignConceptBoard/19-build-plan-services-api-environments|doc 19 · build plan]]** ✅: service build order · **the complete API surface** (3 Edge Fns · 11 RPCs · 2 buckets · 1 Realtime channel · the trust-boundary table) · **3-ring environments with the machine's toolchain audited** · the exact SDK-57 manifest + **4 install traps** · the **build-vs-provision split (A–J ↔ #1–#10)**.
