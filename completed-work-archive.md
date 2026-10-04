@@ -13,7 +13,7 @@
 2. **Superseded context sections** — the S19 review queue, the S20 open follow-up, the Sprint 0 goal
 3. **`next-ai-context.md` footer history** — the dated `*Updated…*` change log
 4. **Completed follow-up items & superseded notes** — was `follow-up-items.md` § Immediate Actions / Validation / Medium-Term / Key Questions / Resources / Notes
-5. **`follow-up-items.md` footer history**
+5. **Completed follow-ups — 2026-10-04 (S28 · S28b)** — PR-3's closures and the **SCRUM-59 stop-rule build**
 
 ---
 
@@ -726,4 +726,39 @@ A read-only MCP sweep of all **135 boards / 10,042 shapes** on page *New-user tu
 
 #### 🏗️ MVP Architecture (next session — see [[AppDesignConceptBoard/05-concept-to-mvp-gap-analysis]])
 - [x] **Close the platform & runtime decision** (native ×2 · Flutter/RN · Unity · web-first) — everything else depends on it (feeds SCRUM-10) → **DONE 2026-09-26**: Option A — Expo / React Native (TypeScript) + Supabase + hosted AI APIs, Android-first
+
+
+---
+
+## 5 · Completed follow-ups — 2026-10-04 (S28 · S28b)
+
+> Moved out of **[[follow-up-items]]** on 2026-10-04 as each closed, per that file's *open work only* rule.
+
+### ✅ `SCRUM-54` — the Supabase backend of record is live (PR-2 + PR-3)
+
+**PR-2:** 21 tables · 25 policies · RLS on every one · private buckets · catalogue seeded (applied to the hosted project). **PR-3** (`b095fba` + `992cb85`, **PR #13**): `submit_burn` (the spine) + 10 more RPCs + 3 Edge Functions (**deployed and run**) + the 5 client libs + 4 new machine-readable gates. **Proven, not asserted:** a client `submit_burn` → **403** · a client ledger INSERT → **403** · `anon` → **0 rows** over the REST API · a real burn → **1,600 tribute** · a replay → `idempotent_replay` · a forged `band` ignored → graded miss · a **full Path C run** → a persisted `.webp` sprite at **$0.09 / 15.0 s**. *(→ doc 19 §12)*
+
+### ✅ The four decisions PR-3 raised — all RATIFIED 2026-10-04
+
+| Ticket | The call | Ratified | Outcome |
+|---|---|---|---|
+| **`SCRUM-58`** | the styled sprite is **WebP** at 1K (49.7 KB) — accept, or PNG + a resize stage? | ✅ **A — accept WebP** | **nothing to build** — PR-3 already ships it; the bucket allows `webp`+`png` and `check:pathc` guards it |
+| **`SCRUM-59`** | what does an alpha **photo burn** cost the player? | ✅ **B — the daily cap + the daily AI-budget STOP-RULE** (no wallets yet) | ✅ **BUILT 2026-10-04** — migration `0011` + the orchestrator short-circuit + its own fault-tested test (see below) |
+| **`SCRUM-60`** | accept the **7 authenticated-definer advisories**, or move 4 RPCs behind a 4th Edge Function? | ✅ **A — accept 7** | **nothing to build** — recorded in doc 19 §12.4; revisit only if an audit asks for a clean report |
+| **`SCRUM-61`** | ratify the **narrowed ADR-002 §4 colour rule** + amend the ADR | ✅ **A — ratify + amend** | ✅ **done** — ADR-002 gained **Amendment 1** (in PR #13) |
+
+### ✅ `SCRUM-59` — the AI-budget stop-rule IS ENFORCED (2026-10-04)
+
+Migration `0011`: `app_config.daily_ai_budget_micros` (alpha **$5/day**, server-only, Dashboard-tunable) · `request_cartoonize` derives today's spend from `cartoonize_jobs.cost_micros` and **QUEUES** when the shrine cannot afford one more photo (**the spec's $0.10 floor is kept**, so the budget is a HARD ceiling) · `cartoonize-orchestrator` returns **`200 {code:'shrine_busy'}`** and never calls fal · a parked job does **not** burn one of the ten daily attempts. **Verified:** `supabase/tests/ai_budget.sql` (S1–S5b/S6–S7, **fault-tested red at the boundary**) + `supabase/checks/exercise-budget.sh` (live: **510 ms / `cost_micros` NULL** against 14.9 s / 90,000 µ for a real run) + **PR-3's own suite re-run green** + zero residue. Built on its own branch (**PR #14**, stacked on #13). *(→ doc 19 §12.5)*
+
+### ✅ Other items closed the same day
+
+- **The unsigned-commit workflow question** — the PM confirmed that unsigned commits from an AI session are fine (the GPG passphrase is not available to the agent shell, so `git commit -S` hangs). Now a **standing rule** in `CONTRIBUTING.md` § Commits, so no future session re-raises it.
+- **`rls_enabled_no_policy` moved 4 → 5** with `app_config` — **by design**: it joins `rate_counters` · `integrity_flags` · `grid_cells` · `cell_burns` as a **server-only table with RLS and deliberately no policies**. Recorded here so it is not re-discovered as a surprise.
+- **The signed-URL gotcha** — `storage.createSignedUrl` can return a **RELATIVE** path; the orchestrator normalises it to absolute before handing it to fal (a relative URL produced a confusing `extraction_unusable`). Implemented and recorded in doc 19 §12.3.
+- **The sprite-format decision (WebP)**, **the 7 accepted advisories**, and **ADR-002 §4's narrowed colour rule** — the reasoning and the measured numbers live in doc 19 §12.4 and doc 14 §3; only the outcomes are kept above.
+
+### 🧾 How S28b ended
+
+PR-3 (**#13**) and SCRUM-59 (**#14**) were both **clean, green and awaiting the PM's merge**; the worktree was left clean, the hosted project at **11/11 migrations with no drift**, and the project with **zero residue** (no rows, no Storage objects, no `auth.users`). Cost: **≈ US$0.09** — one mis-fired live run, logged honestly in [[project-costs]].
 
