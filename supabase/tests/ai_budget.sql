@@ -163,7 +163,7 @@ begin
 
   -- ── S5 · QUEUE, NEVER FAIL: open the budget → the SAME capture proceeds ─
   perform pg_temp.set_budget(public.ai_spend_today() + 1_000_000);
-  v_r := public.request_cartoonize(v_u1, v_cap1);
+  v_r := pg_temp.call_cartoonize(v_u1, v_cap1);
   perform pg_temp.assert_true((v_r->>'budget_exhausted')::boolean = false,
     'S5  once the budget opens, the same capture PROCEEDS (queue, never fail)');
   perform pg_temp.assert_true((v_r->>'already_requested')::boolean = true,
@@ -236,8 +236,9 @@ begin
     'S7  the 11th RUN job of the day is refused by the daily allowance (got ' || v_err || ')');
 
   -- ── guard · the spend reader must be ALIVE ──────────────────────────────
-  -- If `ai_spend_today()` were dead (always 0), S3 would still "pass" (0 >= 0
-  -- blocks) — so this is the assertion that catches a broken reader.
+  -- If `ai_spend_today()` were dead (always 0) the budget would be set to 0 too,
+  -- and 0 + $0.10 > 0 would STILL block — so S3 cannot catch a broken reader.
+  -- This is the assertion that does.
   perform pg_temp.assert_true(public.ai_spend_today() > 0,
     'guard: the spend reader is alive — the recorded costs are visible to it');
 
