@@ -67,7 +67,32 @@ Deno.serve(async (request: Request): Promise<Response> => {
     return fail(code, status, gateError.message);
   }
 
-  const jobRow = job as { job_id: string; status: string; already_requested?: boolean };
+  const jobRow = job as {
+    job_id: string;
+    status: string;
+    already_requested?: boolean;
+    budget_exhausted?: boolean;
+    spend_micros_today?: number;
+    budget_micros?: number;
+  };
+
+  // ── THE STOP-RULE (SCRUM-59 · doc 10 §4) ─────────────────────────────────
+  // The day's AI budget is spent, so the job stays QUEUED and the PROVIDER IS
+  // NOT CALLED. This is a 200, not an error: the offering is not lost — the
+  // client shows the loading-ritual copy ("the shrine is receiving many
+  // offerings…", `ritual_busy` in src/lib/i18n.ts) and the next request
+  // re-checks the budget and proceeds the moment it opens.
+  if (jobRow.budget_exhausted === true) {
+    return json({
+      job_id: jobRow.job_id,
+      status: 'queued',
+      queued: true,
+      code: 'shrine_busy',
+      spend_micros_today: jobRow.spend_micros_today ?? null,
+      budget_micros: jobRow.budget_micros ?? null,
+    });
+  }
+
   if (jobRow.status !== 'queued') {
     // already asked for: return the existing job, never a second generation
     return json({ job_id: jobRow.job_id, status: jobRow.status, already_requested: true });
