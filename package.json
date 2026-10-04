@@ -38,6 +38,7 @@
     "check:pathc": "node supabase/checks/pathc-check.ts",
     "check:sql": "node supabase/checks/sql-structure.js",
     "check:db": "bash supabase/checks/run-sql-tests.sh",
+    "check:budget": "bash supabase/checks/exercise-budget.sh",
     "check": "npm run typecheck && npm run check:tokens && npm run check:domain && npm run check:pathc && npm run check:sql && node design-system/contrast-check.js && node design-system/responsive-check.js && npm run check:lib",
     "bundle:android": "expo export --platform android --output-dir .expo/bundle-check"
   },
