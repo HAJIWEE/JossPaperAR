@@ -88,8 +88,16 @@ Four interface kinds: **2 HTTP Edge Functions + 1 cron**, **Postgres RPCs**, **S
 
 ```
 captures/{user_id}/{capture_id}.jpg     raw photo   · ≤300 KB · 7-day retention (13 §2)
-styled/{user_id}/{capture_id}.png       styled D    · ≤150 KB sprite (14 §3)
+styled/{user_id}/{capture_id}.webp      styled D    · ≤150 KB sprite (14 §3) · ⚠️ WebP, not PNG
 ```
+
+> ⚠️ **The sprite is WebP, not PNG — measured 2026-10-04 (PR-3).** The first REAL
+> Path C run produced a **1,326,732-byte** 1K PNG against 14 §3's 150 KB budget,
+> while the same prompt at the same 1K resolution in **WebP is 50,900 bytes**.
+> WebP carries alpha (the sprite needs it) and Android decodes it natively; the
+> alternative (a resize/quantise stage) needs an image library the Deno Edge
+> runtime does not ship. The `styled` bucket therefore allows **both** MIME types
+> (`20261004095500_styled_bucket_webp.sql`), and `check:pathc` guards the choice.
 
 > ✅ **Resolved — doc 07 v2.9.** §3 previously implied a `tributes` bucket, but [[15-clan-model-and-book-of-tributes]] §7 gives the Book of Tributes **no image**. The bucket is now removed from the architecture; **do not create it.** Fewer privacy surfaces is strictly better (13 §4).
 
@@ -508,6 +516,9 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 - **`get_advisors(security)`**: `authenticated_security_definer_function_executable` **3 → 7** — the four named exceptions, all inside a category the baseline already carried; `rls_enabled_no_policy` **unchanged at 4**; and **nothing in `public` is executable by `anon`** (0 functions) — trap #1's real invariant, asserted in the test.
 - **The buckets exist**: `captures` (307200 · image/jpeg) · `styled` (153600 · image/png), both private.
 - **The pg_cron question stays open**: enabling it is a SCRUM-11 step (the league has no spec yet), so it was deliberately NOT enabled here.
+- **The sprite is WebP.** The very first real Path C run found this: a 1K PNG is **1,326,732 bytes** against doc 14 §3's 150 KB budget; 1K WebP is **50,900 bytes**. One parameter, same model/prompt/resolution → `0010` widens the `styled` bucket to accept both, `check:pathc` guards it, and doc 14 §3 + §3.3 above now say so.
+- **The client must choose the capture id BEFORE it uploads.** `captures` deliberately has no UPDATE policy ("status/moderation are the orchestrator's to set"), so `storage_path` cannot be filled in afterwards — the real client order is: generate the id → upload to `captures/{uid}/{id}.jpg` → insert the row. Found by an exercise that patched the path and watched the orchestrator 404.
+- **The Edge Function's own signed URL needed normalising.** `storage.createSignedUrl` can return a RELATIVE path (`/object/sign/…`), which fal cannot fetch — the symptom was a confusing `extraction_unusable`, because the identifier answered prose about a photo it could not see. The orchestrator prefixes the project URL when the value is relative.
 
 ---
 
