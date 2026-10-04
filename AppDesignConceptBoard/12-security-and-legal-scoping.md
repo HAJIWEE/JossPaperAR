@@ -26,7 +26,7 @@
 | AI keys live **only in Edge Functions, never in the client** | ADR-001 §3 |
 | Client asserts, server decides · append-only ledger · derived band · caps + rate limits + `integrity_flags` | ADR-005 · [[11-integrity-posture]] |
 | RLS on every table · private storage buckets + signed URLs · `grid_cells` stores no user identity | [[07-system-architecture]] §5.3 |
-| Daily caps + **global daily AI-budget stop-rule** (queue, never fail-open) | [[10-economy-spec]] §4 |
+| Daily caps + **global daily AI-budget stop-rule** (queue, never fail-open) | [[10-economy-spec]] §4 — ✅ **stop-rule enforced 2026-10-04** (SCRUM-59; photo path) |
 | Ancestor names never in analytics/crash reports | 07 §5.3 `ancestors` · SCRUM-19 |
 | No secrets in the repo — **verified by scan today** (no `fal_*`/`sk-*`/JWT/.env anywhere in the vault) | this session |
 

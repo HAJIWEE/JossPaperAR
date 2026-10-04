@@ -525,11 +525,45 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 | Ticket | The decision | Ratified choice | Effect on the build |
 |---|---|---|---|
 | **SCRUM-58** | the styled sprite's format | **A — WebP at 1K** | **none**: PR-3 already ships it (`GENERATE_OUTPUT_FORMAT`), the bucket allows `webp`+`png`, and `check:pathc` guards the choice so a "tidy-up" back to PNG cannot silently break the 150 KB NFR. |
-| **SCRUM-59** | what an alpha photo burn costs the player | **B — the daily cap + a global daily AI-budget STOP-RULE (no wallets yet)** | **a build task, not part of PR-3**: `request_cartoonize` must **queue** (never fail) once the day's spend reaches the budget, with the "the shrine is receiving many offerings…" copy. Budget stays **$5/day** (doc 10 §4). The full wallet model (fee · grant · 15/month cap) stays deferred to beta (`SCRUM-18`/`ADR-006`). |
+| **SCRUM-59** | what an alpha photo burn costs the player | **B — the daily cap + a global daily AI-budget STOP-RULE (no wallets yet)** | ✅ **BUILT in its own PR** — migration `0011` + the orchestrator short-circuit + `supabase/tests/ai_budget.sql` + `supabase/checks/exercise-budget.sh` → **§12.5**. `request_cartoonize` now **queues** (never fails) once the shrine cannot afford one more photo, with the "the shrine is receiving many offerings…" copy. Budget stays **$5/day** (doc 10 §4) and is now a live `app_config` knob. The full wallet model (fee · grant · 15/month cap) stays deferred to beta (`SCRUM-18`/`ADR-006`). |
 | **SCRUM-60** | the 7 `authenticated_security_definer_function_executable` advisories | **A — accept 7** | **none**: the four exceptions are documented in the migration that creates them, the `anon` class is **0** and machine-asserted, and no lint category is new. Revisit only if an audit demands a clean report (cheap then — the RPC bodies would not change). |
 | **SCRUM-61** | ADR-002 §4's colour-sanity rule | **A — ratify the narrower rule + amend the ADR** | ✅ done in this PR: **ADR-002 gained Amendment 1** (`COLOUR_LEAK_MIN_TOKENS = 3`; the live false positive recorded; `check:pathc` pins both the fingerprint *and* the false-positive case). |
 
-**The one that changes the code is SCRUM-59**, and it is deliberately **not** folded into PR-3 — it edits `request_cartoonize` (already applied) and so belongs in its own migration + PR, with its own tests.
+**SCRUM-59 was the one that changed the code**, and it was kept out of PR-3 on purpose — it edits `request_cartoonize`, which was already applied, so it belongs in its own migration + PR with its own tests. **It is built: see §12.5.**
+
+### 12.5 · SCRUM-59 — the AI-budget stop-rule, built (migration `0011`)
+
+**The decision was option B** (§12.4): enforce the daily cap **and** a global daily AI-budget stop-rule, with no wallets. This is what it took — and what it found.
+
+**What shipped** (its own branch and PR, as promised):
+
+| Piece | What it does |
+|---|---|
+| `20261004096000_ai_budget_stop_rule.sql` | `app_config` (server-only: RLS on, **no policies** — the `rate_counters` posture) · `ai_spend_today()` · `ai_budget_micros()` · and a `request_cartoonize` that **queues instead of failing** |
+| `cartoonize-orchestrator` | honours `budget_exhausted` → **HTTP 200 `{code: shrine_busy, queued: true}`** and never reaches fal |
+| `supabase/tests/ai_budget.sql` | S1–S5b/S6–S7 against the real database, **fault-tested red** |
+| `supabase/checks/exercise-budget.sh` | the live, self-cleaning proof — **spends nothing by default** |
+
+**Three findings worth keeping:**
+
+1. **The spec's floor is load-bearing.** doc 10 §4 asserts `global.ai_budget_today_usd >= 0.10` — *not* "spend < budget". Kept literally, that makes the budget a **hard ceiling**: at $0.09 a photo, "≥ $0.10 of headroom" means the last job can never overrun the day. The first cut used `spend >= budget` (a *soft* ceiling — overrun by up to one job) and the boundary test caught the difference **before merge**: **$0.099999 of headroom queues; exactly $0.10 proceeds.** The floor also **fails closed** — a missing knob reads as 0 and stops spending rather than allowing it.
+
+2. **⚠️ A rotated service key looks EXACTLY like a stop-rule that did not fire.** The first live run reported no queue — because `/tmp/keys.env`'s `SECRET` had been rotated (401 `Invalid API key`), so the budget was never written… and the run happily went on to complete a **real Path C generation** (US$0.09, logged in [[project-costs]]). The script now **(a) proves the credential before it mutates anything** and **(b) restores the budget from an `EXIT` trap**, so a half-finished run cannot leave the app locked out. *Rule for any future config-mutating runbook: prove the credential FIRST, mutate second.* The fallback also matters — `SVC` (the legacy service_role JWT) still worked while `SECRET` did not, so the script tries both rather than trusting one name.
+
+3. **The Storage API's bulk delete can answer 200 and delete nothing.** `DELETE /storage/v1/object/{bucket}` with `{"prefixes":[…]}` returned **200** and left the objects exactly where they were (re-listing proved it); deleting **by path** worked. Worth knowing before a future cleanup step trusts a status code.
+
+**The numbers** (hosted project, 2026-10-04 — same image, same capture shape, 40 minutes apart):
+
+| | a real Path C run (PR-3) | the stop-rule firing |
+|---|---|---|
+| HTTP | 200 | **200** — `code: shrine_busy` (a queue, not an error) |
+| latency | **14,988 ms** | **510 ms** |
+| `cost_micros` | 90,000 | **NULL** |
+| `cartoonize_jobs.status` | `styled` | **`queued`** — the offering keeps its row, so it is not lost |
+
+**And the posture held:** `authenticated_security_definer_function_executable` **unchanged at 7** — the two new readers are unreachable from the Data API (`anon` · `authenticated` · `service_role` all revoked) and `request_cartoonize` stays `service_role`-only, so the new money-path logic added **zero** lint exposure. `rls_enabled_no_policy` moved **4 → 5**: `app_config` joins `rate_counters` · `integrity_flags` · `grid_cells` · `cell_burns` as a **server-only table with RLS and deliberately no policies** — the number rising is the design working, not a regression. **PR-3's own suite was re-run unchanged → green**, which is the regression check that matters (the 10/day cap and the grant posture are still asserted against the amended function).
+
+**Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
 ---
 

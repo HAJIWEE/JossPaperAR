@@ -20,7 +20,7 @@
 | AI cost / photo | **≈ US$0.10** (0.09–0.13 incl. ≤1 retry, ADR-002) |
 | AI cost / store burn | **≈ US$0.01** (Track-B closed-set ID, no stylize) |
 | Ads | **post-ritual only** (home/league/result screens; never inside the ritual) — banner + interstitial + rewarded (gated photo) |
-| Stop rule | **global daily AI budget** exhausted → queue new burns, never silently fail |
+| Stop rule | **global daily AI budget** exhausted → queue new burns, never silently fail — ✅ **ENFORCED 2026-10-04** (`app_config.daily_ai_budget_micros`, alpha $5/day; SCRUM-59 option B) |
 | Wallets | `photo_credits` ≠ `tribute` ≠ `store` — **invariant: burn awards never produce photo credits** |
 
 ---
@@ -77,7 +77,15 @@ store burns: same checks with cap 20/day and cost 0.01 against budget (Track B s
 - **No per-burn cooldown** — the daily caps *are* the cooldown; streak rewards daily return instead.
 - **Stop rule:** `global.ai_budget_today_usd` (config; alpha = $5/day, production ≈ 70% of trailing-7-day cash-shop net). Exhausted → jobs **queue** (offline-queue machinery already exists), never error.
 
-> ⚠️ **Implementation status (2026-10-04).** The **daily caps are enforced** in `request_cartoonize` (10/day photo allowance + a 3/min burst limit), and the **global stop-rule is now ratified as the next piece of work** — PM decision **SCRUM-59 option B** (2026-10-04): enforce the daily cap *and* the daily AI-budget stop-rule, with the job **queued** rather than failed. The alpha budget stays **$5/day** as written above. Everything else in this block — the 150-credit photo fee, the 2,000-credit starter grant, the 15/month free cap, the `grant|credits|ad` funding split — needs the wallet mechanics and stays deferred to beta (`SCRUM-18` / `ADR-006`).
+> ✅ **Implementation status (2026-10-04 — SCRUM-59 option B, migration `0011`).** **Both halves of this gate are now enforced, and the hard half is the one that bills.**
+>
+> **What runs today.** `request_cartoonize` checks the **10/day photo allowance**, the **3/min burst limit**, and — new — the **global daily AI-budget STOP-RULE**: today's spend is derived from `cartoonize_jobs.cost_micros`, and when the shrine can no longer *afford one more photo* the job is left **QUEUED**, never failed ("the shrine is receiving many offerings…", the loading ritual's own copy). Two details that make it a real ceiling: the spec's **$0.10 floor is kept** as written above (so the check is "≥ $0.10 of headroom left", which means a job that starts can never push the day past the budget), and a **parked job does not burn one of the user's ten attempts** — the allowance counts only jobs that actually ran.
+>
+> **The knob is live.** `app_config.daily_ai_budget_micros` (alpha **$5.00/day**), server-only, changeable from the Dashboard without a deploy. Queue-don't-fail is self-healing: the parked job keeps its row (one job per capture), so the *next* request for that offering re-checks the budget and proceeds the moment it opens.
+>
+> **Proved, not asserted:** `supabase/tests/ai_budget.sql` (S1–S5b/S6–S7 against the real database, **fault-tested red** at the $0.10 boundary) + a live run that spent nothing (HTTP 200 `code: shrine_busy` in **0.51 s** with `cost_micros` NULL, against **14.9 s / 90,000 micros** for a real Path C run) → [[19-build-plan-services-api-environments|doc 19]] §12.5.
+>
+> ⚠️ **The wallet half above is still NOT built** — the 150-credit photo fee, the 2,000-credit starter grant, the 15/month free cap, the `grant|credits|ad` funding split. They need the cash shop and a `sign_in_grants` table that do not exist; deferred to beta (`SCRUM-18` / `ADR-006`). **Nothing above charges a player anything yet: what is enforced is the CEILING, not the price.**
 
 ### UX copy (EN / 中文) — "out of offerings", never "out of credits"
 
@@ -109,7 +117,7 @@ store burns: same checks with cap 20/day and cost 0.01 against budget (Track B s
 | **Per-user monthly subsidy** (grants only: 13 starter + 15 free) | **≤ 28 photos ≈ $2.80 typical / $3.64 worst** |
 | Per-user daily exposure (all funding, cap 10) | $1.00 typical / $1.30 worst — paid portion is revenue-positive |
 | **Per-user monthly net** | ≤ −$3.64 (never buys) … typically ≈ **+$0.50** (mixed) |
-| Global stop | `daily_ai_budget` → **queue new burns when exhausted** (§4) |
+| Global stop | `daily_ai_budget` → **queue new burns when exhausted** (§4) — ✅ **live**: the knob is `app_config.daily_ai_budget_micros`, and a parked job proceeds on the next request |
 | Alpha operating cost | ≈ **$1–3/day** total (expected — 09 §5) |
 
 ---

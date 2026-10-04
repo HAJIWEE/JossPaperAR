@@ -30,7 +30,7 @@
 
 1. Capture/item exists, is owned, and is `styled` (photo path) or a valid `item_code` (store path)
 2. Daily quota still open (photo 10 / store 20, **server-day**)
-3. Global AI budget not exhausted (else → queue, never error — stop-rule, economy §4)
+3. Global AI budget has room for one more job (else → queue, never error — stop-rule, economy §4). ✅ **Enforced on the PHOTO path since 2026-10-04 (SCRUM-59)**; the store path gains it when the Track-B closed-set short-circuit is actually built (store burns do not call AI yet, so today there is nothing to meter).
 4. Band = derive(`accuracy`) · streak from `streaks` · new-ground from `grid_cells`
 5. Award = formula, **clamped** to §4 bounds → append `burns` + `ledger_events(award)` in **one transaction**
 6. Bump `streaks`, `quotas`, `cell_burns` (decay tick) — same transaction
