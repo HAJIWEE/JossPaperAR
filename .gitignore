@@ -40,5 +40,9 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 
+# ── AI agent state (Cline) — local to this machine, never commit ────────────
+# Cline workspace rules live here; each session/machine keeps its own copy.
+.cline/
+
 # ── Logs ────────────────────────────────────────────────────────────────────
 *.log
