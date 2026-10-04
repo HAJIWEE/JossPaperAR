@@ -520,6 +520,17 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 - **The client must choose the capture id BEFORE it uploads.** `captures` deliberately has no UPDATE policy ("status/moderation are the orchestrator's to set"), so `storage_path` cannot be filled in afterwards — the real client order is: generate the id → upload to `captures/{uid}/{id}.jpg` → insert the row. Found by an exercise that patched the path and watched the orchestrator 404.
 - **The Edge Function's own signed URL needed normalising.** `storage.createSignedUrl` can return a RELATIVE path (`/object/sign/…`), which fal cannot fetch — the symptom was a confusing `extraction_unusable`, because the identifier answered prose about a photo it could not see. The orchestrator prefixes the project URL when the value is relative.
 
+### 12.4 · The four decisions — RATIFIED by the PM (2026-10-04)
+
+| Ticket | The decision | Ratified choice | Effect on the build |
+|---|---|---|---|
+| **SCRUM-58** | the styled sprite's format | **A — WebP at 1K** | **none**: PR-3 already ships it (`GENERATE_OUTPUT_FORMAT`), the bucket allows `webp`+`png`, and `check:pathc` guards the choice so a "tidy-up" back to PNG cannot silently break the 150 KB NFR. |
+| **SCRUM-59** | what an alpha photo burn costs the player | **B — the daily cap + a global daily AI-budget STOP-RULE (no wallets yet)** | **a build task, not part of PR-3**: `request_cartoonize` must **queue** (never fail) once the day's spend reaches the budget, with the "the shrine is receiving many offerings…" copy. Budget stays **$5/day** (doc 10 §4). The full wallet model (fee · grant · 15/month cap) stays deferred to beta (`SCRUM-18`/`ADR-006`). |
+| **SCRUM-60** | the 7 `authenticated_security_definer_function_executable` advisories | **A — accept 7** | **none**: the four exceptions are documented in the migration that creates them, the `anon` class is **0** and machine-asserted, and no lint category is new. Revisit only if an audit demands a clean report (cheap then — the RPC bodies would not change). |
+| **SCRUM-61** | ADR-002 §4's colour-sanity rule | **A — ratify the narrower rule + amend the ADR** | ✅ done in this PR: **ADR-002 gained Amendment 1** (`COLOUR_LEAK_MIN_TOKENS = 3`; the live false positive recorded; `check:pathc` pins both the fingerprint *and* the false-positive case). |
+
+**The one that changes the code is SCRUM-59**, and it is deliberately **not** folded into PR-3 — it edits `request_cartoonize` (already applied) and so belongs in its own migration + PR, with its own tests.
+
 ---
 
 *Created 2026-10-03 (Session 27) — the stand-it-up plan for [[07-system-architecture]]: service build order · the complete API surface (3 Edge Fns · 11 RPCs · storage · realtime) · the 3-ring environment with the local toolchain audited · the exact SDK-57 package manifest + install traps · the build-vs-provision split (A–J ↔ #1–#10, filed as **SCRUM-57** / **SCRUM-56**) · and 4 doc-07 inconsistencies found while mapping the build against the architecture. Path C endpoints and prices verified live: **ADR-002's cost model still holds exactly.***
