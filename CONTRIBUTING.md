@@ -20,6 +20,7 @@ GitHub Issues are enabled but are *not* the tracker — file work in Jira and re
 - Imperative subject, concise: `Add CI workflow for design-system checks`
 - Reference the Jira key when the change closes or advances a ticket: `… (SCRUM-15)`
 - Keep secrets out — `.env` is gitignored; only `.env.example` (with placeholders) is committed.
+- **Unsigned commits from an AI session are expected and accepted** (PM decision, 2026-10-04). The GPG signing key's passphrase is not available to the agent shell and there is no pinentry/TTY, so `git commit -S` hangs — agents commit with signing off rather than blocking. *Don't re-raise this as a finding.* If signed history is ever required, `git commit --amend -S` locally (with the passphrase cached) or squash-merge, which GitHub signs.
 
 ## ✅ Checks — run before opening a PR
 

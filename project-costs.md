@@ -42,6 +42,8 @@
 | 2026-09-25 | **Style-D fidelity spike — budget approved** (stakeholder) | Prove low-poly 3D × ink brush is achievable via hosted APIs (fal/Replicate credits) before provider lock-in | US$10–20 budget · **actual US$4.49** | 1.2771 ⚠ placeholder | **S$5.73 actual** (est. — 4.49 × 1.2771) | ✅ approved · **spent 2026-09-26** (133 runs, well under cap ✅) — *estimate; final fal invoice to reconcile at SCRUM-41 close (due 2026-10-06)* |
 | 2026-10-04 | **PR-3 live verification (SCRUM-54b)** — real fal calls against the deployed Edge Functions | Prove the locked Path C pipeline runs end-to-end on the hosted runtime, with cost/latency recorded: 7 × `moondream2` identify (~$0.01) + 4 × `nano-banana-2` 1K generate (~$0.08) | **≈ US$0.40** (est. — 0.07 + 0.32; two runs were spent discovering the PNG-size defect and the colour-rule false positive) | 1.2900 ⚠ placeholder | **≈ S$0.52** (est.) | ✅ **incurred 2026-10-04** — one run completed fully (`cost_micros: 90000`, `latency_ms: 14988`, a persisted sprite). *Placeholder rate (rule 4) — reconcile to the Mastercard rate at the next session; add to the SCRUM-41 reconciliation.* |
 
+| 2026-10-04 | **SCRUM-59 stop-rule verification** — 4 live runs against the deployed orchestrator | Prove the budget **QUEUES** instead of spending (doc 10 §4) | **≈ US$0.09** (the first run **mis-fired** — a rotated service key meant the budget was never written, so it completed a real Path C generation; the corrected runs return `shrine_busy` in 0.5 s and spend **nothing**) | 1.2900 ⚠ placeholder | **≈ S$0.12** (est.) | ✅ **incurred 2026-10-04** — logged because it *was* spent; the intended path costs **$0.00** (doc 19 §12.5 finding 2). *Placeholder rate (rule 4) — reconcile with SCRUM-41.* |
+
 <!-- APPEND-NEW-ONEOFF-COSTS-ABOVE -->
 
 ---
@@ -83,6 +85,7 @@
 |---|---|
 | Committed recurring (ClinePass / month) | S$12.76 |
 | Style-D spike — **actual** (2026-09-26, est. @1.2771 ⚠, pending fal invoice) | **S$5.73** (US$4.49 / 133 runs — under the US$20 cap ✅) |
+| fal.ai credit — **spent to date** (spike **S$5.73** + PR-3 verification **≈S$0.52** + SCRUM-59 verification **≈S$0.12**) | **≈ S$6.37** (≈ **US$4.98** of the approved US$10–20) |
 | **Total known outlay (first month, incl. spike actual)** | **≈ S$8.44** (ClinePass actual S$2.71 + spike actual S$5.73) |
 | Actual spend to date (ClinePass, this month) | S$2.71 (US$2.12) |
 | Paid services running | none yet (all free tiers) |
@@ -110,5 +113,5 @@
 
 ---
 
-*Last updated: 2026-09-26 — **style-D spike actual logged** (US$2.63 = est. S$3.36 @1.2771 ⚠ placeholder; 86 runs ≤ US$20 cap; recipe locked, ADR-002 pending) per SCRUM-41.*
+*Last updated: 2026-10-04 — **PR-3 verification ≈US$0.40** and the **SCRUM-59 stop-rule verification ≈US$0.09** logged (the latter from a mis-fired first run; the corrected path costs nothing — doc 19 §12.5). Both at the 1.2900 ⚠ placeholder rate → reconcile at SCRUM-41 (due 2026-10-06).*
 *Updated 2026-09-25 — page created (session 16); ClinePass + spike budget logged; first-month actual **US$2.12 = S$2.71** recorded, **next charge 2026-10-22**.*
