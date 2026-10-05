@@ -33,4 +33,4 @@
 
 *Started 2026-09-26 (Session 17) with ADR-001 (Option A locked).*
 *Updated 2026-10-02 (Session 26) — **ADR-003 accepted** (non-AR AR for the MVP; ARKit/ARCore/Unity rejected for the MVP; true AR post-MVP via 4 exit ramps) · closes SCRUM-8 §6.2.*
-*Updated 2026-10-05 (Session 29, SCRUM-55) — **ADR-004 · ADR-006 accepted**, closing the two decided-but-unrecorded rows; **ADR-008 drafted as 🟡 Proposed** with its open product questions (A–D) routed to SCRUM-49. All nine §6 decisions are now recorded: **7 Accepted + 1 Proposed.** `npm run check:adrs` added so the register cannot drift from the files.*
+*Updated 2026-10-05 (Session 29, SCRUM-55 + SCRUM-62) — **ADR-004 · ADR-006 accepted**, closing the two decided-but-unrecorded rows; then **ADR-008 accepted** the same day after the PM answered A–D on **SCRUM-62**. All nine §6 decisions are now recorded and **all eight ADRs are Accepted**. `npm run check:adrs` guards the register so it cannot drift from the files — including a *status disagreement*, which is how a 🟡 Proposed could have been lost here.*
