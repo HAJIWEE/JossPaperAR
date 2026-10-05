@@ -63,4 +63,31 @@ The style-D spike (approved US$10–20; closed at **133 runs ≈ US$4.49**) prov
 
 ---
 
+## Amendment 1 · 2026-10-04 — the colour-sanity rule was NARROWED (PR-3 · SCRUM-61, option A)
+
+**Status:** ✅ ratified by the PM (SCRUM-61, 2026-10-04).
+
+**Context.** §Decision item 4 requires the orchestrator to run *"**colour sanity** (identical colour string across different object types ⇒ reject and re-probe)"* — written from a real spike failure: the identify prompt's example colour `"denim blue metallic"` was echoed as the main object's colour on **five consecutive images**, including a rice cooker and a notebook.
+
+**What the first real run showed.** Implemented literally, that rule refuses an honest answer. The deployed orchestrator returned this for a real teapot-and-teacup photo, and the rule rejected it — *"brown is claimed for both teacup and teapot"*:
+
+```
+[ { "label": "Teacup",     "colours": ["Light green", "Brown"] },
+  { "label": "Teapot",     "colours": ["Brown", "Dark brown"] },
+  { "label": "Tea leaves", "colours": ["Dark brown", "Light brown"] } ]
+```
+
+A teacup and a teapot **are** both legitimately brown. Taken literally, the rule blocks the ritual for ordinary scenes — the opposite of what the spike's leak required it to prevent.
+
+**Amendment.** The **blocking** threshold is now the leak's own fingerprint: a colour of **three or more tokens** echoed **verbatim across different object labels** (`"denim blue metallic"` on a sedan *and* a rice cooker) still **rejects and re-probes**. A one- or two-token generic name (`brown`, `dark brown`) is logged as a **note** and the ritual proceeds.
+
+* `COLOUR_LEAK_MIN_TOKENS = 3` · `colourLeak()` (blocking) vs `colourNotes()` (advisory) in `supabase/functions/_shared/pathtemplate.ts`.
+* Five assertions in `supabase/checks/pathc-check.ts` pin the behaviour — **including the false-positive case**, so the narrowing cannot silently regress, and the 3-token leak fingerprint still blocks.
+
+**Rejected.** *Reverting to the literal rule* — it refuses plausible photos (2 of 3 objects sharing a generic colour is normal). *Dropping the rule* — it would let a mis-coloured prompt reach the generator again, which is the one defect the spike proved.
+
+**Effect on §Consequences.** None beyond this clause: the extraction stage keeps its validation, and the accepted trade-off ("extraction is the new weak link") is unchanged in kind.
+
+---
+
 *Accepted 2026-09-26 (Session 18) on PM verdict after the Path-C scorecard (13/13 post-retries). Evidence: spike RESULTS §5b rounds 7–9 · `spike/results/path-C/` (19 images + iterations).*

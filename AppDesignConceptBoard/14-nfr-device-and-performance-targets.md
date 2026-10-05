@@ -57,7 +57,7 @@
 | Bundled app art (icons, fire sprite, fonts) | **≤ 8 MB total** — everything else fetched |
 | Fire overlay animation | sprite sheet **≤ 400 KB**, ≤ 30 fps redraw on Tier F |
 | Capture upload | **≤ 300 KB** (bounded long edge + JPEG q — 07 §4.1) |
-| Styled sprite download | **≤ 150 KB** (transparent PNG at display size, not 2K) |
+| Styled sprite download | **≤ 150 KB** (a clean sprite at display size, not 2K) — ⚠️ **format note (2026-10-04):** measured live, a 1K **PNG** sprite is **≈1.3 MB** (8.6× over) while a 1K **WebP** is **≈50 KB** (3× under), same model/prompt/resolution. The pipeline therefore requests **WebP** (the budget is the NFR; the container was an assumption) → doc 19 §12 |
 | Store/catalogue icons | on-demand + LRU cache inside the 64 MB ceiling |
 | Fonts | 1 latin + 1 CJK subset — **subset, don't ship full CJK** (a full CJK font alone blows N8) |
 

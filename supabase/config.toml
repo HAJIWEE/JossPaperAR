@@ -417,6 +417,25 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# ── Edge Functions (SCRUM-54b / PR-3 · doc 19 §3.1) ──────────────────────────
+# `verify_jwt` decides whether the GATEWAY rejects a call before the function
+# runs. The two client-facing functions keep the default (`true`) because the
+# app invokes them with the signed-in user's access token.
+[functions.award-service]
+verify_jwt = true
+
+[functions.cartoonize-orchestrator]
+verify_jwt = true
+
+# ⚠️ `weekly-roll` is the exception, for a concrete reason: it is a CRON entry
+# point, and it gates itself by requiring the project's SECRET key in the
+# Authorization header. A modern `sb_secret_…` key is NOT a JWT, so the gateway
+# could not have validated it — leaving verify_jwt on would make the cron
+# impossible. The function's own check is therefore the gate, and an ordinary
+# user's JWT is refused with 403 (doc 19 §3.1 F3).
+[functions.weekly-roll]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

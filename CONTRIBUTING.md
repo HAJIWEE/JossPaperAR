@@ -31,9 +31,25 @@ npm run check                            # runs everything below, in order
 npm run typecheck                        # tsc --noEmit
 npm run check:tokens                     # src/theme/tokens.ts ↔ design-system/tokens.css
 npm run check:domain                     # aim bands · award · wallet invariant · quotas
+npm run check:pathc                      # ADR-002's LOCKED Path C pipeline (endpoints · v3 clauses · no colour leak)
+npm run check:sql                        # migration structure: balanced $$/parens, closed statements (trap #7)
+npm run check:lib                        # client libs: keys · invites · EN/中文 parity · split storage · the queue
 node design-system/contrast-check.js     # expect: all 22 contrast checks passed
 node design-system/responsive-check.js   # expect: all 21 responsive checks passed
 npx expo-doctor                          # expect: 21/21 checks passed
+```
+
+**Against a real database** (needs the hosted project; `check:db` uses the pooler URL from `supabase/.temp/`):
+
+```bash
+supabase db push            # apply migrations, then confirm: supabase migration list (no drift)
+npm run check:db            # the PR-3 SQL verification (supabase/tests/*.sql)
+```
+
+`check:pathc`, `check:sql` and `check:db` are **dependency-free** and run in CI's design-system job; `check:lib` needs `node_modules` (it imports `i18n-js`) and runs in the app job. The full run is:
+
+```bash
+npm run check                            # runs all of the above, in order
 ```
 
 CI (`.github/workflows/ci.yml`) runs all of the above on every push/PR to `main`, so a red PR means one of them broke.

@@ -77,6 +77,8 @@ store burns: same checks with cap 20/day and cost 0.01 against budget (Track B s
 - **No per-burn cooldown** — the daily caps *are* the cooldown; streak rewards daily return instead.
 - **Stop rule:** `global.ai_budget_today_usd` (config; alpha = $5/day, production ≈ 70% of trailing-7-day cash-shop net). Exhausted → jobs **queue** (offline-queue machinery already exists), never error.
 
+> ⚠️ **Implementation status (2026-10-04).** The **daily caps are enforced** in `request_cartoonize` (10/day photo allowance + a 3/min burst limit), and the **global stop-rule is now ratified as the next piece of work** — PM decision **SCRUM-59 option B** (2026-10-04): enforce the daily cap *and* the daily AI-budget stop-rule, with the job **queued** rather than failed. The alpha budget stays **$5/day** as written above. Everything else in this block — the 150-credit photo fee, the 2,000-credit starter grant, the 15/month free cap, the `grant|credits|ad` funding split — needs the wallet mechanics and stays deferred to beta (`SCRUM-18` / `ADR-006`).
+
 ### UX copy (EN / 中文) — "out of offerings", never "out of credits"
 
 | State | EN | 中文 |
