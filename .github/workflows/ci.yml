@@ -51,6 +51,12 @@ jobs:
       - name: Slice rules (capture id · failed-generation · shrine_busy queue)
         run: node src/domain/checks/slice.ts
 
+      # THE SLICE'S ACCEPTANCE TEST (doc 17 §2 A5 — "the four aim bands grade
+      # true, not fps"). Also guards the rethrow cap (SCRUM-23: a rethrow may
+      # never be Bullseye) and proves the offset is a true Euclidean distance.
+      - name: Throw grading (four aim bands · rethrow cap · geometry)
+        run: node src/domain/checks/throw.ts
+
       # SCRUM-54b (PR-3). Both are dependency-free, so they belong here:
       #  · pathc-check   — ADR-002's LOCKED pipeline: the endpoints, the v3
       #    template clauses, and the ABSENCE of example colours in the identify
