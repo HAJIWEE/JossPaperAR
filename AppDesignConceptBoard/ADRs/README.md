@@ -17,11 +17,11 @@
 | [[ADR-005-honest-client-caps-append-only-ledger]] | §6.6 integrity posture — honest client + caps vs server verification | ✅ **Accepted 2026-09-27** |
 | [[ADR-006-burn-limit-semantics-daily-quota-cost-per-burn]] | §6.7 burn-limit semantics — daily quota · cost per burn · no cooldown · hard global stop-rule | ✅ **Accepted 2026-10-05** |
 | [[ADR-007-privacy-minimal-windowed-one-tap]] | §6.8 privacy & retention — collect minimal · windowed · coarse location · one-tap delete | ✅ **Accepted 2026-09-27** |
-| [[ADR-008-advertising-posture-never-inside-the-ritual]] | §6.9 ad posture — may ads ever appear inside the ritual flow? | 🟡 **Proposed 2026-10-05 — PM decision** (placement settled; A–D → SCRUM-49) |
+| [[ADR-008-advertising-posture-never-inside-the-ritual]] | §6.9 ad posture — may ads ever appear inside the ritual flow? | ✅ **Accepted 2026-10-05** (A3 · caps 2/3 · SG-for-now · D→SCRUM-63) |
 
-**8 of 9 recorded · 7 Accepted · 1 Proposed.** (Nine decisions → eight ADRs: §6.1 and §6.4 close together inside Option A.)
+**8 of 9 recorded · 8 Accepted.** (Nine decisions → eight ADRs: §6.1 and §6.4 close together inside Option A.)
 
-> ⚠️ **ADR-008 is the only one not Accepted, deliberately.** Its placement rule (*never inside the ritual*) is already locked by [[../10-economy-spec]] §1 and [[../16-cultural-consultation-and-ritual-review]] §5, but the rewarded ad-gated photo, ad volume, protected moments and category exclusions are an open **product** call routed to the cultural review (**SCRUM-49**). Do not read it as ratified.
+> ✅ **ADR-008 accepted on SCRUM-62** (2026-10-05). **A** → A3: the rewarded bonus photo exists but is **never framed as a reward on a ritual screen**. **B** → **2 interstitials on app start, 3 in a row post-ritual**. **C** → **Singapore** practice for now, modelled as data so other Chinese diasporas can be added by iteration. **D** → **strong NO** for gambling, loans and alcohol — the category/compliance detail is split to **SCRUM-63**, which gates the SDK choice.
 
 ---
 
