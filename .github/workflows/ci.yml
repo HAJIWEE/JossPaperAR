@@ -54,6 +54,13 @@ jobs:
       - name: Migration structure check (balanced $$, parens, closed statements)
         run: node supabase/checks/sql-structure.js
 
+      # SCRUM-55. The decided-but-unrecorded drift this ticket fixed CAN recur by
+      # hand — an index edited without its file, or a status claimed in the
+      # register that the ADR itself contradicts. Dependency-free, so it belongs
+      # in this job. It fails on any such disagreement.
+      - name: ADR register integrity (index ↔ files, status agreement)
+        run: node AppDesignConceptBoard/ADRs/check-adrs.js
+
   app-checks:
     name: App checks (typecheck · expo-doctor)
     runs-on: ubuntu-latest

@@ -570,3 +570,31 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 *Created 2026-10-03 (Session 27) — the stand-it-up plan for [[07-system-architecture]]: service build order · the complete API surface (3 Edge Fns · 11 RPCs · storage · realtime) · the 3-ring environment with the local toolchain audited · the exact SDK-57 package manifest + install traps · the build-vs-provision split (A–J ↔ #1–#10, filed as **SCRUM-57** / **SCRUM-56**) · and 4 doc-07 inconsistencies found while mapping the build against the architecture. Path C endpoints and prices verified live: **ADR-002's cost model still holds exactly.***
 
 ---
+### 12.6 · SCRUM-55 — the three unwritten ADRs, recorded (SCRUM-10 chain)
+
+**The finding.** Three of the nine §6 decisions in [[05-concept-to-mvp-gap-analysis]] were **made in prose and recorded nowhere**: identity (§6.5), burn-limit semantics (§6.7) and ad posture (§6.9). They were already *binding* — encoded in doc 07, enforced by doc 10's quota rule, and pre-committed to the cultural reviewer in doc 16 §5 — but with no ADR, each one was one edit away from being re-litigated by someone who had not read the reasoning.
+
+**What landed (2026-10-05, Session 29):**
+
+| ADR | Decision | Status |
+|---|---|---|
+| [[ADRs/ADR-004-anonymous-identity-first-optional-account-later|ADR-004]] | **anonymous device identity first, optional account later** — no signup wall before the first burn; the upgrade *links* the same `user_id` (no data migration) | ✅ **Accepted** |
+| [[ADRs/ADR-006-burn-limit-semantics-daily-quota-cost-per-burn|ADR-006]] | **daily quota** (10 photo / 20 store, local midnight, server-verified) · **cost per burn** differentiated ($0.09 vs $0.01) · **no per-burn cooldown** (the caps *are* the cooldown) · **hard global stop-rule** on the $0.10 floor | ✅ **Accepted** |
+| [[ADRs/ADR-008-advertising-posture-never-inside-the-ritual|ADR-008]] | **ads never inside the ritual flow**; outer surfaces only; no ad while ancestor names are on screen; **no ad SDK at MVP** | 🟡 **Proposed — PM decision** |
+
+**Why ADR-008 is deliberately *not* Accepted.** Its placement rule is already locked ([[10-economy-spec]] §1 · [[16-cultural-consultation-and-ritual-review]] §5 pre-commits that *"the placement rule itself stays"*), so engineering can build against "no ads in the ritual" today. But four sub-questions are a **product** call and are routed to the cultural review (**SCRUM-49**): **A** the rewarded ad-gated bonus photo (the sharpest edge — it puts the earning of a devotional act behind an advertiser) · **B** ad volume/frequency · **C** protected moments (festival days?) · **D** category exclusions. Marking it Accepted would have recorded a decision the PM has not made.
+
+**The gate that stops it recurring — `npm run check:adrs`.** Writing the records is only half the fix; the register can drift from the files again by hand. The check parses the register **and** every ADR file and fails on: a registered row with no file · a file with no register row · a **status the two disagree on** · a row still saying *"record to write"* · a record missing the house sections. It runs in `npm run check` and CI.
+
+**Fault-tested red** (a harness that cannot fail is not a check), each confirmed individually:
+
+| Fault | Result |
+|---|---|
+| an ADR row removed from the register | 🔴 `ADR-006 … ON DISK BUT MISSING FROM THE REGISTER` |
+| a register row → a file that does not exist | 🔴 `REGISTERED BUT THE FILE IS MISSING` |
+| register says **Accepted**, file says **Proposed** (the ADR-008 trap) | 🔴 `STATUS DISAGREES — register says "accepted", file says "proposed"` |
+| an ADR's `## Consequences` heading stripped | 🔴 `INCOMPLETE — missing "## Consequences"` |
+
+One **real defect in the check itself** was found this way and fixed: the *"record to write"* scan initially matched the whole README and therefore **its own documentation prose** — a false red. It now scans table rows only.
+
+**Status:** 🟡 **ADR-008 awaits the PM** (ratify clauses 1–6; answer **A**). All other §6 decisions are recorded.
