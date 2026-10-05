@@ -43,6 +43,14 @@ jobs:
       - name: Domain checks (aim bands · award · wallet invariant · quotas)
         run: node src/domain/checks/run.ts
 
+      # SCRUM-53 / PR-4. The three client rules of doc 19 §12/§12.5 were
+      # DISCOVERED by the live project after being assumed, so they get a machine
+      # check rather than a code comment: the capture id is minted before the
+      # upload · a failed generation forces a NEW capture · 200 shrine_busy is a
+      # queue, not an error. Fault-tested red on each rule.
+      - name: Slice rules (capture id · failed-generation · shrine_busy queue)
+        run: node src/domain/checks/slice.ts
+
       # SCRUM-54b (PR-3). Both are dependency-free, so they belong here:
       #  · pathc-check   — ADR-002's LOCKED pipeline: the endpoints, the v3
       #    template clauses, and the ABSENCE of example colours in the identify
