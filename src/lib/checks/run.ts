@@ -35,6 +35,8 @@ import {
   replayOrder,
 } from '../queue.ts';
 import { QUOTA_SPENT_COPY } from '../../domain/quota.ts';
+import { INITIAL_OFFERING, applyAll, isWaiting, nextAction } from '../../domain/slice.ts';
+import { eventsFromResponse } from '../ritual-map.ts';
 
 let passed = 0;
 let failed = 0;
@@ -282,9 +284,82 @@ async function drainChecks(): Promise<void> {
 // ── 7 · guard — the harness is alive ───────────────────────────────────────
 section('7 · Guard — the harness is alive');
 
+function serviceChecks(): void {
+  section('8 · Service layer — the server response becomes a state-machine event');
+
+  // This is where the slice's three rules are DECIDED, so it gets its own gate
+  // even though the mapping is pure. The temptation this suite exists to kill:
+  // treating every non-200 as a failure, and every `queued` as a job in flight.
+
+  const styled = eventsFromResponse({ job_id: 'j1', status: 'styled', styled_path: 'styled/j1' });
+  check('a styled response is STYLED with its path', styled[0]?.type === 'STYLED');
+  check('the sprite path is carried through, not re-derived', (styled[0] as { spritePath: string }).spritePath === 'styled/j1');
+
+  const failed = eventsFromResponse({ job_id: 'j2', status: 'failed' });
+  check('a failed response is GENERATION_FAILED', failed[0]?.type === 'GENERATION_FAILED');
+
+  // ⚠️ RULE ③ — the response that has no `error` in it. HTTP 200, status
+  // 'queued', code 'shrine_busy'. This is the AI-budget stop-rule doing exactly
+  // what it was built to do (SCRUM-59 / ADR-006), and it must file as a PARK.
+  const parked = eventsFromResponse({ job_id: 'j3', status: 'queued', queued: true, code: 'shrine_busy' });
+  check('a shrine_busy 200 is BUDGET_PARKED, NOT a failure', parked[0]?.type === 'BUDGET_PARKED');
+
+  // The same park with the flag omitted but the code present: the two arrive
+  // together, and a server that dropped one must not turn a park into a job.
+  check('shrine_busy parks even without the queued flag', eventsFromResponse({ job_id: 'j3', status: 'queued', code: 'shrine_busy' })[0]?.type === 'BUDGET_PARKED');
+  // …and with the code absent but the flag present.
+  check('the queued flag alone also parks', eventsFromResponse({ job_id: 'j3', status: 'queued', queued: true })[0]?.type === 'BUDGET_PARKED');
+
+  const inFlight = eventsFromResponse({ job_id: 'j4', status: 'processing' });
+  check('a processing job is a DRAFT the UI waits on, not a park', inFlight[0]?.type === 'CART_DRAFT');
+  check('a processing job is definitely NOT parked', inFlight[0]?.type !== 'BUDGET_PARKED');
+
+  // Rejection is a provider refusal (moderation) — the offering is spent, so it
+  // takes the same road as a failure, NOT the polling road.
+  check('a provider rejection is GENERATION_FAILED', eventsFromResponse({ job_id: 'j5', status: 'rejected' })[0]?.type === 'GENERATION_FAILED');
+  check('an already_requested re-run is a DRAFT, never a second charge', eventsFromResponse({ job_id: 'j6', status: 'queued', already_requested: true })[0]?.type === 'CART_DRAFT');
+
+  /**
+   * THE PROOF THAT MATTERS: take the real `shrine_busy` body, run the mapping, and
+   * then run the STATE MACHINE on it. A unit check that only inspects the event's
+   * name would pass even if the machine filed the park as a failure.
+   *
+   * ⚠️ It replays the WHOLE sequence — capture, then draft, then the outcome —
+   * because `BUDGET_PARKED` is only legal from `preparing`. Feeding it a park
+   * from `INITIAL_OFFERING` is an illegal transition the machine correctly
+   * ignores, which would make the check pass for the wrong reason.
+   */
+  const capturing = applyAll(INITIAL_OFFERING, [{ type: 'CAPTURE_TAKEN', captureId: 'cap-1' }]);
+  check('a capture mints the id and reaches `ready`', capturing.state === 'ready' && capturing.captureId === 'cap-1');
+
+  const park = applyAll(applyAll(capturing, [{ type: 'CART_DRAFT' }]), parked);
+  check('the machine ACCEPTS a park (BUDGET_PARKED is legal from `preparing`)', park.state === 'queued');
+  check('a parked offering is WAITING, not lost', isWaiting(park.state));
+  check('a parked offering waits rather than demanding a new capture', nextAction(park) === 'wait');
+  check('a park does NOT demand a re-capture — nothing was spent', park.needsRecapture === false);
+  check('a park KEEPS the capture id, so the job can still find it', park.captureId === 'cap-1');
+
+  // The asymmetry that would strand a player. A failed generation has SPENT the
+  // capture, so the machine must demand a new one; a park has not.
+  const spent = applyAll(applyAll(capturing, [{ type: 'CART_DRAFT' }]), failed);
+  check('a failed generation leaves the offering needing a NEW capture', nextAction(spent) === 'recapture');
+  check('a failure clears the capture id — that id is spent forever', spent.captureId === null);
+  check('a failure does NOT leave the offering waiting (nothing is in flight)', !isWaiting(spent.state));
+  check(
+    '⚠️ a PARK waits and a FAILURE recaptures — they are NOT the same road',
+    nextAction(park) === 'wait' && nextAction(spent) === 'recapture',
+  );
+
+  // The styled road, for contrast: a job that ran is a sprite and a throw.
+  const done = applyAll(applyAll(capturing, [{ type: 'CART_DRAFT' }]), styled);
+  check('a styled response reaches `styled` and can be thrown', done.state === 'styled' && nextAction(done) === 'throw');
+  check('the sprite path survives the machine unchanged', done.spritePath === 'styled/j1');
+}
+
 async function main(): Promise<void> {
   await storageChecks();
   await drainChecks();
+  serviceChecks();
 
   check('guard: a 5-character key is NOT valid', !isValidIdempotencyKey('12345'));
   check('guard: junk is NOT a clan code', normaliseClanCode('not-a-code!!') === null);

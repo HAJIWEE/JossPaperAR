@@ -82,6 +82,17 @@ Three real cases the audit caught on 2026-10-05: **SCRUM-53** (moved to `In Prog
 - Worktrees share one `main` checkout, so `git checkout main` fails in a sibling worktree. Verify the merged state with `git merge-base --is-ancestor <local-branch> origin/main` — **not** `origin/<branch>`, because `git fetch --prune` deletes those refs *after* a merge and `--is-ancestor` then reports a misleading "not merged".
 - Every applied migration is permanent: **never edit an applied migration** — add a new version number.
 
+### Spend within the approved budget without asking
+
+**You do not need to ask before spending fal.ai credit, as long as the spend stays inside the approved budget.**
+
+* **Approved:** US$10–20 for the AI work; **US$4.98 spent** as of 2026-10-05 (≈ S$6.38 at the Mastercard rate 1.2808 — reconciled at SCRUM-41). The full Path C pipeline is ≈ **US$0.09/run**.
+* **In scope without asking:** any number of verification runs that keep the total **under US$20**.
+* **Still ask first:** anything that would take the total **over US$20**, a new service or subscription, or a purchase of physical hardware.
+* **Always:** log the spend in `project-costs.md` (SGD @ the Mastercard rate, with the USD figure and the derivation inline) and say what it bought. A $0.00 line beats an absent one.
+
+Rationale: the ceiling exists so an unmetered bill cannot surprise us (doc 10 §6), not to require a round-trip before every $0.09 run. The stop-rule already bounds the *global* spend per day (`app_config.daily_ai_budget_micros`).
+
 ### Docs are part of "done"
 
 Ship the docs with the work, not after: doc 19 §12.x · `next-ai-context.md` · `follow-up-items.md` (move closed items to `completed-work-archive.md`) · `project-costs.md` (SGD, Mastercard rate or a marked placeholder) · and a **Jira comment** on the ticket.
