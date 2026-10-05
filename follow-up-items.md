@@ -29,7 +29,7 @@
 
 - [ ] **`SCRUM-52` — Buy the Tier F floor device** — 1 of 3 (Galaxy A05s · Redmi A5 · Nokia C-series, ~S$100–150) → becomes the named CI phone (doc 14 §1) · blocks `SCRUM-51` + the device checks in `SCRUM-53`. **A PM action.**
 - [ ] **`SCRUM-53` — Build the MVP vertical slice** (SCRUM-17 execution) — camera → cartoonize → burn → award → persist on the floor device; distinct from SCRUM-17, which only *scoped* it (Done). Acceptance test = the **four aim bands**.
-- [ ] **`SCRUM-55` — Write ADR-004 + ADR-006 + ADR-008** *from* the existing specs — decided but unrecorded; **ADR-008 (ad posture) additionally blocks the ad SDK + rewarded photo**.
+- [x] **`SCRUM-55` — Write ADR-004 + ADR-006 + ADR-008** ✅ **Done 2026-10-05 (S29)** — all three written *from* the specs that had already decided them. **ADR-004** (anonymous identity first, optional account later) and **ADR-006** (daily quota · cost per burn · **no** cooldown · hard global stop-rule) **Accepted**; **ADR-008** (ad posture) drafted as 🟡 **Proposed — PM decision**, because its placement rule is locked but four sub-questions (A–D: the **rewarded** ad-gated photo · ad volume · protected moments · category exclusions) are a *product* call → routed to **SCRUM-49**. The register is now guarded by **`npm run check:adrs`** (fault-tested red on 4 cases), so decided-but-unrecorded drift cannot return. ⚠️ **ADR-008 still blocks the ad SDK + the rewarded photo** — ratify clauses 1–6 and answer A to unblock that work.
 
 ### 🖌️ Design — PM review & decisions
 - [ ] **Whole-file visual review of the 47 boards** changed by the S21 contrast tranche — an eyeball that is still owed. *(Note: it no longer "releases a colour hold" — `SCRUM-42` and `SCRUM-33` are already **Done** in Jira since 30 Sep; the old hold wording is in the archive.)*
@@ -69,7 +69,7 @@
 - [ ] **Plan the core game loop implementation.**
 - [ ] **Execute the vertical slice (`SCRUM-53`)** — SCRUM-17 wrote the acceptance criteria; the *build* is now SCRUM-53, gated by SCRUM-54 + the floor device. The slice = camera → cartoonize → burn → award → persist, end-to-end on a real device.
 - [ ] **Run the AR-fire spike (`SCRUM-51`)** — blocked by the floor device; plan is [[AppDesignConceptBoard/17-ar-fire-spike-plan|doc 17]].
-- [ ] **Write `ADR-004` (identity) + `ADR-006` (burn-limit semantics) + `ADR-008` (ad posture)** — **now filed as `SCRUM-55`**; each is written *from* the spec that already decided it ([[AppDesignConceptBoard/10-economy-spec|10]] · [[AppDesignConceptBoard/13-privacy-and-retention|13]]). ADR-008 is a product call.
+- [x] **Write `ADR-004` (identity) + `ADR-006` (burn-limit semantics) + `ADR-008` (ad posture)** ✅ **done 2026-10-05 (S29, SCRUM-55)** — [[AppDesignConceptBoard/ADRs/ADR-004-anonymous-identity-first-optional-account-later|ADR-004]] ✅ and [[AppDesignConceptBoard/ADRs/ADR-006-burn-limit-semantics-daily-quota-cost-per-burn|ADR-006]] ✅ **Accepted**; [[AppDesignConceptBoard/ADRs/ADR-008-advertising-posture-never-inside-the-ritual|ADR-008]] 🟡 **Proposed — awaiting the PM** (clauses 1–6 ratifiable now; **A** = the rewarded ad-gated photo is the real question → **SCRUM-49**). All nine §6 decisions are now recorded; `npm run check:adrs` keeps the register honest.
 - [x] **Milestones plan** ✅ **done 2026-10-03 (S27)** — [[AppDesignConceptBoard/18-mvp-scope-and-timeline|doc 18]] (M0–M5) closes the SCRUM-10 chain item and **is** the SCRUM-14 deliverable.
 
 ### Business planning
