@@ -36,6 +36,12 @@ export const MESSAGES = {
     'ritual.cannotPrepare': 'This offering cannot be prepared.',
     'ritual.offeringPrepared': 'Your offering is ready.',
     'ritual.refundReturned': 'The offering could not be prepared — your points have returned.',
+    // ⚠️ Two DIFFERENT retries, deliberately. `common.retry` is for a request
+    // that did not cost anything (parked by the budget, or never sent);
+    // `common.recapture` is for a capture that IS spent and needs a new photo.
+    // One shared "try again" would imply a re-offer is free when it is not.
+    'common.retry': 'Check again',
+    'common.recapture': 'Offer a new photo',
     'quota_spent': QUOTA_SPENT_COPY.en,
 
     // ── the throw (doc 05 §2 — the four bands) ────────────────────────────
@@ -85,6 +91,8 @@ export const MESSAGES = {
     'ritual.cannotPrepare': '此供品無法製作。',
     'ritual.offeringPrepared': '您的供品已備好。',
     'ritual.refundReturned': '供品未能製成，點數已退回。',
+    'common.retry': '再試一次',
+    'common.recapture': '重新供相',
     'quota_spent': QUOTA_SPENT_COPY.zh,
 
     'band_bullseye': '正中',

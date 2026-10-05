@@ -42,6 +42,7 @@
 | 2026-09-25 | **Style-D fidelity spike — budget approved** (stakeholder) | Prove low-poly 3D × ink brush is achievable via hosted APIs (fal/Replicate credits) before provider lock-in | US$10–20 budget · **actual US$4.49** | **1.2808** (Mastercard, **verified 2026-10-05**) | **S$5.75** (4.49 × 1.2808) | ✅ approved · **spent 2026-09-26** (133 runs, well under cap ✅) — ✅ **reconciled at SCRUM-41 (2026-10-05)** @ the Mastercard rate · **no overrun** (US$4.49 of the US$20 cap = 22%) |
 | 2026-10-04 | **PR-3 live verification (SCRUM-54b)** — real fal calls against the deployed Edge Functions | Prove the locked Path C pipeline runs end-to-end on the hosted runtime, with cost/latency recorded: 7 × `moondream2` identify (~$0.01) + 4 × `nano-banana-2` 1K generate (~$0.08) | **≈ US$0.40** (est. — 0.07 + 0.32; two runs were spent discovering the PNG-size defect and the colour-rule false positive) | **1.2808** (Mastercard, verified 2026-10-05) | **≈ S$0.51** (0.40 × 1.2808) | ✅ **incurred 2026-10-04** — one run completed fully (`cost_micros: 90000`, `latency_ms: 14988`, a persisted sprite). ✅ **rate reconciled at SCRUM-41** (was a 1.2900 ⚠ placeholder). |
 
+| 2026-10-05 | **SCRUM-53 service layer** — `ritual.ts` / `ritual-map.ts` / `preparing.tsx` | Wire the client to the deployed orchestrator under the pre-minted capture id | **US$0.00** — no fal.ai call was made: the mapping is asserted against the orchestrator's **real response contract**, and the live run is the device/emulator acceptance step (SCRUM-52) | **1.2808** (Mastercard, verified 2026-10-05) | **S$0.00** | ✅ **no spend** — logged so the zero is on the record rather than absent. A live Path C run (≈ US$0.09) is authorised and budgeted for the acceptance step. |
 | 2026-10-04 | **SCRUM-59 stop-rule verification** — 4 live runs against the deployed orchestrator | Prove the budget **QUEUES** instead of spending (doc 10 §4) | **≈ US$0.09** (the first run **mis-fired** — a rotated service key meant the budget was never written, so it completed a real Path C generation; the corrected runs return `shrine_busy` in 0.5 s and spend **nothing**) | **1.2808** (Mastercard, verified 2026-10-05) | **≈ S$0.12** (0.09 × 1.2808) | ✅ **incurred 2026-10-04** — logged because it *was* spent; the intended path costs **$0.00** (doc 19 §12.5 finding 2). ✅ **rate reconciled at SCRUM-41.** |
 
 
@@ -88,7 +89,7 @@
 |---|---|
 | Committed recurring (ClinePass / month) | S$12.76 |
 | Style-D spike — **actual** (2026-09-26, **@1.2808 Mastercard, reconciled 2026-10-05**) | **S$5.75** (US$4.49 / 133 runs — under the US$20 cap ✅) |
-| fal.ai credit — **spent to date** (spike **S$5.75** + PR-3 verification **≈S$0.51** + SCRUM-59 verification **≈S$0.12**) | **≈ S$6.38** (≈ **US$4.98** of the approved US$10–20 — **30% used**) |
+| fal.ai credit — **spent to date** (spike **S$5.75** + PR-3 verification **≈S$0.51** + SCRUM-59 verification **≈S$0.12** + SCRUM-53 service layer **S$0.00**) | **≈ S$6.38** (≈ **US$4.98** of the approved US$10–20 — **30% used**) |
 | **Total known outlay (first month, incl. spike actual)** | **≈ S$8.47** (ClinePass actual S$2.71 + fal actual S$5.75) |
 | Actual spend to date (ClinePass, this month) | S$2.71 (US$2.12) |
 | Paid services running | none yet (all free tiers) |
