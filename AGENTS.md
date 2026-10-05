@@ -16,6 +16,25 @@ Steps:
 4. **Add it to the active sprint.** Sprint field is `customfield_10020`; the current sprint is **id 1 = `SCRUM Sprint 1`** (2026-10-02 → 2026-10-16). Verify the sprint id via `jql: project = SCRUM AND sprint IN openSprints()` with field `customfield_10020` — **do not assume it stays 1**, and **do not assume a newly created issue is in the sprint** (it is not; set it explicitly and confirm with a read-back).
 5. Label it `decision` (plus `pm-action`, and a domain label such as `adr-008` / `economy` / `cultural`).
 
+### Anything worked on is in the sprint — no exceptions
+
+**A ticket you are actively working on must be in the active sprint.** Moving a ticket to `In Progress`/`In Review` while leaving it in the backlog hides the work from the sprint board and makes the board lie about what is happening.
+
+This is not only for new tickets — **when you RESUME a backlog ticket, move it into the sprint in the same action.**
+
+```bash
+# the sprint id, re-read every time (never hard-code 1)
+jql: project = SCRUM AND sprint IN openSprints()   → field customfield_10020
+# then set it:  { "customfield_10020": <id> }
+
+# the audit that must come back EMPTY — nothing in flight is stranded in the backlog
+jql: project = SCRUM AND sprint is EMPTY AND statusCategory = "In Progress"
+```
+
+Run the audit before ending a session that changed any ticket's status. Two real cases it caught on 2026-10-05: **SCRUM-53** (the slice, moved to `In Progress` but left in the backlog) and **SCRUM-56** (PM provisioning, `In Progress` since 2026-10-03, never in a sprint). Both are now in Sprint 1, along with **SCRUM-52** (the device — in flight as a PM purchase even though its status is still `To Do`).
+
+**Why it matters:** the sprint board is the PM's only honest view of the work. A ticket in the backlog and a ticket in the sprint are different claims about priority, and the board is where the PM looks to see what is actually moving.
+
 **Why:** a decision that lives only in a PR description is invisible to the PM's workflow and will not be answered. An ADR stuck at 🟡 Proposed is a decision recorded as unmade — the ticket is what converts it.
 
 **Corollary:** when a decision is genuinely the PM's, **do not mark the deliverable `Done`** on the strength of your own recommendation — park the build ticket in `In Review` and let the decision ticket carry the open question.

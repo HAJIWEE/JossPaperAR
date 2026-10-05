@@ -565,9 +565,31 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
----
+### 12.7 · SCRUM-53 started — the slice's client rules, made executable (2026-10-05)
 
-*Created 2026-10-03 (Session 27) — the stand-it-up plan for [[07-system-architecture]]: service build order · the complete API surface (3 Edge Fns · 11 RPCs · storage · realtime) · the 3-ring environment with the local toolchain audited · the exact SDK-57 package manifest + install traps · the build-vs-provision split (A–J ↔ #1–#10, filed as **SCRUM-57** / **SCRUM-56**) · and 4 doc-07 inconsistencies found while mapping the build against the architecture. Path C endpoints and prices verified live: **ADR-002's cost model still holds exactly.***
+**The finding.** The three client rules of §12/§12.5 were written as *warnings*, which is the form most easily violated: a well-meaning refactor six weeks later breaks a rule that nothing in the type system objects to, and the breakage is discovered by a player rather than by a check.
+
+They are now a **typed state machine** (`src/domain/slice.ts`) with a machine check (`npm run check:slice`, in `npm run check` + CI):
+
+| Rule | Encoded as |
+|---|---|
+| ① capture id minted **before** the upload | `CAPTURE_TAKEN` carries the client-minted id; `CART_DRAFT` is **refused** when `captureId` is null, so the id can never be minted implicitly |
+| ② a **failed** generation means a **NEW** capture | `GENERATION_FAILED` discards the spent id, sets `needsRecapture`, and `nextAction` returns **`recapture`** — the UI cannot offer a retry of the row |
+| ③ `200 shrine_busy` is a **queue**, not an error | `BUDGET_PARKED` → `queued`: not a failure, id **kept**, and it resumes straight to `styled` with no re-request and no re-upload |
+
+**36 checks green, and the harness fault-tested two ways.** Breaking rule ② (a failure that keeps the spent id) goes **red on that assertion**; breaking rule ③ (treating `shrine_busy` as an error) goes **red on six**. The harness also asserts **its own aliveness** — a deliberately wrong belief must be reported as a failure, then the counters are restored, so a dead harness cannot print an unbroken column of ticks.
+
+**Three defects the check caught in the first implementation** — worth recording because none was visible by reading the code:
+
+1. **A stale sprite survived a failed generation.** `GENERATION_FAILED` cleared the capture id but left `spritePath`, so a failure after a previously-styled offering would have shown a sprite for an offering that no longer existed. Fixed: the whole offering resets.
+2. **A spent offering reported an endless `wait`.** After three misses the state is `thrown`, and `nextAction` had no `thrown` branch — it fell through to `wait`, which would have left a screen spinning forever after the last legal throw. Fixed: a spent `thrown` is `done`.
+3. **The identity assertions were testing the harness, not the machine.** Several checks compared `transition(x, e) === x` where `x` was built by a function *call* — so each side was a different object and every "illegal event is ignored" check failed for the wrong reason. Fixed by binding each fixture to a local first.
+
+**Also:** the emulator question (the PM is waiting on a 10.10 sale for the Tier-F device, **SCRUM-52**) is filed as **SCRUM-64**. KVM was measured as **genuinely usable** on the dev laptop — `KVM_GET_API_VERSION → 12` and `KVM_CREATE_VM` succeeded, which is the real proof. The scope is honest: an emulator is a **development** target, so every *functional* acceptance criterion can be met on it and **no performance** one (N2/N3/N4/N10) can.
+
+⚠️ **A near-miss recorded for the sake of the next session:** the first KVM probe used a malformed `ioctl` buffer and returned `EINVAL` — the *classic* signature of "nested virtualisation unavailable" — which would have justified dropping the emulator plan on a false premise. The device was fine; the test was wrong. **"The check failed" and "the thing is broken" are different claims, and the difference is worth one more attempt before abandoning a plan.**
+
+---
 
 ---
 ### 12.6 · SCRUM-55 — the three unwritten ADRs, recorded (SCRUM-10 chain)
@@ -597,4 +619,7 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 One **real defect in the check itself** was found this way and fixed: the *"record to write"* scan initially matched the whole README and therefore **its own documentation prose** — a false red. It now scans table rows only.
 
-**Status:** 🟡 **ADR-008 awaits the PM** (ratify clauses 1–6; answer **A**). All other §6 decisions are recorded.
+**Status:** ✅ **ADR-008 Accepted** (SCRUM-62, 2026-10-05): A3 · caps 2 on app start / 3 in a row post-ritual · Singapore for now (structured for other diasporas) · D strong NO, detail in **SCRUM-63**. All nine §6 decisions recorded; all eight ADRs Accepted.
+
+*Created 2026-10-03 (Session 27) — the stand-it-up plan for [[07-system-architecture]]: service build order · the complete API surface (3 Edge Fns · 11 RPCs · storage · realtime) · the 3-ring environment with the local toolchain audited · the exact SDK-57 package manifest + install traps · the build-vs-provision split (A–J ↔ #1–#10, filed as **SCRUM-57** / **SCRUM-56**) · and 4 doc-07 inconsistencies found while mapping the build against the architecture. Path C endpoints and prices verified live: **ADR-002's cost model still holds exactly.***
+*Updated 2026-10-05 (S29c) — **§12.7**: SCRUM-53 started; the slice's three client rules are now a typed state machine with a fault-tested gate (`npm run check:slice`), and the emulator interim target is filed as **SCRUM-64**.*
