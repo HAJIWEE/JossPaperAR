@@ -1,10 +1,11 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AIM_BANDS } from '@/domain/aim';
 import { OFFERINGS, baseValueOf } from '@/domain/catalogue';
 import { DAILY_PHOTO_BURNS, DAILY_STORE_BURNS } from '@/domain/quota';
-import { TOUCH_GAP, TOUCH_TARGET, brand, fontSize, fluidSize, radius, space, surface, text } from '@/theme/tokens';
+import { TOUCH_GAP, TOUCH_TARGET, brand, fontSize, fluidSize, onColorCream, radius, space, surface, text } from '@/theme/tokens';
 
 /**
  * HOME — a SCAFFOLD, not the shrine.
@@ -24,6 +25,7 @@ import { TOUCH_GAP, TOUCH_TARGET, brand, fontSize, fluidSize, radius, space, sur
 
 export default function HomeScaffold() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   return (
     <ScrollView
@@ -90,6 +92,17 @@ export default function HomeScaffold() {
         Touch targets are {TOUCH_TARGET} px; type scales fluidly (hero renders at{' '}
         {Math.round(fluidSize(fontSize.hero, 390))} px on the 390 px reference).
       </Text>
+
+      {/* ── the slice begins here (SCRUM-53 / PR-4) ────────────────────────── */}
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => {
+          router.push('/capture');
+        }}
+        style={({ pressed }) => [styles.begin, pressed && { opacity: 0.8 }]}
+      >
+        <Text style={styles.beginLabel}>Begin an offering · 開始供奉</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -132,4 +145,13 @@ const styles = StyleSheet.create({
   rowLabel: { flex: 1, color: text.ink, fontSize: fontSize.body.at390 },
   rowValue: { color: text.gold, fontSize: fontSize.body.at390, fontWeight: '600' },
   swatch: { width: 12, height: 12, borderRadius: 3, marginRight: space.sm },
+  begin: {
+    marginTop: space.xl,
+    minHeight: TOUCH_TARGET,
+    backgroundColor: brand.cinnabar,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  beginLabel: { color: onColorCream, fontSize: fontSize.bodyLg.at390, fontWeight: '600' },
 });
