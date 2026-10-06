@@ -31,6 +31,24 @@
 - [ ] **`SCRUM-53` — Build the MVP vertical slice** (SCRUM-17 execution) — camera → cartoonize → burn → award → persist on the floor device; distinct from SCRUM-17, which only *scoped* it (Done). Acceptance test = the **four aim bands**.
 - [x] **`SCRUM-55` — Write ADR-004 + ADR-006 + ADR-008** ✅ **Done 2026-10-05 (S29)** — all three written *from* the specs that had already decided them. **ADR-004** (anonymous identity first, optional account later) and **ADR-006** (daily quota · cost per burn · **no** cooldown · hard global stop-rule) **Accepted**. **ADR-008** (ad posture) was drafted as 🟡 Proposed and then **Accepted the same day** once the PM answered A–D on **`SCRUM-62`**: **A3** rewarded photo · **B** caps 2 on app start / 3 in a row post-ritual · **C** Singapore practice now, modelled as data for other diasporas · **D** strong NO (gambling, loans, alcohol). ⚠️ The **ad SDK choice** stays gated on **`SCRUM-63`** (the D category/compliance research) — but the **MVP has no ads at all**, so this does not block PR-4. The register is guarded by **`npm run check:adrs`** (fault-tested red on 4 cases), so decided-but-unrecorded drift cannot return.
 
+### 🏢 Business & compliance — register and run the Singapore sole proprietorship
+
+> **Research done, sourced and dated → [[AppDesignConceptBoard/20-business-registration-and-compliance.md]]** (2026-10-05). Milestones filed as **`SCRUM-65`** (epic) + **`SCRUM-66`–`SCRUM-78`** (B1–B13). ⚠️ **The two traps:** the **D-U-N-S lead time** before the Play organization account can be verified (B11), and **outstanding MediSave blocking the ACRA renewal** (B10 → B12). ACRA + Play cost to complete the core: **S$115 + US$25 ≈ S$147**.
+
+- [ ] **B1 `SCRUM-66`** — lock the business identity (registered name · address route · public legal name) — **blocks everything**
+- [ ] **B2 `SCRUM-67`** — reserve the business name on Bizfile (**S$15**)
+- [ ] **B3 `SCRUM-68`** — register the sole proprietorship (**S$100**) → **UEN** + Business Profile ⚠️ the free copy expires in **60 days**
+- [ ] **B4 `SCRUM-69`** — Corppass + ACRA e-services access (required for every government transaction)
+- [ ] **B5 `SCRUM-70`** — business bank account (Play payouts · IRAS + MediSave GIRO)
+- [ ] **B6 `SCRUM-71`** — business email + phone + a live URL (Play publishes two of them)
+- [ ] **B7 `SCRUM-72`** — PDPA: appoint the DPO, register it with PDPC, publish the contact, policy v1
+- [ ] **B8 `SCRUM-73`** — licence/permit check (GoBusiness e-Adviser) → file the verdict
+- [ ] **B9 `SCRUM-74`** — tax: myTax · records · **Form B by 18 Apr** · GST watch (**S$1M**)
+- [ ] **B10 `SCRUM-75`** — MediSave / CPF self-employment arrangement ⚠️ **gates the renewal**
+- [ ] **B11 `SCRUM-76`** — Google Play Console **organization** account (**D-U-N-S** · US$25 · verification) — un-defers doc 19 §4 #10
+- [ ] **B12 `SCRUM-77`** — compliance calendar + the one-page runbook
+- [ ] **B13 `SCRUM-78`** — decision: the incorporation trigger (deferred)
+
 ### 🖌️ Design — PM review & decisions
 - [ ] **Whole-file visual review of the 47 boards** changed by the S21 contrast tranche — an eyeball that is still owed. *(Note: it no longer "releases a colour hold" — `SCRUM-42` and `SCRUM-33` are already **Done** in Jira since 30 Sep; the old hold wording is in the archive.)*
 - [ ] **Save a named Penpot version** — Penpot UI → File → Version history (the plugin API has no version endpoint).
@@ -73,10 +91,13 @@
 - [x] **Milestones plan** ✅ **done 2026-10-03 (S27)** — [[AppDesignConceptBoard/18-mvp-scope-and-timeline|doc 18]] (M0–M5) closes the SCRUM-10 chain item and **is** the SCRUM-14 deliverable.
 
 ### Business planning
-- [ ] **Research advertising platforms** suitable for family-oriented content → `ADR-008` depends on this.
+- [ ] **Research advertising platforms** suitable for family-oriented content → **ADR-008 ✅ accepted** (SCRUM-62); the *category* half is now researched (**SCRUM-63** → [[AppDesignConceptBoard/21-ad-category-denylist|doc 21]]); the *network* half **is** the SDK selection and stays open.
+- [x] **`SCRUM-63` — the ad-category denylist** ✅ **researched 2026-10-05** — the five classes with a **Singapore basis per class** (gambling · loans · tobacco/vapes · Nutri-Grade "D" are **compelled**; **alcohol is our own stricter policy — no SG statute bans it, and Google *permits* it here**), the implementable taxonomy, what AdMob/AppLovin actually block (and their documented limits), and the three enforcement layers → [[AppDesignConceptBoard/21-ad-category-denylist|doc 21]]. **Now code, not prose:** `src/domain/adCategories.ts` + **`npm run check:ads`** (51 assertions, fault-tested, in CI).
+- [ ] **`SCRUM-63` — the one residual:** the **Unity / Meta publisher-control read** (doc 21 §4.3, §8 item 1) — their doc pages 404'd, so they are recorded *unverified*; needed before the **SDK is selected**, not before the slice.
 - [ ] **Plan monetization timeline and strategy.**
 - [ ] **Plan community building approach.**
 - [ ] **`SCRUM-43`** — legal long-tail (awareness only): Play fee vs the $1.19 floor · ToS/privacy policy · trademark · model-terms reads.
+- [ ] **`SCRUM-65`** — **business registration & compliance** (Singapore sole proprietor) — milestones **B1–B13**; *new 2026-10-05*, listed in full under **🏢 Business & compliance** in Immediate Actions; research → [[AppDesignConceptBoard/20-business-registration-and-compliance|doc 20]].
 
 ---
 

@@ -57,6 +57,14 @@ jobs:
       - name: Throw grading (four aim bands · rethrow cap · geometry)
         run: node src/domain/checks/throw.ts
 
+      # SCRUM-63 (ADR-008 D). Dependency-free, so it belongs here. It guards the
+      # ad-category denylist's POLICY OF RECORD: the five classes and their legal
+      # basis (alcohol is OUR policy, not the law's), the ritual-flow placement
+      # rule, and the guard that our own ritual copy is never classified as a
+      # blocked ad category.
+      - name: Ad-denylist checks (ADR-008 D — categories · legal basis · placement)
+        run: node src/domain/checks/ads.ts
+
       # SCRUM-54b (PR-3). Both are dependency-free, so they belong here:
       #  · pathc-check   — ADR-002's LOCKED pipeline: the endpoints, the v3
       #    template clauses, and the ABSENCE of example colours in the identify

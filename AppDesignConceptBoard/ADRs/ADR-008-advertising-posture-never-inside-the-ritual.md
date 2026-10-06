@@ -3,10 +3,10 @@
 **Status:** ✅ **Accepted** · 2026-10-05 (Session 29) — *decided by the PM on **SCRUM-62**; drafted here as 🟡 Proposed, signed there*
 **Decider:** stakeholder (PM) — **SCRUM-62** (2026-10-05), answering A/B/C/D. The *placement* half was already settled by [[../10-economy-spec]] §1 and [[../16-cultural-consultation-and-ritual-review]] §5; the *scope* half was decided on SCRUM-62
 **Closes (gap-analysis §6):** **9 · ad posture** — *may ads ever appear inside the ritual flow?*
-**Blocks:** the ad SDK choice (now gated on **D → SCRUM-63**) · monetization planning · doc 19 §6.2 item 11 · [[../09-economy-quick-check]] §4 (its +40–60% mediation assumption)
+**Blocks:** ~~the ad SDK choice~~ — ✅ **unblocked 2026-10-05**: the clause-D research (**SCRUM-63**) landed and the SDK can now be selected against a written list (see **clause D** below) · monetization planning · doc 19 §6.2 item 11 · [[../09-economy-quick-check]] §4 (its +40–60% mediation assumption)
 **Related:** [[../10-economy-spec]] §1 (ads = post-ritual only) · §5 (ARPDAU band $0.005 / $0.011 / $0.04) · [[../16-cultural-consultation-and-ritual-review]] §1.5 item 5 + Q8/Q9 (the practitioner question) · §5 (what we will and won't change) · [[../12-security-and-legal-scoping]] S9 + D10 (SDK vetting · EEA consent) · [[../13-privacy-and-retention]] §1 item 12 (ad id, later) · **SCRUM-62** (the decision) · **SCRUM-63** (D — category/compliance research) · SCRUM-49 (the cultural review) · SCRUM-43 (legal long-tail)
 
-> **In one line:** advertising is **post-ritual only** — it may never enter the capture → cartoonize → burn → reward flow, and never appear while ancestor names are on screen. The rewarded bonus photo **exists but is never framed as a reward on a ritual screen** (A3). Volume is capped at **2 on app start / 3 in a row post-ritual** (B). Categories are **strong NO** for gambling, loans and alcohol (D), with the compliance detail split to **SCRUM-63**. Protected moments follow **Singapore** practice for now, with the structure left open for other Chinese diasporas (C).
+> **In one line:** advertising is **post-ritual only** — it may never enter the capture → cartoonize → burn → reward flow, and never appear while ancestor names are on screen. The rewarded bonus photo **exists but is never framed as a reward on a ritual screen** (A3). Volume is capped at **2 on app start / 3 in a row post-ritual** (B). Categories are a **strong NO for five classes** — gambling · loans · alcohol · tobacco/vapes · high-sugar drinks (D) — and the compliance research (**SCRUM-63**) found that **only four of the five are compelled by Singapore law: alcohol is our own stricter policy alone**. Protected moments follow **Singapore** practice for now, with the structure left open for other Chinese diasporas (C).
 
 ---
 
@@ -48,12 +48,30 @@ This is the one decision in the §6 set that is not an engineering trade-off. Ev
 | **A** | **A3 · Allow the rewarded bonus photo, but never frame it as a reward on a ritual screen.** | The format survives (doc 10 §5's revenue case keeps its ads), but the offering is **presented on a post-ritual surface as an optional extra** — never as something the player *earns*, and never in the ritual's own language. It must not appear during, or immediately adjacent to, the capture → burn → reward sequence. **Revisitable at SCRUM-49** (doc 16 Q8 asks the practitioner the same question). |
 | **B** | **Cap volume: 2 on app start, 3 in a row after the ritual.** | Two **absolute** interstitial slots on app entry; a **run** of at most 3 in a row post-ritual, which is the burst the ritual-complete transition actually generates. Banners are not counted in these caps but stay frequency-limited. *A starting cap to be tuned from real data, not a validated optimum.* |
 | **C** | **Follow Singapore practice for now; leave the structure open for other Chinese diasporas.** | Protected moments today are the **SG** calendar and ritual rhythm (Qingming, Hungry Ghost month, CNY, death anniversaries). The rule is **modelled as data, not hard-coded**, so another diaspora's calendar and dates can be added by iteration later. Explicitly recorded: **Singapore is not the only Chinese diaspora** — a v1 scope decision, not a claim about "Chinese" timing generally. |
-| **D** | **Strong NO — gambling, loans, alcohol.** | Blocked categories, cultural grounds first and compliance grounds second. The **detail** (exact taxonomy, what the SDK's own policy blocks vs what *we* must enforce, and the relevant Singapore law) is **split out to `SCRUM-63`** — this ADR does not guess at it, and the SDK cannot be selected until it lands. |
+| **D** | **Strong NO — five classes: gambling · loans · alcohol · tobacco/vapes · high-sugar drinks.** | Blocked categories — cultural grounds first, compliance grounds second. The **detail landed 2026-10-05**: the exact taxonomy, the SDK's own limits, the Singapore basis per class, and the enforceable list are below and in [[../21-ad-category-denylist|doc 21]]. |
 
 **What is now unblocked vs still gated**
 
-* ✅ **Unblocked:** the A3 rewarded-flow *design* (surface + copy), and the B volume caps — both buildable now.
-* ⛔ **Still gated:** the **ad SDK choice**, which depends on **D → SCRUM-63**. No SDK is integrated at MVP anyway (clause 4).
+* ✅ **Unblocked:** the A3 rewarded-flow *design* (surface + copy) · the B volume caps · **and the ad SDK choice** — clause D's research landed, so the selection can proceed against a written list and a gate.
+* ⛔ **Still gated on nothing in this ADR.** No SDK is integrated at MVP anyway (clause 4); the SDK selection now turns on **auditability + consent support**, not on this record.
+
+#### D — the compliance research (landed 2026-10-05 · SCRUM-63 → [[../21-ad-category-denylist|doc 21]])
+
+The research found **five** classes to block, not three — and, more importantly, that **they do not all rest on the same footing.** Only these are compelled by Singapore law:
+
+| Class | Singapore basis | Compelled? |
+|---|---|---|
+| **Gambling** | **Gambling Control Act 2022** — advertising unlawful gambling in or from Singapore, or **to a person in Singapore**, is an offence (an individual: fine up to **$20,000**); licensed operators' advertising and promotion is prohibited unless **approved by GRA** | 🔴 **Statutory** |
+| **Loans / credit** | **Moneylenders Act 2008 s.29(3) r/w s.45(1)** → Registrar's Directions v3.0 (wef 2025-04-01): a licensee may advertise through a **closed channel list only** — directories · its own website · its own premises. **No entry reaches a third-party app surface**, and unlicensed lending is criminal | 🔴 **Regulatory direction** |
+| **Alcohol** | **None.** Self-regulatory advice only (ASAS Singapore Code of Advertising Practice, Appendix K). Singapore has **no statutory ban** on alcohol advertising — and **Google permits** alcohol inventory to be served here | ⚪ **Our policy alone** |
+| **Tobacco & vaporisers** | **Tobacco and Vaporisers Control Act 1993** — the tobacco advertising ban was extended to e-cigarettes and similar products, and expressly covers advertisements **published electronically** | 🔴 **Statutory** |
+| **High-sugar drinks** | **Food Regulations reg. 184E–184F** — *"Advertisements related to Nutri-Grade beverages graded 'D' are prohibited"* (2022-12-30; freshly prepared 2023-12-30). Fine ≤ **$1,000** (≤ **$2,000** repeat) | 🔴 **Statutory** |
+
+**The consequence for this record, stated plainly.** Gambling and loans are **unservable here, not merely inadvisable** — for loans because the permitted-channel list is *closed* and nothing on it reaches an app's ad slot, so no *licensed* moneylender can lawfully buy our inventory. But **alcohol is the one class where we are stricter than the law.** That is exactly why D was split out of this ADR rather than asserted in it, and it matters twice over: the record must not claim a compulsion it cannot support, and — per doc 16 §5, which pre-authorises exclusions to change on the practitioner's advice while the placement rule may not — **alcohol is the one exclusion SCRUM-49 may legitimately revisit**, and the one where the law would not protect us.
+
+**Where it is enforced.** Our own list is the control of record, carried as code: **`src/domain/adCategories.ts`** (the five classes, their `basis`, the ritual-flow placement allow-list, the caps, protected moments) guarded by **`npm run check:ads`** — 51 assertions, fault-tested, in `npm run check` and CI — layered under the SDK's own category blocks and the Ad review center. The gate asserts **the legal basis per class**, so this ADR's honesty about alcohol cannot be silently "tidied up" into a legal claim later.
+
+⚠️ **Two honest residuals:** the networks' taxonomies align with **no** country's law and their filters are documented as best-effort (AdMob **removes its `Consumer Loans` category on 2026-10-23**), so the list stays ours; and the **Unity/Meta** publisher-control read is still open (doc 21 §8 item 1) — needed before the SDK is *selected*, not before the slice. Nothing here is a runtime filter: **the MVP is ad-free.**
 ## Alternatives considered → rejected
 
 | Alternative | Why rejected |
@@ -81,7 +99,7 @@ This is the one decision in the §6 set that is not an engineering trade-off. Ev
 - **The decision is only as good as its enforcement.** No ad inside the ritual is a rule a designer can break by accident; it wants a machine-readable check (a slot allow-list) before the first SDK lands, not a code-review convention.
 - **B's caps (2/3) are a starting judgement, not a validated optimum.** They were set from judgement, not data; they must be tuned from real ad-fatigue and retention numbers once an SDK exists — and if they prove too loose, the cost is measured in the audience's trust.
 - **C ships Singapore-only cultural timing.** Other Chinese diasporas have different calendars and dates; encoding SG practice is a **v1 scope decision**, not a claim about "Chinese" ritual timing in general. Mitigated by modelling the calendar as data rather than hard-coding dates.
-- **D is a strong NO with the mechanism still outstanding** — until **SCRUM-63** lands we know *which* categories to block but not the enforcement mechanism or the compliance basis, so the SDK cannot be chosen.
+- **D's mechanism is now in place — and it surfaced a distinction worth keeping.** The research (**SCRUM-63**) found the five classes do **not** share one legal footing: four are compelled (a statute or a regulator's directions) and **alcohol is our own stricter policy** — Singapore has no statutory ban, and Google *permits* the inventory. The risk that remains is **operational, not legal**: no network's taxonomy aligns with Singapore law, their filters are documented as best-effort, and one network's loans category is being withdrawn (AdMob, 2026-10-23) — so **our own list stays the control of record** (`check:ads`), with the Unity/Meta read still open.
 - **A3 is revisitable at SCRUM-49.** If the practitioner objects to the rewarded format in a memorial setting, dropping it costs the secondary ad stream, not the app's viability.
 
 ---
@@ -94,11 +112,12 @@ This is the one decision in the §6 set that is not an engineering trade-off. Ev
 - [[../12-security-and-legal-scoping]] S9 (one vetted SDK) · D10 (EEA consent/UMP)
 - [[../13-privacy-and-retention]] §1 item 12 (ad id — later) · §4 (names-never rule, extended here)
 - [[../19-build-plan-services-api-environments|doc 19]] §6.2 item 11 (SDK TBD, deferred)
+- [[../21-ad-category-denylist|doc 21]] — the clause-D research: the five classes, the **Singapore basis per class**, what AdMob/AppLovin actually block, and the three enforcement layers
 - [[../18-mvp-scope-and-timeline|doc 18]] D8 (ratify ADR-004/006 when their records land — ADR-008 is the product half)
-- SCRUM-49 (the cultural review — where A–D go) · SCRUM-43 (legal long-tail) · SCRUM-55 (this record)
+- SCRUM-62 (the decision) · **SCRUM-63** (the clause-D research) · SCRUM-49 (the cultural review — where A–D go) · SCRUM-43 (legal long-tail) · SCRUM-55 (this record)
 
 ---
 
-*Drafted 2026-10-05 (Session 29) as SCRUM-55, then **accepted the same day**: the PM answered A–D on **SCRUM-62**. **A → A3** (rewarded photo allowed, never framed as a reward on a ritual screen) · **B → 2 on app start / 3 in a row post-ritual** · **C → Singapore practice now, structured as data for other Chinese diasporas** · **D → strong NO** (gambling, loans, alcohol), detail split to **SCRUM-63**. No SDK is integrated until D lands; the MVP is ad-free regardless.*
+*Drafted 2026-10-05 (Session 29) as SCRUM-55, then **accepted the same day**: the PM answered A–D on **SCRUM-62**. **A → A3** (rewarded photo allowed, never framed as a reward on a ritual screen) · **B → 2 on app start / 3 in a row post-ritual** · **C → Singapore practice now, structured as data for other Chinese diasporas** · **D → strong NO**, widened by the clause-D research (**SCRUM-63**, landed 2026-10-05 → [[../21-ad-category-denylist|doc 21]]) from three classes to **five**, with **alcohol the only one not compelled by Singapore law**. That research **unblocked the SDK choice**; the list is now code plus a gate (`src/domain/adCategories.ts` · `check:ads`). No SDK is integrated at MVP; the app is ad-free regardless.*
 
 ---
