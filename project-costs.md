@@ -48,6 +48,8 @@
 
 | 2026-10-05 | **SCRUM-55 — the three ADRs** | Documentation + a zero-dependency Node gate (`npm run check:adrs`) | **US$0.00** | — | **S$0.00** | ✅ no API calls, no migrations, nothing deployed — recorded so the ticket's cost is explicit |
 
+| 2026-10-06 | **S31 — SCRUM-64 emulator setup, the first end-to-end attempt, and the i18n fix** | Stand up an interim emulator test target; attempt the slice's first end-to-end run | **US$0.00** — **no fal.ai call was made**: the emulator needs no API, and the path stopped at `preparing` (the missing client auth bootstrap, **SCRUM-80**) *before* any paid step could be reached | — | **S$0.00** | ✅ **no spend** — logged so the zero is on the record rather than absent. The live Path C run (≈ US$0.09) stays budgeted and **unspent**. |
+
 <!-- APPEND-NEW-ONEOFF-COSTS-ABOVE -->
 
 ---
