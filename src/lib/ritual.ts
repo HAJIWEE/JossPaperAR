@@ -143,3 +143,107 @@ function base64ToBytes(b64: string): Uint8Array {
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
   return bytes;
 }
+
+/**
+ * The receipt `award-service` returns — the ONLY source of the band and award.
+ *
+ * ⚠️ The client already graded this throw locally for the preview. It is NOT
+ * what is shown as earned: this receipt is. ADR-005 gives the server sole
+ * authority over the band, so `submitBurn` returns what the server said and the
+ * screen displays that, never the local preview. A disagreement between the two
+ * is therefore visible rather than silently papered over.
+ */
+export interface BurnReceipt {
+  readonly band: string;
+  readonly multiplier: number;
+  readonly award: number;
+  readonly new_ground: boolean;
+  readonly streak_day: number | null;
+  /** True when the integrity clamp bound the award (doc 11 §2). */
+  readonly clamped: boolean;
+  readonly kind: string;
+  readonly tribute_balance: number;
+  /** True when this exact `idempotency_key` had already been paid. */
+  readonly idempotent_replay: boolean;
+  readonly burn_id: string;
+}
+
+export type SubmitResult =
+  | { readonly kind: 'ok'; readonly receipt: BurnReceipt }
+  /**
+   * The award was not written. Nothing was banked, so the offering is still
+   * whole and the throw may be repeated — with the SAME idempotency key, which
+   * is what makes a repeat safe (doc 14 N6: one key, one award, forever).
+   */
+  | { readonly kind: 'transient'; readonly reason: string };
+
+/**
+ * Submit the burn. `accuracy` is the px offset; the band is NEVER sent — the
+ * function strips a client-supplied `band` anyway (ADR-005), and this never
+ * constructs one.
+ *
+ * ⚠️ The `idempotency_key` is derived from the capture id and the THROW NUMBER,
+ * not generated fresh per attempt. That is what makes a network retry safe: the
+ * same throw replayed carries the same key, so the server recognises it and
+ * pays once. A fresh key per retry would turn a dropped connection into a second
+ * award for one throw.
+ */
+export async function submitBurn(
+  captureId: string,
+  accuracyPx: number,
+  throwNumber: number,
+  opts: { signal?: AbortSignal } = {},
+): Promise<SubmitResult> {
+  if (!Number.isFinite(accuracyPx) || accuracyPx < 0) {
+    // aim.ts refuses a negative/NaN offset rather than grading it, and so does
+    // the server. Catching it here turns a 500 into a no-op.
+    return { kind: 'transient', reason: 'accuracy must be a finite, non-negative px offset' };
+  }
+
+  let token: string | undefined;
+  let base: string;
+  try {
+    base = supabaseConfig().url;
+    const { data } = await supabase().auth.getSession();
+    token = data.session?.access_token;
+  } catch {
+    return { kind: 'transient', reason: 'not_authenticated' };
+  }
+  if (!token) return { kind: 'transient', reason: 'not_authenticated' };
+
+  const idempotencyKey = `burn:${captureId}:${throwNumber}`;
+
+  let res: Response;
+  try {
+    res = await fetch(`${base}/functions/v1/award-service`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // The award path takes its idempotency key in this header, not the body.
+        'Idempotency-Key': idempotencyKey,
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ capture_id: captureId, accuracy: accuracyPx }),
+      ...(opts.signal ? { signal: opts.signal } : {}),
+    });
+  } catch {
+    return { kind: 'transient', reason: 'network_error' };
+  }
+
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch {
+    return { kind: 'transient', reason: 'bad_response' };
+  }
+
+  if (!res.ok) return { kind: 'transient', reason: (body as { code?: string })?.code ?? 'bad_response' };
+
+  const receipt = body as BurnReceipt;
+  // A receipt without an award is not a receipt. Better a retry than a screen
+  // that reads "0" and sends the player away thinking they earned nothing.
+  if (typeof receipt?.award !== 'number' || typeof receipt.burn_id !== 'string') {
+    return { kind: 'transient', reason: 'bad_response' };
+  }
+  return { kind: 'ok', receipt };
+}

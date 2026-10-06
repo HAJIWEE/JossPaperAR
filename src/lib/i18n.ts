@@ -42,6 +42,7 @@ export const MESSAGES = {
     // One shared "try again" would imply a re-offer is free when it is not.
     'common.retry': 'Check again',
     'common.recapture': 'Offer a new photo',
+    'common.done': 'Return to the shrine',
     'quota_spent': QUOTA_SPENT_COPY.en,
 
     // ── the throw (doc 05 §2 — the four bands) ────────────────────────────
@@ -93,6 +94,7 @@ export const MESSAGES = {
     'ritual.refundReturned': '供品未能製成，點數已退回。',
     'common.retry': '再試一次',
     'common.recapture': '重新供相',
+    'common.done': '回到神龛',
     'quota_spent': QUOTA_SPENT_COPY.zh,
 
     'band_bullseye': '正中',
