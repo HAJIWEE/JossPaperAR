@@ -42,7 +42,7 @@
 | S6 | **Dependency hygiene**: lockfile committed, `npm audit` in CI, no new dep without license check (feeds the license inventory §B.3) | **MVP** | repo + CI milestone |
 | S7 | **Safe error surfaces**: client never sees stack traces/provider errors; logs carry `user_id` + event, never photo bytes/names (privacy × security overlap) | **MVP** | app + edge fns |
 | S8 | **Crash/analytics off until consent**; no ancestor names/coordinates in any SDK payload (also Play Data Safety accuracy) | alpha | SCRUM-25 |
-| S9 | **Ad SDK** (later): one vetted family-safe SDK, data-safety disclosure + EEA consent (UMP) declared at integration time | beta | ADR-008 |
+| S9 | **Ad SDK** (later): one vetted family-safe SDK, data-safety disclosure + EEA consent (UMP) declared at integration time. **Category exclusions researched — SCRUM-63 → [[21-ad-category-denylist\|doc 21]]: no network's taxonomy aligns with Singapore law, so the selection turns on *auditability* + consent support, not alignment. The denylist is ours, and it is gated: `npm run check:ads`** | beta | ADR-008 · **doc 21** |
 | S10 | **Play Integrity / device attestation**: deferred per ADR-005 — revisit only on §6 abuse signals | beta | SCRUM-11 |
 | S11 | **Backup/restore + delete-all rehearsal**: prove restore of Postgres *and* prove full account deletion (Play requires a working account-deletion path once accounts exist — §B.5) | alpha | SCRUM-19 |
 
@@ -123,7 +123,7 @@ Traditional motifs are legally free and culturally load-bearing. **SCRUM-24 owns
 | D7 | **DPO designation** — PM is the natural holder at hobby scale; publish a contact in the privacy policy. Free, but it is a *legal* requirement | PDPA · GDPR | B.8 privacy policy |
 | D8 | **Data inventory built once, used three times** — one inventory (photos · coarse location · names · device ids · ad-id later) feeds the **Play Data Safety form**, the PDPA purpose notices, and the GDPR Art. 13 disclosures | all three + Play | SCRUM-19 (= §B.5 hook 2) |
 | D9 | **Ancestor names**: excluded as deceased-person data from both laws (PDPA covers the living; GDPR Recital 27) — but cultural harm doesn't care about jurisdiction → keep names out of analytics, logs, and share surfaces (already the 07 §5.3 rule; SCRUM-24 for the sensitivity side) | both scope-outs | standing rule ✅ |
-| D10 | **Ads consent**: EEA → Google UMP consent banner before any ad renders; elsewhere → Play defaults | GDPR consent for ads | S9 · ADR-008 |
+| D10 | **Ads consent**: EEA → Google UMP consent banner before any ad renders; elsewhere → Play defaults. ⚠️ **Separate control from category blocking — and note that alcohol ads are *permitted* to be served in Singapore (Google's country list), so the alcohol exclusion is a deliberate switch, not a default** | GDPR consent for ads | S9 · ADR-008 · [[21-ad-category-denylist\|doc 21]] §4.1 |
 
 **Scope guard:** these ten are *considerations for design*. The full obligation sets (PDPA's nine obligations, GDPR's rights catalog) get the SCRUM-19 treatment; PIPL stays deferred.
 
@@ -147,6 +147,24 @@ Credits are a **digital good sold in-app → Google Play Billing is mandatory** 
 
 Needed at Play submission: **privacy policy URL** (we process photos/location/names) + **ToS** covering: AI-output nature (§B.1.3) · no religious efficacy claim · user owns their photos, licence to process for stylization · account-deletion instructions · ads disclosure (later). Draft = SCRUM-19 output; keep plain-language + EN/ZH (audience).
 
+### B.10 Ad-category exclusions — ADR-008 D ✅ **researched (SCRUM-63)**
+
+*(Numbered B.10 to match the register row below; it sits ahead of the §B.9 summary by design — the register stays last.)*
+
+**ADR-008 (accepted 2026-10-05) decided the categories as a strong NO for gambling, loans and alcohol.** The compliance basis was deliberately **not** asserted in the ADR — SCRUM-63 researched it, and it is written up in full in **[[21-ad-category-denylist|doc 21]]**. The finding that changes how the register should read: **only three of the five excluded classes are compelled by Singapore law.**
+
+| Class | Singapore basis | Compelled? |
+|---|---|---|
+| **Gambling** | Gambling Control Act 2022 — advertising unlawful gambling in/from Singapore, or to a person in Singapore, is an offence (individual: fine up to **$20,000**); licensed operators need **GRA** approval to advertise at all | 🔴 **Statutory** |
+| **Loans / credit** | Moneylenders Act 2008 **s.29(3) r/w s.45(1)** → Registrar's Directions (v3.0 wef 2025-04-01): a licensee may advertise through a **closed channel list** (directories · its own website · its own premises). No entry reaches a third-party app surface; unlicensed lending is criminal | 🔴 **Regulatory direction** |
+| **Alcohol** | **None.** Self-regulatory advice only (ASAS Singapore Code of Advertising Practice, Appendix K). Singapore has **no statutory alcohol ad ban**, and **Google permits** alcohol ads here | ⚪ **Our policy alone** |
+| **Tobacco & vaporisers** | Tobacco and Vaporisers Control Act 1993 — tobacco ad prohibition **extended to e-cigarettes/vaporisers** and to **electronically published** advertisements | 🔴 **Statutory** |
+| **Nutri-Grade "D" drinks** | Food Regulations reg. 184E–184F — *"Advertisements related to Nutri-Grade beverages graded 'D' are prohibited"* (2022-12-30; freshly prepared from 2023-12-30). Penalty ≤ **$1,000** (≤ **$2,000** repeat) | 🔴 **Statutory** |
+
+**Enforcement — three layers:** the SDK's own controls (category blocks + content-rating cap, **alcohol switched OFF explicitly**) · the **Ad review center** (reactive, per-creative) · and **our own denylist as code** — `src/domain/adCategories.ts`, guarded by **`npm run check:ads`** (in the aggregate `check` and in CI). The gate asserts the classes, **the legal basis per class**, the ritual-flow placement rule and the caps — so a class's `basis` cannot be changed silently, and the app's own ritual copy is proven never to trip the filter.
+
+**Cross-doc consequences:** the **SDK selection** (S9) is unblocked and now turns on auditability + consent support, **not** on any claim of legal alignment — no network's taxonomy matches Singapore law, and **AdMob removes its `Consumer Loans` category on 2026-10-23**. ⚠️ **Nothing here is a runtime filter**: the MVP has no ads (doc 19 §6.2 item 11 stays deferred), so this is the policy of record, not an implementation. **Open:** the Unity/Meta publisher-control read (doc 21 §8 item 1).
+
 ### B.9 Register summary
 
 | # | Item | Status | Owner / when |
@@ -160,8 +178,10 @@ Needed at Play submission: **privacy policy URL** (we process photos/location/na
 | B.7 | **Play billing fee vs. $1.19 floor** — margin may not hold | ⚠️ | SCRUM-18 follow-up · check with SCRUM-42 |
 | B.8 | Privacy policy + ToS (EN/ZH) | ⚠️ | SCRUM-19 deliverable |
 | B.9 | Model-provider terms (Google/nano-2, moondream) — 10-min read | ⏳ | at first production call |
+| **B.10** | **Ad-category exclusions (ADR-008 D)** — five classes · **basis per class (three statutory · one direction · alcohol ours)** · enforcement layers · `check:ads` | ✅ **researched (SCRUM-63)** | **doc 21** · SDK selection open |
 
 ---
 
+*Updated 2026-10-05 — **§B.10 added (ad-category exclusions, ADR-008 D · SCRUM-63)**; **S9** and **D10** now carry the findings (no network's taxonomy aligns with SG law; alcohol is *permitted* to be served here, so its block is a deliberate switch); register row **B.10** added. The research of record is [[21-ad-category-denylist|doc 21]]; the list is now **code plus a gate** — `src/domain/adCategories.ts` · `npm run check:ads` (CI).*
 *Updated 2026-09-27 (**v2**, same session, PM) — **§B.5 expanded into §B.5.1 (PDPA vs GDPR obligations, primary sources verified: PDPA breach timelines 30d/3d · ≥500 threshold · 10%/S$1M penalties · GDPR Recital 27 deceased-scope-out · Art. 9 religious belief) and §B.5.2 (D1–D10 design considerations)**; scoping stance pinned: **PDPA = baseline, GDPR = design target**; register B.5 row updated*
 *Created 2026-09-27 (Session 19) — brief security + legal/IP scoping requested by PM alongside SCRUM-21. Primary sources verified: fal.ai ToS (2026-09-08) + API Services Terms · Google Play AI-Generated Content policy. New cross-doc findings: Play account-deletion + Data Safety hooks for SCRUM-19 (§B.5), Play-fee question for the economy floor (§B.7).*

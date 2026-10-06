@@ -3,7 +3,7 @@
 > An AR app that replaces physical joss-paper burning with a digital ritual — capture an object, cartoonize it, throw it onto the fire, earn Tribute Points.
 > Hobby project, family-legacy vision, no timeline pressure.
 
-**Status:** 📐 design signed off · 📝 specs + ADRs written (**docs 01–19**) · 💻 **engineering started — repo + CI ✅ (SCRUM-15), Expo app scaffolded** · **next: SCRUM-57 repo bootstrap → SCRUM-54 backend → SCRUM-53 vertical slice** (build plan → [`AppDesignConceptBoard/19-build-plan-services-api-environments.md`](AppDesignConceptBoard/19-build-plan-services-api-environments.md))
+**Status:** 📐 design signed off · 📝 specs + ADRs written (**docs 01–21**) · 💻 **engineering started — repo + CI ✅ (SCRUM-15), Expo app scaffolded** · **next: SCRUM-57 repo bootstrap → SCRUM-54 backend → SCRUM-53 vertical slice** (build plan → [`AppDesignConceptBoard/19-build-plan-services-api-environments.md`](AppDesignConceptBoard/19-build-plan-services-api-environments.md))
 
 ## Where things live
 
@@ -11,7 +11,7 @@
 |---|---|
 | 📋 Issue tracking (source of truth) | Jira → [hajiwee9411.atlassian.net](https://hajiwee9411.atlassian.net) project **SCRUM** |
 | 🎨 Design source of truth | **Penpot** — file `JossPaperAR`, page *"New-user tutorial · Core loop"*, 153 boards, EN + 中文 |
-| 🗂 Design concept board & specs | [`AppDesignConceptBoard/`](AppDesignConceptBoard/) — docs 01–18 + [`ADRs/`](AppDesignConceptBoard/ADRs/) |
+| 🗂 Design concept board & specs | [`AppDesignConceptBoard/`](AppDesignConceptBoard/) — docs 01–21 + [`ADRs/`](AppDesignConceptBoard/ADRs/) |
 | 🎨 Design system (tokens + checks) | [`design-system/`](design-system/) — `tokens.css` · `responsive.css` + the CI checks |
 | 🧪 Retired prototype (spec, not code) | [`prototype/`](prototype/) — ⚠️ retired 2026-09-28, kept as reference |
 | 🔬 Style spike results | [`spike/`](spike/) — 133 runs, Path C locked (ADR-002) |

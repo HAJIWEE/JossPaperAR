@@ -3,3 +3,4 @@ export * from './award';
 export * from './catalogue';
 export * from './currency';
 export * from './quota';
+export * from './adCategories';

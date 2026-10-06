@@ -67,7 +67,7 @@ When the real build stylesheet exists, point both checks at it: `--css=path/to/s
 
 - **ADRs** (`AppDesignConceptBoard/ADRs/`) — one record per architecture decision: context · decision · rejected alternatives · consequences. Accepting one updates the ADR register in `AppDesignConceptBoard/README.md`.
 - **Session log** lives in `completed-work-archive.md`, **newest first**; the live hand-off is `next-ai-context.md`; open work is `follow-up-items.md`. Keep those three in sync — nothing completed should linger in the open-work file.
-- **Specs** live as numbered docs in `AppDesignConceptBoard/` (01–19) and are authoritative over prototypes: the `prototype/` folder is **retired** — it is a spec, not code.
+- **Specs** live as numbered docs in `AppDesignConceptBoard/` (01–21) and are authoritative over prototypes: the `prototype/` folder is **retired** — it is a spec, not code.
 - **Costs** go in `project-costs.md` (SGD, one row per actual/commitment).
 
 ## 📱 Build conventions (ADR-001 — app scaffolded, single repo)
