@@ -24,18 +24,29 @@
  * Deliberately free of React and of expo-router, so plain Node can check it.
  */
 
-/** The params `/reward` needs. `captureId` is the one that must never be lost. */
-export interface RewardParams {
+/**
+ * ⚠️ A **TYPE ALIAS**, not an `interface` — and that is load-bearing.
+ *
+ * expo-router types `router.push({ params })` as `UnknownInputParams`, which is an
+ * index-signature record (`Record<string, …>`). TypeScript gives **implicit index
+ * signatures to object type aliases but NOT to `interface` declarations**, so an
+ * `interface` here fails `tsc` with *"Type 'RewardParams' is not assignable to
+ * type 'UnknownInputParams'"* — which is exactly what CI caught on PR #23
+ * (2026-10-06, `src/app/burn.tsx:129`). Nothing at runtime changes; the shape is
+ * identical. Keep it an alias.
+ */
+export type RewardParams = {
   readonly captureId: string;
   /** Sent as a string — expo-router params are strings on the wire. */
   readonly offsetPx: string;
   readonly throwNumber: string;
-}
+};
 
-export interface BurnParams {
+/** Same alias rule as `RewardParams` above — see that note. */
+export type BurnParams = {
   readonly captureId: string;
   readonly uri: string;
-}
+};
 
 /** expo-router hands a param back as `string | string[]`; take the first. */
 function first(value: string | string[] | undefined): string | undefined {
