@@ -6,10 +6,10 @@
  * session (see that file's header).
  */
 
-import { eventsFromResponse, type Outcome, type OrchestratorResponse } from './ritual-map.ts';
+import { eventsFromResponse, outcomeFromHttpFailure, type Outcome, type OrchestratorResponse } from './ritual-map.ts';
 import { supabase, supabaseConfig } from './supabase.ts';
 
-export { eventsFromResponse, isTransportCode, type Outcome, type OrchestratorResponse } from './ritual-map.ts';
+export { eventsFromResponse, httpFailureReason, isTransportCode, outcomeFromHttpFailure, type Outcome, type OrchestratorResponse } from './ritual-map.ts';
 
 /**
  * Ask the orchestrator to prepare the offering under the client-minted id.
@@ -57,10 +57,15 @@ export async function requestCartoonize(
   }
 
   if (!res.ok) {
-    // A 4xx/5xx that is not an auth problem means the request was understood
-    // and refused (quota complete, capture not found, server error). The
-    // capture was NOT spent — `request_cartoonize` never got as far as a job.
-    return { kind: 'ok', jobId: 'x', events: [{ type: 'GENERATION_FAILED' }] };
+    // ⚠️ FIXED 2026-10-06. This branch used to return
+    // `{ kind: 'ok', jobId: 'x', events: [{ type: 'GENERATION_FAILED' }] }` —
+    // a fake job id plus rule ②'s event, contradicting its own comment that the
+    // capture was NOT spent. A 5xx, or a 4xx the server meant (quota complete,
+    // capture not found), would therefore have told the player to photograph a
+    // new offering. No job is created on a non-2xx, so nothing is spent and the
+    // offering is intact: this is transient, carrying the server's own code.
+    // The classification is pure and checked — see `check:wire`.
+    return outcomeFromHttpFailure(res.status, body);
   }
 
   const parsed = body as OrchestratorResponse;

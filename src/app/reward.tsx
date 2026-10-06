@@ -27,13 +27,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { t } from '@/lib/i18n';
 import { submitBurn, type BurnReceipt } from '@/lib/ritual';
+import { readRewardParams } from '@/lib/route-params';
 import { TOUCH_TARGET, fontSize, onColorCream, radius, space, surface } from '@/theme/tokens';
 
 type Phase =
   | { readonly kind: 'submitting' }
   | { readonly kind: 'shown'; readonly receipt: BurnReceipt }
   /** Nothing was banked - the SAME key may be retried. */
-  | { readonly kind: 'retryable'; readonly reason: string };
+  | { readonly kind: 'retryable'; readonly reason: string }
+  /**
+   * The ROUTE is broken (no capture id), which retrying cannot fix. Distinct from
+   * `retryable` on purpose: a retry button here would fail identically forever.
+   */
+  | { readonly kind: 'lost' };
 
 /** The band the SERVER returned, rendered in both locales. */
 const BAND_LABELS: Record<string, { en: string; zh: string }> = {
@@ -46,21 +52,32 @@ const BAND_LABELS: Record<string, { en: string; zh: string }> = {
 export default function Reward(): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { captureId, offsetPx, throwNumber } = useLocalSearchParams<{
-    captureId: string;
-    offsetPx: string;
-    throwNumber: string;
-  }>();
+  /**
+   * The route contract (src/lib/route-params.ts). The old code read the raw
+   * params and coerced them with `Number(...)`, so a missing `captureId` was a
+   * generic `bad_params` and a missing `offsetPx` became `NaN` — an award
+   * submitted with a `NaN` offset. Both are now refused BY NAME.
+   */
+  const parsed = readRewardParams(
+    useLocalSearchParams<{ captureId: string; offsetPx: string; throwNumber: string }>(),
+  );
+  const captureId = parsed.ok ? parsed.captureId : null;
+  const accuracy = parsed.ok ? parsed.accuracyPx : 0;
+  const throwNo = parsed.ok ? parsed.throwNumber : 1;
+  /** Non-null only when the route itself is unusable. */
+  const problem = parsed.ok ? null : parsed.reason;
 
   const [phase, setPhase] = useState<Phase>({ kind: 'submitting' });
   const started = useRef(false);
 
-  const accuracy = Number(offsetPx);
-  const throwNo = Number(throwNumber);
-
   const submit = useCallback(async () => {
-    if (typeof captureId !== 'string') {
-      setPhase({ kind: 'retryable', reason: 'bad_params' });
+    if (captureId === null) {
+      // A broken ROUTE cannot be retried into working — send them back honestly.
+      setPhase(
+        problem === 'missing_capture_id'
+          ? { kind: 'lost' }
+          : { kind: 'retryable', reason: String(problem) },
+      );
       return;
     }
     setPhase({ kind: 'submitting' });
@@ -71,7 +88,7 @@ export default function Reward(): React.JSX.Element {
         ? { kind: 'shown', receipt: result.receipt }
         : { kind: 'retryable', reason: result.reason },
     );
-  }, [captureId, accuracy, throwNo]);
+  }, [captureId, accuracy, throwNo, problem]);
 
   // `started` mirrors preparing.tsx: a double-invoked effect would submit the
   // same throw twice, which is safe ONLY because the key is derived rather than
@@ -79,6 +96,22 @@ export default function Reward(): React.JSX.Element {
   if (!started.current) {
     started.current = true;
     void submit();
+  }
+
+  if (phase.kind === 'lost') {
+    return (
+      <View style={[styles.root, { paddingTop: insets.top + space.xl }]}>
+        <Text style={styles.title}>{t('ritual.cannotPrepare')}</Text>
+        <Text style={styles.body}>Your offering lost its place - begin again.</Text>
+        <Pressable
+          style={styles.button}
+          onPress={() => router.replace('/capture')}
+          accessibilityRole="button"
+        >
+          <Text style={styles.buttonText}>{t('common.recapture')}</Text>
+        </Pressable>
+      </View>
+    );
   }
 
   if (phase.kind === 'submitting') {
