@@ -130,6 +130,60 @@ setLocale('en');
 check('the English quota copy matches the domain module', t('quota_spent') === QUOTA_SPENT_COPY.en);
 check('interpolation works', t('clan_welcome', { name: '陳氏' }).includes('陳氏'));
 
+/*
+ * ⚠️ RESOLVABILITY — NOT parity, and the gap between the two is the whole point.
+ *
+ * The parity checks above compare key SETS, so all of them stayed green while
+ * EVERY dotted key in the table was unreachable on the device: `i18n-js` reads
+ * `.` as a scope separator, so `t('ritual.cannotPrepare')` resolved to
+ * `[missing "en.ritual.cannotPrepare" translation]`. Found on glass 2026-10-06,
+ * on the slice's failure screen — precisely where a player needs the words.
+ *
+ * A key that cannot be looked up is not a translation, so assert each one
+ * RESOLVES. The marker is matched precisely: `[missing "…" translation]` is the
+ * missing-TRANSLATION string, whereas an unfilled placeholder renders
+ * `[missing "%{name}" value]` — a different thing, and not a failure here.
+ */
+const unresolved: string[] = [];
+for (const locale of LOCALES) {
+  setLocale(locale);
+  for (const key of messageKeys(locale)) {
+    if (/\[missing .* translation\]/.test(t(key))) unresolved.push(`${locale}:${key}`);
+  }
+}
+setLocale('en');
+check(
+  'every message RESOLVES in both locales (a key that cannot be looked up is not a translation)',
+  unresolved.length === 0,
+  unresolved.slice(0, 6).join(', ') + (unresolved.length > 6 ? ` (+${unresolved.length - 6} more)` : ''),
+);
+
+/*
+ * Resolving is not the same as resolving to the RIGHT copy, so assert the
+ * stronger property for every message without placeholders: the lookup must
+ * return that key's own copy, VERBATIM. (`%{…}` values are skipped — an unfilled
+ * placeholder legitimately renders differently — and interpolation itself is
+ * covered by the check above.)
+ *
+ * This is the assertion that names the 2026-10-06 regression: `ritual.cannotPrepare`
+ * and its 15 dotted siblings appear here by name if they ever go unreachable again.
+ */
+const mismatched: string[] = [];
+for (const locale of LOCALES) {
+  setLocale(locale);
+  for (const [key, value] of Object.entries(MESSAGES[locale])) {
+    if (typeof value === 'string' && !value.includes('%{') && t(key) !== value) {
+      mismatched.push(`${locale}:${key}`);
+    }
+  }
+}
+setLocale('en');
+check(
+  'every placeholder-free message returns its OWN copy verbatim',
+  mismatched.length === 0,
+  mismatched.slice(0, 6).join(', ') + (mismatched.length > 6 ? ` (+${mismatched.length - 6} more)` : ''),
+);
+
 check('a zh-Hans device tag detects 中文', detectLocale(['zh-Hans-SG', 'en-SG']) === 'zh');
 check('an en device tag detects English', detectLocale(['en-GB']) === 'en');
 check('an unknown tag falls back to English', detectLocale(['fr-FR']) === 'en');
