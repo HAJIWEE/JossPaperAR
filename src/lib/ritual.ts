@@ -7,6 +7,7 @@
  */
 
 import { eventsFromResponse, outcomeFromHttpFailure, type Outcome, type OrchestratorResponse } from './ritual-map.ts';
+import { captureStoragePath } from './storage-path.ts';
 import { supabase, supabaseConfig } from './supabase.ts';
 
 export { eventsFromResponse, httpFailureReason, isTransportCode, outcomeFromHttpFailure, type Outcome, type OrchestratorResponse } from './ritual-map.ts';
@@ -88,9 +89,8 @@ export async function requestCartoonize(
  * `storage_path` is derived here, not passed in, so it cannot disagree with the
  * key the upload writes to: one source of truth for the path.
  */
-export function captureStoragePath(userId: string, captureId: string): string {
-  return `captures/${userId}/${captureId}.jpg`;
-}
+// `captureStoragePath` lives in the PURE `storage-path.ts` (imported above) so the
+// dependency-free `check:wire` can assert the key shape without the native client.
 
 /** Insert the capture row. Returns the user id it was written under. */
 export async function registerCapture(captureId: string): Promise<{ userId: string }> {
@@ -124,14 +124,21 @@ export async function uploadCapture(
 ): Promise<{ path: string }> {
   const path = captureStoragePath(userId, captureId);
 
-  // React Native has no `fetch(uri).blob()` for file:// URIs on every platform,
-  // so the array-buffer form is used and the bytes are wrapped by hand. RN's
-  // fetch returns base64 for a data URI, which is why it is decoded here rather
-  // than sent as-is.
+  // ⚠️ FOUND ON GLASS (2026-10-07) — this path had never actually run (the S31
+  // attempt died at auth), and it failed twice before it worked:
+  //  ① the old code read `fetch(uri).text().split(',')[1]` as if the uri were a
+  //     `data:` URI, but `takePictureAsync` returns a `file://` uri — so the
+  //     "base64" was garbage and nothing uploaded;
+  //  ② RN Blobs carry an EMPTY type, and the `captures` bucket allows only
+  //     image/*; an untyped Blob uploads as `text/plain` and is REJECTED
+  //     ("mime type text/plain is not supported"). Re-wrap with an explicit type.
+  // The bytes go up AS A BLOB (RN fetch's array-buffer form is not reliable
+  // across platforms); the bucket's file_size_limit enforces 300 KB regardless.
   const res = await fetch(fileUri);
-  const base64 = (await res.text()).split(',')[1] ?? '';
+  const raw = await res.blob();
+  const blob = raw.type === 'image/jpeg' ? raw : new Blob([raw], { type: 'image/jpeg' });
 
-  const { error } = await supabase().storage.from('captures').upload(path, base64ToBytes(base64), {
+  const { error } = await supabase().storage.from('captures').upload(path, blob, {
     contentType: 'image/jpeg',
     // The row already exists (rule ①); re-uploading the same bytes must not 409
     // and strand an offering whose row is already committed.
@@ -139,14 +146,6 @@ export async function uploadCapture(
   });
   if (error) throw new Error(`capture_upload_failed: ${error.message}`);
   return { path };
-}
-
-/** Decode base64 into bytes for the storage upload. */
-function base64ToBytes(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return bytes;
 }
 
 /**
