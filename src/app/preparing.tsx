@@ -36,6 +36,7 @@ import {
   requestCartoonize,
   uploadCapture,
 } from '@/lib/ritual';
+import { ensureAnonymousSession } from '@/lib/session';
 import { TOUCH_TARGET, fontSize, onColorCream, radius, space, surface, text } from '@/theme/tokens';
 
 type Phase =
@@ -62,6 +63,16 @@ export default function Preparing(): React.JSX.Element {
       return;
     }
     setPhase({ kind: 'working' });
+
+    // ── 0 · a session the server will accept (ADR-004 / SCRUM-80) ───────────
+    // Every step below is an authenticated call; with no session `registerCapture`
+    // throws `not_authenticated` and RLS refuses the row (401 / 42501). Nothing is
+    // spent if this fails, so it retries on the same road as a transport failure.
+    const session = await ensureAnonymousSession();
+    if (!session.ok) {
+      setPhase({ kind: 'offline', reason: session.reason });
+      return;
+    }
 
     // ── 1 · the row, under the id minted before the photo (rule ①) ──────────
     let userId: string;
