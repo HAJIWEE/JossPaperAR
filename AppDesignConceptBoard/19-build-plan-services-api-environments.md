@@ -565,27 +565,25 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
-### 12.9 · SCRUM-80 — the client identity bootstrap, built (2026-10-07)
+### 12.10 · SCRUM-53 — the slice's first device run (2026-10-07)
 
-**The finding.** §12.8 fixed the write path's two dead wires, so every screen was wired to the service layer — and the first end-to-end attempt still stopped at `preparing`. The cause was not the emulator and not the code below it: **the app never created a session.** `signInAnonymously` / `setSession` / `signInWithPassword` appeared **zero times** in `src/`, so `auth.getSession()` was always empty, `registerCapture` threw `not_authenticated`, and RLS refused an anonymous `captures` insert (`401 / 42501`). ADR-004 was **provisioned server-side and absent client-side**, and **no PR in §8 owned the step** — so it was filed as a PR-scope decision (`SCRUM-80`), not wired unilaterally.
+**What ran.** With SCRUM-80's auth bootstrap in place, the slice ran on the emulator (`floor_api30`, Android 11 / SDK 30) for the first time, driven over `adb`: **capture → cartoonize → burn**. It reached the burn screen with the real styled sprite and graded a throw.
 
-**The fix, in the project's pure/device split.**
+**It failed a few times before it worked — three real defects, none ever exercised** (S31 died at auth, so the whole write path was virgin).
 
-| File | Half | What it does |
-|---|---|---|
-| `src/lib/session-map.ts` | **pure** (imports nothing) | `planSession()` — reuse / sign-in / unconfigured — and `reasonFromAuthError()`, a total error→reason map |
-| `src/lib/session.ts` | device | `ensureAnonymousSession()` — **single-flight**, so the root-layout warm-up and the ritual's own call cannot race into two anonymous users |
-| `src/app/_layout.tsx` | wire | fires `ensureAnonymousSession()` once on mount (fire-and-forget) |
-| `src/app/preparing.tsx` | wire | `await ensureAnonymousSession()` **before** the first authenticated step; a failure is a free retry, never a spent capture |
-| `src/lib/checks/session.ts` | gate | **17 checks**, dependency-free, so it runs in CI's no-install job |
+| # | Where | Defect | Fix |
+|---|---|---|---|
+| 1 | `uploadCapture` | read `fetch(uri).text().split(',')[1]` as if the media URI were a `data:` URI; `takePictureAsync` returns a `file://` URI, so the "base64" was garbage | read the bytes as a **Blob** |
+| 2 | `uploadCapture` | RN Blobs carry an **empty type** → uploaded as `text/plain` → `mime type text/plain is not supported` | re-wrap with an explicit `image/jpeg` type |
+| 3 | `captureStoragePath` | baked the **bucket name into the object key** (`captures/{uid}/…`); the bucket's RLS policy (`foldername(name)[1] = auth.uid()`) read the owner as `"captures"` → `new row violates row-level security policy` | a **bucket-relative** key `{uid}/{id}.jpg` (matches the `styled` convention + the pr3 fixture); the function moved to the pure `src/lib/storage-path.ts` so `check:wire` asserts it (3 checks, fault-tested red) |
 
-**Why `planSession` refuses to reuse a session with no user id.** A session object with no `user.id` cannot be signed into anything; trusting it would silently reproduce the exact `not_authenticated` failure this bootstrap exists to prevent — so it falls through to `sign_in`. That is also the fault-test: making it reuse a session-less user turns exactly two checks red.
+Defects 1–3 are **SCRUM-81** (PR #26; `check:wire` 40 → 43).
 
-**Proven with a real call (2026-10-07).** `POST /auth/v1/signup` with only the publishable key → **200**, `is_anonymous: true`, `role: authenticated`, a session issued; `GET /rest/v1/profiles` returns **`[]`** as `anon` and **the caller's own row** with that session — identity is real and RLS-scoped, and migration `0006`'s `handle_new_user` trigger had already created the `profiles` row.
+**What it proved.** After the upload fix the pipeline completed on glass: `cartoonize_jobs.status = 'styled'`, `cost_micros = 90000` (**US$0.09**), `latency_ms = 16131`, the sprite persisted to the private `styled` bucket, and the throw graded **虔誠 Devout ±22.94 px** — the first real Path C burn driven from the app.
 
-**Residue.** The verification created one anonymous `auth.users` row (with its trigger `profiles` row) — precisely ADR-004's intent for a first launch, not test debris; no other writes, no Storage objects, no spend.
+**What still blocks the ritual — SCRUM-82.** The **award** never lands: `award-service` returns **400**, because `submit_burn` requires `clan_id` (migration 0004, line 226) **and** the actor's `clan_members` row (line 252). The slice's `submitBurn` sends only `{ capture_id, accuracy }`, and a fresh anonymous user is in no clan — the slice's "hard-coded clan" was never wired, and there is no clan bootstrap. `burns = 0`.
 
-**What this does NOT do.** It does not prove the slice *ran* — that is the device/emulator acceptance step (the live ≈US$0.09 Path C burn on `floor_api30`, then the four aim bands on the `SCRUM-52` device). It also does not add the *account-upgrade* half of ADR-004 (offered later; out of MVP scope).
+**Cost.** US$0.09 (`project-costs.md`) — the first real spend of the slice.
 
 ### 12.8 · SCRUM-53 continued — the write path's two dead wires (2026-10-06)
 

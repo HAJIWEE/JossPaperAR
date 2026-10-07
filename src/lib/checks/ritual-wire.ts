@@ -27,6 +27,7 @@
  */
 
 import { readBurnParams, readRewardParams, toBurnParams, toRewardParams } from '../route-params.ts';
+import { captureStoragePath } from '../storage-path.ts';
 import {
   eventsFromResponse,
   httpFailureReason,
@@ -173,6 +174,21 @@ check(
 check(
   'guard: a reward route with no capture id is NOT acceptable',
   (readRewardParams({ offsetPx: '1' }).ok === true) === false,
+);
+
+// ── 4 · The storage key is BUCKET-RELATIVE (defect found on glass 2026-10-07) ─
+// The upload key carried the bucket name (`captures/{uid}/…`), so the bucket's
+// own RLS policy — which scopes on `foldername(name)[1] = auth.uid()` — read the
+// owner as `"captures"` and refused EVERY upload ("new row violates row-level
+// security policy"). This pins the convention that made the slice run.
+section('4 · Storage keys — the bucket name is never in the key');
+
+const capKey = captureStoragePath('u1', 'c1');
+check('a capture key is {uid}/{id}.jpg', capKey === 'u1/c1.jpg');
+check('⚠️ the key does NOT repeat the bucket name', !capKey.startsWith('captures/'));
+check(
+  '⚠️ foldername(key)[1] is the owner — what the RLS policy scopes on',
+  capKey.split('/')[0] === 'u1',
 );
 
 // ── verdict ─────────────────────────────────────────────────────────────────

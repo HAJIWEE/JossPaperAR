@@ -50,7 +50,7 @@
 
 | 2026-10-06 | **S31 — SCRUM-64 emulator setup, the first end-to-end attempt, and the i18n fix** | Stand up an interim emulator test target; attempt the slice's first end-to-end run | **US$0.00** — **no fal.ai call was made**: the emulator needs no API, and the path stopped at `preparing` (the missing client auth bootstrap, **SCRUM-80**) *before* any paid step could be reached | — | **S$0.00** | ✅ **no spend** — logged so the zero is on the record rather than absent. The live Path C run (≈ US$0.09) stays budgeted and **unspent**. |
 
-| 2026-10-07 | **SCRUM-80 — the client identity bootstrap (ADR-004)** | Adopt an anonymous session at first launch + re-ensure before the ritual; prove it against the live project | **US$0.00** — no fal.ai call: an anonymous sign-in is **free**, and the slice's paid step (Path C, ≈ US$0.09) is not reached until the device run | — | **S$0.00** | ✅ **no spend** — logged so the zero is on the record rather than absent. The ≈ US$0.09 Path C run stays budgeted and **unspent**. |
+| 2026-10-07 | **SCRUM-53 — the slice's first device run (emulator `floor_api30`)** | Capture → cartoonize → burn, end to end, after SCRUM-80 + SCRUM-81 | **≈ US$0.09** — one real Path C run: `cartoonize_jobs.cost_micros = 90000`, `latency_ms = 16131` | **1.2808** (Mastercard, verified 2026-10-05) | **≈ S$0.12** (0.09 × 1.2808) | ✅ **incurred 2026-10-07** — the first real AI burn, driven from the app on the emulator. fal total ≈ **US$5.07 / S$6.49** of the approved US$10–20. |
 
 <!-- APPEND-NEW-ONEOFF-COSTS-ABOVE -->
 
