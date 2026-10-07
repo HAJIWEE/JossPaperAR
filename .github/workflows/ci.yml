@@ -74,6 +74,12 @@ jobs:
       - name: Ritual wire (route contract · a refusal is not a failure)
         run: node src/lib/checks/ritual-wire.ts
 
+      # SCRUM-80. Dependency-free, so it belongs here. Guards ADR-004's identity
+      # bootstrap: a session with no user id is never reused, an unconfigured app
+      # never calls a client, and an auth error always maps to a stable reason.
+      - name: Session bootstrap (reuse · sign-in · unconfigured · error mapping)
+        run: node src/lib/checks/session.ts
+
       # SCRUM-54b (PR-3). Both are dependency-free, so they belong here:
       #  · pathc-check   — ADR-002's LOCKED pipeline: the endpoints, the v3
       #    template clauses, and the ABSENCE of example colours in the identify

@@ -565,6 +565,28 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.9 · SCRUM-80 — the client identity bootstrap, built (2026-10-07)
+
+**The finding.** §12.8 fixed the write path's two dead wires, so every screen was wired to the service layer — and the first end-to-end attempt still stopped at `preparing`. The cause was not the emulator and not the code below it: **the app never created a session.** `signInAnonymously` / `setSession` / `signInWithPassword` appeared **zero times** in `src/`, so `auth.getSession()` was always empty, `registerCapture` threw `not_authenticated`, and RLS refused an anonymous `captures` insert (`401 / 42501`). ADR-004 was **provisioned server-side and absent client-side**, and **no PR in §8 owned the step** — so it was filed as a PR-scope decision (`SCRUM-80`), not wired unilaterally.
+
+**The fix, in the project's pure/device split.**
+
+| File | Half | What it does |
+|---|---|---|
+| `src/lib/session-map.ts` | **pure** (imports nothing) | `planSession()` — reuse / sign-in / unconfigured — and `reasonFromAuthError()`, a total error→reason map |
+| `src/lib/session.ts` | device | `ensureAnonymousSession()` — **single-flight**, so the root-layout warm-up and the ritual's own call cannot race into two anonymous users |
+| `src/app/_layout.tsx` | wire | fires `ensureAnonymousSession()` once on mount (fire-and-forget) |
+| `src/app/preparing.tsx` | wire | `await ensureAnonymousSession()` **before** the first authenticated step; a failure is a free retry, never a spent capture |
+| `src/lib/checks/session.ts` | gate | **17 checks**, dependency-free, so it runs in CI's no-install job |
+
+**Why `planSession` refuses to reuse a session with no user id.** A session object with no `user.id` cannot be signed into anything; trusting it would silently reproduce the exact `not_authenticated` failure this bootstrap exists to prevent — so it falls through to `sign_in`. That is also the fault-test: making it reuse a session-less user turns exactly two checks red.
+
+**Proven with a real call (2026-10-07).** `POST /auth/v1/signup` with only the publishable key → **200**, `is_anonymous: true`, `role: authenticated`, a session issued; `GET /rest/v1/profiles` returns **`[]`** as `anon` and **the caller's own row** with that session — identity is real and RLS-scoped, and migration `0006`'s `handle_new_user` trigger had already created the `profiles` row.
+
+**Residue.** The verification created one anonymous `auth.users` row (with its trigger `profiles` row) — precisely ADR-004's intent for a first launch, not test debris; no other writes, no Storage objects, no spend.
+
+**What this does NOT do.** It does not prove the slice *ran* — that is the device/emulator acceptance step (the live ≈US$0.09 Path C burn on `floor_api30`, then the four aim bands on the `SCRUM-52` device). It also does not add the *account-upgrade* half of ADR-004 (offered later; out of MVP scope).
+
 ### 12.8 · SCRUM-53 continued — the write path's two dead wires (2026-10-06)
 
 **The finding.** §12.7 made the three client rules executable, and the screens *were* wired to the service layer (`preparing.tsx` → `registerCapture` · `uploadCapture` · `requestCartoonize`; `reward.tsx` → `submitBurn`). But **the slice's last hop could not complete, and nothing could notice:**
