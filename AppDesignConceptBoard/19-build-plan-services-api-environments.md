@@ -565,6 +565,29 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.8 · SCRUM-53 continued — the write path's two dead wires (2026-10-06)
+
+**The finding.** §12.7 made the three client rules executable, and the screens *were* wired to the service layer (`preparing.tsx` → `registerCapture` · `uploadCapture` · `requestCartoonize`; `reward.tsx` → `submitBurn`). But **the slice's last hop could not complete, and nothing could notice:**
+
+1. **The capture id was dropped between screens.** `burn.tsx` read **no route params at all** — no `useLocalSearchParams` — so `confirm` pushed `/reward` with `{ offsetPx, throwNumber }` and no `captureId`. `reward.tsx` then refused with a generic `bad_params`, which means **the reward screen could never show a receipt**: every player who completed the ritual ended at *"This offering cannot be prepared."* expo-router params are an untyped string bag, so the compiler had no opinion and no check covered a route push.
+2. **A non-2xx answer was reported as a FAILED GENERATION.** `requestCartoonize` answered every `!res.ok` with `{ kind: 'ok', jobId: 'x', events: [{ type: 'GENERATION_FAILED' }] }` — a fake job id *and* rule ②'s event, contradicting its own comment (*"the capture was NOT spent"*). A 500, or an exhausted daily quota, therefore told the player to photograph a **new** offering for a failure that never touched the server. `isTransportCode` had been written for exactly this distinction and was **never called**.
+
+Both are the same species as §12.7's problem: **a rule that lives only in prose and in a caller's memory.**
+
+**What landed**
+
+| Fix | Where |
+|---|---|
+| The route contract **as code** — `captureId` is a **required argument** of `toRewardParams`, so a hop cannot forget it; a missing id is refused **by name** (`missing_capture_id`), and an absent `offsetPx` is refused rather than becoming `Number(undefined)` → `NaN` | `src/lib/route-params.ts` **(new, pure)** |
+| `burn.tsx` reads its own params; a lost id now says so honestly and offers a fresh start, instead of grading a throw that could never be awarded | `src/app/burn.tsx` |
+| `reward.tsx` parses instead of coercing, and a broken route gets its own **`lost`** state — not a retry button that must fail forever | `src/app/reward.tsx` |
+| `outcomeFromHttpFailure(status, body)` — a non-2xx is **`transient`, never rule ②**, carrying the server's own `code` | `src/lib/ritual-map.ts` → used in `src/lib/ritual.ts` |
+| **`npm run check:wire`** — 40 checks, **dependency-free** (so it runs on a bare checkout *and* in CI's dependency-free job, unlike `check:lib` which needs `npm ci`) | `src/lib/checks/ritual-wire.ts` **(new)** |
+
+**The gate is fault-tested, and it guards the regressions themselves.** Making a refusal report `ok` goes **red on 6** assertions; letting a reward route through without a capture id goes **red on 5**. It also asserts the **counter**-fact, so the fix cannot buy green by blunting the rules it protects: a 2xx `status: 'failed'` **still** emits `GENERATION_FAILED` (rule ②), `shrine_busy` **still** parks (rule ③), and a `styled` job **still** yields a sprite.
+
+⚠️ **What is still not done, and it is the honest headline: the slice has never been run end-to-end.** Two dead wires are now correct — that is not the same as *proven*. The acceptance test (the four bands, on the Tier-F floor device) still waits on **SCRUM-52**, and no live Path C call (≈ **US$0.09**, inside the approved budget) has been made for a real burn. **That run is the next step**, not another refactor.
+
 ### 12.7 · SCRUM-53 started — the slice's client rules, made executable (2026-10-05)
 
 **The finding.** The three client rules of §12/§12.5 were written as *warnings*, which is the form most easily violated: a well-meaning refactor six weeks later breaks a rule that nothing in the type system objects to, and the breakage is discovered by a player rather than by a check.

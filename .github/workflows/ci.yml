@@ -65,6 +65,15 @@ jobs:
       - name: Ad-denylist checks (ADR-008 D — categories · legal basis · placement)
         run: node src/domain/checks/ads.ts
 
+      # SCRUM-53. Dependency-free, so it belongs here. It guards the two defects
+      # found while continuing the slice: the capture id must survive EVERY route
+      # hop (it was dropped on the way to /reward, so the last screen could never
+      # show a receipt), and a non-2xx answer must never masquerade as a failed
+      # generation (a 500, or an exhausted quota, was telling the player to
+      # photograph a new offering when nothing had been spent).
+      - name: Ritual wire (route contract · a refusal is not a failure)
+        run: node src/lib/checks/ritual-wire.ts
+
       # SCRUM-54b (PR-3). Both are dependency-free, so they belong here:
       #  · pathc-check   — ADR-002's LOCKED pipeline: the endpoints, the v3
       #    template clauses, and the ABSENCE of example colours in the identify

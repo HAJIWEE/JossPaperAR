@@ -21,7 +21,7 @@
  */
 
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   PanResponder,
@@ -35,6 +35,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { BandId } from '@/domain/aim';
 import { MAX_THROWS, bandLabel, canThrow, gradeThrow, offsetFromHeart } from '@/domain/throw';
+import { readBurnParams, toRewardParams } from '@/lib/route-params';
 import { TOUCH_TARGET, fontSize, onColorCream, radius, space, surface, text } from '@/theme/tokens';
 
 /**
@@ -60,6 +61,17 @@ export default function BurnScreen() {
   const cameraRef = useRef<CameraView>(null);
 
   const [permission] = useCameraPermissions();
+  /**
+   * The route contract, read as a CONTRACT (src/lib/route-params.ts).
+   *
+   * ⚠️ THE FIX (2026-10-06). This screen previously read no route params at all,
+   * so `captureId` — the id the whole award is keyed to — was never in scope, and
+   * `confirm` pushed to `/reward` without it. `/reward` then refused with a
+   * generic `bad_params`, which meant the slice could never show a receipt.
+   * A missing id is now refused by name, at the screen that would have dropped it.
+   */
+  const burnParams = readBurnParams(useLocalSearchParams<{ captureId: string; uri: string }>());
+  const captureId = burnParams.ok ? burnParams.captureId : null;
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [preview, setPreview] = useState<Preview | null>(null);
   const [throwNumber, setThrowNumber] = useState(1);
@@ -107,11 +119,16 @@ export default function BurnScreen() {
    */
   const confirm = useCallback(() => {
     if (preview === null || !canThrow(throwNumber)) return;
+    // ⚠️ THE FIX (2026-10-06): the capture id used to be dropped right here, so
+    // `/reward` refused with `bad_params` and the slice could never show a
+    // receipt. It is now a REQUIRED argument of `toRewardParams`, so a future
+    // edit cannot forget it — the compiler objects instead of the player finding out.
+    if (captureId === null) return;
     router.push({
       pathname: '/reward',
-      params: { offsetPx: String(preview.offsetPx), throwNumber: String(throwNumber) },
+      params: toRewardParams(captureId, preview.offsetPx, throwNumber),
     });
-  }, [preview, router, throwNumber]);
+  }, [preview, router, throwNumber, captureId]);
 
   /** The offering RETURNS on a miss (S9) — the sprite is not consumed. */
   const rethrow = useCallback(() => {
@@ -123,6 +140,31 @@ export default function BurnScreen() {
 
   if (permission && !permission.granted) {
     return <View style={styles.screen} />;
+  }
+
+  /**
+   * No capture id ⇒ this screen cannot complete the ritual. That is a routing
+   * fault, never something the player did — so it says so plainly and offers the
+   * only honest way on (begin again), rather than grading a throw that could
+   * never be awarded. Reachable only if a future hop forgets the id, which is
+   * exactly what `check:wire` now guards.
+   */
+  if (captureId === null) {
+    return (
+      <View
+        style={[
+          styles.screen,
+          styles.lost,
+          { paddingTop: insets.top + space.xl, paddingBottom: insets.bottom + space.xl },
+        ]}
+      >
+        <Text style={styles.caption}>This offering lost its place — begin again.</Text>
+        <Text style={styles.caption}>供品已失去記錄，請重新開始。</Text>
+        <Pressable accessibilityRole="button" onPress={() => router.replace('/capture')} style={styles.button}>
+          <Text style={styles.buttonLabel}>開始 · Begin</Text>
+        </Pressable>
+      </View>
+    );
   }
 
   const exhausted = preview !== null && (preview.spent || preview.returns) && !canThrow(throwNumber);
@@ -191,6 +233,7 @@ export default function BurnScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: surface.camera },
+  lost: { alignItems: 'center', justifyContent: 'center' },
   fire: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   heart: {
     width: 120,

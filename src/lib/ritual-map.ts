@@ -111,3 +111,40 @@ const TRANSPORT_CODES = new Set([
 export function isTransportCode(code: string): boolean {
   return TRANSPORT_CODES.has(code);
 }
+
+/**
+ * The reason string for a non-2xx answer: the server's own `code` when it sent
+ * one, otherwise `http_<status>`. Surfaced (not swallowed) so the screen and the
+ * log can tell "the daily quota is spent" from "the network blinked".
+ */
+export function httpFailureReason(status: number, body: unknown): string {
+  const code = (body as { code?: unknown } | null | undefined)?.code;
+  if (typeof code === 'string' && code.trim().length > 0) return code.trim();
+  return `http_${status}`;
+}
+
+/**
+ * Map a non-2xx HTTP answer onto an `Outcome`.
+ *
+ * ⚠️ THIS FUNCTION IS THE FIX FOR A REAL DEFECT (found 2026-10-06). The branch it
+ * replaces read:
+ *
+ *     if (!res.ok) return { kind: 'ok', jobId: 'x', events: [{ type: 'GENERATION_FAILED' }] };
+ *
+ * …which its own comment contradicted ("the capture was NOT spent") and which
+ * broke two things at once:
+ *
+ *   • it reported **`kind: 'ok'` with a fake job id**, so the caller's transient
+ *     handling was bypassed entirely and a `job_id` of `'x'` was invented;
+ *   • it emitted **`GENERATION_FAILED`**, which sets `needsRecapture` — telling the
+ *     player to photograph a *new* offering after a 500 or an exhausted daily
+ *     quota. Nothing had been spent, and the offering they already had was valid.
+ *
+ * Rule ② belongs to a generation that actually **ran** and failed, and that
+ * arrives on the **2xx** path (`status: 'failed' | 'rejected'`). A refusal — a
+ * 4xx the server meant, or a 5xx it did not — never is one, so this returns
+ * `transient` with the server's code and leaves the offering whole.
+ */
+export function outcomeFromHttpFailure(status: number, body: unknown): Outcome {
+  return { kind: 'transient', reason: httpFailureReason(status, body) };
+}

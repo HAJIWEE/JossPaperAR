@@ -133,7 +133,36 @@ export const MESSAGES = {
   },
 } as const;
 
-const i18n = new I18n(MESSAGES as unknown as Record<string, Record<string, string>>);
+/**
+ * ⚠️ THE KEY SEPARATOR — AND WHY `.` IS A BUG HERE.
+ *
+ * `i18n-js` reads `.` as a SCOPE separator, so `t('ritual.cannotPrepare')` was
+ * looked up as the nested path `messages.en.ritual.cannotPrepare`, which does not
+ * exist. Every DOTTED key in the table above was therefore unreachable, while
+ * every underscore key (`ritual_preparing`, `clan_welcome`) worked — which is
+ * exactly the pattern that made it so easy to miss.
+ *
+ * Found on glass 2026-10-06 (SCRUM-53 / SCRUM-64): the slice's failure screen
+ * rendered `[missing "en.ritual.cannotPrepare" translation]` instead of the copy
+ * we signed off, so a player hitting a recoverable error was shown nothing
+ * readable. It survived the whole gate suite because `check:lib` compared key
+ * SETS between the locales — and the one key it happened to interpolate is an
+ * underscore one.
+ *
+ * THE TABLE IS FLAT ON PURPOSE ("one lookup, no nesting rules" — see MESSAGES
+ * above), and a dotted key is a flat key that merely LOOKS nested. So the fix is
+ * a separator that cannot occur inside a key: scope splitting is disabled
+ * entirely, and every key is looked up whole, dots and all.
+ *
+ * ⚠️ Do not "tidy this away". Deleting it silently re-breaks every dotted key;
+ * `check:lib` now asserts that every message RESOLVES, which is the check that
+ * was missing the first time.
+ */
+const FLAT_KEY_SEPARATOR = '\u0000';
+
+const i18n = new I18n(MESSAGES as unknown as Record<string, Record<string, string>>, {
+  defaultSeparator: FLAT_KEY_SEPARATOR,
+});
 i18n.defaultLocale = DEFAULT_LOCALE;
 i18n.enableFallback = true;
 i18n.locale = DEFAULT_LOCALE;
