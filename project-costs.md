@@ -52,6 +52,8 @@
 
 | 2026-10-07 | **SCRUM-53 — the slice's first device run (emulator `floor_api30`)** | Capture → cartoonize → burn, end to end, after SCRUM-80 + SCRUM-81 | **≈ US$0.09** — one real Path C run: `cartoonize_jobs.cost_micros = 90000`, `latency_ms = 16131` | **1.2808** (Mastercard, verified 2026-10-05) | **≈ S$0.12** (0.09 × 1.2808) | ✅ **incurred 2026-10-07** — the first real AI burn, driven from the app on the emulator. fal total ≈ **US$5.07 / S$6.49** of the approved US$10–20. |
 
+| 2026-10-07 | **SCRUM-82 — the clan fix, validated on the emulator** | Prove the full ritual completes (capture → cartoonize → burn → **award → persist**) | **≈ US$0.09** — one real Path C run: the job `styled`, `cost_micros = 90000` | **1.2808** (Mastercard) | **≈ S$0.12** | ✅ **incurred 2026-10-07** — the ritual completed and awarded **600 devout tribute**. fal total ≈ **US$5.16 / S$6.61** of the approved US$10–20. |
+
 <!-- APPEND-NEW-ONEOFF-COSTS-ABOVE -->
 
 ---
