@@ -565,6 +565,26 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.10 · SCRUM-53 — the slice's first device run (2026-10-07)
+
+**What ran.** With SCRUM-80's auth bootstrap in place, the slice ran on the emulator (`floor_api30`, Android 11 / SDK 30) for the first time, driven over `adb`: **capture → cartoonize → burn**. It reached the burn screen with the real styled sprite and graded a throw.
+
+**It failed a few times before it worked — three real defects, none ever exercised** (S31 died at auth, so the whole write path was virgin).
+
+| # | Where | Defect | Fix |
+|---|---|---|---|
+| 1 | `uploadCapture` | read `fetch(uri).text().split(',')[1]` as if the media URI were a `data:` URI; `takePictureAsync` returns a `file://` URI, so the "base64" was garbage | read the bytes as a **Blob** |
+| 2 | `uploadCapture` | RN Blobs carry an **empty type** → uploaded as `text/plain` → `mime type text/plain is not supported` | re-wrap with an explicit `image/jpeg` type |
+| 3 | `captureStoragePath` | baked the **bucket name into the object key** (`captures/{uid}/…`); the bucket's RLS policy (`foldername(name)[1] = auth.uid()`) read the owner as `"captures"` → `new row violates row-level security policy` | a **bucket-relative** key `{uid}/{id}.jpg` (matches the `styled` convention + the pr3 fixture); the function moved to the pure `src/lib/storage-path.ts` so `check:wire` asserts it (3 checks, fault-tested red) |
+
+Defects 1–3 are **SCRUM-81** (PR #26; `check:wire` 40 → 43).
+
+**What it proved.** After the upload fix the pipeline completed on glass: `cartoonize_jobs.status = 'styled'`, `cost_micros = 90000` (**US$0.09**), `latency_ms = 16131`, the sprite persisted to the private `styled` bucket, and the throw graded **虔誠 Devout ±22.94 px** — the first real Path C burn driven from the app.
+
+**What still blocks the ritual — SCRUM-82.** The **award** never lands: `award-service` returns **400**, because `submit_burn` requires `clan_id` (migration 0004, line 226) **and** the actor's `clan_members` row (line 252). The slice's `submitBurn` sends only `{ capture_id, accuracy }`, and a fresh anonymous user is in no clan — the slice's "hard-coded clan" was never wired, and there is no clan bootstrap. `burns = 0`.
+
+**Cost.** US$0.09 (`project-costs.md`) — the first real spend of the slice.
+
 ### 12.8 · SCRUM-53 continued — the write path's two dead wires (2026-10-06)
 
 **The finding.** §12.7 made the three client rules executable, and the screens *were* wired to the service layer (`preparing.tsx` → `registerCapture` · `uploadCapture` · `requestCartoonize`; `reward.tsx` → `submitBurn`). But **the slice's last hop could not complete, and nothing could notice:**
