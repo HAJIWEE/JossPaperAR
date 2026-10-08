@@ -62,7 +62,6 @@ import {
   oldestElder,
   planLeave,
   roleChangeRefusal,
-  SUCCESSOR_RANK,
   type ClanRole,
   type LeaveMember,
 } from '../clan-roles.ts';
@@ -595,28 +594,41 @@ function serviceChecks(): void {
   check('oldestElder excludes the departing head',
     oldestElder(withElder, 'u-e') === null && oldestElder(withElder, 'u-head')?.userId === 'u-e');
 
-  // ⚠️ THE PROMOTED RANK — SCRUM-84's ONE remaining open question, asserted here
-  // so it can never drift silently. It is deliberately NOT hard-coded in the
-  // implementation: `SUCCESSOR_RANK` mirrors `c_successor_role` in migration 0013,
-  // and these five checks mean whichever reading the PM settles on, a wrong value
-  // fails a gate that NAMES the thing to change.
+  // ⚠️ THE SUCCESSOR'S RANK — SCRUM-84, ANSWERED BY THE PM 2026-10-08:
   //
-  // Today it is `co_head`, not `head`: the original answer promotes the nominee into
-  // the head-POWER tier, and `head` is otherwise the founder's immutable fact. The
-  // open question is whether a departing `head` should hand over to a new `head`
-  // instead — "it will depend if the new nominated head is joining a co-head".
-  check('⚠️ the promoted rank is CO-HEAD, into the head-power tier',
-    SUCCESSOR_RANK === 'co_head');
-  check('…and it is a head-POWER rank — a promoted successor can run the clan',
-    hasHeadPower(SUCCESSOR_RANK));
-  check('⚠️ …and it is NOT `head` — `head` stays the founder\'s fact, not a promotion',
-    SUCCESSOR_RANK !== 'head');
-  check('⚠️ a NAMED successor is promoted into exactly that rank',
-    named.action === 'promote_then_leave' && named.promoteTo === SUCCESSOR_RANK);
-  check('⚠️ …and the AUTO-promoted elder goes into the same rank',
-    auto.action === 'auto_promote_then_leave' && auto.promoteTo === SUCCESSOR_RANK);
-  check('⚠️ …and the OLDER of two elders too — the rank is not path-dependent',
-    older.action === 'auto_promote_then_leave' && older.promoteTo === SUCCESSOR_RANK);
+  //   "hand over to a new head if no co-head, co-head if co-head already exists."
+  //
+  // The successor INHERITS the departing rank. These checks are the reason the rank
+  // is carried on the plan at all instead of living inside an `UPDATE`: a fixed
+  // value would pass every other assertion in this file.
+  check('⚠️ a departing HEAD hands over to a new HEAD — not a co-head',
+    named.action === 'promote_then_leave' && named.promoteTo === 'head');
+  check('⚠️ …and the AUTO-promoted oldest elder becomes the HEAD too',
+    auto.action === 'auto_promote_then_leave' && auto.promoteTo === 'head');
+  check('⚠️ …and the OLDER of two elders as well — the rank is not path-dependent',
+    older.action === 'auto_promote_then_leave' && older.promoteTo === 'head');
+
+  // The SOLE-co_head branch — ⚠️ this is the check that stops anyone "simplifying"
+  // promoteTo back to a hard-coded `head`. There is NO `head` row here (reachable
+  // once a founder has gone), so the departing co-head's successor stays a co-head.
+  const soleCoHead = [lm('u-c1', 'co_head', '2026-01-01'), lm('u-e', 'elder', '2026-02-01')];
+  const coNamed = planLeave(soleCoHead, 'u-c1', 'u-e');
+  check('⚠️ a departing SOLE CO-HEAD hands over to a CO-HEAD — never a head',
+    coNamed.action === 'promote_then_leave' && coNamed.promoteTo === 'co_head');
+  const coAuto = planLeave(soleCoHead, 'u-c1');
+  check('⚠️ …and auto-promoting there stays a CO-HEAD as well',
+    coAuto.action === 'auto_promote_then_leave' && coAuto.promoteTo === 'co_head');
+
+  // "co-head if co-head already exists" — the handover goes TO the existing
+  // co-head, so a head who leaves one behind promotes NOBODY.
+  check('⚠️ a head leaving a CO-HEAD behind promotes NOBODY — that co-head carries on',
+    planLeave(headPlusCoHead, 'u-h').action === 'leave');
+
+  // the invariant, stated once: the rank is ALWAYS the departing role
+  check('⚠️ the promoted rank is always the DEPARTING role — never a fixed value',
+    named.promoteTo === 'head' && coNamed.promoteTo === 'co_head');
+  check('…and both candidate ranks are head power, so the clan is never left headless',
+    hasHeadPower('head') && hasHeadPower('co_head'));
 
   check('canLeaveClan: a sole head CAN leave once an elder exists', canLeaveClan(withElder, 'u-head'));
   check('canLeaveClan: …and cannot when there is no successor',

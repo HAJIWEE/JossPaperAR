@@ -143,11 +143,12 @@ export type LeavePlan =
       readonly action: 'promote_then_leave';
       readonly successorId: string;
       /**
-       * ⚠️ The RANK the successor is promoted INTO — carried explicitly so it is
-       * reviewable and assertable rather than buried in an `UPDATE`. Its value
-       * mirrors `c_successor_role` in migration `0013`; SCRUM-84's outstanding
-       * question is whether that should be `head` in some cases, and this field is
-       * the one place the answer lands.
+       * ⚠️ The RANK the successor is promoted INTO. SCRUM-84, as answered by the PM
+       * 2026-10-08: *"hand over to a new head if no co-head, co-head if co-head
+       * already exists."* So the successor **INHERITS the departing rank** — this is
+       * always `actor.role`, never a fixed value. Migration `0014` does
+       * `set role = v_role` for exactly the same reason. Carried explicitly so it is
+       * reviewable and assertable rather than buried inside an `UPDATE`.
        */
       readonly promoteTo: ClanRole;
     }
@@ -159,11 +160,27 @@ export type LeavePlan =
   | { readonly action: 'refuse'; readonly reason: LeaveRefusal };
 
 /**
- * The rank a successor is promoted into — mirrors `c_successor_role` in `0013`.
- * `co_head`, not `head`: the original SCRUM-84 answer promotes the nominee into the
- * head-POWER tier, and `head` is otherwise the founder's immutable fact.
+ * ⚠️ THE SUCCESSOR'S RANK — SCRUM-84, answered by the PM 2026-10-08:
+ *
+ *   "hand over to a new head if no co-head, co-head if co-head already exists."
+ *
+ * The successor **INHERITS the rank of the person they succeed**. In the ramp that
+ * can only ever resolve to two things — a departing `head` with no co-head hands
+ * over to a new **`head`**, and a departing sole `co_head` hands over to a
+ * **`co_head`** — so the implementation is simply `promoteTo: actor.role`, and the
+ * SQL (migration `0014`) is `set role = v_role`.
+ *
+ * ⚠️ A departing `head` who leaves a CO-HEAD behind never reaches the ramp at all:
+ * there is still head power, so nobody is promoted and that co-head carries on.
+ * That is "co-head if co-head already exists", and it is the PM's own earlier
+ * clarification ("the cohead becomes the only cohead"), not a new rule.
+ *
+ * ⚠️ `head` IS NOW REACHABLE BY SUCCESSION. This reverses the earlier reading that
+ * `head` was the founder's immutable fact. The FOUNDING fact survives —
+ * `clans.created_by` still records who founded the clan and is never rewritten —
+ * but headship no longer dies with the founder, which is the point of a line of
+ * succession. `set_member_role` still refuses `head`; succession is its only path.
  */
-export const SUCCESSOR_RANK: ClanRole = 'co_head';
 
 /**
  * The OLDEST ELDER by time of joining, excluding `actorId`.
@@ -208,11 +225,13 @@ export function planLeave(
     if (!members.some((m) => m.userId === namedSuccessorId)) {
       return { action: 'refuse', reason: 'successor_not_member' };
     }
-    return { action: 'promote_then_leave', successorId: namedSuccessorId, promoteTo: SUCCESSOR_RANK };
+    // ⚠️ `promoteTo: actor.role` IS THE RULE (PM, 2026-10-08) — the successor
+    // inherits the departing rank. Mirrors migration 0014's `set role = v_role`.
+    return { action: 'promote_then_leave', successorId: namedSuccessorId, promoteTo: actor.role };
   }
 
   const heir = oldestElder(members, actorId);
-  if (heir) return { action: 'auto_promote_then_leave', successorId: heir.userId, promoteTo: SUCCESSOR_RANK };
+  if (heir) return { action: 'auto_promote_then_leave', successorId: heir.userId, promoteTo: actor.role };
 
   // ⚠️ No co-head, no elder, nobody named — the case the PM's instruction does
   // not cover. Refuse rather than invert the ladder (see 0013's header).

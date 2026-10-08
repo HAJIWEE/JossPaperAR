@@ -648,23 +648,35 @@ Also asserted in the pure mirror (`check:lib`) and over real PostgREST (`check:c
 
 ⚠️ **And the fixtures caught a real interaction:** F/G added memberships to u1/u2, and C11's 11 spare-clan heads split across two keepers pushed **u2 to ELEVEN — over the 10-clan cap**. The trigger correctly refused it, which failed the *whole file at its COMMIT* rather than in an assertion (a confusing failure mode, worth knowing). The spares are now spread across **three** keepers and every keeper stays under the cap. `clan_management.sql` GREEN · `check:clanapi` **77/77** · `lib` **234**.
 
-#### ⚠️ STILL OPEN on SCRUM-84 — the RANK a successor is promoted INTO (2026-10-08)
+#### ✅ ANSWERED on SCRUM-84 — the RANK a successor is promoted INTO (2026-10-08, later)
 
-The PM then said: *"it will depend if the new nominated head is joining a co-head."* **That does not resolve from the wording alone** — it admits at least two readings that differ in a real case, notably ***the founder `head` leaving while a co-head remains*** (today nobody is promoted, per fixture E; under one reading the founder would nominate a new **`head`** who *joins* that co-head). Rather than guess at a ladder semantic, the question was left open and the code was made to **refuse to let it drift silently**.
+The PM's follow-up did not resolve from its wording alone (*"it will depend if the new nominated head is joining a co-head"*), so the question was left open and the code was made to **refuse to let it drift silently** — the rank was pulled out of the `UPDATE` and asserted from three directions. The PM then settled it:
 
-**Behaviour is unchanged:** the successor becomes **`co_head`** — head **power**, never `head` — because `head` is otherwise the founder's immutable fact (`clans.created_by`). What changed is that the rank is now **explicit and asserted from three directions**, so whichever reading wins, a wrong value fails a gate that *names* the thing to change:
+> **"hand over to a new head if no co-head, co-head if co-head already exists."**
+
+That is one sentence of SQL: **the successor INHERITS the rank of the person they succeed** — `set role = v_role`. Migration **`0014`** (a NEW file; `0013` is applied and is never edited).
+
+| Who leaves | Who is promoted | The clan ends up with |
+|---|---|---|
+| a **`head`**, no co-head | the named successor, else the oldest elder → **`head`** | **one `head`** |
+| a **`head`**, with a co-head | **nobody** — that co-head carries on | a **co-head** leads ← *"co-head if co-head already exists"* |
+| a **sole `co_head`** (no `head` row) | → **`co_head`** | a **co-head** leads |
+
+⚠️ **This reverses `0013`'s rationale on `head`, deliberately.** `0013` refused to promote into `head` because `head` was "the founder's immutable fact". **What survives is the FOUNDING fact** — `clans.created_by` still records who founded the clan and is never rewritten (C13 now asserts that *after* a succession has moved the headship). What changes is that **headship no longer dies with the founder**, which is the entire point of a line of succession, and it means a clan may have a `head` who did not found it. ⚠️ `set_member_role` **still refuses** `head`: the ladder appoints co-heads, and **succession is the only path to headship**.
+
+**Asserted as a PAIR, so neither value can be hard-coded.** Fixture **A** (a departing `head` → `head`) and the NEW fixture **H** (**no `head` row** at all, a sole co-head → `co_head`) are deliberately opposite: hard-code *either* value and one passes while the other fails. Plus:
 
 | Layer | What pins it |
 |---|---|
-| `check:lib` | `SUCCESSOR_RANK` — the pure mirror's plan now **carries `promoteTo` explicitly** instead of leaving the rank implicit, and **six** checks pin it (`=== 'co_head'` · `hasHeadPower(...)` · `!== 'head'` · one per promotion path) |
+| `check:lib` | the pure plan carries **`promoteTo`** — the rank was pulled out of the `UPDATE` and made reviewable — and **8** checks pin the rule (both ranks, both paths, the "co-head already exists" branch, and the invariant stated once) |
 | `check:clanapi` **§9b/§9c** | the promoted successor's **actual role read back from `clan_members`** over PostgREST — the strongest form, because it exercises the *real* function rather than trusting a duplicated literal |
-| migration `0013` | the literal `'co_head'` in the `UPDATE`, now commented as this decision's landing site |
+| `clan_management.sql` **C13 A + H** | the end state read **as the OWNER**, so RLS cannot flatter it — and `created_by` is asserted to **survive** the succession |
 
-⚠️ **The literal is deliberately NOT duplicated into the client**, and a SQL `constant` was considered and **dropped**: `0013` may already be applied on the hosted project, and this worktree has **no `supabase link`** (`Cannot find project ref`), so editing its *body* could not be verified against remote migration history — and an unverifiable edit is how drift starts. A **comment-only** change is provably safe (the executable SQL is byte-identical) and is what shipped.
+⚠️ **The change went into a NEW migration rather than editing `0013`'s body.** `0013` may already be applied on the hosted project and this worktree has **no `supabase link`** (`Cannot find project ref`), so an edit to it could not be verified against remote migration history — and an unverifiable edit is how drift starts. `0014` uses `create or replace` on the **same signature**, deliberately: `0013`'s header warns that a stray `leave_clan(uuid)` would make every 1-arg call ambiguous.
 
 ⚠️ **A harness trap re-confirmed:** `run-sql-tests.sh` calls `docker run` **without `--network host`**, so `127.0.0.1:54322` resolves to the *throwaway client container's own* loopback and every file reports `Connection refused` — which reads exactly like a failing test. The SQL suite must be run with `--network host` (or a non-loopback URL) locally. `clan_management.sql` GREEN that way; `check:clanapi` **81/81**; `lib` **240**.
 
-⚠️ **FAULT-TESTED, both ways — and the fault test answered a question in passing.** Flipping `0013`'s literal to `'head'` and re-running turns **exactly those four** contract checks red and **nothing else** (`✓ 4 of 81 clan-API contract checks FAILED`, exit 1), so the gate is real rather than decorative; restoring the literal returns `81/81`. **But the injected `'head'` promotion *succeeded*** — no constraint, no trigger and no RLS policy refused it. So the alternative reading (**a departing `head` hands over to a new `head`**, who then *joins* any surviving co-head) is **a one-line change: no migration, no schema work, no new policy.** `clans.created_by` still records the founder, so a clan can have a `head` who is not its founder. That makes the decision's cost **asymmetric in *meaning*, not in *effort*** — worth knowing before answering.
+⚠️ **FAULT-TESTED, both ways — and the pair is what makes it a gate rather than a decoration.** Before the decision landed, the fault test also proved the `head` promotion was *possible*: no constraint, no trigger and no RLS policy refused it, so the answer's cost turned out to be **one line rather than a schema change**. (⚠️ Two `head` rows exist **momentarily** while the promotion runs before the departing head's row is deleted — safe, because there is no uniqueness constraint on `head` and the deferred ≥1-head trigger is a **minimum**, not a maximum.) After it landed, forcing `set role` back to the old literal `'co_head'` turns fixture **A** red; forcing `'head'` turns fixture **H** red. **`set role = v_role` is the only value that passes both.**
 
 
 

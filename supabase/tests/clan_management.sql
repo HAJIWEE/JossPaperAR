@@ -37,7 +37,10 @@
 --   C12 an erasure is never blocked by the ≥1-head invariant
 --   C13 ⚠️ THE HEAD-EXIT RAMP (SCRUM-84, PM-answered 2026-10-08): a sole head
 --       leaves BY PROMOTING — the successor they NAME, or failing that the
---       OLDEST ELDER by joined_at; refused only when there is no candidate
+--       OLDEST ELDER by joined_at; refused only when there is no candidate.
+--       ⚠️ The successor INHERITS THE DEPARTING RANK (0014): a departing `head`
+--       hands over to a `head` (fixture A), a departing SOLE `co_head` to a
+--       `co_head` (fixture H). A head leaving a CO-HEAD behind promotes NOBODY.
 --
 -- ── ⚠️ FAULT-TEST IT ────────────────────────────────────────────────────────
 -- Break one rule and confirm the matching letter goes red. The two that matter
@@ -483,8 +486,15 @@ $del$;
 -- has an EXPLICIT `joined_at`, which makes "the oldest elder" deterministic AND
 -- keeps the joins-per-hour limb clear (it only counts joins inside the hour).
 --
--- u5 is the head in every fixture — u1 and u2 are erased later by C12, and u4 is
--- the subject of C11's anti-abuse counts, so neither may be borrowed here.
+-- ⚠️⚠️ THE RANK RULE, added 2026-10-08 (migration 0014): *"hand over to a new head
+-- if no co-head, co-head if co-head already exists."* The successor INHERITS the
+-- departing rank, so fixtures A and H are a PAIR — A a departing `head` → `head`,
+-- H a departing sole `co_head` → `co_head`. Hard-coding either value fails the
+-- other fixture, which is exactly why both exist.
+--
+-- u5 is the head in fixtures A–G — u1 and u2 are erased later by C12, and u4 is
+-- the subject of C11's anti-abuse counts, so neither may be borrowed there. H is
+-- the exception: it needs NO `head` row at all, so u1 is the sole co-head there.
 reset role;
 
 do $rampfix$
@@ -562,7 +572,19 @@ begin
     (v_c, v_u2, 'co_head', timestamptz '2026-02-01'),
     (v_c, v_u1, 'elder',   timestamptz '2026-04-01');
 
-  raise notice '  · ramp fixtures: seven clans with explicit join times';
+  -- H · ⚠️⚠️ THE BRANCH THAT STOPS 0014 BEING "SIMPLIFIED" BACK TO A FIXED VALUE:
+  -- NO `head` row (reachable once a founder has gone) and exactly ONE co-head —
+  -- so the co-head is the SOLE head-power holder and the ramp DOES fire. A
+  -- departing `head` hands over to a `head`; a departing SOLE CO-HEAD hands over to
+  -- a CO-HEAD. Hard-coding either value fails one half of the pair (fixture A/H).
+  insert into public.clans (name, code, created_by) values ('Ramp SoloCo', 'RAMPHXYZ', v_u1)
+    returning id into v_c;
+  insert into pg_temp.fx values ('rampSoloCo', v_c, null);
+  insert into public.clan_members (clan_id, user_id, role, joined_at) values
+    (v_c, v_u1, 'co_head', timestamptz '2026-01-01'),
+    (v_c, v_u3, 'elder',   timestamptz '2026-02-01');
+
+  raise notice '  · ramp fixtures: eight clans with explicit join times';
 end
 $rampfix$;
 
@@ -640,6 +662,17 @@ begin
   perform pg_temp.assert_true((v_r->>'left') = 'true', 'C13 with NO head row a co-head still leaves freely');
   perform pg_temp.assert_true((v_r->>'successor') is null, 'C13 ⚠️ …promoting NOBODY — a co-head remained');
   perform pg_temp.assert_true((v_r->>'auto_promoted') = 'false', 'C13 ⚠️ …not even the elder who was oldest');
+
+  -- ── H · ⚠️⚠️ A SOLE CO-HEAD leaves with NO head row → the successor INHERITS
+  -- `co_head`, NOT `head`. This is the half of the rule that a hard-coded value
+  -- would break, and the reason the rank is `v_role` rather than a literal.
+  select v into v_clan from pg_temp.fx where k = 'rampSoloCo';
+  perform set_config('request.jwt.claims', json_build_object('sub', v_u1, 'role', 'authenticated')::text, false);
+  v_r := public.leave_clan(v_clan);
+  perform pg_temp.assert_true((v_r->>'left') = 'true', 'C13 ⚠️ a SOLE CO-HEAD leaves by promoting — the ramp DOES fire');
+  perform pg_temp.assert_true((v_r->>'was') = 'co_head', 'C13 …and it reports the co-head role they left with');
+  perform pg_temp.assert_true((v_r->>'successor') = v_u3, 'C13 …auto-promoting the only elder');
+  perform pg_temp.assert_true((v_r->>'auto_promoted') = 'true', 'C13 …and reporting it as an automatic choice');
 end
 $rampcall$;
 
@@ -658,13 +691,36 @@ select pg_temp.assert_true(
   'C13 ⚠️ …and is STILL in the one that refused — a refusal changes nothing');
 select pg_temp.assert_true(
   pg_temp.count_where(format($q$select count(*) from public.clan_members
-    where clan_id = (select v from pg_temp.fx where k = 'rampA') and role = 'co_head'$q$)) = 1,
-  'C13 ⚠️ the auto-promoted elder now holds HEAD POWER (co_head), so the clan is not headless');
+    where clan_id = (select v from pg_temp.fx where k = 'rampA') and role = 'head'$q$)) = 1,
+  'C13 ⚠️ the auto-promoted elder holds HEAD — the successor INHERITS the rank (0014)');
 select pg_temp.assert_true(
   pg_temp.count_where(format($q$select count(*) from public.clan_members
     where clan_id = (select v from pg_temp.fx where k = 'rampA')
-      and user_id = 'aaaa0002-0000-0000-0000-000000000002' and role = 'co_head'$q$)) = 1,
-  'C13 …and it is the eldest elder who holds it');
+      and user_id = 'aaaa0002-0000-0000-0000-000000000002' and role = 'head'$q$)) = 1,
+  'C13 …and it is the eldest elder who holds it, as `head` and not `co_head`');
+select pg_temp.assert_true(
+  pg_temp.count_where(format($q$select count(*) from public.clan_members
+    where clan_id = (select v from pg_temp.fx where k = 'rampA') and role = 'co_head'$q$)) = 0,
+  'C13 ⚠️ …and NOBODY is a co-head — the old fixed literal would have made one');
+-- ⚠️ THE FOUNDING FACT SURVIVES the succession: a new head does not rewrite who
+-- founded the clan. This is what 0013's "head is the founder's immutable fact"
+-- reasoning was protecting, and it still holds.
+select pg_temp.assert_true(
+  pg_temp.count_where(format($q$select count(*) from public.clans
+    where id = (select v from pg_temp.fx where k = 'rampA')
+      and created_by = 'aaaa0005-0000-0000-0000-000000000005'$q$)) = 1,
+  'C13 ⚠️ …and `clans.created_by` STILL names the founder — headship moves, founding does not');
+-- the NAMED path and the TIE path reach the same rank, so it is not path-dependent
+select pg_temp.assert_true(
+  pg_temp.count_where(format($q$select count(*) from public.clan_members
+    where clan_id = (select v from pg_temp.fx where k = 'rampB')
+      and user_id = 'aaaa0002-0000-0000-0000-000000000002' and role = 'head'$q$)) = 1,
+  'C13 ⚠️ a NAMED successor is `head` too — the rank is the leaver''s, not the path''s');
+select pg_temp.assert_true(
+  pg_temp.count_where(format($q$select count(*) from public.clan_members
+    where clan_id = (select v from pg_temp.fx where k = 'rampTie')
+      and user_id = 'aaaa0002-0000-0000-0000-000000000002' and role = 'head'$q$)) = 1,
+  'C13 ⚠️ …and the uuid-tiebreak winner is `head` as well');
 select pg_temp.assert_true(
   pg_temp.count_where(format($q$select count(*) from public.clan_members
     where clan_id = (select v from pg_temp.fx where k = 'rampA')
@@ -711,6 +767,19 @@ select pg_temp.assert_true(
     where clan_id = (select v from pg_temp.fx where k = 'rampTwoCo')
       and user_id = 'aaaa0001-0000-0000-0000-000000000001' and role = 'elder'$q$)) = 1,
   'C13 ⚠️ and the elder is STILL an elder — the ramp did not fire');
+
+-- ── H end state — ⚠️⚠️ THE OTHER HALF OF THE RULE, in the DATABASE ──────────
+-- A sole co-head's successor is a CO-HEAD. If anyone ever hard-codes `head` here,
+-- fixture A passes and this fails — which is the whole point of having both.
+select pg_temp.assert_true(
+  pg_temp.count_where(format($q$select count(*) from public.clan_members
+    where clan_id = (select v from pg_temp.fx where k = 'rampSoloCo')
+      and user_id = 'aaaa0003-0000-0000-0000-000000000003' and role = 'co_head'$q$)) = 1,
+  'C13 ⚠️ a SOLE CO-HEAD hands over to a CO-HEAD — the successor inherits the rank');
+select pg_temp.assert_true(
+  pg_temp.count_where(format($q$select count(*) from public.clan_members
+    where clan_id = (select v from pg_temp.fx where k = 'rampSoloCo') and role = 'head'$q$)) = 0,
+  'C13 ⚠️ …and NO `head` row is invented — the clan stays co-head-led');
 
 -- verify the rest of the cascade as the OWNER, so RLS cannot flatter the count
 reset role;

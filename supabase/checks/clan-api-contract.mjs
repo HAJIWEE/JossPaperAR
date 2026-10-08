@@ -228,18 +228,18 @@ let clanTwo = null;
   check('…and the head is gone', left.data?.left === true);
 
   // ⚠️ THE RANK THE SUCCESSOR ACTUALLY GOT — read back from the TABLE, not trusted
-  // from the response, so the literal in migration 0013 is asserted from the
-  // OUTSIDE. This pair is what goes red if SCRUM-84's open question ("it will
-  // depend if the new nominated head is joining a co-head") is answered as `head`.
+  // from the response. SCRUM-84, answered 2026-10-08: the successor INHERITS the
+  // departing rank, so a departing HEAD hands over to a new `head` (migration 0014).
+  // This is the strongest form of the assertion: it exercises the REAL function.
   const bRow = await B.client
     .from('clan_members')
     .select('role')
     .eq('clan_id', clanTwo)
     .eq('user_id', B.userId)
     .maybeSingle();
-  check('⚠️ the AUTO-promoted elder really is a CO-HEAD', bRow.data?.role === 'co_head', bRow.error?.message);
-  check('⚠️ …and NOT a `head` — a promotion never grants the founder\'s rank',
-    bRow.data?.role !== 'head');
+  check('⚠️ the AUTO-promoted elder really is the new HEAD', bRow.data?.role === 'head', bRow.error?.message);
+  check('⚠️ …and NOT a `co_head` — the successor INHERITS the departing rank',
+    bRow.data?.role !== 'co_head');
 }
 
 // ═══ 9c · the NAMED path — this section exists for the ARGUMENT NAME ═══════
@@ -268,9 +268,9 @@ let clanThree = null;
     .eq('clan_id', clanThree)
     .eq('user_id', C.userId)
     .maybeSingle();
-  check('⚠️ the NAMED successor is promoted to CO-HEAD too', cRow.data?.role === 'co_head', cRow.error?.message);
-  check('⚠️ …and NOT `head`, even though the head NAMED them',
-    cRow.data?.role !== 'head');
+  check('⚠️ the NAMED successor is the new HEAD too', cRow.data?.role === 'head', cRow.error?.message);
+  check('⚠️ …and NOT a `co_head`, even though they were named rather than auto-chosen',
+    cRow.data?.role !== 'co_head');
 }
 
 // ═══ 10 · delete_clan · { p_clan_id } ══════════════════════════════════════
