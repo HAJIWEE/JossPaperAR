@@ -120,6 +120,13 @@ npx tsc --noEmit
 
 **Known traps:** no local `psql` and no `supabase query` subcommand — to run SQL, add a migration file, `db push`, then delete it and `migration repair --status reverted <version>` or remote history drifts. `app_config` is a kill switch — any script that writes it must restore it from an `EXIT` trap. The Storage bulk-delete `{"prefixes":[…]}` answers `200` and deletes nothing; delete objects **by path**. A Path C generation is ≈ **US$0.09** — check the budget before spending.
 
+⚠️ **`run-sql-tests.sh` calls `docker run` WITHOUT `--network host`**, so pointing it at a local URL makes **every** file report `Connection refused` while the stack is perfectly healthy — a failure that reads exactly like a red suite. Locally, run the SQL suite with `--network host` (`docker run --rm -i --network host postgres:17 psql "<url>" -v ON_ERROR_STOP=1 -q -f - < supabase/tests/<file>.sql`). Measured 2026-10-08 (S34).
+
+⚠️ **`supabase db reset` re-applies the migration files from disk**, which is the free way to make a migration change take effect locally. You can also re-apply a single `create or replace function` migration by hand (`psql -f supabase/migrations/<file>.sql`) — but the SQL suite's `assert_true` **raises**, so a failing run aborts **before** its teardown and leaves residue; reset before trusting the next run.
+
+⚠️ **A worktree without `supabase link` cannot prove whether a migration is applied remotely** (`Cannot find project ref`). So a *behavioural* change to an applied migration goes in a **new version number**, never an edit to the old file — a comment-only edit is safe only because the executable SQL is byte-identical, which you can prove by filtering the diff to non-comment lines.
+
+
 **SQL-test harness traps** (measured 2026-10-08 — they break tests silently, so read them before writing one):
 
 * ⚠️ `set_config(…, is_local := true)` and `SET LOCAL` **do not survive across statements** under `run-sql-tests.sh` — psql runs each statement in its own transaction (autocommit), and `SET LOCAL` even warns *"can only be used in transaction blocks"*. Use **session-scoped** `SET ROLE` / `set_config(…, false)`: that form works in **both** runners (and inside the CLI-migration path too).
