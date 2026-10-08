@@ -71,6 +71,11 @@ Continue building **JossPaperAR** — an Expo/React Native AR app that replaces 
 16. **`pkill -f 'qemu-system-x86_64'` SELF-MATCHES** — the pattern matches the `pkill` command's own cmdline, so it SIGTERMs the shell. Stop the emulator with **`systemctl --user stop floor-avd`** (`systemctl --user reset-failed floor-avd` to clear a failed unit), never `pkill -f`.
 17. **The clan fix needed NO migration.** `create_clan` is SECURITY INVOKER (granted to `authenticated`) and `clan_members_select_member` lets a caller read their own membership — so **do not add a migration for the slice's clan.**
 
+**GitHub / records**
+
+18. ⚠️ **Create PRs with the GitHub MCP server, NOT `gh`.** They authenticate differently: `git push` works through the **`kwallet6`** credential helper (KWallet) while `gh` uses a **fine-grained PAT in its own keyring** (`~/.config/gh/hosts.yml`, no `GH_TOKEN` env). That PAT is **read-only** on this repo — `gh api /repos/HAJIWEE/JossPaperAR --jq .permissions` answers `{"pull":true,"push":false,…}` — so `gh pr create` fails with `403 Resource not accessible by personal access token (createPullRequest)` **even though the push just succeeded**. The MCP `createPullRequest` works (`PR #28`). Do not burn a round-trip "fixing token permissions" before trying the MCP path.
+19. **A 403 is not a 401.** `gh auth status` reporting *no* `Token scopes:` line is the **fine-grained-PAT fingerprint** (classic tokens list their scopes) — a useful tell when diagnosing which credential is actually in play.
+
 ## 7 · Commands
 
 ```bash
