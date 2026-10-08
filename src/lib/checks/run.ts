@@ -62,6 +62,7 @@ import {
   oldestElder,
   planLeave,
   roleChangeRefusal,
+  SUCCESSOR_RANK,
   type ClanRole,
   type LeaveMember,
 } from '../clan-roles.ts';
@@ -593,6 +594,29 @@ function serviceChecks(): void {
     tie.action === 'auto_promote_then_leave' && tie.successorId === 'u-aaa');
   check('oldestElder excludes the departing head',
     oldestElder(withElder, 'u-e') === null && oldestElder(withElder, 'u-head')?.userId === 'u-e');
+
+  // ⚠️ THE PROMOTED RANK — SCRUM-84's ONE remaining open question, asserted here
+  // so it can never drift silently. It is deliberately NOT hard-coded in the
+  // implementation: `SUCCESSOR_RANK` mirrors `c_successor_role` in migration 0013,
+  // and these five checks mean whichever reading the PM settles on, a wrong value
+  // fails a gate that NAMES the thing to change.
+  //
+  // Today it is `co_head`, not `head`: the original answer promotes the nominee into
+  // the head-POWER tier, and `head` is otherwise the founder's immutable fact. The
+  // open question is whether a departing `head` should hand over to a new `head`
+  // instead — "it will depend if the new nominated head is joining a co-head".
+  check('⚠️ the promoted rank is CO-HEAD, into the head-power tier',
+    SUCCESSOR_RANK === 'co_head');
+  check('…and it is a head-POWER rank — a promoted successor can run the clan',
+    hasHeadPower(SUCCESSOR_RANK));
+  check('⚠️ …and it is NOT `head` — `head` stays the founder\'s fact, not a promotion',
+    SUCCESSOR_RANK !== 'head');
+  check('⚠️ a NAMED successor is promoted into exactly that rank',
+    named.action === 'promote_then_leave' && named.promoteTo === SUCCESSOR_RANK);
+  check('⚠️ …and the AUTO-promoted elder goes into the same rank',
+    auto.action === 'auto_promote_then_leave' && auto.promoteTo === SUCCESSOR_RANK);
+  check('⚠️ …and the OLDER of two elders too — the rank is not path-dependent',
+    older.action === 'auto_promote_then_leave' && older.promoteTo === SUCCESSOR_RANK);
 
   check('canLeaveClan: a sole head CAN leave once an elder exists', canLeaveClan(withElder, 'u-head'));
   check('canLeaveClan: …and cannot when there is no successor',

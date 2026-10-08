@@ -226,6 +226,20 @@ let clanTwo = null;
   check('⚠️ …and it reports the SERVER chose (`auto_promoted`)', left.data?.auto_promoted === true);
   check('⚠️ …with the elder as the successor', left.data?.successor === B.userId);
   check('…and the head is gone', left.data?.left === true);
+
+  // ⚠️ THE RANK THE SUCCESSOR ACTUALLY GOT — read back from the TABLE, not trusted
+  // from the response, so the literal in migration 0013 is asserted from the
+  // OUTSIDE. This pair is what goes red if SCRUM-84's open question ("it will
+  // depend if the new nominated head is joining a co-head") is answered as `head`.
+  const bRow = await B.client
+    .from('clan_members')
+    .select('role')
+    .eq('clan_id', clanTwo)
+    .eq('user_id', B.userId)
+    .maybeSingle();
+  check('⚠️ the AUTO-promoted elder really is a CO-HEAD', bRow.data?.role === 'co_head', bRow.error?.message);
+  check('⚠️ …and NOT a `head` — a promotion never grants the founder\'s rank',
+    bRow.data?.role !== 'head');
 }
 
 // ═══ 9c · the NAMED path — this section exists for the ARGUMENT NAME ═══════
@@ -247,6 +261,16 @@ let clanThree = null;
   check('⚠️ leave_clan accepts { p_clan_id, p_successor }', left.error === null, left.error?.message);
   check('…the NAMED member is the successor', left.data?.successor === C.userId);
   check('…and it is NOT reported as an auto choice', left.data?.auto_promoted === false);
+
+  const cRow = await C.client
+    .from('clan_members')
+    .select('role')
+    .eq('clan_id', clanThree)
+    .eq('user_id', C.userId)
+    .maybeSingle();
+  check('⚠️ the NAMED successor is promoted to CO-HEAD too', cRow.data?.role === 'co_head', cRow.error?.message);
+  check('⚠️ …and NOT `head`, even though the head NAMED them',
+    cRow.data?.role !== 'head');
 }
 
 // ═══ 10 · delete_clan · { p_clan_id } ══════════════════════════════════════

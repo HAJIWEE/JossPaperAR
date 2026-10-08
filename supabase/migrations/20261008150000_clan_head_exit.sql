@@ -114,7 +114,18 @@ begin
         end if;
       end if;
 
-      -- Promote to CO-HEAD, then leave. `clan_members_update_head` permits this
+      -- ⚠️ THE SUCCESSOR'S RANK IS `co_head` — the head-POWER tier, NOT `head`.
+      -- `head` stays the founder's fact (`clans.created_by`), so a promotion never
+      -- grants it. SCRUM-84's ONE remaining open question is whether a departing
+      -- `head` should instead hand over to a new `head` ("it will depend if the new
+      -- nominated head is joining a co-head") — unresolved, and filed as such.
+      --
+      -- ⚠️ This literal is NOT duplicated in the client. It is asserted FROM THE
+      -- OUTSIDE, against this real function: `check:clanapi` §9b/§9c read the
+      -- promoted successor's actual role back through PostgREST, and `check:lib`
+      -- pins the pure mirror's `SUCCESSOR_RANK`. Change this line and both go red.
+      --
+      -- Promote to co-head, then leave. `clan_members_update_head` permits this
       -- because the caller is still the head at this moment — the delete is below.
       update public.clan_members
          set role = 'co_head'

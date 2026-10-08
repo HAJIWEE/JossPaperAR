@@ -139,9 +139,31 @@ export type LeaveRefusal =
  */
 export type LeavePlan =
   | { readonly action: 'leave' }
-  | { readonly action: 'promote_then_leave'; readonly successorId: string }
-  | { readonly action: 'auto_promote_then_leave'; readonly successorId: string }
+  | {
+      readonly action: 'promote_then_leave';
+      readonly successorId: string;
+      /**
+       * ⚠️ The RANK the successor is promoted INTO — carried explicitly so it is
+       * reviewable and assertable rather than buried in an `UPDATE`. Its value
+       * mirrors `c_successor_role` in migration `0013`; SCRUM-84's outstanding
+       * question is whether that should be `head` in some cases, and this field is
+       * the one place the answer lands.
+       */
+      readonly promoteTo: ClanRole;
+    }
+  | {
+      readonly action: 'auto_promote_then_leave';
+      readonly successorId: string;
+      readonly promoteTo: ClanRole;
+    }
   | { readonly action: 'refuse'; readonly reason: LeaveRefusal };
+
+/**
+ * The rank a successor is promoted into — mirrors `c_successor_role` in `0013`.
+ * `co_head`, not `head`: the original SCRUM-84 answer promotes the nominee into the
+ * head-POWER tier, and `head` is otherwise the founder's immutable fact.
+ */
+export const SUCCESSOR_RANK: ClanRole = 'co_head';
 
 /**
  * The OLDEST ELDER by time of joining, excluding `actorId`.
@@ -186,11 +208,11 @@ export function planLeave(
     if (!members.some((m) => m.userId === namedSuccessorId)) {
       return { action: 'refuse', reason: 'successor_not_member' };
     }
-    return { action: 'promote_then_leave', successorId: namedSuccessorId };
+    return { action: 'promote_then_leave', successorId: namedSuccessorId, promoteTo: SUCCESSOR_RANK };
   }
 
   const heir = oldestElder(members, actorId);
-  if (heir) return { action: 'auto_promote_then_leave', successorId: heir.userId };
+  if (heir) return { action: 'auto_promote_then_leave', successorId: heir.userId, promoteTo: SUCCESSOR_RANK };
 
   // ⚠️ No co-head, no elder, nobody named — the case the PM's instruction does
   // not cover. Refuse rather than invert the ladder (see 0013's header).

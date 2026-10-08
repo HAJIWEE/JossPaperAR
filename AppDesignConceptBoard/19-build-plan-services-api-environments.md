@@ -648,6 +648,22 @@ Also asserted in the pure mirror (`check:lib`) and over real PostgREST (`check:c
 
 ⚠️ **And the fixtures caught a real interaction:** F/G added memberships to u1/u2, and C11's 11 spare-clan heads split across two keepers pushed **u2 to ELEVEN — over the 10-clan cap**. The trigger correctly refused it, which failed the *whole file at its COMMIT* rather than in an assertion (a confusing failure mode, worth knowing). The spares are now spread across **three** keepers and every keeper stays under the cap. `clan_management.sql` GREEN · `check:clanapi` **77/77** · `lib` **234**.
 
+#### ⚠️ STILL OPEN on SCRUM-84 — the RANK a successor is promoted INTO (2026-10-08)
+
+The PM then said: *"it will depend if the new nominated head is joining a co-head."* **That does not resolve from the wording alone** — it admits at least two readings that differ in a real case, notably ***the founder `head` leaving while a co-head remains*** (today nobody is promoted, per fixture E; under one reading the founder would nominate a new **`head`** who *joins* that co-head). Rather than guess at a ladder semantic, the question was left open and the code was made to **refuse to let it drift silently**.
+
+**Behaviour is unchanged:** the successor becomes **`co_head`** — head **power**, never `head` — because `head` is otherwise the founder's immutable fact (`clans.created_by`). What changed is that the rank is now **explicit and asserted from three directions**, so whichever reading wins, a wrong value fails a gate that *names* the thing to change:
+
+| Layer | What pins it |
+|---|---|
+| `check:lib` | `SUCCESSOR_RANK` — the pure mirror's plan now **carries `promoteTo` explicitly** instead of leaving the rank implicit, and **six** checks pin it (`=== 'co_head'` · `hasHeadPower(...)` · `!== 'head'` · one per promotion path) |
+| `check:clanapi` **§9b/§9c** | the promoted successor's **actual role read back from `clan_members`** over PostgREST — the strongest form, because it exercises the *real* function rather than trusting a duplicated literal |
+| migration `0013` | the literal `'co_head'` in the `UPDATE`, now commented as this decision's landing site |
+
+⚠️ **The literal is deliberately NOT duplicated into the client**, and a SQL `constant` was considered and **dropped**: `0013` may already be applied on the hosted project, and this worktree has **no `supabase link`** (`Cannot find project ref`), so editing its *body* could not be verified against remote migration history — and an unverifiable edit is how drift starts. A **comment-only** change is provably safe (the executable SQL is byte-identical) and is what shipped.
+
+⚠️ **A harness trap re-confirmed:** `run-sql-tests.sh` calls `docker run` **without `--network host`**, so `127.0.0.1:54322` resolves to the *throwaway client container's own* loopback and every file reports `Connection refused` — which reads exactly like a failing test. The SQL suite must be run with `--network host` (or a non-loopback URL) locally. `clan_management.sql` GREEN that way; `check:clanapi` **81/81**; `lib` **240**.
+
 
 
 **The gap this closed.** The RPCs existed and were proved, but **nothing called them**: the only `.rpc()` site in `src/` was `create_clan` in the SCRUM-82 shortcut. So the app could not invite, promote, remove, rename, leave, delete or read the Book at all.
