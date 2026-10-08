@@ -664,6 +664,8 @@ The PM then said: *"it will depend if the new nominated head is joining a co-hea
 
 ⚠️ **A harness trap re-confirmed:** `run-sql-tests.sh` calls `docker run` **without `--network host`**, so `127.0.0.1:54322` resolves to the *throwaway client container's own* loopback and every file reports `Connection refused` — which reads exactly like a failing test. The SQL suite must be run with `--network host` (or a non-loopback URL) locally. `clan_management.sql` GREEN that way; `check:clanapi` **81/81**; `lib` **240**.
 
+⚠️ **FAULT-TESTED, both ways — and the fault test answered a question in passing.** Flipping `0013`'s literal to `'head'` and re-running turns **exactly those four** contract checks red and **nothing else** (`✓ 4 of 81 clan-API contract checks FAILED`, exit 1), so the gate is real rather than decorative; restoring the literal returns `81/81`. **But the injected `'head'` promotion *succeeded*** — no constraint, no trigger and no RLS policy refused it. So the alternative reading (**a departing `head` hands over to a new `head`**, who then *joins* any surviving co-head) is **a one-line change: no migration, no schema work, no new policy.** `clans.created_by` still records the founder, so a clan can have a `head` who is not its founder. That makes the decision's cost **asymmetric in *meaning*, not in *effort*** — worth knowing before answering.
+
 
 
 **The gap this closed.** The RPCs existed and were proved, but **nothing called them**: the only `.rpc()` site in `src/` was `create_clan` in the SCRUM-82 shortcut. So the app could not invite, promote, remove, rename, leave, delete or read the Book at all.
