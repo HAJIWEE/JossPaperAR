@@ -59,7 +59,11 @@ import {
   isHeadless,
   isInBookWindow,
   joinRefusal,
+  oldestElder,
+  planLeave,
   roleChangeRefusal,
+  type ClanRole,
+  type LeaveMember,
 } from '../clan-roles.ts';
 import {
   CREATE_STEPS,
@@ -510,12 +514,58 @@ function serviceChecks(): void {
   check('a lone co-head is NOT headless — co-head carries head power', !isHeadless(['co_head']));
   check('an empty clan is headless', isHeadless([]));
 
-  // leaving — promote-first (doc 15 §5.3 + §10.4)
-  check('a member leaves freely', canLeaveClan(['head', 'member'], 'member'));
-  check('an elder leaves freely', canLeaveClan(['head', 'elder'], 'elder'));
-  check('⚠️ the SOLE head may NOT leave — promote a co-head first', !canLeaveClan(['head', 'member'], 'head'));
-  check('a head MAY leave once a co-head exists', canLeaveClan(['head', 'co_head', 'member'], 'head'));
-  check('a non-member cannot leave', !canLeaveClan(['head'], null));
+  // leaving — THE SCRUM-84 RAMP (PM-answered 2026-10-08). Its MEANING changed:
+  // a sole head is no longer refused, they leave BY PROMOTING. These assertions
+  // replaced five that encoded the old promote-first-only reading.
+  const lm = (userId: string, role: ClanRole, joinedAt: string): LeaveMember => ({ userId, role, joinedAt });
+  const base = [lm('u-head', 'head', '2026-01-01'), lm('u-b', 'member', '2026-02-01')];
+  const withElder = [...base, lm('u-e', 'elder', '2026-02-01')];
+
+  check('a member leaves freely', planLeave(base, 'u-b').action === 'leave');
+  check('an elder leaves freely', planLeave(withElder, 'u-e').action === 'leave');
+  check('a non-member cannot leave',
+    planLeave(base, 'u-nobody').action === 'refuse');
+  check('a head with a co-head simply leaves — nothing to inherit',
+    planLeave([...base, lm('u-c', 'co_head', '2026-03-01')], 'u-head').action === 'leave');
+
+  // the case the PM's instruction does not cover: no co-head, no elder, nobody named
+  const noSuccessor = planLeave(base, 'u-head');
+  check('⚠️ a sole head with nobody to inherit is REFUSED',
+    noSuccessor.action === 'refuse' && noSuccessor.reason === 'no_successor');
+  check('⚠️ …and a plain MEMBER is never auto-promoted — the fallback is elders only',
+    planLeave(base, 'u-head').action === 'refuse');
+
+  // STEP 1 · the head NAMES a successor
+  const named = planLeave(withElder, 'u-head', 'u-b');
+  check('a NAMED successor is promoted, then the head leaves',
+    named.action === 'promote_then_leave' && named.successorId === 'u-b');
+  const selfNamed = planLeave(withElder, 'u-head', 'u-head');
+  check('naming yourself is refused',
+    selfNamed.action === 'refuse' && selfNamed.reason === 'successor_is_self');
+  const strangerNamed = planLeave(withElder, 'u-head', 'u-nobody');
+  check('naming a non-member is refused',
+    strangerNamed.action === 'refuse' && strangerNamed.reason === 'successor_not_member');
+
+  // STEP 2 · nobody named → the OLDEST ELDER by time of joining
+  const auto = planLeave(withElder, 'u-head');
+  check('⚠️ no successor named → the oldest elder is AUTO-promoted',
+    auto.action === 'auto_promote_then_leave' && auto.successorId === 'u-e');
+
+  const twoElders = [...base, lm('u-late', 'elder', '2026-06-01'), lm('u-early', 'elder', '2026-02-01')];
+  const older = planLeave(twoElders, 'u-head');
+  check('⚠️ with two elders the OLDER one wins, whatever the row order',
+    older.action === 'auto_promote_then_leave' && older.successorId === 'u-early');
+
+  const tied = [...base, lm('u-zzz', 'elder', '2026-02-01'), lm('u-aaa', 'elder', '2026-02-01')];
+  const tie = planLeave(tied, 'u-head');
+  check('⚠️ a tie on joined_at breaks on user_id — the rule is deterministic',
+    tie.action === 'auto_promote_then_leave' && tie.successorId === 'u-aaa');
+  check('oldestElder excludes the departing head',
+    oldestElder(withElder, 'u-e') === null && oldestElder(withElder, 'u-head')?.userId === 'u-e');
+
+  check('canLeaveClan: a sole head CAN leave once an elder exists', canLeaveClan(withElder, 'u-head'));
+  check('canLeaveClan: …and cannot when there is no successor',
+    !canLeaveClan(base, 'u-head'));
 
   // anti-abuse (doc 15 §5.2)
   check('the clans-per-user limit is 10', CLANS_PER_USER === 10);

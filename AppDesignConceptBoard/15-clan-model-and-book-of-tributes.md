@@ -120,7 +120,7 @@ One active `code` per clan (Head can re-roll it): **link · QR · copyable code*
 |---|---|
 | Member / elder leaves | instant and free; their **past** Book entries stay (the record is the clan's) |
 | Head removes a member | allowed; same history rule |
-| Head leaves | must promote a co-head first — or delete the clan (no headless clans) |
+| Head leaves | ✅ **Answered at SCRUM-84 (2026-10-08) — the ramp.** If a co-head exists, they simply leave. Otherwise they are **prompted to name a successor**; if they name none, the **oldest ELDER by time of joining** is auto-promoted to **co-head**, and then they leave. Refused only when there is no co-head, no elder **and** nobody named (then: promote a co-head, or delete the clan). No headless clans, ever. |
 
 ---
 
@@ -216,7 +216,7 @@ One active `code` per clan (Head can re-roll it): **link · QR · copyable code*
 | 1 | ~~Offering scope~~ → ✅ **resolved (PM): clan-scoped** — no per-ancestor attribution; *"in real life no one specifies which ancestor"* (§6) | ~~PM~~ ✅ |
 | 2 | ~~Personal vs clan altars~~ → ✅ **resolved (PM): no non-clan altar** — the first-run fork is required (§4/§6) | ~~PM~~ ✅ |
 | 3 | ~~Ancestor cap~~ → ✅ **resolved (PM): cap 10**, extra slots monetized later (§6/§9) | ~~PM~~ ✅ |
-| 4 | Head-exit mechanic — promote-first (proposed) vs auto-promote most-senior elder | PM |
+| 4 | ~~Head-exit mechanic~~ → ✅ **resolved (PM, 2026-10-08 — SCRUM-84)**: a **HYBRID**, neither of the two I offered. **Prompt the leaving head to name a successor; if none is named, auto-promote the OLDEST ELDER by `joined_at`** (ties break on `user_id`, so it is deterministic). The successor becomes **co-head, not `head`** — §3 keeps `head` the founder's immutable fact. Refused only when there is **no co-head AND no elder AND nobody named**. Built in migration `0013`. | ~~PM~~ ✅ |
 | 5 | Book window — hide vs purge rows older than 1 month (13 §2 amendment) | build ticket (SCRUM-46) |
 | 6 | ~~ZH terminology lock~~ → ✅ **locked against the design row (SCRUM-48 Done 2026-10-02)**: **宗族 · 族长 · 长老 · 副族长 · 成员 · 供奉簿 · 邀请码** | ~~design row~~ ✅ |
 | 7 | **Altar display at cap 10** — the art holds 4 tablets; scroll / rows / pages needs a design pass (feeds SCRUM-7/29 boards) | design row |

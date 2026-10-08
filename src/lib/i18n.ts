@@ -97,7 +97,23 @@ export const MESSAGES = {
     'clan.removeConfirm': 'Remove %{name} from the clan? Their past offerings stay.',
     'clan.leave': 'Leave this clan',
     'clan.leaveConfirm': 'Leave this clan? Your past offerings stay.',
-    'clan.leavePromoteFirst': 'Promote a co-head before you leave — a clan must keep a head.',
+    // ── the SCRUM-84 head-exit ramp (PM-answered 2026-10-08) ──────────────
+    // The prompt is step ONE of the rule, so its copy prepares the head for the
+    // question instead of refusing them.
+    'clan.leaveHint': 'You will be asked who leads the clan next.',
+    'clan.nameSuccessor': 'Name a successor',
+    'clan.successorHint':
+      'Choose who leads the clan after you — or leave it to the longest-standing elder.',
+    'clan.leaveWithoutSuccessor': 'Leave without naming one',
+    // the refusals, so a 中文 reader never meets the server's English sentence
+    'clan.leaveNotMember': 'You are not a member of this clan.',
+    'clan.leaveSelfSuccessor': 'You cannot name yourself as your successor.',
+    'clan.leaveStrangerSuccessor': 'That person is not a member of this clan.',
+    'clan.leaveNoSuccessor':
+      'Nobody can lead after you yet. Promote a co-head first, or delete the clan.',
+    'clan.successorNamed': '%{name} now leads the clan.',
+    'clan.successorAuto':
+      'No successor named — %{name}, the longest-standing elder, now leads the clan.',
     'clan.deleteClan': 'Delete this clan',
     'clan.deleteConfirm':
       'Delete this clan? Every member loses the altar and the Book of Tributes. This cannot be undone.',
@@ -176,7 +192,17 @@ export const MESSAGES = {
     'clan.removeConfirm': '將 %{name} 移出宗族？先前的供奉紀錄將保留。',
     'clan.leave': '離開此宗族',
     'clan.leaveConfirm': '離開此宗族？先前的供奉紀錄將保留。',
-    'clan.leavePromoteFirst': '離開前請先設一位副族長——宗族必須保有族長。',
+    // the SCRUM-84 head-exit ramp — the successor prompt and its refusals
+    'clan.leaveHint': '系統將詢問由誰接任帶領宗族。',
+    'clan.nameSuccessor': '指定繼任者',
+    'clan.successorHint': '選擇在您離開後帶領宗族的人，或交由加入最久的長老接任。',
+    'clan.leaveWithoutSuccessor': '不指定直接離開',
+    'clan.leaveNotMember': '您不是此宗族的成員。',
+    'clan.leaveSelfSuccessor': '不能指定自己為繼任者。',
+    'clan.leaveStrangerSuccessor': '此人不是此宗族的成員。',
+    'clan.leaveNoSuccessor': '目前沒有可接任的人。請先設副族長，或刪除宗族。',
+    'clan.successorNamed': '現由 %{name} 帶領宗族。',
+    'clan.successorAuto': '未指定繼任者——由加入最久的長老 %{name} 帶領宗族。',
     'clan.deleteClan': '刪除宗族',
     'clan.deleteConfirm': '刪除宗族？所有成員將失去祭壇與供奉簿，無法復原。',
 

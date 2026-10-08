@@ -590,7 +590,32 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Left for SCRUM-46:** ⬜ **the QR half** — SCRUM-50 owns the scanner and the rendered QR (needs `react-native-svg` + a QR lib, which are native modules and so want a dev build). ⬜ **the Home clan card**, which needs a Home design pass: the signed-off Home layout has **no free band** for it. ⬜ **first-run routing** — deliberately NOT changed, because whether the fork replaces the slice's auto-create is **`SCRUM-83`**.
 
-### 12.12b · SCRUM-46 continued — the client layer and the clan screens (2026-10-08)
+### 12.12c · SCRUM-84 answered — the head-exit ramp, built (2026-10-08)
+
+**The decision.** The PM answered with a **hybrid**, not either option I offered: *"if there is no co-head, prompt leaving clan head to name a successor, if none named, promote automatically the oldest elder by time of joining the clan."* Recorded on `SCRUM-84` (now **Done**), and folded into doc 15 §3/§5.3/§10 item 4.
+
+**⚠️ This superseded a shipped behaviour.** `0012` implemented pure promote-first — a sole head was **refused**. That is wrong now, so `leave_clan` is **re-specified in migration `0013`**, never edited in place.
+
+**Migration `0013` — the ramp.** A head-power holder leaving: another holder exists → leave; else a **named** successor is promoted to co-head, else the **oldest elder** (`order by joined_at asc, user_id asc`) is promoted, else **refused**. Three implementation notes worth keeping:
+
+* **`drop function` first.** `leave_clan(uuid)` and `leave_clan(uuid, uuid default null)` are *different functions* to Postgres, and the default makes the 2-arg form callable with one argument — leaving both makes every 1-arg call **ambiguous** ("could not choose the best candidate function"). The old signature has to go explicitly.
+* **The successor becomes `co_head`, not `head`.** §3 keeps `head` the founder's immutable fact, `set_member_role` already refuses to assign it, and the deferred ≥1-head trigger counts head *power* (head OR co_head) — so a clan led by a co-head is valid. Making the successor literally `head` would make "who founded this clan" mutable.
+* **The `user_id` tiebreak.** Two elders who joined in the same second must resolve **deterministically**; a rule that picks a different successor on a second run is not a rule.
+
+**⚠️ The one case the instruction does not cover**, flagged on the ticket rather than silently decided: **no co-head, no elder, nobody named**. "Promote the oldest elder" has no candidate, so it **refuses** and names both exits. The alternative — auto-promoting an arbitrary *member* — would invert the ladder in exactly the case where the clan is least supervised.
+
+**Client + screen.** `leaveClan(clanId, successorId?)` returns *what happened* (`successor`, `auto_promoted`), and `planLeave` in `clan-roles.ts` mirrors the ramp purely so the screen can **prompt before the tap**. Two details a screen would have got wrong:
+
+1. **The refusal is decided by the pure mirror BEFORE the call**, so what the user reads is our translated copy. The server's refusal is an English sentence (`42501`) — `LEAVE_REFUSAL_KEY` exists so a 中文 reader does not meet it mid-flow.
+2. **"Leave without naming one" is offered only when the fallback can actually run** (`auto_promote_then_leave`). At any other point it would lead straight into the refusal — a button that lies.
+
+**Proof.** `clan_management.sql` **C13** — five purpose-built fixtures with **explicit `joined_at`** (which also keeps the joins-per-hour limb clear): two elders where the older must win · a named successor · a **same-second tie** · the no-candidate refusal plus both validation refusals · a co-head clan where nobody is promoted. Plus the end state read **as the owner**, so RLS cannot flatter it. And `check:clanapi` grew a **`p_successor`** section — the argument name `tsc` cannot check — with `p_successor` **omitted** (the SQL default) and **named**.
+
+**Fault-tested:** flipping `order by joined_at asc` to `desc` turns C13's *"the OLDEST elder"* assertion **red**.
+
+**Gates:** `tokens 36 · domain 45 · slice 36 · throw 33 · ads 51 · wire 43 · session 17 · pathc 38 · sql 13 · adrs 34 · contrast 22 · responsive 21 · lib 200 → 210` · `check:clanapi 55 → 69`. **Spend US$0.00.**
+
+
 
 **The gap this closed.** The RPCs existed and were proved, but **nothing called them**: the only `.rpc()` site in `src/` was `create_clan` in the SCRUM-82 shortcut. So the app could not invite, promote, remove, rename, leave, delete or read the Book at all.
 

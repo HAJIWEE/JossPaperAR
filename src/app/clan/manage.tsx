@@ -25,8 +25,16 @@ import {
   renameClan,
   setMemberRole,
 } from '@/lib/clan-api';
-import { ROLE_LABEL_KEY, actionsFor, leaveHintKey, promoteLabelKey } from '@/lib/clan-flow';
-import type { ClanRole } from '@/lib/clan-roles';
+import {
+  LEAVE_REFUSAL_KEY,
+  LEAVE_RESULT_KEYS,
+  ROLE_LABEL_KEY,
+  SUCCESSOR_PROMPT_KEYS,
+  actionsFor,
+  leaveHintKey,
+  promoteLabelKey,
+} from '@/lib/clan-flow';
+import { type ClanRole, type LeaveMember, planLeave } from '@/lib/clan-roles';
 import { activeLocale, t } from '@/lib/i18n';
 import { INVITE_SHARE_COPY, inviteLink } from '@/lib/invites';
 import { supabase } from '@/lib/supabase';
@@ -53,8 +61,19 @@ export default function ClanManageScreen() {
   const [problem, setProblem] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState('');
+  /** SCRUM-84 step 1 — the sole head is choosing a successor before leaving. */
+  const [choosingSuccessor, setChoosingSuccessor] = useState(false);
+  /** What just happened: who leads now, and whether the SERVER chose for them. */
+  const [notice, setNotice] = useState<string | null>(null);
 
   const clan: ClanSummary | null = clans[index] ?? null;
+
+  /**
+   * The SCRUM-84 leave plan for the CURRENT user, computed from the roster — so
+   * the button, the successor prompt and the refusal message all read ONE rule.
+   * `null` until the roster has loaded, which is why every use guards on it.
+   */
+  const leavePlan = clan && me && members.length > 0 ? planLeave(members, me) : null;
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -135,24 +154,58 @@ export default function ClanManageScreen() {
     await load();
   }, [clan, newName, load]);
 
+  /**
+   * Leave — the SCRUM-84 ramp, in the order the PM specified.
+   *
+   * ⚠️ The REFUSAL is decided by the pure mirror BEFORE the call, so what the user
+   * reads is OUR translated copy. The server's refusal is an English sentence
+   * (`42501`), and showing it to a 中文 reader mid-flow is exactly the bug the
+   * `LEAVE_REFUSAL_KEY` map exists to prevent. The server is still the authority —
+   * if it refuses anyway (a race), its reason is shown as a fallback.
+   */
+  const leaveNow = useCallback(
+    async (successorId: string | null) => {
+      if (!clan) return;
+      const result = await leaveClan(clan.clanId, successorId);
+      if (!result.ok) {
+        setProblem(result.reason);
+        return;
+      }
+      const { successor, autoPromoted } = result.data;
+      setNotice(
+        t(autoPromoted ? LEAVE_RESULT_KEYS.auto : LEAVE_RESULT_KEYS.named, {
+          name: successor ? successor.slice(0, 8) : '',
+        }),
+      );
+      setChoosingSuccessor(false);
+      await load();
+    },
+    [clan, load],
+  );
+
   const onLeave = useCallback(() => {
-    if (!clan) return;
-    Alert.alert(t('clan.leave'), t('clan.leaveConfirm'), [
-      { text: t('clan.back'), style: 'cancel' },
-      {
-        text: t('clan.leave'),
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            const result = await leaveClan(clan.clanId);
-            // ⚠️ a SOLE head is refused here, by design (doc 15 §10.4)
-            if (!result.ok) setProblem(result.reason);
-            else await load();
-          })();
-        },
-      },
-    ]);
-  }, [clan, load]);
+    if (!clan || !leavePlan) return;
+    setProblem(null);
+    setNotice(null);
+
+    if (leavePlan.action === 'refuse') {
+      setProblem(t(LEAVE_REFUSAL_KEY[leavePlan.reason]));
+      return;
+    }
+
+    // not the sole head-power holder: nothing to inherit, just go
+    if (leavePlan.action === 'leave') {
+      Alert.alert(t('clan.leave'), t('clan.leaveConfirm'), [
+        { text: t('clan.back'), style: 'cancel' },
+        { text: t('clan.leave'), style: 'destructive', onPress: () => void leaveNow(null) },
+      ]);
+      return;
+    }
+
+    // ⚠️ STEP 1 — a sole head NAMES a successor. This prompt IS the rule: skip it
+    // and the family discovers afterwards who the server picked.
+    setChoosingSuccessor(true);
+  }, [clan, leavePlan, leaveNow]);
 
   const onDelete = useCallback(() => {
     if (!clan) return;
@@ -317,10 +370,42 @@ export default function ClanManageScreen() {
         )
       ) : null}
 
-      {actions.includes('leave') ? (
+      {actions.includes('leave') && !choosingSuccessor ? (
         <>
           <GhostButton testID="clan-leave" label={t('clan.leave')} danger onPress={onLeave} />
           <Hint>{t(leaveHintKey())}</Hint>
+        </>
+      ) : null}
+
+      {/* ── SCRUM-84 STEP 1 — the sole head names a successor ────────────────
+          ⚠️ "Leave without naming one" is offered ONLY when the fallback can
+          actually run (`auto_promote_then_leave`). At any other time it would
+          lead straight into the server's refusal — offering a path the UI
+          already knows is closed is how a button becomes a lie. */}
+      {choosingSuccessor && clan ? (
+        <>
+          <SectionTitle>{t(SUCCESSOR_PROMPT_KEYS.title)}</SectionTitle>
+          <Hint>{t(SUCCESSOR_PROMPT_KEYS.hint)}</Hint>
+          {members
+            .filter((m) => m.userId !== me)
+            .map((m) => (
+              <Row
+                key={m.userId}
+                testID={`clan-successor-${m.userId}`}
+                onPress={() => void leaveNow(m.userId)}
+                left={<Text style={styles.rowTitle}>{m.userId.slice(0, 8)}</Text>}
+                right={<Text style={styles.rowMeta}>{t(ROLE_LABEL_KEY[m.role])}</Text>}
+              />
+            ))}
+          {leavePlan?.action === 'auto_promote_then_leave' ? (
+            <GhostButton
+              testID="clan-leave-without-successor"
+              label={t(SUCCESSOR_PROMPT_KEYS.skip)}
+              danger
+              onPress={() => void leaveNow(null)}
+            />
+          ) : null}
+          <GhostButton label={t('clan.back')} onPress={() => setChoosingSuccessor(false)} />
         </>
       ) : null}
 
@@ -328,6 +413,7 @@ export default function ClanManageScreen() {
         <GhostButton testID="clan-delete" label={t('clan.deleteClan')} danger onPress={onDelete} />
       ) : null}
 
+      {notice ? <Text style={styles.notice}>{notice}</Text> : null}
       {problem ? <Text style={styles.problem}>{problem}</Text> : null}
       <Label>{busy ? '…' : ''}</Label>
       <GhostButton label={t('common.done')} onPress={() => router.replace('/')} />
@@ -339,5 +425,7 @@ const styles = StyleSheet.create({
   rowTitle: { color: text.ink, fontSize: 15, fontWeight: '600' },
   rowMeta: { color: text.muted, fontSize: 12, marginTop: 2 },
   code: { color: text.ink, fontSize: 24, fontWeight: '700', letterSpacing: 4, marginBottom: 8 },
+  /** who leads now — a success line, so malachite (contrast-checked) not cinnabar */
+  notice: { color: text.malachite, fontSize: 14, marginTop: 8 },
   problem: { color: text.cinnabar, fontSize: 14, marginTop: 8 },
 });

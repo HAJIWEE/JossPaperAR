@@ -71,6 +71,8 @@ function assertSummary(label, payload) {
 
 const A = await newDevice();
 const B = await newDevice();
+// a third device, used for the Book's outsider projection AND the ramp's named path
+const C = await newDevice();
 let clanId = null;
 let code = null;
 
@@ -170,8 +172,7 @@ section('7 · clan_book · { p_clan_id, p_limit }');
   check('clan_book: entries is an array', Array.isArray(asMember.data?.entries));
 
   // a stale book (before the join) read by a NON-member — B was promoted to elder,
-  // so use a third device to see the anonymised projection
-  const C = await newDevice();
+  // so use the third device to see the anonymised projection
   const asOutsider = await C.client.rpc('clan_book', { p_clan_id: clanId, p_limit: 50 });
   check('clan_book resolves for a non-member too', asOutsider.error === null, asOutsider.error?.message);
   check('⚠️ clan_book: a non-member is reported as NOT a member', asOutsider.data?.member === false);
@@ -188,16 +189,64 @@ section('8 · remove_member · { p_clan_id, p_user_id }');
   check('⚠️ a head cannot remove themselves — leave_clan is the way', self.error !== null);
 }
 
-// ═══ 9 · leave_clan · { p_clan_id } — and the promote-first refusal ════════
-section('9 · leave_clan · { p_clan_id }');
+// ═══ 9 · leave_clan · { p_clan_id } — the ONE case still refused ══════════
+// SCRUM-84 (PM-answered 2026-10-08) replaced "the sole head is always refused"
+// with a ramp. On THIS clan A is the only member at all — no co-head, no elder,
+// nobody to inherit — which is the single case the ramp still refuses.
+section('9 · leave_clan · { p_clan_id } — no candidate');
 {
-  // ⚠️ A is the ONLY head: the server must refuse, and the message must name the
-  // way out — that string is shown verbatim to the user (doc 15 §10.4).
   const refused = await A.client.rpc('leave_clan', { p_clan_id: clanId });
   check('leave_clan accepts { p_clan_id }', refused.error !== null);
-  check('⚠️ the SOLE head is refused', refused.error !== null);
-  check('⚠️ …and the refusal names the way out — "promote a co-head"',
+  check('⚠️ a sole head with NO candidate is refused', refused.error !== null);
+  check('⚠️ …and the refusal names a way out ("promote a co-head")',
     (refused.error?.message ?? '').includes('promote a co-head'), refused.error?.message);
+}
+
+// ═══ 9b · the AUTO path — nobody named, an elder exists ════════════════════
+section('9b · leave_clan — no successor named → the oldest elder');
+let clanTwo = null;
+{
+  const created = await A.client.rpc('create_clan', { p_name: 'Ramp Two' });
+  check('a second clan is created for the ramp', created.error === null, created.error?.message);
+  clanTwo = created.data?.clan_id ?? null;
+
+  const joined = await B.client.rpc('join_clan', { p_code: created.data?.code });
+  check('B joins it', joined.error === null, joined.error?.message);
+  const promoted = await A.client.rpc('set_member_role', {
+    p_clan_id: clanTwo,
+    p_user_id: B.userId,
+    p_role: 'elder',
+  });
+  check('B is made an elder', promoted.error === null, promoted.error?.message);
+
+  // ⚠️ `p_successor` is OMITTED ENTIRELY — the SQL default must let the call
+  // through, and the ramp must then fall back to the oldest elder.
+  const left = await A.client.rpc('leave_clan', { p_clan_id: clanTwo });
+  check('⚠️ leave_clan works with `p_successor` OMITTED', left.error === null, left.error?.message);
+  check('⚠️ …and it reports the SERVER chose (`auto_promoted`)', left.data?.auto_promoted === true);
+  check('⚠️ …with the elder as the successor', left.data?.successor === B.userId);
+  check('…and the head is gone', left.data?.left === true);
+}
+
+// ═══ 9c · the NAMED path — this section exists for the ARGUMENT NAME ═══════
+section('9c · leave_clan — a NAMED successor');
+let clanThree = null;
+{
+  const created = await A.client.rpc('create_clan', { p_name: 'Ramp Three' });
+  check('a third clan is created', created.error === null, created.error?.message);
+  clanThree = created.data?.clan_id ?? null;
+  const joined = await C.client.rpc('join_clan', { p_code: created.data?.code });
+  check('C joins the third clan', joined.error === null, joined.error?.message);
+
+  const left = await A.client.rpc('leave_clan', {
+    p_clan_id: clanThree,
+    // ⚠️ THE ARGUMENT THIS SECTION EXISTS FOR. A typo here is invisible to `tsc`
+    // and would fail only on a device — which is why the contract test is a gate.
+    p_successor: C.userId,
+  });
+  check('⚠️ leave_clan accepts { p_clan_id, p_successor }', left.error === null, left.error?.message);
+  check('…the NAMED member is the successor', left.data?.successor === C.userId);
+  check('…and it is NOT reported as an auto choice', left.data?.auto_promoted === false);
 }
 
 // ═══ 10 · delete_clan · { p_clan_id } ══════════════════════════════════════
@@ -211,6 +260,18 @@ section('10 · delete_clan · { p_clan_id }');
 
   const after = await A.client.rpc('clan_book', { p_clan_id: clanId, p_limit: 10 });
   check('the clan really is gone — the Book reports found:false', after.data?.found === false);
+}
+
+// ═══ CLEANUP — leave no residue, so a re-run starts from the same place ════
+// The ramp sections create two extra clans. Their NEW co-heads delete them, which
+// is also the last proof that a promoted successor really did inherit head power.
+section('cleanup');
+{
+  const d2 = await B.client.rpc('delete_clan', { p_clan_id: clanTwo });
+  check('⚠️ the promoted successor CAN delete the clan — head power was real',
+    d2.error === null, d2.error?.message);
+  const d3 = await C.client.rpc('delete_clan', { p_clan_id: clanThree });
+  check('…and so can the NAMED successor', d3.error === null, d3.error?.message);
 }
 
 // ═══ RESULT ════════════════════════════════════════════════════════════════

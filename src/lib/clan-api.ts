@@ -315,16 +315,37 @@ export async function removeMember(clanId: string, userId: string): Promise<ApiR
 }
 
 /**
- * Leave a clan. ⚠️ A SOLE head is refused by the server with the promote-first
- * message (doc 15 §10.4) — that refusal is the point, so it is passed through
- * as a reason rather than swallowed.
+ * Leave a clan — the SCRUM-84 ramp (PM-answered 2026-10-08).
+ *
+ * A member or elder just leaves. A **sole head-power holder** leaves *by
+ * promoting*: name who should lead next (`successorId`), or pass nothing and the
+ * server promotes the **oldest elder by `joined_at`**. The only refusal left is
+ * "no co-head, no elder, nobody named" — there is no candidate.
+ *
+ * ⚠️ Returns WHAT HAPPENED, not just success: the screen has to tell the family
+ * who leads now, and whether the server chose for them.
  */
-export async function leaveClan(clanId: string): Promise<ApiResult<ClanRole | null>> {
-  const { data, error } = await supabase().rpc('leave_clan', { p_clan_id: clanId });
+export async function leaveClan(
+  clanId: string,
+  successorId?: string | null,
+): Promise<ApiResult<{ was: ClanRole | null; successor: string | null; autoPromoted: boolean }>> {
+  const { data, error } = await supabase().rpc('leave_clan', {
+    p_clan_id: clanId,
+    // sent explicitly, `null` meaning "nobody named" — the branch the ramp reads
+    p_successor: successorId ?? null,
+  });
   if (error) return { ok: false, reason: reasonOf(error) };
 
-  const was = asRecord(data)?.was;
-  return { ok: true, data: isClanRole(was) ? was : null };
+  const r = asRecord(data);
+  const was = r?.was;
+  return {
+    ok: true,
+    data: {
+      was: isClanRole(was) ? was : null,
+      successor: str(r?.successor),
+      autoPromoted: r?.auto_promoted === true,
+    },
+  };
 }
 
 /** Rename the clan (head/co-head). Validated with the server's own 2..20 rule. */

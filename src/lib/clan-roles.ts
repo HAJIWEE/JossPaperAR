@@ -111,17 +111,100 @@ export function isHeadless(roles: readonly ClanRole[]): boolean {
   return !roles.some((r) => hasHeadPower(r));
 }
 
+/** A membership row, as the leave rule needs it. */
+export interface LeaveMember {
+  readonly userId: string;
+  readonly role: ClanRole;
+  /** ISO timestamp — the "time of joining" the SCRUM-84 rule ranks by. */
+  readonly joinedAt: string;
+}
+
+export type LeaveRefusal =
+  | 'not_a_member'
+  | 'successor_is_self'
+  | 'successor_not_member'
+  | 'no_successor';
+
 /**
- * May this member leave? Members and elders always may. A head-power holder may
- * only once someone ELSE still holds head power — **promote-first**, doc 15
- * §10.4. `roles` must include the departing member.
+ * What leaving THIS clan, as THIS member, should do (SCRUM-84, answered
+ * 2026-10-08). The server (`0013`) is the authority; this mirrors it so the
+ * screen can prompt BEFORE the user taps, and so the rule is asserted without a
+ * database.
+ *
+ *   * not head power            → leave
+ *   * head power, but another   → leave (someone else still carries it)
+ *   * SOLE head power + a named successor → promote them, then leave
+ *   * SOLE head power, nobody named, an elder exists → the OLDEST elder, then leave
+ *   * SOLE head power, nobody named, no elder → refuse
  */
-export function canLeaveClan(roles: readonly ClanRole[], actorRole: ClanRole | null | undefined): boolean {
-  if (!isClanRole(actorRole)) return false;
-  if (!hasHeadPower(actorRole)) return true;
-  // remaining = every OTHER holder of head power
-  const remaining = roles.filter((r) => hasHeadPower(r)).length - 1;
-  return remaining >= 1;
+export type LeavePlan =
+  | { readonly action: 'leave' }
+  | { readonly action: 'promote_then_leave'; readonly successorId: string }
+  | { readonly action: 'auto_promote_then_leave'; readonly successorId: string }
+  | { readonly action: 'refuse'; readonly reason: LeaveRefusal };
+
+/**
+ * The OLDEST ELDER by time of joining, excluding `actorId`.
+ *
+ * ⚠️ Ties break on `userId` so two elders who joined in the same second resolve
+ * DETERMINISTICALLY — the SQL does `order by joined_at asc, user_id asc`. A rule
+ * that picks a different successor on a second run is not a rule.
+ */
+export function oldestElder(
+  members: readonly LeaveMember[],
+  actorId: string,
+): LeaveMember | null {
+  const elders = members
+    .filter((m) => m.userId !== actorId && m.role === 'elder')
+    .slice()
+    .sort((a, b) => {
+      if (a.joinedAt !== b.joinedAt) return a.joinedAt < b.joinedAt ? -1 : 1;
+      if (a.userId === b.userId) return 0;
+      return a.userId < b.userId ? -1 : 1;
+    });
+  return elders[0] ?? null;
+}
+
+export function planLeave(
+  members: readonly LeaveMember[],
+  actorId: string,
+  namedSuccessorId?: string | null,
+): LeavePlan {
+  const actor = members.find((m) => m.userId === actorId);
+  if (!actor) return { action: 'refuse', reason: 'not_a_member' };
+
+  // a member or an elder: nothing to inherit
+  if (!hasHeadPower(actor.role)) return { action: 'leave' };
+
+  // another head-power holder remains — head power survives without help
+  const others = members.filter((m) => m.userId !== actorId && hasHeadPower(m.role));
+  if (others.length > 0) return { action: 'leave' };
+
+  // ── the SOLE head-power holder: the two-step ramp (SCRUM-84) ─────────────
+  if (namedSuccessorId) {
+    if (namedSuccessorId === actorId) return { action: 'refuse', reason: 'successor_is_self' };
+    if (!members.some((m) => m.userId === namedSuccessorId)) {
+      return { action: 'refuse', reason: 'successor_not_member' };
+    }
+    return { action: 'promote_then_leave', successorId: namedSuccessorId };
+  }
+
+  const heir = oldestElder(members, actorId);
+  if (heir) return { action: 'auto_promote_then_leave', successorId: heir.userId };
+
+  // ⚠️ No co-head, no elder, nobody named — the case the PM's instruction does
+  // not cover. Refuse rather than invert the ladder (see 0013's header).
+  return { action: 'refuse', reason: 'no_successor' };
+}
+
+/**
+ * May this member leave AT ALL? ⚠️ Its MEANING CHANGED at SCRUM-84: a sole head
+ * is no longer refused — they leave *by promoting*, so this is now true for
+ * them. `planLeave(...).action !== 'refuse'` is the precise question; this
+ * remains for callers that only need "is there a way out".
+ */
+export function canLeaveClan(members: readonly LeaveMember[], actorId: string): boolean {
+  return planLeave(members, actorId).action !== 'refuse';
 }
 
 // ── anti-abuse (doc 15 §5.2) — the numbers this ticket owns ────────────────

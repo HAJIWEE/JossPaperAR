@@ -18,7 +18,7 @@
  * are reachable and the *routing* decision stays with the PM.
  */
 
-import type { ClanRole } from './clan-roles.ts';
+import type { ClanRole, LeaveRefusal } from './clan-roles.ts';
 import { canDeleteClan, canEditAncestors, canInvite, canOffer, canRemoveMember, canRenameClan } from './clan-roles.ts';
 import { isValidClanName } from './clan-rules.ts';
 import { normaliseClanCode } from './invites.ts';
@@ -145,10 +145,47 @@ export function actionsForOutsider(): ClanAction[] {
 }
 
 /**
- * ⚠️ Leaving is OFFERED to everyone but REFUSED to a sole head (doc 15 §3 +
- * §10.4 promote-first). The screen must say why rather than hide the row — a
+ * ⚠️ Leaving is OFFERED to everyone but has a REFUSAL case (SCRUM-84: no co-head,
+ * no elder, nobody named). The screen must say why rather than hide the row — a
  * hidden control reads as a bug, a disabled one reads as a rule.
+ *
+ * The copy changed with the ramp: leaving is no longer blocked for a sole head,
+ * so the hint now *prepares* them for the successor question instead of refusing.
  */
 export function leaveHintKey(): string {
-  return 'clan.leavePromoteFirst';
+  return 'clan.leaveHint';
 }
+
+/**
+ * The successor prompt (SCRUM-84 step 1) — shown to a sole head BEFORE they leave.
+ * The prompt is the first step of the rule, not a nicety: skip it and the family
+ * discovers after the fact that the server picked their next Head.
+ */
+export const SUCCESSOR_PROMPT_KEYS = {
+  title: 'clan.nameSuccessor',
+  hint: 'clan.successorHint',
+  /** "Leave without naming one" — the explicitly allowed path into step 2. */
+  skip: 'clan.leaveWithoutSuccessor',
+} as const;
+
+/**
+ * i18n keys for the ramp's refusals.
+ *
+ * ⚠️ WHY THIS EXISTS: the server raises `42501` with an ENGLISH message, and that
+ * text is what a screen would otherwise show. Mapping the reason to our own copy
+ * is what keeps a 中文 user from reading an English sentence mid-flow.
+ */
+export const LEAVE_REFUSAL_KEY: Readonly<Record<LeaveRefusal, string>> = {
+  not_a_member: 'clan.leaveNotMember',
+  successor_is_self: 'clan.leaveSelfSuccessor',
+  successor_not_member: 'clan.leaveStrangerSuccessor',
+  no_successor: 'clan.leaveNoSuccessor',
+};
+
+/** Who leads now, after a leave — named by the user or chosen by the server. */
+export const LEAVE_RESULT_KEYS = {
+  /** The user named them. */
+  named: 'clan.successorNamed',
+  /** ⚠️ The server chose — say so, do not imply the user picked. */
+  auto: 'clan.successorAuto',
+} as const;

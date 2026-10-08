@@ -17,21 +17,27 @@
 -- ── WHAT IT PROVES (each assertion RAISES, so the run is green or red) ──────
 --   C1  create_clan — the founder is the head, and is the only head
 --   C2  join_clan — the invite code is the only way in; a joiner is a member
---   C3  the ladder — promote member→elder, elder→co_head; an ELDER CANNOT
+--   C3  the sole head with NO candidate is refused (SCRUM-84: superseded by C13
+--       for every other case)
+--   C4  the ladder — promote member→elder, elder→co_head; an ELDER CANNOT
 --       promote; `head` is not assignable; the founder's role is immutable
---   C4  removal — a head removes a member; an elder cannot; the founding head
+--   C5  removal — a head removes a member; an elder cannot; the founding head
 --       cannot be removed; a head cannot remove themselves
---   C5  leaving — §10.4 promote-first: the SOLE head is REFUSED; a member
---       leaves freely; once a co-head exists the founder may leave
---   C6  ⚠️ the ≥1-head invariant holds in the DATABASE, not just the RPC —
+--   C6  leaving — a member/elder leaves freely; the founder leaves once a
+--       co-head exists
+--   C7  ⚠️ the ≥1-head invariant holds in the DATABASE, not just the RPC —
 --       forced with `set constraints … immediate` so the deferred trigger is
 --       observable inside a transaction
---   C7  rename — head only; the 2..20 rule is a named error, not a CHECK blow-up
---   C8  the Book — a member sees WHO; a non-member gets the ANONYMISED
+--   C8  rename — head only; the 2..20 rule is a named error, not a CHECK blow-up
+--   C9  the Book — a member sees WHO; a non-member gets the ANONYMISED
 --       projection; the 1-month window HIDES (not purges); `private` is owner-only
---   C9  delete_clan — head only; members, ancestors and tributes cascade
---   C10 anti-abuse — the 11th clan is refused, and ⚠️ the joins-per-hour limb
+--   C10 delete_clan — head only; members, ancestors and tributes cascade
+--   C11 anti-abuse — the 11th clan is refused, and ⚠️ the joins-per-hour limb
 --       is REACHABLE (it must sit below the clan cap or it is dead logic)
+--   C12 an erasure is never blocked by the ≥1-head invariant
+--   C13 ⚠️ THE HEAD-EXIT RAMP (SCRUM-84, PM-answered 2026-10-08): a sole head
+--       leaves BY PROMOTING — the successor they NAME, or failing that the
+--       OLDEST ELDER by joined_at; refused only when there is no candidate
 --
 -- ── ⚠️ FAULT-TEST IT ────────────────────────────────────────────────────────
 -- Break one rule and confirm the matching letter goes red. The two that matter
@@ -177,13 +183,16 @@ begin
   perform pg_temp.assert_true(v_err like '23505%', 'C2  …as a duplicate (23505), not a second row');
 
   -- ── C3 · ⚠️ PROMOTE-FIRST: the sole head may not leave ─────────────────
-  -- Run BEFORE any co-head exists — that is the whole point of the rule
-  -- (doc 15 §3 / §10.4: the option implemented; the alternative is SCRUM-84).
+  -- ⚠️ RE-SPECIFIED at SCRUM-84 (2026-10-08). This used to read "promote-first:
+  -- the sole head may not leave". The rule is now a RAMP (see C13), and this
+  -- fixture lands on the one case it still refuses: u2/u3/u4 are all plain
+  -- MEMBERS, so there is no co-head and no ELDER to inherit, and nobody is named.
+  -- A member is never auto-promoted — C13 asserts that too.
   perform set_config('request.jwt.claims', json_build_object('sub', v_u1, 'role', 'authenticated')::text, false);
   v_err := pg_temp.expect_error(format('select public.leave_clan(%L)', v_clan),
-    'C3  the SOLE head is REFUSED when leaving');
+    'C3  a sole head with NO successor to promote is REFUSED');
   perform pg_temp.assert_true(v_err like '%promote a co-head%',
-    'C3  …and the refusal names the way out (promote a co-head)');
+    'C3  …and the refusal names a way out');
   perform pg_temp.assert_true(
     pg_temp.count_where($q$select count(*) from public.clan_members$q$) = 4,
     'C3  the refused head is still a member — nothing was changed');
@@ -467,6 +476,159 @@ begin
     'C10 …and the members went with it — the invariant did not block the delete');
 end
 $del$;
+
+-- ═══ C13 · THE HEAD-EXIT RAMP — SCRUM-84 (PM-answered 2026-10-08) ══════════
+-- The RULE CHANGED here, so the old promote-first assertions above (C3) now
+-- cover only the no-candidate case. These are purpose-built fixtures: each clan
+-- has an EXPLICIT `joined_at`, which makes "the oldest elder" deterministic AND
+-- keeps the joins-per-hour limb clear (it only counts joins inside the hour).
+--
+-- u5 is the head in every fixture — u1 and u2 are erased later by C12, and u4 is
+-- the subject of C11's anti-abuse counts, so neither may be borrowed here.
+reset role;
+
+do $rampfix$
+declare
+  v_u2  uuid := 'aaaa0002-0000-0000-0000-000000000002';
+  v_u3  uuid := 'aaaa0003-0000-0000-0000-000000000003';
+  v_u5  uuid := 'aaaa0005-0000-0000-0000-000000000005';
+  v_c   uuid;
+begin
+  -- A · two elders, nobody named → the OLDEST (u2, Feb) must win over u3 (Jun)
+  insert into public.clans (name, code, created_by) values ('Ramp Auto', 'RAMPAXYZ', v_u5)
+    returning id into v_c;
+  insert into pg_temp.fx values ('rampA', v_c, null);
+  insert into public.clan_members (clan_id, user_id, role, joined_at) values
+    (v_c, v_u5, 'head',  timestamptz '2026-01-01'),
+    (v_c, v_u2, 'elder', timestamptz '2026-02-01'),
+    (v_c, v_u3, 'elder', timestamptz '2026-06-01');
+
+  -- B · no elder, but the head NAMES a plain member → that member is promoted
+  insert into public.clans (name, code, created_by) values ('Ramp Named', 'RAMPBXYZ', v_u5)
+    returning id into v_c;
+  insert into pg_temp.fx values ('rampB', v_c, null);
+  insert into public.clan_members (clan_id, user_id, role, joined_at) values
+    (v_c, v_u5, 'head',   timestamptz '2026-01-01'),
+    (v_c, v_u2, 'member', timestamptz '2026-02-01');
+
+  -- C · two elders joined THE SAME SECOND → the uuid tiebreak must decide (u2 < u3)
+  insert into public.clans (name, code, created_by) values ('Ramp Tie', 'RAMPCXYZ', v_u5)
+    returning id into v_c;
+  insert into pg_temp.fx values ('rampTie', v_c, null);
+  insert into public.clan_members (clan_id, user_id, role, joined_at) values
+    (v_c, v_u5, 'head',  timestamptz '2026-01-01'),
+    (v_c, v_u3, 'elder', timestamptz '2026-03-01 09:00:00+00'),
+    (v_c, v_u2, 'elder', timestamptz '2026-03-01 09:00:00+00');
+
+  -- D · no co-head, no elder, nobody named → REFUSED (the case the PM did not cover)
+  insert into public.clans (name, code, created_by) values ('Ramp None', 'RAMPDXYZ', v_u5)
+    returning id into v_c;
+  insert into pg_temp.fx values ('rampNone', v_c, null);
+  insert into public.clan_members (clan_id, user_id, role, joined_at) values
+    (v_c, v_u5, 'head',   timestamptz '2026-01-01'),
+    (v_c, v_u3, 'member', timestamptz '2026-02-01');
+
+  -- E · a co-head exists → the head simply leaves, nobody is promoted
+  insert into public.clans (name, code, created_by) values ('Ramp CoHead', 'RAMPEXYZ', v_u5)
+    returning id into v_c;
+  insert into pg_temp.fx values ('rampCo', v_c, null);
+  insert into public.clan_members (clan_id, user_id, role, joined_at) values
+    (v_c, v_u5, 'head',    timestamptz '2026-01-01'),
+    (v_c, v_u2, 'co_head', timestamptz '2026-02-01');
+
+  raise notice '  · ramp fixtures: five clans with explicit join times';
+end
+$rampfix$;
+
+do $rampcall$
+declare
+  v_u1   text := 'aaaa0001-0000-0000-0000-000000000001';
+  v_u2   text := 'aaaa0002-0000-0000-0000-000000000002';
+  v_u3   text := 'aaaa0003-0000-0000-0000-000000000003';
+  v_u5   text := 'aaaa0005-0000-0000-0000-000000000005';
+  v_clan uuid;
+  v_r    jsonb;
+  v_err  text;
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', v_u5, 'role', 'authenticated')::text, false);
+
+  -- ── A · NOBODY NAMED → the oldest elder (u2, Feb) is auto-promoted ──────
+  select v into v_clan from pg_temp.fx where k = 'rampA';
+  v_r := public.leave_clan(v_clan);
+  perform pg_temp.assert_true((v_r->>'left') = 'true', 'C13 the sole head DOES leave now (SCRUM-84)');
+  perform pg_temp.assert_true((v_r->>'auto_promoted') = 'true', 'C13 ⚠️ …and it reports the SERVER chose');
+  perform pg_temp.assert_true((v_r->>'successor') = v_u2, 'C13 ⚠️ …the OLDEST elder (Feb), not u3 (Jun)');
+  perform pg_temp.assert_true((v_r->>'was') = 'head', 'C13 …and it names the role they left with');
+
+  -- ── B · NAMED → the named member is promoted, no auto choice ───────────
+  select v into v_clan from pg_temp.fx where k = 'rampB';
+  v_r := public.leave_clan(v_clan, v_u2::uuid);
+  perform pg_temp.assert_true((v_r->>'successor') = v_u2, 'C13 a NAMED successor is the one promoted');
+  perform pg_temp.assert_true((v_r->>'auto_promoted') = 'false', 'C13 …and it is NOT reported as an auto choice');
+  perform pg_temp.assert_true((v_r->>'left') = 'true', 'C13 …and the head still leaves');
+
+  -- ── C · a TIE on joined_at → the uuid tiebreak decides ─────────────────
+  select v into v_clan from pg_temp.fx where k = 'rampTie';
+  v_r := public.leave_clan(v_clan);
+  perform pg_temp.assert_true((v_r->>'successor') = v_u2,
+    'C13 ⚠️ a tie on joined_at breaks on user_id — deterministic, not storage order');
+
+  -- ── D · no co-head, no elder, nobody named → REFUSED ───────────────────
+  select v into v_clan from pg_temp.fx where k = 'rampNone';
+  v_err := pg_temp.expect_error(format('select public.leave_clan(%L)', v_clan),
+    'C13 ⚠️ with no candidate at all the leave is REFUSED');
+  perform pg_temp.assert_true(v_err like '%promote a co-head%',
+    'C13 …and the refusal still names that way out');
+
+  -- the two validation refusals, which never reach the candidate search
+  v_err := pg_temp.expect_error(format('select public.leave_clan(%L, %L)', v_clan, v_u5),
+    'C13 naming YOURSELF as successor is refused');
+  perform pg_temp.assert_true(v_err like '22023%', 'C13 …as invalid-parameter (22023)');
+  v_err := pg_temp.expect_error(format('select public.leave_clan(%L, %L)', v_clan, v_u1),
+    'C13 naming a NON-member as successor is refused');
+  perform pg_temp.assert_true(v_err like '22023%', 'C13 …as invalid-parameter too');
+
+  -- ── E · a co-head exists → simply leave, nobody is promoted ────────────
+  select v into v_clan from pg_temp.fx where k = 'rampCo';
+  v_r := public.leave_clan(v_clan);
+  perform pg_temp.assert_true((v_r->>'left') = 'true', 'C13 a head with a co-head simply leaves');
+  perform pg_temp.assert_true((v_r->>'successor') is null, 'C13 …and NOBODY is promoted — none was needed');
+  perform pg_temp.assert_true((v_r->>'auto_promoted') = 'false', 'C13 …and nothing was auto-chosen');
+end
+$rampcall$;
+
+-- ── the end state, read as the OWNER so RLS cannot flatter it ──────────────
+reset role;
+
+select pg_temp.assert_true(
+  pg_temp.count_where(format($q$select count(*) from public.clan_members
+    where user_id = 'aaaa0005-0000-0000-0000-000000000005' and clan_id in
+      (select v from pg_temp.fx where k in ('rampA','rampB','rampTie','rampCo'))$q$)) = 0,
+  'C13 the departing head is gone from all four clans that accepted the leave');
+select pg_temp.assert_true(
+  pg_temp.count_where(format($q$select count(*) from public.clan_members
+    where user_id = 'aaaa0005-0000-0000-0000-000000000005'
+      and clan_id = (select v from pg_temp.fx where k = 'rampNone')$q$)) = 1,
+  'C13 ⚠️ …and is STILL in the one that refused — a refusal changes nothing');
+select pg_temp.assert_true(
+  pg_temp.count_where(format($q$select count(*) from public.clan_members
+    where clan_id = (select v from pg_temp.fx where k = 'rampA') and role = 'co_head'$q$)) = 1,
+  'C13 ⚠️ the auto-promoted elder now holds HEAD POWER (co_head), so the clan is not headless');
+select pg_temp.assert_true(
+  pg_temp.count_where(format($q$select count(*) from public.clan_members
+    where clan_id = (select v from pg_temp.fx where k = 'rampA')
+      and user_id = 'aaaa0002-0000-0000-0000-000000000002' and role = 'co_head'$q$)) = 1,
+  'C13 …and it is the eldest elder who holds it');
+select pg_temp.assert_true(
+  pg_temp.count_where(format($q$select count(*) from public.clan_members
+    where clan_id = (select v from pg_temp.fx where k = 'rampA')
+      and user_id = 'aaaa0003-0000-0000-0000-000000000003' and role = 'elder'$q$)) = 1,
+  'C13 …while the younger elder is left exactly as they were');
+select pg_temp.assert_true(
+  pg_temp.count_where(format($q$select count(*) from public.clan_members
+    where clan_id = (select v from pg_temp.fx where k = 'rampCo')
+      and role in ('head','co_head')$q$)) = 1,
+  'C13 the co-head clan kept exactly one holder of head power');
 
 -- verify the rest of the cascade as the OWNER, so RLS cannot flatter the count
 reset role;
