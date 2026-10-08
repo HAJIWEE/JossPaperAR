@@ -489,6 +489,7 @@ reset role;
 
 do $rampfix$
 declare
+  v_u1  uuid := 'aaaa0001-0000-0000-0000-000000000001';
   v_u2  uuid := 'aaaa0002-0000-0000-0000-000000000002';
   v_u3  uuid := 'aaaa0003-0000-0000-0000-000000000003';
   v_u5  uuid := 'aaaa0005-0000-0000-0000-000000000005';
@@ -536,7 +537,32 @@ begin
     (v_c, v_u5, 'head',    timestamptz '2026-01-01'),
     (v_c, v_u2, 'co_head', timestamptz '2026-02-01');
 
-  raise notice '  · ramp fixtures: five clans with explicit join times';
+  -- F · ⚠️ THE PM'S CLARIFICATION (2026-10-08): a CO-HEAD leaves, ANOTHER
+  -- head-power holder remains → no nomination, no promotion, and the remaining
+  -- co-head is simply the only co-head. u1 is an ELDER so the test can assert he
+  -- was NOT promoted — the strong form of "nobody was".
+  insert into public.clans (name, code, created_by) values ('Ramp CoHeads', 'RAMPFXYZ', v_u5)
+    returning id into v_c;
+  insert into pg_temp.fx values ('rampCoHeads', v_c, null);
+  insert into public.clan_members (clan_id, user_id, role, joined_at) values
+    (v_c, v_u5, 'head',    timestamptz '2026-01-01'),
+    (v_c, v_u2, 'co_head', timestamptz '2026-02-01'),
+    (v_c, v_u3, 'co_head', timestamptz '2026-03-01'),
+    (v_c, v_u1, 'elder',   timestamptz '2026-04-01');
+
+  -- G · ⚠️ THE EDGE THAT MATTERS MOST: TWO co-heads and NO `head` row — reachable
+  -- once a founder has left. One leaves; the other becomes the SOLE head-power
+  -- holder. If the ramp fired here it would drag the unrelated elder (u1) up the
+  -- ladder, so u1 staying an elder IS the proof the guard held.
+  insert into public.clans (name, code, created_by) values ('Ramp TwoCo', 'RAMPGXYZ', v_u5)
+    returning id into v_c;
+  insert into pg_temp.fx values ('rampTwoCo', v_c, null);
+  insert into public.clan_members (clan_id, user_id, role, joined_at) values
+    (v_c, v_u5, 'co_head', timestamptz '2026-01-01'),
+    (v_c, v_u2, 'co_head', timestamptz '2026-02-01'),
+    (v_c, v_u1, 'elder',   timestamptz '2026-04-01');
+
+  raise notice '  · ramp fixtures: seven clans with explicit join times';
 end
 $rampfix$;
 
@@ -594,6 +620,26 @@ begin
   perform pg_temp.assert_true((v_r->>'left') = 'true', 'C13 a head with a co-head simply leaves');
   perform pg_temp.assert_true((v_r->>'successor') is null, 'C13 …and NOBODY is promoted — none was needed');
   perform pg_temp.assert_true((v_r->>'auto_promoted') = 'false', 'C13 …and nothing was auto-chosen');
+
+  -- ── F · ⚠️ THE PM'S CLARIFICATION: a CO-HEAD leaves, another co-head remains
+  -- No nomination, no promotion — and the survivor is simply the only co-head.
+  select v into v_clan from pg_temp.fx where k = 'rampCoHeads';
+  perform set_config('request.jwt.claims', json_build_object('sub', v_u3, 'role', 'authenticated')::text, false);
+  v_r := public.leave_clan(v_clan);
+  perform pg_temp.assert_true((v_r->>'left') = 'true', 'C13 a CO-HEAD leaves while another co-head remains');
+  perform pg_temp.assert_true((v_r->>'successor') is null, 'C13 ⚠️ …nominating and promoting NOBODY');
+  perform pg_temp.assert_true((v_r->>'auto_promoted') = 'false', 'C13 ⚠️ …and nothing was auto-chosen');
+  perform pg_temp.assert_true((v_r->>'was') = 'co_head', 'C13 …and it reports the co-head role they left with');
+
+  -- ── G · ⚠️ two co-heads and NO head row, reachable once a founder has left.
+  -- One leaves; the other becomes the SOLE head-power holder — and an unrelated
+  -- elder must NOT be dragged up the ladder by the ramp.
+  select v into v_clan from pg_temp.fx where k = 'rampTwoCo';
+  perform set_config('request.jwt.claims', json_build_object('sub', v_u5, 'role', 'authenticated')::text, false);
+  v_r := public.leave_clan(v_clan);
+  perform pg_temp.assert_true((v_r->>'left') = 'true', 'C13 with NO head row a co-head still leaves freely');
+  perform pg_temp.assert_true((v_r->>'successor') is null, 'C13 ⚠️ …promoting NOBODY — a co-head remained');
+  perform pg_temp.assert_true((v_r->>'auto_promoted') = 'false', 'C13 ⚠️ …not even the elder who was oldest');
 end
 $rampcall$;
 
@@ -630,6 +676,42 @@ select pg_temp.assert_true(
       and role in ('head','co_head')$q$)) = 1,
   'C13 the co-head clan kept exactly one holder of head power');
 
+-- ── F & G end state — the PM's clarification, in the DATABASE ──────────────
+select pg_temp.assert_true(
+  pg_temp.count_where(format($q$select count(*) from public.clan_members
+    where clan_id = (select v from pg_temp.fx where k = 'rampCoHeads') and role = 'co_head'$q$)) = 1,
+  'C13 ⚠️ the surviving co-head is the ONLY co-head (the clarification)');
+select pg_temp.assert_true(
+  pg_temp.count_where(format($q$select count(*) from public.clan_members
+    where clan_id = (select v from pg_temp.fx where k = 'rampCoHeads')
+      and user_id = 'aaaa0002-0000-0000-0000-000000000002' and role = 'co_head'$q$)) = 1,
+  'C13 …and it is the one who did not leave');
+select pg_temp.assert_true(
+  pg_temp.count_where(format($q$select count(*) from public.clan_members
+    where clan_id = (select v from pg_temp.fx where k = 'rampCoHeads')
+      and user_id = 'aaaa0001-0000-0000-0000-000000000001' and role = 'elder'$q$)) = 1,
+  'C13 ⚠️ …and the ELDER was NOT promoted — nobody was');
+select pg_temp.assert_true(
+  pg_temp.count_where(format($q$select count(*) from public.clan_members
+    where clan_id = (select v from pg_temp.fx where k = 'rampCoHeads')
+      and user_id = 'aaaa0005-0000-0000-0000-000000000005' and role = 'head'$q$)) = 1,
+  'C13 …and the founder head is untouched by a co-head leaving');
+select pg_temp.assert_true(
+  pg_temp.count_where(format($q$select count(*) from public.clan_members
+    where clan_id = (select v from pg_temp.fx where k = 'rampTwoCo')
+      and role in ('head','co_head')$q$)) = 1,
+  'C13 ⚠️ with no head row, the survivor is the SOLE head-power holder');
+select pg_temp.assert_true(
+  pg_temp.count_where(format($q$select count(*) from public.clan_members
+    where clan_id = (select v from pg_temp.fx where k = 'rampTwoCo')
+      and user_id = 'aaaa0002-0000-0000-0000-000000000002' and role = 'co_head'$q$)) = 1,
+  'C13 …and it is a co-head, not an elder the ramp promoted');
+select pg_temp.assert_true(
+  pg_temp.count_where(format($q$select count(*) from public.clan_members
+    where clan_id = (select v from pg_temp.fx where k = 'rampTwoCo')
+      and user_id = 'aaaa0001-0000-0000-0000-000000000001' and role = 'elder'$q$)) = 1,
+  'C13 ⚠️ and the elder is STILL an elder — the ramp did not fire');
+
 -- verify the rest of the cascade as the OWNER, so RLS cannot flatter the count
 reset role;
 
@@ -656,6 +738,7 @@ do $abuse$
 declare
   v_u1   uuid := 'aaaa0001-0000-0000-0000-000000000001';
   v_u2   uuid := 'aaaa0002-0000-0000-0000-000000000002';
+  v_u3   uuid := 'aaaa0003-0000-0000-0000-000000000003';
   v_u4   uuid := 'aaaa0004-0000-0000-0000-000000000004';
   v_keeper uuid;
   v_clan uuid;
@@ -667,8 +750,13 @@ begin
   -- (doc 15 §3), and the invariant trigger says so loudly — which is exactly
   -- what this fixture discovered when they were first inserted headless. Two
   -- keepers, so neither burns its own clan cap: u1 heads 1..6, u2 heads 7..11.
+  -- ⚠️ THREE keepers, not two. The ramp fixtures (F/G) added memberships to u1
+  -- and u2, and 11 spare heads across only two users pushed **u2 to ELEVEN** —
+  -- over the 10-clan cap, which the trigger then (correctly) refused, failing this
+  -- whole file at its COMMIT rather than in an assertion. Spreading the spares
+  -- keeps every keeper under the cap AND leaves the anti-abuse test intact.
   for i in 1..11 loop
-    v_keeper := case when i <= 6 then v_u1 else v_u2 end;
+    v_keeper := case when i <= 4 then v_u1 when i <= 8 then v_u3 else v_u2 end;
     insert into public.clans (name, code, created_by)
     values ('Spare ' || i,
             'SPARE' || substr('ABCDEFGHJKMNPQRSTUVWXYZ', i, 1) || 'XY',

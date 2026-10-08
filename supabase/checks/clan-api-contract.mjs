@@ -262,6 +262,34 @@ section('10 · delete_clan · { p_clan_id }');
   check('the clan really is gone — the Book reports found:false', after.data?.found === false);
 }
 
+// ═══ 9d · a CO-HEAD leaving while the head remains — SCRUM-84 clarified ════
+// ⚠️ Uses B and C, NOT A. A is already at the 3-joins-per-hour cap from 9b/9c,
+// so a fourth clan from A would be (correctly) refused by the anti-abuse trigger
+// and this section would fail for entirely the wrong reason.
+section('9d · leave_clan — a co-head leaves, the head remains');
+let clanFour = null;
+{
+  const created = await B.client.rpc('create_clan', { p_name: 'Ramp Four' });
+  check('B creates a fourth clan', created.error === null, created.error?.message);
+  clanFour = created.data?.clan_id ?? null;
+
+  const joined = await C.client.rpc('join_clan', { p_code: created.data?.code });
+  check('C joins it', joined.error === null, joined.error?.message);
+  const promoted = await B.client.rpc('set_member_role', {
+    p_clan_id: clanFour,
+    p_user_id: C.userId,
+    p_role: 'co_head',
+  });
+  check('C is made a co-head', promoted.error === null, promoted.error?.message);
+
+  // ⚠️ THE CLARIFICATION: no nomination, no promotion — the head remains.
+  const left = await C.client.rpc('leave_clan', { p_clan_id: clanFour });
+  check('⚠️ a CO-HEAD leaves without nominating', left.error === null, left.error?.message);
+  check('⚠️ …and promotes NOBODY', left.data?.successor === null);
+  check('⚠️ …and reports no auto choice', left.data?.auto_promoted === false);
+  check('…and it says they left as a co_head', left.data?.was === 'co_head');
+}
+
 // ═══ CLEANUP — leave no residue, so a re-run starts from the same place ════
 // The ramp sections create two extra clans. Their NEW co-heads delete them, which
 // is also the last proof that a promoted successor really did inherit head power.
@@ -272,6 +300,8 @@ section('cleanup');
     d2.error === null, d2.error?.message);
   const d3 = await C.client.rpc('delete_clan', { p_clan_id: clanThree });
   check('…and so can the NAMED successor', d3.error === null, d3.error?.message);
+  const d4 = await B.client.rpc('delete_clan', { p_clan_id: clanFour });
+  check('…and the 9d clan is cleaned up too', d4.error === null, d4.error?.message);
 }
 
 // ═══ RESULT ════════════════════════════════════════════════════════════════

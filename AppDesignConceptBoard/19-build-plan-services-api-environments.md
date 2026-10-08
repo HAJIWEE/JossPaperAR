@@ -639,6 +639,15 @@ A useful consequence: **no new asset was needed.** `burn.tsx` never renders the 
 
 **Gates:** `tokens 36 · domain 45 · slice 36 · throw 33 · ads 51 · wire 43 · session 17 · pathc 38 · sql 13 · adrs 34 · contrast 22 · responsive 21 · lib 200 → 210` · `check:clanapi 55 → 69`. **Spend US$0.00.**
 
+**⚠️ Clarified by the PM the same day:** *"if there is a cohead and another cohead leaves without nominating the cohead becomes the only cohead."* — i.e. **the ramp does not fire while another head-power holder remains**: a co-head leaving needs no nomination, nobody is promoted, and the survivor is simply the only co-head. That was **already the behaviour** (`v_others` is counted before the ramp), but it **was not asserted** — fixture E only covered *the head* leaving with a co-head present. Two fixtures added, both asserting the **strong** form (*no other member's role changed*, not merely that the leaver got out):
+
+* **F** — founder head + two co-heads + an elder → one co-head leaves → the survivor is the only co-head, the founder is untouched, and **the elder is still an elder**.
+* **G** — **two co-heads and NO `head` row** (reachable once a founder has left) → one leaves → the survivor is the **sole head-power holder** and **the elder is still an elder**. This is the case where a misplaced ramp would have dragged an unrelated elder up the ladder.
+
+Also asserted in the pure mirror (`check:lib`) and over real PostgREST (`check:clanapi` **§9d**) — three layers.
+
+⚠️ **And the fixtures caught a real interaction:** F/G added memberships to u1/u2, and C11's 11 spare-clan heads split across two keepers pushed **u2 to ELEVEN — over the 10-clan cap**. The trigger correctly refused it, which failed the *whole file at its COMMIT* rather than in an assertion (a confusing failure mode, worth knowing). The spares are now spread across **three** keepers and every keeper stays under the cap. `clan_management.sql` GREEN · `check:clanapi` **77/77** · `lib` **234**.
+
 
 
 **The gap this closed.** The RPCs existed and were proved, but **nothing called them**: the only `.rpc()` site in `src/` was `create_clan` in the SCRUM-82 shortcut. So the app could not invite, promote, remove, rename, leave, delete or read the Book at all.

@@ -537,6 +537,28 @@ function serviceChecks(): void {
   check('a head with a co-head simply leaves — nothing to inherit',
     planLeave([...base, lm('u-c', 'co_head', '2026-03-01')], 'u-head').action === 'leave');
 
+  // ⚠️ SCRUM-84 CLARIFIED 2026-10-08: "if there is a cohead and another cohead
+  // leaves without nominating the cohead becomes the only cohead." So a co-head
+  // leaving needs NO nomination while another head-power holder remains — and the
+  // ramp must NOT fire, even when an elder is available to promote.
+  const twoCoHeads = [
+    lm('u-c1', 'co_head', '2026-01-01'),
+    lm('u-c2', 'co_head', '2026-02-01'),
+    lm('u-e', 'elder', '2026-03-01'),
+  ];
+  check('⚠️ a CO-HEAD leaving with another co-head present just leaves',
+    planLeave(twoCoHeads, 'u-c1').action === 'leave');
+  check('⚠️ …and the ramp does NOT fire, even though an elder is available',
+    planLeave(twoCoHeads, 'u-c1').action !== 'auto_promote_then_leave');
+  const headPlusCoHead = [lm('u-h', 'head', '2026-01-01'), lm('u-c', 'co_head', '2026-02-01')];
+  check('a co-head leaving while the founder remains just leaves',
+    planLeave(headPlusCoHead, 'u-c').action === 'leave');
+  check('…and the founder leaving while a co-head remains just leaves',
+    planLeave(headPlusCoHead, 'u-h').action === 'leave');
+  check('⚠️ the ramp only fires when NO other head-power holder is left',
+    planLeave([lm('u-c1', 'co_head', '2026-01-01'), lm('u-e', 'elder', '2026-02-01')], 'u-c1')
+      .action === 'auto_promote_then_leave');
+
   // the case the PM's instruction does not cover: no co-head, no elder, nobody named
   const noSuccessor = planLeave(base, 'u-head');
   check('⚠️ a sole head with nobody to inherit is REFUSED',
