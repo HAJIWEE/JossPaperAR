@@ -25,6 +25,7 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ensureClan } from '@/lib/clan';
 import { t } from '@/lib/i18n';
 import { submitBurn, type BurnReceipt } from '@/lib/ritual';
 import { readRewardParams } from '@/lib/route-params';
@@ -81,8 +82,15 @@ export default function Reward(): React.JSX.Element {
       return;
     }
     setPhase({ kind: 'submitting' });
+    // ⚠️ submit_burn is clan-scoped (SCRUM-82): ensure the caller has an altar
+    // FIRST. Nothing is spent if this fails, so it retries like a transport blip.
+    const clan = await ensureClan();
+    if (!clan.ok) {
+      setPhase({ kind: 'retryable', reason: clan.reason });
+      return;
+    }
     // Same arguments -> the same derived key. That is the whole safety story.
-    const result = await submitBurn(captureId, accuracy, throwNo);
+    const result = await submitBurn(captureId, accuracy, throwNo, clan.clanId);
     setPhase(
       result.kind === 'ok'
         ? { kind: 'shown', receipt: result.receipt }

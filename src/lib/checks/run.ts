@@ -11,6 +11,7 @@
  * ⚠️ FAULT-TEST IT: change an expected string and confirm it goes RED.
  */
 
+import { SLICE_CLAN_NAME, isValidClanName, planClan } from '../clan-rules.ts';
 import { type UuidFactory, isValidIdempotencyKey, newIdempotencyKey } from '../idempotency.ts';
 import {
   CODE_ALPHABET,
@@ -408,6 +409,21 @@ function serviceChecks(): void {
   const done = applyAll(applyAll(capturing, [{ type: 'CART_DRAFT' }]), styled);
   check('a styled response reaches `styled` and can be thrown', done.state === 'styled' && nextAction(done) === 'throw');
   check('the sprite path survives the machine unchanged', done.spritePath === 'styled/j1');
+
+  // ── 9 · the slice's clan bootstrap (SCRUM-82) ────────────────────────────
+  // `submit_burn` requires a clan_id; the slice stands one up on first use. The
+  // default name must satisfy `create_clan`'s 2..20 rule, and a caller who
+  // already has a clan must REUSE it rather than make a second altar.
+  section('9 · The slice’s clan bootstrap (SCRUM-82)');
+  check('the default altar name satisfies create_clan (2..20 chars)', isValidClanName(SLICE_CLAN_NAME));
+  check('a 1-character name is rejected', !isValidClanName('a'));
+  check('a 21-character name is rejected', !isValidClanName('x'.repeat(21)));
+  check('surrounding whitespace does not defeat the check', isValidClanName(`  ${SLICE_CLAN_NAME}  `));
+  const reusePlan = planClan('clan-1');
+  check('an existing clan is REUSED', reusePlan.action === 'reuse');
+  check('…and the reused id is the one observed', reusePlan.action === 'reuse' && reusePlan.clanId === 'clan-1');
+  check('no clan means CREATE', planClan(null).action === 'create');
+  check('⚠️ an empty-string clan id is NOT reused — it creates', planClan('').action === 'create');
 }
 
 async function main(): Promise<void> {

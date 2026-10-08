@@ -1,6 +1,6 @@
 # 🤝 Hand-over prompt — next AI session
 
-> **Written 2026-10-06 (S31 wrap).** Paste everything below the rule into a fresh session's first message.
+> **Written 2026-10-07 (S33 wrap).** Paste everything below the rule into a fresh session's first message.
 > It is deliberately self-contained: goal · state · what to do first · traps · files.
 > The living versions are **[[next-ai-context]]** (state) · **[[follow-up-items]]** (open work) · **[[completed-work-archive]]** (history) · **[[AppDesignConceptBoard/19-build-plan-services-api-environments|doc 19]] §12** (what the backend found).
 
@@ -8,9 +8,9 @@
 
 ## 1 · Goal
 
-Continue building **JossPaperAR** — an Expo/React Native AR app that replaces physical joss-paper burning with a digital ritual. Repo: `/home/gweejiahan/.cline/worktrees/eecec/JossPaperAR` (branch **`cline/scrum-53-wire`**) · remote `github.com/HAJIWEE/JossPaperAR` · Jira `hajiwee9411.atlassian.net` (project **SCRUM**, the source of truth for decisions).
+Continue building **JossPaperAR** — an Expo/React Native AR app that replaces physical joss-paper burning with a digital ritual. Repo: `/home/gweejiahan/.cline/worktrees/d27c5/JossPaperAR` (branch **`cline/scrum-82-clan-award`** = **PR #27**) · the vault worktree is `~/Documents/Obsidian Vault/Projects/JossPaperAR` · remote `github.com/HAJIWEE/JossPaperAR` · Jira `hajiwee9411.atlassian.net` (project **SCRUM**, the source of truth for decisions).
 
-**Where the project is:** the backend of record is **live and exercised** (Supabase + Postgres + Edge Functions on the hosted project `yercgevebxvtzkgctfai`), the economy's **AI-cost ceiling is enforced**, and the **Android emulator test target is live**. What is left is **PR-4 = SCRUM-53, the vertical slice** — and ⚠️ **it is blocked before its first run, not by hardware, but by `SCRUM-80`**.
+**Where the project is:** the backend of record is **live and exercised** (Supabase + Postgres + Edge Functions on the hosted project `yercgevebxvtzkgctfai`), the economy's **AI-cost ceiling is enforced**, the **Android emulator test target is live**, and 🎉 **the vertical slice (PR-4 = SCRUM-53) now completes a FULL ritual on glass** — capture → cartoonize → burn → **award → persist**. All three blockers are fixed (`SCRUM-80` auth · `SCRUM-81` upload · `SCRUM-82` the clan-scoped award). **Left: merge PR #27, run the four-band acceptance test (`SCRUM-52`), and answer one open product decision (`SCRUM-83`).**
 
 ## 2 · The PM's working rules (non-negotiable)
 
@@ -23,26 +23,28 @@ Continue building **JossPaperAR** — an Expo/React Native AR app that replaces 
 
 ## 3 · Do this first, in order
 
-1. Read `next-ai-context.md` (*Quick Reference* → *Start Here*) → `follow-up-items.md` → doc 19 **§12**.
-2. Check **PR #23** (`cline/scrum-53-wire` → `main`, **3 commits**). CI is the first full typecheck, because a fresh worktree may have no `node_modules`. Verify a merge with `git merge-base --is-ancestor <branch> origin/main` — **not** `origin/<branch>`, which `fetch --prune` deletes *after* a merge.
-3. Ask the PM for the **`SCRUM-80`** call (A: fold into PR-4 · B: its own PR-5 · C: defer). **Do not wire auth unilaterally** — it is a PR-scope decision, and it writes a user row to the live project on first launch.
+1. Read `next-ai-context.md` (*Quick Reference* → *Start Here*) → `follow-up-items.md` → doc 19 **§12** (esp. **§12.11**, the ritual's first complete run).
+2. Check **PR #27** (`cline/scrum-82-clan-award` → `main`, **2 commits**) — **open, not merged**. CI is the first full typecheck (a fresh worktree may have no `node_modules`). Verify a merge with `git merge-base --is-ancestor <branch> origin/main` — **not** `origin/<branch>`, which `fetch --prune` deletes *after* a merge. (PRs **#25** and **#26** are already merged; `main` = `de18ee1`, CI green.)
+3. **Ask the PM for the `SCRUM-83` call** (🎯, in Sprint 1): how the slice gives a new user a clan — **A** auto-create a personal altar (*shipped*, the recommendation) · **B** one shared seeded clan · **C** build the real create/join flow now · **D** defer. **Do not merge PR #27 before the call.**
 4. Baseline is green: `npm run check` and `npx tsc --noEmit`.
+5. The emulator E2E is **re-runnable** and is the only real proof of the award path (≈**US$0.09** per run) — see §6 traps 14–16 for the exact recipe.
 
 ## 4 · What exists (verified against the live project, not asserted)
 
 - **Supabase** `yercgevebxvtzkgctfai` (ap-southeast-1, Postgres 17.11, CLI v2.119, **linked**) — **11 migrations, no drift** · 21 tables · 25 policies · private buckets `captures` (300 KB jpeg) + `styled` (webp+png) · **3 Edge Functions deployed and run** · **anonymous sign-ins ARE enabled and proven**.
 - **The AI-budget stop-rule (SCRUM-59)** — `app_config.daily_ai_budget_micros` = **$5/day**, server-only; the shrine **queues** (`200 shrine_busy`) rather than failing, and a parked job does not consume one of the ten daily attempts.
-- **The slice's write path** — `preparing.tsx` → `registerCapture` · `uploadCapture` · `requestCartoonize`; `reward.tsx` → `submitBurn`. Its **two dead wires are fixed** and pinned by a dependency-free gate, **`npm run check:wire`** (40 checks, fault-tested).
+- **The slice, proven end-to-end (2026-10-07)** — the full ritual ran on `floor_api30`: capture → cartoonize (**styled, US$0.09**) → burn (**虔誠 Devout ±28.57 px**) → **award → persist** → `clans: 1` ("My Altar") · `clan_members: 1` (head) · `burns: 1` (band `devout`, `award_snapshot` **600**) · `ledger_events: 1` · `tributes: 1`. The reward screen showed the **server's** receipt — **600 · Balance 600** (ADR-005).
+- **The slice's write path** — `preparing.tsx` → `registerCapture` · `uploadCapture` · `requestCartoonize`; `reward.tsx` → `ensureClan()` → `submitBurn(…, clanId)`. Fixed and pinned by **`npm run check:wire`** (43 checks) + the clan rules in **`check:lib`**.
 - **The emulator target (SCRUM-64)** — `floor_api30`: Android **11 / sdk 30** · **720×1280** · **320 dpi** · **2.92 GB**, read off the device.
-- **Gates** — `npm run check` = tokens 36 · domain 45 · slice 36 · throw 33 · ads 51 · wire 40 · pathc 38 · sql 11 · adrs 34 · contrast 22 · responsive 21 · lib 97.
+- **Gates** — `npm run check` = tokens 36 · domain 45 · slice 36 · throw 33 · ads 51 · **wire 43** · pathc 38 · sql 11 · adrs 34 · contrast 22 · responsive 21 · **lib 105** (+ `session` 17).
 
 ## 5 · What's next — the PM picks
 
-1. 🎯 **`SCRUM-80` — the client auth bootstrap.** The slice cannot complete a single ritual: nothing creates a session, so `registerCapture` throws `not_authenticated` and RLS refuses an anonymous write (`401 / 42501`). **This gates SCRUM-53's M1 *and* SCRUM-52.**
-2. **`SCRUM-52`** — buy the Tier-F floor device (~S$100–150). *A PM action.*
-3. **The live ≈US$0.09 Path C burn** — the first end-to-end proof, once #1 is answered.
-4. **`SCRUM-33`** — `delete_my_data` does not purge Storage objects or the `auth.users` row.
-5. **`SCRUM-11`** — the league spec (`get_league_board` + `weekly-roll` are labelled stubs; `pg_cron` deliberately off).
+1. 🎯 **`SCRUM-83` — how the slice gives a new user a clan.** Decides whether to keep the shipped auto-create (**A**) or switch (**B/C/D**). **Gates merging PR #27.**
+2. **`SCRUM-52`** — the **four-aim-band acceptance test** on the floor device (buy the Tier-F unit, ~S$100–150). **Now unblocked** — the ritual completes. *A PM action.*
+3. **Merge PR #27** (after #1) — then a **post-merge docs reconciliation** (PR #25/#26 already produced a hand-resolved conflict; expect a small one again).
+4. **`SCRUM-56` residual** — GH secrets + EAS login, once a throwaway Supabase project exists for CI.
+5. **`SCRUM-33`** — `delete_my_data` does not purge Storage objects or the `auth.users` row. **`SCRUM-11`** — the league spec (`get_league_board` + `weekly-roll` are labelled stubs; `pg_cron` deliberately off).
 
 ## 6 · Traps that cost real time (measured — don't re-derive them)
 
@@ -64,6 +66,10 @@ Continue building **JossPaperAR** — an Expo/React Native AR app that replaces 
 **Client**
 12. ⚠️ **`i18n-js` reads `.` as a scope separator.** The `MESSAGES` table is *flat by design*, so a dotted key silently resolved to `[missing "en.…" translation]` on the device — for **all 16** of them. `src/lib/i18n.ts` now disables scope splitting, and `check:lib` asserts every message **resolves** *and* returns its own copy verbatim. **Do not "tidy that away".**
 13. **The worktree needs its own `.env`** (gitignored; copy `.env.example`). Without it `supabase()` throws *"Supabase is not configured"* and the ritual dies at `preparing`.
+14. **The burn screen's graded THROW is a swipe** — `adb shell input swipe 360 1101 360 717 500`, then **Confirm** at `(360, 1113)`. ⚠️ **A Metro warning toast sits over the bottom and eats the swipe** — dismiss it first (tap the `×` at ~`(656, 1091)`), or the throw silently does not register.
+15. **Metro survives an emulator restart.** After re-booting `floor-avd`, relaunch the app with `adb shell am start -a android.intent.action.VIEW -d 'exp://<host-LAN-ip>:8081' host.exp.exponent` (the dev server is still on `:8081`). Re-read the bundle from Metro — the whole point is to run the **new** code.
+16. **`pkill -f 'qemu-system-x86_64'` SELF-MATCHES** — the pattern matches the `pkill` command's own cmdline, so it SIGTERMs the shell. Stop the emulator with **`systemctl --user stop floor-avd`** (`systemctl --user reset-failed floor-avd` to clear a failed unit), never `pkill -f`.
+17. **The clan fix needed NO migration.** `create_clan` is SECURITY INVOKER (granted to `authenticated`) and `clan_members_select_member` lets a caller read their own membership — so **do not add a migration for the slice's clan.**
 
 ## 7 · Commands
 
@@ -82,4 +88,4 @@ systemctl --user stop floor-avd  # stop the emulator (see trap 1 to start it)
 
 ## 8 · Money
 
-fal.ai credit: **≈ US$4.98 spent** of the approved **US$10–20** (style-D spike US$4.49 · PR-3 ≈US$0.40 · SCRUM-59 ≈US$0.09). **S31 (2026-10-06) spent nothing** — no Path C run was made. A full Path C generation is ≈ **US$0.09**; the stop-rule bounds the global daily spend, and every spend is logged in `project-costs.md` (SGD, Mastercard rate or a marked placeholder).
+fal.ai credit: **≈ US$5.16 spent** of the approved **US$10–20** (style-D spike US$4.49 · PR-3 ≈US$0.40 · SCRUM-59 ≈US$0.09 · the two 2026-10-07 E2E runs ≈US$0.09 each). A full Path C generation is ≈ **US$0.09**; the stop-rule bounds the global daily spend, and every spend is logged in `project-costs.md` (SGD @ the Mastercard rate 1.2808). **You may spend freely inside the budget — no need to ask.**

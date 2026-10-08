@@ -191,17 +191,26 @@ export type SubmitResult =
  * same throw replayed carries the same key, so the server recognises it and
  * pays once. A fresh key per retry would turn a dropped connection into a second
  * award for one throw.
+ *
+ * ⚠️ `clanId` is REQUIRED by `submit_burn` (SCRUM-82): the burn is clan-scoped,
+ * and the server refuses without it. The caller obtains one via `ensureClan()`.
  */
 export async function submitBurn(
   captureId: string,
   accuracyPx: number,
   throwNumber: number,
+  clanId: string,
   opts: { signal?: AbortSignal } = {},
 ): Promise<SubmitResult> {
   if (!Number.isFinite(accuracyPx) || accuracyPx < 0) {
     // aim.ts refuses a negative/NaN offset rather than grading it, and so does
     // the server. Catching it here turns a 500 into a no-op.
     return { kind: 'transient', reason: 'accuracy must be a finite, non-negative px offset' };
+  }
+  if (typeof clanId !== 'string' || clanId.length === 0) {
+    // submit_burn requires a clan_id (SCRUM-82). Failing here costs nothing —
+    // no request is sent — and is honest about why.
+    return { kind: 'transient', reason: 'clan_required' };
   }
 
   let token: string | undefined;
@@ -227,7 +236,7 @@ export async function submitBurn(
         'Idempotency-Key': idempotencyKey,
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ capture_id: captureId, accuracy: accuracyPx }),
+      body: JSON.stringify({ capture_id: captureId, accuracy: accuracyPx, clan_id: clanId }),
       ...(opts.signal ? { signal: opts.signal } : {}),
     });
   } catch {

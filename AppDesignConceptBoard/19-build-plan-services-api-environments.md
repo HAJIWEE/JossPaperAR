@@ -565,6 +565,28 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.11 · SCRUM-82 — the clan bootstrap, and the first complete ritual (2026-10-07)
+
+**The blocker.** `submit_burn` is clan-scoped: it requires `clan_id` (migration 0004 §226) **and** the caller's `clan_members` row (§252). The slice's `submitBurn` sent only `{ capture_id, accuracy }`, and a fresh anonymous user is in no clan — so `award-service` answered **400** and `burns` stayed **0**. §12.10 proved everything upstream; this was the last step.
+
+**The fix — no migration needed.** `create_clan(name)` already exists (SECURITY INVOKER, granted to `authenticated`), and `clan_members_select_member` lets a caller read their own membership — so the slice can reuse-or-create entirely from the client:
+
+| File | Half | What |
+|---|---|---|
+| `src/lib/clan-rules.ts` | **pure** | `SLICE_CLAN_NAME` · `isValidClanName` · `planClan` (reuse vs create) |
+| `src/lib/clan.ts` | device | `ensureClan()` — reuse the caller's clan, else `create_clan` |
+| `src/lib/ritual.ts` | device | `submitBurn(..., clanId)` now sends `clan_id` |
+| `src/app/reward.tsx` | wire | `await ensureClan()` before the award |
+| `src/lib/checks/run.ts` | gate | **8 checks** (`check:lib` 97 → 105), fault-tested red |
+
+**The first complete ritual, on glass.** Emulator `floor_api30`, driven over `adb`:
+
+> capture → cartoonize (**`styled`, US$0.09**) → burn (**虔誠 Devout ±28.57 px**) → **award → persist**
+
+`clans: 1` ("My Altar") · `clan_members: 1` (head) · `burns: 1` (band `devout`, `award_snapshot` **600**) · `ledger_events: 1` · `tributes: 1`. The reward screen showed the **server's** receipt — **600 · Balance 600** — not the client's own grade (ADR-005).
+
+**The one thing this is not.** The auto-create is a slice **shortcut** for the real "four taps to head" flow (doc 15 §4.2 / SCRUM-46/50). It is a stand-in, not the clan model — filed as **SCRUM-83** for the PM.
+
 ### 12.10 · SCRUM-53 — the slice's first device run (2026-10-07)
 
 **What ran.** With SCRUM-80's auth bootstrap in place, the slice ran on the emulator (`floor_api30`, Android 11 / SDK 30) for the first time, driven over `adb`: **capture → cartoonize → burn**. It reached the burn screen with the real styled sprite and graded a throw.
