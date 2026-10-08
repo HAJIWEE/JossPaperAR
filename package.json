@@ -45,6 +45,7 @@
     "check:sql": "node supabase/checks/sql-structure.js",
     "check:adrs": "node AppDesignConceptBoard/ADRs/check-adrs.js",
     "check:db": "bash supabase/checks/run-sql-tests.sh",
+    "check:clanapi": "bash supabase/checks/run-clan-api-contract.sh",
     "check:budget": "bash supabase/checks/exercise-budget.sh",
     "check": "npm run typecheck && npm run check:tokens && npm run check:domain && npm run check:slice && npm run check:throw && npm run check:ads && npm run check:wire && npm run check:session && npm run check:pathc && npm run check:sql && npm run check:adrs && node design-system/contrast-check.js && node design-system/responsive-check.js && npm run check:lib",
     "bundle:android": "expo export --platform android --output-dir .expo/bundle-check"

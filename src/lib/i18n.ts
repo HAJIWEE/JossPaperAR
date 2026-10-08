@@ -71,6 +71,37 @@ export const MESSAGES = {
     'role_elder': 'Elder',
     'role_member': 'Member',
 
+    // ── the clan SCREENS — fork · create · join · manage (SCRUM-46 · doc 15 §4/§8) ──
+    // Written from doc 15 §8's copy table (C1 fork title, C12 promote, C13 offer,
+    // C17 delete) plus the statements §4 names. The screen keys the pure
+    // `clan-flow.ts` returns — `ROLE_LABEL_KEY`, `promoteLabelKey`,
+    // `leaveHintKey` — must exist here, and `check:lib` asserts exactly that.
+    'clan.forkTitle': "Your family's altar",
+    'clan.nameHint': 'e.g. 陳氏 · Tan Family',
+    'clan.create': 'Create',
+    'clan.join': 'Join',
+    'clan.skip': 'Skip',
+    'clan.next': 'Continue',
+    'clan.back': 'Back',
+    'clan.invite': 'Invite family',
+    'clan.copied': 'Invite code copied.',
+    'clan.placeFirstTablet': 'Place your first tablet',
+    'clan.offerTo': "Offer to %{name}'s ancestors",
+    'clan.manage': 'Members',
+    'clan.yourRole': 'Your role',
+    'clan.makeElder': 'Make Elder',
+    'clan.makeCoHead': 'Make Co-Head',
+    'clan.rename': 'Rename',
+    'clan.renamePrompt': 'New clan name',
+    'clan.removeMember': 'Remove',
+    'clan.removeConfirm': 'Remove %{name} from the clan? Their past offerings stay.',
+    'clan.leave': 'Leave this clan',
+    'clan.leaveConfirm': 'Leave this clan? Your past offerings stay.',
+    'clan.leavePromoteFirst': 'Promote a co-head before you leave — a clan must keep a head.',
+    'clan.deleteClan': 'Delete this clan',
+    'clan.deleteConfirm':
+      'Delete this clan? Every member loses the altar and the Book of Tributes. This cannot be undone.',
+
     // ── the Book of Tributes (doc 15 §7) ──────────────────────────────────
     'book_header': 'Book of Tributes',
     'book_outside': 'A member made this offering.',
@@ -120,6 +151,34 @@ export const MESSAGES = {
     'role_co_head': '副族長',
     'role_elder': '長老',
     'role_member': '成員',
+
+    // ⚠️ TRADITIONAL characters, matching this file (not doc 15 §8's table, which
+    // is typed in SIMPLIFIED — 家人发来了链接 vs the shipped 家人發來了連結).
+    // See the note in the EN block; the mismatch is recorded, not silently resolved.
+    'clan.forkTitle': '您家族的祭壇',
+    'clan.nameHint': '例：陳氏 · Tan Family',
+    'clan.create': '創建',
+    'clan.join': '加入',
+    'clan.skip': '略過',
+    'clan.next': '繼續',
+    'clan.back': '返回',
+    'clan.invite': '邀請家人',
+    'clan.copied': '邀請碼已複製。',
+    'clan.placeFirstTablet': '安放第一塊神主牌',
+    'clan.offerTo': '向%{name}的先人供奉',
+    'clan.manage': '成員',
+    'clan.yourRole': '您的身分',
+    'clan.makeElder': '設為長老',
+    'clan.makeCoHead': '設為副族長',
+    'clan.rename': '重新命名',
+    'clan.renamePrompt': '新的宗族名稱',
+    'clan.removeMember': '移出宗族',
+    'clan.removeConfirm': '將 %{name} 移出宗族？先前的供奉紀錄將保留。',
+    'clan.leave': '離開此宗族',
+    'clan.leaveConfirm': '離開此宗族？先前的供奉紀錄將保留。',
+    'clan.leavePromoteFirst': '離開前請先設一位副族長——宗族必須保有族長。',
+    'clan.deleteClan': '刪除宗族',
+    'clan.deleteConfirm': '刪除宗族？所有成員將失去祭壇與供奉簿，無法復原。',
 
     'book_header': '供奉簿',
     'book_outside': '由宗族成員供奉。',

@@ -108,6 +108,7 @@ A check that cannot fail is not a check. **Fault-test every new gate by breaking
 npm run check            # full local gate suite (typecheck · tokens · domain · pathc · sql · adrs · contrast · responsive · libs)
 npm run check:adrs       # ADR register ↔ files (status agreement)
 npm run check:db         # SQL tests (needs docker + supabase/.temp/pooler-url)
+npm run check:clanapi    # the clan client↔server CONTRACT (needs `npx supabase start`)
 npm run check:budget     # live AI-budget stop-rule proof — free by default
 npx supabase start                                            # local stack — applies the migrations FROM THE FILES, no account/link needed
 bash supabase/checks/run-sql-tests.sh \
@@ -125,6 +126,7 @@ npx tsc --noEmit
 * ⚠️ A `pg_temp` table grants **nothing** to PUBLIC. A test that switches to `authenticated` needs an explicit `grant select, insert, update, delete on pg_temp.<t> to authenticated`, or its first read/write fails with *permission denied for table*.
 * A **`DEFERRABLE INITIALLY DEFERRED`** constraint trigger fires at COMMIT, so an exception handler **cannot** catch it. Force it with `set constraints <name> immediate` **inside the transaction** (at top level it only warns and does nothing) to make the violation observable and assertable.
 * The local DB URL is printed by `npx supabase status`; a `docker run` test client needs `--network host` to reach `127.0.0.1:54322`.
+* ⚠️ **The client has NO generated DB types**, so nothing static checks that an RPC's argument names (`p_clan_id`…) or response fields match the database — `tsc` is blind to it and it fails only on a device. `npm run check:clanapi` drives the real RPCs over real PostgREST and asserts the real fields. **When you add an RPC or change its shape, extend that file** — fault-tested by renaming `p_clan_id` to `p_clanid`, which turns 22 checks red.
 
 ## Expo has changed — do not trust your training data
 

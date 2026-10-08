@@ -61,6 +61,24 @@ import {
   joinRefusal,
   roleChangeRefusal,
 } from '../clan-roles.ts';
+import {
+  CREATE_STEPS,
+  FORK,
+  PREVIEW_MESSAGE_KEY,
+  PREVIEW_SHOWS_ANCESTOR_NAMES,
+  ROLE_LABEL_KEY,
+  actionsFor,
+  actionsForOutsider,
+  canSubmitCode,
+  canSubmitName,
+  createStepIndex,
+  isSkippable,
+  leaveHintKey,
+  nextCreateStep,
+  previewArgs,
+  previousCreateStep,
+  promoteLabelKey,
+} from '../clan-flow.ts';
 
 let passed = 0;
 let failed = 0;
@@ -521,6 +539,99 @@ function serviceChecks(): void {
   // the two Book projections (doc 15 §7.2)
   check('a member sees the full entry', bookProjection(true) === 'full');
   check('⚠️ a non-member gets the anonymised entry', bookProjection(false) === 'anonymous');
+
+  // ── 11 · the clan SCREENS (SCRUM-46 · doc 15 §4/§8) ────────────────────
+  // The wizard order, the button gates, the preview card and the RENDERED
+  // action list. ⚠️ The keys the pure module RETURNS are asserted to EXIST in
+  // both locales — the guard that would have caught the dotted-key bug (a key
+  // the code asks for but the table never defined renders `[missing]`).
+  section('11 · The clan screens — fork · create · join · manage (SCRUM-46)');
+
+  const enKeys = new Set(messageKeys('en'));
+  const zhKeys = new Set(messageKeys('zh'));
+  const keyExists = (k: string): boolean => enKeys.has(k) && zhKeys.has(k);
+
+  // the fork — one screen, two cards (doc 15 §4.1)
+  check('the fork is exactly two cards', Object.keys(FORK).length === 2);
+  check('the join card has a title and a hint',
+    FORK.join.titleKey === 'clan.forkJoin' && FORK.join.hintKey === 'clan.forkJoinHint');
+  check('the create card has a title and a hint',
+    FORK.create.titleKey === 'clan.forkCreate' && FORK.create.hintKey === 'clan.forkCreateHint');
+  check('⚠️ all four fork strings exist in BOTH locales',
+    [FORK.join.titleKey, FORK.join.hintKey, FORK.create.titleKey, FORK.create.hintKey].every(keyExists));
+
+  // the wizard — four taps to head (doc 15 §4.2)
+  check('four taps to head', CREATE_STEPS.length === 4);
+  check('⚠️ the invite card comes BEFORE the ancestor sheet (the amended order)',
+    createStepIndex('invite') < createStepIndex('ancestors'));
+  check('the first tap is naming', CREATE_STEPS[0] === 'name');
+  check('the wizard walks forward',
+    nextCreateStep('name') === 'confirm' && nextCreateStep('confirm') === 'invite' &&
+    nextCreateStep('invite') === 'ancestors');
+  check('the wizard ends — the last tap has no successor', nextCreateStep('ancestors') === null);
+  check('the wizard walks BACK',
+    previousCreateStep('ancestors') === 'invite' && previousCreateStep('confirm') === 'name');
+  check('the wizard cannot walk back past the first tap', previousCreateStep('name') === null);
+  check('⚠️ the invite card is skippable (doc 15 §4.2)', isSkippable('invite'));
+  check('the ancestor sheet is skippable too — Skip and Continue both lead into it',
+    isSkippable('ancestors'));
+  check('naming and confirming are NOT skippable', !isSkippable('name') && !isSkippable('confirm'));
+
+  // the two primary buttons
+  check('Create is enabled for a valid name', canSubmitName('Tan Family'));
+  check('Create is DISABLED for a 1-character name', !canSubmitName('a'));
+  check('Create is DISABLED for a 21-character name', !canSubmitName('x'.repeat(21)));
+  check('Create tolerates a padded name', canSubmitName('  Tan Family  '));
+  check('Join is enabled once the code is canonical', canSubmitCode('ABCDEFGH'));
+  check('⚠️ Join normalises lower case — people read these aloud', canSubmitCode('abcdefgh'));
+  check('Join tolerates spaces and hyphens', canSubmitCode('ABCD-EFGH'));
+  check('Join is DISABLED for a 7-character code', !canSubmitCode('ABCDEFG'));
+  check('⚠️ Join is DISABLED for a code with I/L/O/0/1 — not in the alphabet',
+    !canSubmitCode('ABCDEFGI') && !canSubmitCode('ABCDEFG0'));
+
+  // the preview card — counts only, never a name (doc 15 §8 C8 · doc 13 §4)
+  check('previewArgs floors a fractional count', previewArgs('Tan', 2.9, 3.1).ancestors === 2);
+  check('previewArgs clamps a negative count to 0', previewArgs('Tan', -5, 3).ancestors === 0);
+  check('previewArgs clamps NaN to 0',
+    previewArgs('Tan', Number.NaN, 3).ancestors === 0 && previewArgs('Tan', Number.NaN, 3).members === 3);
+  check('the preview copy is owned by i18n, not the module', keyExists(PREVIEW_MESSAGE_KEY));
+  check('⚠️ a preview never shows ancestor names before joining (doc 13 §4)',
+    PREVIEW_SHOWS_ANCESTOR_NAMES === false);
+
+  // role + promote labels (doc 15 §8 C11/C12)
+  check('all four roles have a label', Object.keys(ROLE_LABEL_KEY).length === 4);
+  check('⚠️ every role label is translated in BOTH locales',
+    Object.values(ROLE_LABEL_KEY).every(keyExists));
+  check('promoting to co-head is labelled', promoteLabelKey('co_head') === 'clan.makeCoHead');
+  check('promoting to elder is labelled', promoteLabelKey('elder') === 'clan.makeElder');
+  check('⚠️ head is NOT offered as a promotion — succession runs through co-head',
+    promoteLabelKey('head') === null);
+  check('a member target offers nothing', promoteLabelKey('member') === null);
+  check('both promote labels are translated',
+    keyExists('clan.makeCoHead') && keyExists('clan.makeElder'));
+  check('the leave refusal has copy to show', keyExists(leaveHintKey()));
+
+  // the action list — the matrix AS RENDERED (doc 15 §3)
+  const headActions = actionsFor('head');
+  const headNeeds = ['offer', 'book', 'ancestors', 'invite', 'manage', 'rename', 'delete', 'leave'] as const;
+  check('a head gets offer · book · ancestors · invite · manage · rename · delete · leave',
+    headNeeds.every((a) => headActions.includes(a)));
+  const elderActions = actionsFor('elder');
+  check('an elder can add ancestors', elderActions.includes('ancestors'));
+  check('⚠️ an elder CANNOT invite — the matrix is Head-only', !elderActions.includes('invite'));
+  check('an elder cannot manage, rename or delete',
+    !elderActions.includes('manage') && !elderActions.includes('rename') &&
+    !elderActions.includes('delete'));
+  const memberActions = actionsFor('member');
+  check('a member may offer and read the Book',
+    memberActions.includes('offer') && memberActions.includes('book'));
+  check('⚠️ a member may NOT add ancestors', !memberActions.includes('ancestors'));
+  check('a member may leave', memberActions.includes('leave'));
+  check('a co-head carries the full Head column',
+    actionsFor('co_head').includes('delete') && actionsFor('co_head').includes('invite'));
+  check('⚠️ a NON-member gets the Book ONLY — no Offer, no Leave', actionsFor(null).join() === 'book');
+  check('the outsider helper agrees with it', actionsForOutsider().join() === 'book');
+  check('an unknown role is treated as an outsider', actionsFor(undefined).join() === 'book');
 }
 
 async function main(): Promise<void> {

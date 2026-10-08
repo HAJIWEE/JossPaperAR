@@ -184,6 +184,8 @@ One active `code` per clan (Head can re-roll it): **link · QR · copyable code*
 
 **Terminology (ZH lock — confirm against the design row):** 宗族 clan · 族长 head · 长老 elder · 副族长 co-head · 成员 member · 供奉簿 Book of Tributes · 邀请码 invite code. *(供奉 already means "offering" in the shipped copy — [[10-economy-spec]] §4.)*
 
+> ⚠️ **CHARACTER-SET MISMATCH — measured 2026-10-08, and not silently resolved.** This table is typed in **SIMPLIFIED** (C2's *家人发来了链接？输入邀请码。*), but the shipped `src/lib/i18n.ts` is **TRADITIONAL** (*家人發來了連結？輸入邀請碼。*) — and the code is what the signed-off `ZH · 0e 宗族` boards were built from. The new SCRUM-46 copy was therefore written **traditional**, to match the app rather than this table. **Which character set the Singapore-diaspora audience should read is a product question for the PM** (Singapore is officially simplified, but its traditional-using families are a real segment) — a definitive answer means either a sweep of the i18n table or a correction here. Recorded so a future session does not copy this table into the app and silently half-translate it.
+
 ---
 
 ## 9 · Schema impact → [[07-system-architecture]] (v2.7)

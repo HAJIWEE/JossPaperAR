@@ -588,7 +588,25 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Spend: US$0.00** — no fal.ai call, no deploy: `npm install`, the local gate suite, and a local Supabase stack on Docker. The invariant, the caps and the Book were proved against a **real Postgres 17.11**, not asserted.
 
-**Left for SCRUM-46:** the **frontend** — the first-run fork, create, join, invite/share and the Home clan card per the SCRUM-48 boards (SCRUM-50 owns the QR scanner). The API half is done and pinned.
+**Left for SCRUM-46:** ⬜ **the QR half** — SCRUM-50 owns the scanner and the rendered QR (needs `react-native-svg` + a QR lib, which are native modules and so want a dev build). ⬜ **the Home clan card**, which needs a Home design pass: the signed-off Home layout has **no free band** for it. ⬜ **first-run routing** — deliberately NOT changed, because whether the fork replaces the slice's auto-create is **`SCRUM-83`**.
+
+### 12.12b · SCRUM-46 continued — the client layer and the clan screens (2026-10-08)
+
+**The gap this closed.** The RPCs existed and were proved, but **nothing called them**: the only `.rpc()` site in `src/` was `create_clan` in the SCRUM-82 shortcut. So the app could not invite, promote, remove, rename, leave, delete or read the Book at all.
+
+**`src/lib/clan-api.ts` — the device half.** Eleven typed wrappers (create · preview · join · reroll · myClans · clanMembers · setMemberRole · removeMember · leaveClan · renameClan · deleteClan · clanBook). They normalise their inputs through the PURE modules (`normaliseClanCode`, `isValidClanName`) so the client and the server agree on what a code and a name are, and they parse responses defensively because **there are no generated DB types** — a cast would turn a server change into a silent `undefined` on a screen.
+
+**`src/lib/clan-flow.ts` — the pure rules of the screens.** The wizard order, the button gates, the preview args and the **rendered action list**, delegating every permission to `clan-roles.ts` (which mirrors the SQL) rather than restating `role === 'head'` in a component. Two things it decided that a screen would have got wrong:
+
+1. **The invite card comes BEFORE the ancestor sheet** — the amended order, now asserted, so swapping them in a component is a red gate rather than a silent product regression.
+2. **A non-member's action list is the Book and nothing else.** The first cut appended `leave` unconditionally, which rendered a **Leave** button — and an **Offer** — on a clan the viewer was not in. Caught by writing the assertion.
+
+**`src/components/clan-ui.tsx` + five screens** — `clan/index` (the fork), `clan/create` (four taps), `clan/join` (code → preview → join), `clan/manage` (card · roster · ladder · rename · leave · delete) and `clan/book`. Destructive actions confirm, and the **leave refusal is passed through verbatim** so a sole head reads *"promote a co-head first"* rather than a generic failure.
+
+**⚠️ `npm run check:clanapi` — a new gate, for a gap nothing else covered.** With no generated types, nothing static checks that the argument names `clan-api.ts` sends (`p_clan_id`, `p_user_id`, `p_role`, `p_code`, `p_name`, `p_limit`) or the response fields it reads (`clan_id` · `ancestor_count` · `was` · `entries` …) match the database. `tsc` is blind to it and it fails only on a device, as an empty screen. The test drives the **real RPCs over real PostgREST** with the real arg names and asserts the real fields — **55 checks, all passing**, and **fault-tested**: renaming `p_clan_id` → `p_clanid` turns **22 of 55 red**.
+
+**Verification.** `tsc` clean · `lib` 153 → **200** (47 new checks in the screens group, fault-tested — swapping the wizard order and deleting the outsider guard turned **7** red) · `check:clanapi` **55/55** · the full suite green. **Spend US$0.00** — a local Supabase stack on Docker, no AI call, no deploy. The screens are validated by types and by the contract; **no device run was made this session**, so `testID`s are in place for one.
+
 
 
 ### 12.11 · SCRUM-82 — the clan bootstrap, and the first complete ritual (2026-10-07)
