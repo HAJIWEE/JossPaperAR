@@ -28,12 +28,13 @@
 
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Crypto from 'expo-crypto';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { INITIAL_OFFERING, transition, type Offering } from '@/domain/slice';
+import { DEMO_PARAM, DEMO_VALUE, isDemo } from '@/lib/tutorial';
 import { TOUCH_TARGET, brand, fontSize, onColorCream, radius, space, surface, text } from '@/theme/tokens';
 
 type Phase =
@@ -46,6 +47,14 @@ export default function CaptureScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const cameraRef = useRef<CameraView>(null);
+
+  /**
+   * SCRUM-85 — the tutorial flag arrives from Home and must be carried ONWARD.
+   * ⚠️ Dropping it here would send a demo into the real pipeline, which uploads
+   * and cartoonizes: a ≈US$0.09 AI call for a brand-new user, before any clan or
+   * quota row exists to bound it.
+   */
+  const demo = isDemo(useLocalSearchParams<{ demo?: string }>().demo);
 
   const [permission, requestPermission] = useCameraPermissions();
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
@@ -79,7 +88,12 @@ export default function CaptureScreen() {
       setOffering((current) => transition(current, { type: 'CAPTURE_TAKEN', captureId }));
 
       // The service layer uploads under THIS id, then requests the cartoonize.
-      router.push({ pathname: '/preparing', params: { captureId, uri: photo.uri } });
+      // ⚠️ The tutorial flag rides along (SCRUM-85): `preparing` branches on it and
+      // skips the upload entirely for a demo.
+      router.push({
+        pathname: '/preparing',
+        params: { captureId, uri: photo.uri, ...(demo ? { [DEMO_PARAM]: DEMO_VALUE } : {}) },
+      });
     } catch {
       // No photo ⇒ no row ⇒ no id consumed. Not rule ②: nothing was spent.
       setPhase({ kind: 'failed' });

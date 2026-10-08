@@ -24,6 +24,8 @@
  * Deliberately free of React and of expo-router, so plain Node can check it.
  */
 
+import { DEMO_VALUE, isDemo } from './tutorial.ts';
+
 /**
  * ⚠️ A **TYPE ALIAS**, not an `interface` — and that is load-bearing.
  *
@@ -40,12 +42,19 @@ export type RewardParams = {
   /** Sent as a string — expo-router params are strings on the wire. */
   readonly offsetPx: string;
   readonly throwNumber: string;
+  /**
+   * SCRUM-85: `DEMO_VALUE` when this hop belongs to the first-run TUTORIAL.
+   * ⚠️ It must survive EVERY hop — a demo flag dropped at one hop turns the
+   * tutorial into a real, paying ritual. `check:wire` asserts it does.
+   */
+  readonly demo?: string;
 };
 
 /** Same alias rule as `RewardParams` above — see that note. */
 export type BurnParams = {
   readonly captureId: string;
   readonly uri: string;
+  readonly demo?: string;
 };
 
 /** expo-router hands a param back as `string | string[]`; take the first. */
@@ -57,20 +66,41 @@ function first(value: string | string[] | undefined): string | undefined {
  * Build the `/reward` params. The only sanctioned way to reach that screen: the
  * capture id is a **required argument**, so a caller cannot forget it the way
  * `burn.tsx` did.
+ *
+ * `demo` is optional and omitted entirely when false, so a REAL ritual's URL is
+ * byte-identical to before this flag existed — the tutorial cannot make the
+ * normal path grow a param it never had.
  */
-export function toRewardParams(captureId: string, offsetPx: number, throwNumber: number): RewardParams {
-  return { captureId, offsetPx: String(offsetPx), throwNumber: String(throwNumber) };
+export function toRewardParams(
+  captureId: string,
+  offsetPx: number,
+  throwNumber: number,
+  demo = false,
+): RewardParams {
+  return {
+    captureId,
+    offsetPx: String(offsetPx),
+    throwNumber: String(throwNumber),
+    ...(demo ? { demo: DEMO_VALUE } : {}),
+  };
 }
 
 /** Build the `/burn` params (preparing → burn). */
-export function toBurnParams(captureId: string, uri: string): BurnParams {
-  return { captureId, uri };
+export function toBurnParams(captureId: string, uri: string, demo = false): BurnParams {
+  return { captureId, uri, ...(demo ? { demo: DEMO_VALUE } : {}) };
 }
 
 export type RewardParamProblem = 'missing_capture_id' | 'bad_accuracy' | 'bad_throw_number';
 
 export type RewardParamRead =
-  | { readonly ok: true; readonly captureId: string; readonly accuracyPx: number; readonly throwNumber: number }
+  | {
+      readonly ok: true;
+      readonly captureId: string;
+      readonly accuracyPx: number;
+      readonly throwNumber: number;
+      /** SCRUM-85 — true when this hop is the first-run TUTORIAL. */
+      readonly demo: boolean;
+    }
   | { readonly ok: false; readonly reason: RewardParamProblem };
 
 /**
@@ -85,6 +115,7 @@ export function readRewardParams(raw: {
   readonly captureId?: string | string[];
   readonly offsetPx?: string | string[];
   readonly throwNumber?: string | string[];
+  readonly demo?: string | string[];
 }): RewardParamRead {
   const captureId = first(raw.captureId)?.trim() ?? '';
   if (captureId.length === 0) return { ok: false, reason: 'missing_capture_id' };
@@ -105,17 +136,32 @@ export function readRewardParams(raw: {
     return { ok: false, reason: 'bad_throw_number' };
   }
 
-  return { ok: true, captureId, accuracyPx, throwNumber };
+  return {
+    ok: true,
+    captureId,
+    accuracyPx,
+    throwNumber,
+    // ⚠️ Anything but the exact marker is NOT a demo — an unreadable flag must
+    // fall through to the REAL ritual, where the server is the authority. The
+    // reverse default would let a bad param silently skip a paying award.
+    demo: isDemo(first(raw.demo)),
+  };
 }
 
 /** Read and validate `/burn`'s params. Same rule: the id is not optional. */
 export function readBurnParams(raw: {
   readonly captureId?: string | string[];
   readonly uri?: string | string[];
-}): { readonly ok: true; readonly captureId: string; readonly uri: string } | { readonly ok: false; readonly reason: 'missing_capture_id' | 'missing_uri' } {
+  readonly demo?: string | string[];
+}): {
+  readonly ok: true;
+  readonly captureId: string;
+  readonly uri: string;
+  readonly demo: boolean;
+} | { readonly ok: false; readonly reason: 'missing_capture_id' | 'missing_uri' } {
   const captureId = first(raw.captureId)?.trim() ?? '';
   if (captureId.length === 0) return { ok: false, reason: 'missing_capture_id' };
   const uri = first(raw.uri)?.trim() ?? '';
   if (uri.length === 0) return { ok: false, reason: 'missing_uri' };
-  return { ok: true, captureId, uri };
+  return { ok: true, captureId, uri, demo: isDemo(first(raw.demo)) };
 }

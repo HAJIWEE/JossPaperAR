@@ -31,12 +31,14 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { t } from '@/lib/i18n';
+import { toBurnParams } from '@/lib/route-params';
 import {
   registerCapture,
   requestCartoonize,
   uploadCapture,
 } from '@/lib/ritual';
 import { ensureAnonymousSession } from '@/lib/session';
+import { TUTORIAL_WAIT_MS, isDemo } from '@/lib/tutorial';
 import { TOUCH_TARGET, fontSize, onColorCream, radius, space, surface, text } from '@/theme/tokens';
 
 type Phase =
@@ -52,7 +54,13 @@ type Phase =
 export default function Preparing(): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { captureId, uri } = useLocalSearchParams<{ captureId: string; uri: string }>();
+  const { captureId, uri, demo: demoParam } = useLocalSearchParams<{
+    captureId: string;
+    uri: string;
+    demo?: string;
+  }>();
+  /** SCRUM-85 — a demo skips the upload and the generation entirely. */
+  const demo = isDemo(demoParam);
 
   const [phase, setPhase] = useState<Phase>({ kind: 'working' });
   const started = useRef(false);
@@ -63,6 +71,21 @@ export default function Preparing(): React.JSX.Element {
       return;
     }
     setPhase({ kind: 'working' });
+
+    // ── SCRUM-85 · THE TUTORIAL: no server, no AI, no spend ────────────────
+    // ⚠️ This branch is the whole point of the demo. Letting it fall through to
+    // the real pipeline would upload the photo and request a Path C generation
+    // for EVERY new user — ≈ US$0.09 each, invisible, because it happens before
+    // any quota, clan or `app_config` budget row exists to catch it.
+    //
+    // So the offering passes through untouched and the wait is a local timer.
+    // The demo is honest because the SCREENS are real; only the network is not.
+    if (demo) {
+      await new Promise((resolve) => setTimeout(resolve, TUTORIAL_WAIT_MS));
+      setPhase({ kind: 'done' });
+      router.push({ pathname: '/burn', params: toBurnParams(captureId, uri, true) });
+      return;
+    }
 
     // ── 0 · a session the server will accept (ADR-004 / SCRUM-80) ───────────
     // Every step below is an authenticated call; with no session `registerCapture`
@@ -114,9 +137,11 @@ export default function Preparing(): React.JSX.Element {
     }
     if (event?.type === 'STYLED') {
       setPhase({ kind: 'done' });
-      router.push({ pathname: '/burn', params: { captureId, uri } });
+      // ⚠️ Built by the route contract, not inline: `preparing` was the one hop
+      // that bypassed `toBurnParams`, which is how a param gets dropped silently.
+      router.push({ pathname: '/burn', params: toBurnParams(captureId, uri) });
     }
-  }, [captureId, uri, router]);
+  }, [captureId, uri, demo, router]);
 
   // `started` guards against React 18 StrictMode double-invoking effects, which
   // would upload twice and — because `unique(capture_id)` makes the job

@@ -114,6 +114,20 @@ export const MESSAGES = {
     'clan.successorNamed': '%{name} now leads the clan.',
     'clan.successorAuto':
       'No successor named — %{name}, the longest-standing elder, now leads the clan.',
+
+    // ── the FIRST-RUN TUTORIAL (SCRUM-85 · the SCRUM-83 answer) ────────────
+    // ⚠️ The copy must be HONEST that nothing is recorded and nothing is spent.
+    // A demo the player mistakes for a real award is worse than no demo at all.
+    'tutorial.badge': 'Demo',
+    'tutorial.intro':
+      'This first offering is a demonstration. Nothing is recorded and no points are earned.',
+    'tutorial.preparing': 'Preparing a demo offering…',
+    'tutorial.preparingNote':
+      'In the real ritual this is where your photo becomes a paper offering.',
+    'tutorial.receiptNote': 'Demo only — no points were earned and no clan was touched.',
+    'tutorial.finish': "Build your family's altar",
+    'tutorial.startHint': 'First time? This one is a guided demo.',
+    'tutorial.noClanNote': 'The demo needs no clan — you will create or join one next.',
     'clan.deleteClan': 'Delete this clan',
     'clan.deleteConfirm':
       'Delete this clan? Every member loses the altar and the Book of Tributes. This cannot be undone.',
@@ -203,6 +217,16 @@ export const MESSAGES = {
     'clan.leaveNoSuccessor': '目前沒有可接任的人。請先設副族長，或刪除宗族。',
     'clan.successorNamed': '現由 %{name} 帶領宗族。',
     'clan.successorAuto': '未指定繼任者——由加入最久的長老 %{name} 帶領宗族。',
+
+    // the FIRST-RUN TUTORIAL (SCRUM-85) — parity is enforced, so BOTH locales
+    'tutorial.badge': '示範',
+    'tutorial.intro': '首次供奉為示範。不會留下紀錄，也不會獲得點數。',
+    'tutorial.preparing': '正在製作示範供品…',
+    'tutorial.preparingNote': '在正式儀式中，您的照片會在此化為紙紮供品。',
+    'tutorial.receiptNote': '僅為示範——未獲得點數，也未涉及任何宗族。',
+    'tutorial.finish': '建立您家族的祭壇',
+    'tutorial.startHint': '第一次嗎？這次是引導示範。',
+    'tutorial.noClanNote': '示範不需要宗族——接下來您將建立或加入一個。',
     'clan.deleteClan': '刪除宗族',
     'clan.deleteConfirm': '刪除宗族？所有成員將失去祭壇與供奉簿，無法復原。',
 

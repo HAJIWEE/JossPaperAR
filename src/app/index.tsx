@@ -5,6 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AIM_BANDS } from '@/domain/aim';
 import { OFFERINGS, baseValueOf } from '@/domain/catalogue';
 import { DAILY_PHOTO_BURNS, DAILY_STORE_BURNS } from '@/domain/quota';
+import { readFirstRun } from '@/lib/first-run';
+import { DEMO_PARAM, DEMO_VALUE, needsTutorial } from '@/lib/tutorial';
 import { TOUCH_GAP, TOUCH_TARGET, brand, fontSize, fluidSize, onColorCream, radius, space, surface, text } from '@/theme/tokens';
 
 /**
@@ -96,8 +98,20 @@ export default function HomeScaffold() {
       {/* ── the slice begins here (SCRUM-53 / PR-4) ────────────────────────── */}
       <Pressable
         accessibilityRole="button"
+        testID="home-begin"
         onPress={() => {
-          router.push('/capture');
+          // ── SCRUM-85 · the FIRST burn is a TUTORIAL ────────────────────────
+          // ⚠️ Read the first-run record HERE, at the tap, rather than in an
+          // effect: the flag must reflect the device's state at the moment of
+          // the decision, and a stale render must not send an already-tutored
+          // user back through a demo.
+          void (async () => {
+            const firstRun = await readFirstRun();
+            const params = needsTutorial(firstRun)
+              ? { [DEMO_PARAM]: DEMO_VALUE }
+              : {};
+            router.push({ pathname: '/capture', params });
+          })();
         }}
         style={({ pressed }) => [styles.begin, pressed && { opacity: 0.8 }]}
       >

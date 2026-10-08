@@ -25,15 +25,23 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ensureClan } from '@/lib/clan';
+import { myClans } from '@/lib/clan-api';
+import { markTutorialDone } from '@/lib/first-run';
 import { t } from '@/lib/i18n';
 import { submitBurn, type BurnReceipt } from '@/lib/ritual';
 import { readRewardParams } from '@/lib/route-params';
+import { AFTER_TUTORIAL_ROUTE, demoReceipt, type DemoReceipt } from '@/lib/tutorial';
 import { TOUCH_TARGET, fontSize, onColorCream, radius, space, surface } from '@/theme/tokens';
 
 type Phase =
   | { readonly kind: 'submitting' }
   | { readonly kind: 'shown'; readonly receipt: BurnReceipt }
+  /**
+   * SCRUM-85 — the first-run TUTORIAL's receipt. ⚠️ A structurally DIFFERENT
+   * shape from `BurnReceipt`, so demo money can never be rendered by the code
+   * that renders the server's. It carries `balanceDelta: 0`.
+   */
+  | { readonly kind: 'demo'; readonly receipt: DemoReceipt }
   /** Nothing was banked - the SAME key may be retried. */
   | { readonly kind: 'retryable'; readonly reason: string }
   /**
@@ -65,6 +73,8 @@ export default function Reward(): React.JSX.Element {
   const captureId = parsed.ok ? parsed.captureId : null;
   const accuracy = parsed.ok ? parsed.accuracyPx : 0;
   const throwNo = parsed.ok ? parsed.throwNumber : 1;
+  /** SCRUM-85 — true for the first-run tutorial. */
+  const demo = parsed.ok ? parsed.demo : false;
   /** Non-null only when the route itself is unusable. */
   const problem = parsed.ok ? null : parsed.reason;
 
@@ -81,14 +91,36 @@ export default function Reward(): React.JSX.Element {
       );
       return;
     }
-    setPhase({ kind: 'submitting' });
-    // ⚠️ submit_burn is clan-scoped (SCRUM-82): ensure the caller has an altar
-    // FIRST. Nothing is spent if this fails, so it retries like a transport blip.
-    const clan = await ensureClan();
-    if (!clan.ok) {
-      setPhase({ kind: 'retryable', reason: clan.reason });
+    // ── SCRUM-85 · THE TUTORIAL: no clan, no server, no points ──────────────
+    // ⚠️ This IS the SCRUM-83 answer. A demo must NOT call `ensureClan` (which
+    // WROTE a clan — the shortcut SCRUM-83 retired) and must NOT submit a burn:
+    // the demo awards nothing to anyone, and there is no clan to award it to.
+    // The receipt is computed locally and carries `balanceDelta: 0`.
+    if (demo) {
+      setPhase({ kind: 'demo', receipt: demoReceipt(accuracy) });
+      // The tutorial has been seen. Best-effort — a failed write replays it,
+      // which is the recoverable direction.
+      void markTutorialDone();
       return;
     }
+
+    setPhase({ kind: 'submitting' });
+
+    // ⚠️ THE CLAN IS NOW GUARANTEED BY THE FORK (option C) — no longer
+    // auto-created here. If there is none, the right move is the fork, NOT a
+    // retry: a retry would fail identically forever, which is how the old
+    // `ensureClan` failure presented.
+    const mine = await myClans();
+    if (!mine.ok) {
+      setPhase({ kind: 'retryable', reason: mine.reason });
+      return;
+    }
+    const clan = mine.data[0];
+    if (!clan) {
+      router.replace(AFTER_TUTORIAL_ROUTE);
+      return;
+    }
+
     // Same arguments -> the same derived key. That is the whole safety story.
     const result = await submitBurn(captureId, accuracy, throwNo, clan.clanId);
     setPhase(
@@ -96,7 +128,7 @@ export default function Reward(): React.JSX.Element {
         ? { kind: 'shown', receipt: result.receipt }
         : { kind: 'retryable', reason: result.reason },
     );
-  }, [captureId, accuracy, throwNo, problem]);
+  }, [captureId, accuracy, throwNo, problem, demo, router]);
 
   // `started` mirrors preparing.tsx: a double-invoked effect would submit the
   // same throw twice, which is safe ONLY because the key is derived rather than
@@ -138,6 +170,35 @@ export default function Reward(): React.JSX.Element {
         <Text style={styles.body}>Your offering is safe - nothing has been recorded.</Text>
         <Pressable style={styles.button} onPress={() => void submit()} accessibilityRole="button">
           <Text style={styles.buttonText}>{t('common.retry')}</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  // ── SCRUM-85 · the TUTORIAL receipt ───────────────────────────────────────
+  // ⚠️ Rendered by DIFFERENT code from the server's receipt, on a different type,
+  // so demo money cannot reach the ledger's rendering path. And it says out loud
+  // that nothing was banked — a demo mistaken for an award is worse than no demo.
+  if (phase.kind === 'demo') {
+    const demoLabel =
+      BAND_LABELS[phase.receipt.band] ?? { en: phase.receipt.band, zh: phase.receipt.band };
+    return (
+      <View style={[styles.root, { paddingTop: insets.top + space.xl }]}>
+        <Text style={styles.tag}>{t('tutorial.badge')}</Text>
+        <Text style={styles.title}>
+          {demoLabel.zh} {demoLabel.en}
+        </Text>
+        <Text style={styles.award}>{phase.receipt.award}</Text>
+        <Text style={styles.caption}>tribute</Text>
+        <Text style={styles.body}>{t('tutorial.receiptNote')}</Text>
+        <Text style={styles.body}>{t('tutorial.noClanNote')}</Text>
+        <Pressable
+          testID="tutorial-finish"
+          style={styles.button}
+          accessibilityRole="button"
+          onPress={() => router.replace(AFTER_TUTORIAL_ROUTE)}
+        >
+          <Text style={styles.buttonText}>{t('tutorial.finish')}</Text>
         </Pressable>
       </View>
     );

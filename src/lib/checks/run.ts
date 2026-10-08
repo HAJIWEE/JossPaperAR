@@ -11,7 +11,7 @@
  * ⚠️ FAULT-TEST IT: change an expected string and confirm it goes RED.
  */
 
-import { SLICE_CLAN_NAME, isValidClanName, planClan } from '../clan-rules.ts';
+import { isValidClanName } from '../clan-rules.ts';
 import { type UuidFactory, isValidIdempotencyKey, newIdempotencyKey } from '../idempotency.ts';
 import {
   CODE_ALPHABET,
@@ -83,6 +83,14 @@ import {
   previousCreateStep,
   promoteLabelKey,
 } from '../clan-flow.ts';
+import {
+  AFTER_TUTORIAL_ROUTE,
+  TUTORIAL_CONSEQUENCES,
+  TUTORIAL_WAIT_MS,
+  demoReceipt,
+  isDemo,
+  needsTutorial,
+} from '../tutorial.ts';
 
 let passed = 0;
 let failed = 0;
@@ -459,16 +467,17 @@ function serviceChecks(): void {
   // `submit_burn` requires a clan_id; the slice stands one up on first use. The
   // default name must satisfy `create_clan`'s 2..20 rule, and a caller who
   // already has a clan must REUSE it rather than make a second altar.
-  section('9 · The slice’s clan bootstrap (SCRUM-82)');
-  check('the default altar name satisfies create_clan (2..20 chars)', isValidClanName(SLICE_CLAN_NAME));
+  // ⚠️ SCRUM-83 RETIRED THE SLICE'S AUTO-CREATE. This section used to assert
+  // `planClan` (reuse-or-create) and the hard-coded `SLICE_CLAN_NAME`; both were
+  // DELETED from `clan-rules.ts`, because the first burn is now a tutorial and
+  // the real fork follows it. The NAME rule survives — create and rename need it.
+  section('9 · The clan NAME rule (the SCRUM-82 shortcut is retired)');
+  check('a 2-character name is accepted', isValidClanName('陳氏'));
+  check('a 20-character name is accepted', isValidClanName('x'.repeat(20)));
   check('a 1-character name is rejected', !isValidClanName('a'));
   check('a 21-character name is rejected', !isValidClanName('x'.repeat(21)));
-  check('surrounding whitespace does not defeat the check', isValidClanName(`  ${SLICE_CLAN_NAME}  `));
-  const reusePlan = planClan('clan-1');
-  check('an existing clan is REUSED', reusePlan.action === 'reuse');
-  check('…and the reused id is the one observed', reusePlan.action === 'reuse' && reusePlan.clanId === 'clan-1');
-  check('no clan means CREATE', planClan(null).action === 'create');
-  check('⚠️ an empty-string clan id is NOT reused — it creates', planClan('').action === 'create');
+  check('surrounding whitespace does not defeat the check', isValidClanName('  Tan Family  '));
+  check('an all-whitespace name is rejected', !isValidClanName('     '));
 
   // ── 10 · the clan ladder (SCRUM-46 · doc 15 §3/§5/§7) ───────────────────
   // The role matrix, the ≥1-head invariant, the anti-abuse numbers and the
@@ -682,6 +691,52 @@ function serviceChecks(): void {
   check('⚠️ a NON-member gets the Book ONLY — no Offer, no Leave', actionsFor(null).join() === 'book');
   check('the outsider helper agrees with it', actionsForOutsider().join() === 'book');
   check('an unknown role is treated as an outsider', actionsFor(undefined).join() === 'book');
+
+  // ── 12 · the FIRST-RUN TUTORIAL (SCRUM-85 · the SCRUM-83 answer) ────────
+  // ⚠️ THE FIRST ASSERTION IS THE IMPORTANT ONE. If a future change wires the demo
+  // into the server or the AI, it has to delete an assertion that says why — a
+  // per-user ≈US$0.09 cost that would otherwise land silently, before any quota
+  // or clan exists to bound it.
+  section('12 · The first-run tutorial — no clan, no points, no spend (SCRUM-85)');
+
+  check('⚠️ a tutorial creates NO clan', TUTORIAL_CONSEQUENCES.createsClan === false);
+  check('⚠️ a tutorial awards NO points', TUTORIAL_CONSEQUENCES.awardsPoints === false);
+  check('⚠️ a tutorial writes NOTHING to the ledger', TUTORIAL_CONSEQUENCES.writesLedger === false);
+  check('⚠️ a tutorial makes NO server call', TUTORIAL_CONSEQUENCES.callsServer === false);
+  check('⚠️ a tutorial makes NO AI call — this is the ≈US$0.09/user one',
+    TUTORIAL_CONSEQUENCES.callsAi === false);
+  check('every consequence is asserted, not just the convenient ones',
+    Object.values(TUTORIAL_CONSEQUENCES).every((v) => v === false));
+
+  // the first-run decision
+  check('a missing record means the tutorial is still owed', needsTutorial(null));
+  check('an empty record means the tutorial is still owed', needsTutorial({ tutorialDone: false }));
+  check('a completed record means it is NOT', !needsTutorial({ tutorialDone: true }));
+  check('⚠️ anything other than an explicit true replays the tutorial',
+    needsTutorial({ tutorialDone: undefined as unknown as boolean }));
+
+  // option C, after it
+  check('⚠️ the tutorial hands off to the FORK, not an auto-created altar',
+    AFTER_TUTORIAL_ROUTE === '/clan');
+
+  // the demo receipt
+  const devoutDemo = demoReceipt(20);
+  check('the demo receipt is flagged as a demo', devoutDemo.demo === true);
+  check('⚠️ the demo receipt moves NO balance', devoutDemo.balanceDelta === 0);
+  check('the demo uses the REAL award maths, so the number is truthful',
+    devoutDemo.band === 'devout' && devoutDemo.award === 600);
+  check('a bullseye demo reads 800 — 400 base × 2.0, and no bonuses in a demo',
+    demoReceipt(0).award === 800);
+  check('a graze demo reads 400', demoReceipt(70).award === 400);
+  check('a miss demo reads 0', demoReceipt(200).award === 0);
+  check('⚠️ a demo receipt has no balance field to render as real money',
+    !('tribute_balance' in devoutDemo) && !('idempotency_key' in devoutDemo));
+
+  // the flag itself
+  check('the demo marker is read positively', isDemo('1'));
+  check('⚠️ anything else is NOT a demo — an unreadable flag runs the REAL ritual',
+    !isDemo('0') && !isDemo('true') && !isDemo(undefined) && !isDemo('') && !isDemo(' 1'));
+  check('the tutorial’s wait is a real beat, not zero', TUTORIAL_WAIT_MS > 0);
 }
 
 async function main(): Promise<void> {

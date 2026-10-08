@@ -590,7 +590,31 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Left for SCRUM-46:** ⬜ **the QR half** — SCRUM-50 owns the scanner and the rendered QR (needs `react-native-svg` + a QR lib, which are native modules and so want a dev build). ⬜ **the Home clan card**, which needs a Home design pass: the signed-off Home layout has **no free band** for it. ⬜ **first-run routing** — deliberately NOT changed, because whether the fork replaces the slice's auto-create is **`SCRUM-83`**.
 
-### 12.12c · SCRUM-84 answered — the head-exit ramp, built (2026-10-08)
+### 12.12d · SCRUM-83 answered (option E) — the first burn is a TUTORIAL (2026-10-08)
+
+**The decision**, verbatim: *"the first burn should be a tutorial, a demo to the user. so no clan involved and no real points to contribute to any clan. after the tutorial build the PATH C mentioned in the ticket."* Recorded on `SCRUM-83` (now **Done**); built under **`SCRUM-85`**.
+
+So the first-run sequence is **tutorial → your family's altar** — replacing the silent auto-created *"My Altar"*. Option C (the fork) is now the thing the tutorial hands off **to**, which is the shape none of A–D described.
+
+**⚠️ THE CONSTRAINT THAT SHAPED THE BUILD — the tutorial must not spend AI money.** A demo that ran a real Path C generation would cost **≈ US$0.09 for every new user** — the unmetered bill doc 10 §6 put a ceiling on — and it would be **invisible**, because it happens *before* any quota, clan or `app_config` budget row exists to bound it. So the demo **skips `registerCapture` · `uploadCapture` · `requestCartoonize` entirely**, and the "preparing" beat is a local timer (`TUTORIAL_WAIT_MS`).
+
+A useful consequence: **no new asset was needed.** `burn.tsx` never renders the sprite — it is the offering's *identity*, not its picture — so the tutorial carries the captured photo straight through. A bundled demo sprite would be decoration, not a demo.
+
+**`src/lib/tutorial.ts` — the invariants as DATA.** `TUTORIAL_CONSEQUENCES` states `createsClan · awardsPoints · writesLedger · callsServer · callsAi` — all `false`, and a gate asserts every one. A future change that wires the demo into the server or the AI has to **delete an assertion that says why**, rather than quietly reintroducing a per-user cost.
+
+**`DemoReceipt` is a DIFFERENT TYPE from `BurnReceipt`**, so demo money cannot be rendered by the code that renders the server's. It carries `balanceDelta: 0`, and it uses the **real award maths** (`computeAward`) with no new-ground and no streak bonus — so a Devout throw demos **600**, the real single-burn number. Honest, and banked nowhere.
+
+**`ensureClan` is DELETED, not deprecated.** The SCRUM-82 shortcut is gone from `src/lib/clan.ts` (file removed), along with `planClan` and `SLICE_CLAN_NAME` from `clan-rules.ts`. A helper whose comment says *"the real flow is SCRUM-46/50"* is an invitation to wire the shortcut back in, so `check:lib` §9 was rewritten to assert only the NAME rule that create and rename still need. `reward.tsx` now calls `myClans()`; **no clan** routes to the fork — **not** a retry, because a retry fails identically forever, which is how the old failure presented.
+
+**One latent bug fixed on the way:** `preparing.tsx` was the one hop that **bypassed `toBurnParams`** and pushed raw params — precisely the pattern `route-params.ts` was written to prevent, and the reason a new flag can vanish silently. It now uses the builder.
+
+**Proof.** `check:lib` §12 (20 checks: the five invariants, the first-run decision, the fork hand-off, the demo receipt's arithmetic and shape, the flag's parsing) · **`check:wire` §5** (9 checks: the flag on both builders and both readers, a REAL hop carrying **no** param at all, the four-hop chain, and a deliberately **dropped** flag reading as a real turn). **Fault-tested both ways:** `callsAi: true` turns 2 lib checks red; dropping the flag at the burn hop turns 2 wire checks red.
+
+⚠️ **Parity caught a real miss:** the tutorial copy was added to EN and *not* 中文 — `check:lib`'s locale-parity assertion failed, which is the check doing exactly its job.
+
+**Gates:** `wire 43 → 52` · `lib 210 → 229` · 13 migrations · 0 TS errors. **Spend US$0.00** — the tutorial's whole point is that it costs nothing, and building it cost nothing either.
+
+
 
 **The decision.** The PM answered with a **hybrid**, not either option I offered: *"if there is no co-head, prompt leaving clan head to name a successor, if none named, promote automatically the oldest elder by time of joining the clan."* Recorded on `SCRUM-84` (now **Done**), and folded into doc 15 §3/§5.3/§10 item 4.
 
