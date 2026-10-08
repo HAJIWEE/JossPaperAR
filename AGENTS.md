@@ -78,6 +78,7 @@ Three real cases the audit caught on 2026-10-05: **SCRUM-53** (moved to `In Prog
 ### Branching and merging
 
 - Work on a **`cline/<id>` branch in a worktree**, then **open a PR into `main`**. Never push to `main` directly; never merge without being asked.
+- ⚠️ **Open PRs with the GitHub MCP server (`createPullRequest`) — never the `gh` CLI.** `git push` and `gh` authenticate through **different stores**: git uses the `kwallet6` helper (KWallet), while `gh` holds a **fine-grained PAT in its own keyring** (`~/.config/gh/hosts.yml`; there is no `GH_TOKEN` in the env). That PAT is **read-only on this repo** — `gh api /repos/HAJIWEE/JossPaperAR --jq .permissions` answers `{"pull":true,"push":false,…}` — so `gh pr create` fails with **`403 Resource not accessible by personal access token (createPullRequest)`** *even though the push just succeeded*. **Do not go and "fix token permissions": that is the wrong diagnosis and a wasted round-trip.** Read PRs, CI and checks through the MCP too, for the same reason. *(Measured 2026-10-08, opening PR #28 — see `handover-prompt.md` §6 traps 18–19.)*
 - `git commit` **hangs** in an agent shell (GPG signing waits on pinentry with no TTY). Commit with `-c commit.gpgsign=false`. Unsigned AI-session commits are accepted (`CONTRIBUTING.md` § Commits) — do not re-raise it.
 - Worktrees share one `main` checkout, so `git checkout main` fails in a sibling worktree. Verify the merged state with `git merge-base --is-ancestor <local-branch> origin/main` — **not** `origin/<branch>`, because `git fetch --prune` deletes those refs *after* a merge and `--is-ancestor` then reports a misleading "not merged".
 - Every applied migration is permanent: **never edit an applied migration** — add a new version number.
@@ -86,7 +87,7 @@ Three real cases the audit caught on 2026-10-05: **SCRUM-53** (moved to `In Prog
 
 **You do not need to ask before spending fal.ai credit, as long as the spend stays inside the approved budget.**
 
-* **Approved:** US$10–20 for the AI work; **US$4.98 spent** as of 2026-10-05 (≈ S$6.38 at the Mastercard rate 1.2808 — reconciled at SCRUM-41). The full Path C pipeline is ≈ **US$0.09/run**.
+* **Approved:** US$10–20 for the AI work; **US$5.16 spent** as of 2026-10-08 (≈ S$6.61 at the Mastercard rate 1.2808 — two Path C runs on 2026-10-07; reconciled at SCRUM-41). The full Path C pipeline is ≈ **US$0.09/run**. *Re-derive this figure from `project-costs.md` rather than trusting this line — it goes stale silently.*
 * **In scope without asking:** any number of verification runs that keep the total **under US$20**.
 * **Still ask first:** anything that would take the total **over US$20**, a new service or subscription, or a purchase of physical hardware.
 * **Always:** log the spend in `project-costs.md` (SGD @ the Mastercard rate, with the USD figure and the derivation inline) and say what it bought. A $0.00 line beats an absent one.
@@ -108,12 +109,22 @@ npm run check            # full local gate suite (typecheck · tokens · domain 
 npm run check:adrs       # ADR register ↔ files (status agreement)
 npm run check:db         # SQL tests (needs docker + supabase/.temp/pooler-url)
 npm run check:budget     # live AI-budget stop-rule proof — free by default
-npx supabase migration list   # expect 11/11, no drift
+npx supabase start                                            # local stack — applies the migrations FROM THE FILES, no account/link needed
+bash supabase/checks/run-sql-tests.sh \
+  "postgresql://postgres:postgres@127.0.0.1:54322/postgres"   # the whole supabase/tests/ suite against that local Postgres
+npx supabase migration list   # expect 12/12, no drift
 npx supabase db push --yes
 npx tsc --noEmit
 ```
 
 **Known traps:** no local `psql` and no `supabase query` subcommand — to run SQL, add a migration file, `db push`, then delete it and `migration repair --status reverted <version>` or remote history drifts. `app_config` is a kill switch — any script that writes it must restore it from an `EXIT` trap. The Storage bulk-delete `{"prefixes":[…]}` answers `200` and deletes nothing; delete objects **by path**. A Path C generation is ≈ **US$0.09** — check the budget before spending.
+
+**SQL-test harness traps** (measured 2026-10-08 — they break tests silently, so read them before writing one):
+
+* ⚠️ `set_config(…, is_local := true)` and `SET LOCAL` **do not survive across statements** under `run-sql-tests.sh` — psql runs each statement in its own transaction (autocommit), and `SET LOCAL` even warns *"can only be used in transaction blocks"*. Use **session-scoped** `SET ROLE` / `set_config(…, false)`: that form works in **both** runners (and inside the CLI-migration path too).
+* ⚠️ A `pg_temp` table grants **nothing** to PUBLIC. A test that switches to `authenticated` needs an explicit `grant select, insert, update, delete on pg_temp.<t> to authenticated`, or its first read/write fails with *permission denied for table*.
+* A **`DEFERRABLE INITIALLY DEFERRED`** constraint trigger fires at COMMIT, so an exception handler **cannot** catch it. Force it with `set constraints <name> immediate` **inside the transaction** (at top level it only warns and does nothing) to make the violation observable and assertable.
+* The local DB URL is printed by `npx supabase status`; a `docker run` test client needs `--network host` to reach `127.0.0.1:54322`.
 
 ## Expo has changed — do not trust your training data
 
