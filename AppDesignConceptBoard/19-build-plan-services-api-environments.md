@@ -565,6 +565,32 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.12 · SCRUM-46 — the clan management API (2026-10-08)
+
+**What was already there.** `clans` · `clan_members` · `create_clan` · `preview_clan` · `join_clan` · `reroll_clan_code` · `save_ancestor` · `is_clan_member` · `clan_role_of` · `is_clan_head` · `enforce_ancestor_cap` all shipped with PR-2/PR-3. What SCRUM-46 adds is the half doc 15 §3 *promises* and nothing implemented: **the role ladder, leaving and removal, rename, delete, and the Book of Tributes read path** — plus the anti-abuse limits §5.2 hands to this ticket.
+
+**Migration `0012` — 12/12, no drift.** The real gap was RLS, not logic: `clan_members` had a **SELECT policy only**, so role changes and leaving had *no path at all* and the tempting fix was SECURITY DEFINER. Adding `clan_members_update_head` · `clan_members_delete_head_or_self` · `clans_delete_head` closes it and keeps **all five management RPCs SECURITY INVOKER** (RULE B). Only `clan_book` is elevated — RULE B's **fifth** named exception, because a NON-member must read the anonymised projection `tributes_select_member` will not grant.
+
+**Three decisions this ticket owned (doc 15 §10), taken and recorded.**
+1. **§10.5 Book window → HIDE, not purge.** The spec's own wording is a *read* rule (*"shows and QUERIES the last month only"*), §5.3 promises a leaver their entries *stay*, and purging needs a scheduler `pg_cron` deliberately has off. Hide → purge stays open later; purge → hide does not.
+2. **§5.2 anti-abuse → 10 clans per user · 3 joins per hour.** doc 11 §5's "≈3× the fastest honest play".
+3. **§10.4 head exit → promote-first**, the spec's own proposal. ⚠️ **The PM confirmation is filed as `SCRUM-84`** — this is the documented reading, not a decision taken here.
+
+**⚠️ Two real defects the verification found — both in this migration's first cut.**
+1. **The joins-per-hour limb was DEAD LOGIC.** It was written as `10`, equal to the clan cap — but a membership *is* a clan, so the clan limb always binds first and the hourly limb can never fire. Now `3`, and both the pure gate and C11 assert the ordering holds.
+2. **The `≥1 head` invariant would have BLOCKED a GDPR deletion.** As a *hard* DB invariant it fires when a co-head who is not the founder erases their data and legitimately orphans a clan — i.e. `delete_my_data()` would have failed. Fixed by exempting the case where the member's **profile** is gone, which works because the trigger is `DEFERRABLE INITIALLY DEFERRED` (by COMMIT the profile is deleted, so `delete_my_data`'s existing order needs no change). Deferral also buys the two things an immediate trigger cannot: `delete_clan`'s cascade works, and **promote-then-leave in one transaction** is allowed — exactly the §10.4 UI.
+
+**The verification — `supabase/tests/clan_management.sql`.** C1–C12 + teardown, every assertion RAISING, so the run is green or red. It drives the API as **real signed-in users** (`set role authenticated` + a real `request.jwt.claims`), not as the owner, so RLS is genuinely in the path. It proves: the founder is the only head · a code joins instantly and a bad one fails loudly · **an elder cannot promote, invite, rename or remove** · head is not assignable and the founder's role is immutable · **the sole head is refused when leaving and the founder may leave once a co-head exists** · the invariant fires **in the database** (`set constraints … immediate` is what makes a *deferred* error observable) · the Book's two projections, the 45-day row hidden **but still present**, and `private` withheld from non-members · delete cascades to members, tributes and burns · **both** anti-abuse limbs.
+
+**⚠️ Two harness facts, measured — they matter to every SQL test here.** `set_config(…, is_local := true)` and `SET LOCAL` **do not survive across statements** under `run-sql-tests.sh` (psql autocommit): each statement is its own transaction, so `SET LOCAL` even warns *"can only be used in transaction blocks"*. Session-scoped `SET ROLE` / `set_config(…, false)` is the form that works in BOTH runners. And a `pg_temp` table grants **nothing** to PUBLIC — the test needs an explicit `grant … to authenticated`, or its first read/write as a user fails. *(`pr3_verification.sql` uses `SET LOCAL`, so it only works on the CLI-migration path, not `run-sql-tests.sh` — recorded, not changed.)*
+
+**Gates:** `tokens 36 · domain 45 · slice 36 · throw 33 · ads 51 · wire 43 · session 17 · pathc 38 · sql 12 · adrs 34 · contrast 22 · responsive 21 · lib 153` (+ the new SQL file, which `run-sql-tests.sh` picks up automatically). **Fault-tested:** flipping the pure rules to 10/10 and to allow-any-role turned **7** `lib` checks red; removing the trigger's profile exemption turned **C12** red with the expected message.
+
+**Spend: US$0.00** — no fal.ai call, no deploy: `npm install`, the local gate suite, and a local Supabase stack on Docker. The invariant, the caps and the Book were proved against a **real Postgres 17.11**, not asserted.
+
+**Left for SCRUM-46:** the **frontend** — the first-run fork, create, join, invite/share and the Home clan card per the SCRUM-48 boards (SCRUM-50 owns the QR scanner). The API half is done and pinned.
+
+
 ### 12.11 · SCRUM-82 — the clan bootstrap, and the first complete ritual (2026-10-07)
 
 **The blocker.** `submit_burn` is clan-scoped: it requires `clan_id` (migration 0004 §226) **and** the caller's `clan_members` row (§252). The slice's `submitBurn` sent only `{ capture_id, accuracy }`, and a fresh anonymous user is in no clan — so `award-service` answered **400** and `burns` stayed **0**. §12.10 proved everything upstream; this was the last step.

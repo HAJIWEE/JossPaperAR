@@ -54,7 +54,7 @@
 
 | 2026-10-07 | **SCRUM-82 — the clan fix, validated on the emulator** | Prove the full ritual completes (capture → cartoonize → burn → **award → persist**) | **≈ US$0.09** — one real Path C run: the job `styled`, `cost_micros = 90000` | **1.2808** (Mastercard) | **≈ S$0.12** | ✅ **incurred 2026-10-07** — the ritual completed and awarded **600 devout tribute**. fal total ≈ **US$5.16 / S$6.61** of the approved US$10–20. |
 
-| 2026-10-08 | **S34 — post-merge docs reconciliation (SCRUM-82)** | Bring `next-ai-context.md` · `follow-up-items.md` · `handover-prompt.md` back in line with `main` after PR #27 merged | **US$0.00** — **no fal.ai call was made**: the session ran `npm install` and `npm run check` only (all gates are local and dependency-free); nothing was deployed and no migration was applied | — | **S$0.00** | ✅ **no spend** — logged so the zero is on the record rather than absent. The fal total is unchanged at ≈ **US$5.16 / S$6.61** of the approved US$10–20. |
+| 2026-10-08 | **S34 — the post-merge docs reconciliation (SCRUM-82) + `SCRUM-46`'s clan management API** | Bring the docs back in line with `main` after PR #27 merged; then build the clan role ladder + the Book of Tributes read path and prove them against a real database | **US$0.00** — **no fal.ai call was made**: the session ran `npm install`, the local gate suite, and a **local Supabase stack on Docker** (migrations applied from the files, real Postgres 17.11). Nothing was deployed to the hosted project, no AI pipeline ran, and the only remote calls were Jira/GitHub records | — | **S$0.00** | ✅ **no spend** — logged so the zero is on the record rather than absent. The fal total is unchanged at ≈ **US$5.16 / S$6.61** of the approved US$10–20. |
 
 <!-- APPEND-NEW-ONEOFF-COSTS-ABOVE -->
 
@@ -127,7 +127,7 @@
 
 ---
 
-*Updated 2026-10-08 — **S34**: the post-merge docs reconciliation logged at **US$0.00 / S$0.00** (no AI call, no deploy, no migration — only `npm install` + the local gates). The fal total stands at **≈ S$6.61 / US$5.16** — the two 2026-10-07 Path C runs — i.e. **26%** of the approved US$20 ceiling.*  
+*Updated 2026-10-08 — **S34**: the post-merge docs reconciliation **and `SCRUM-46`'s clan management API** both logged at **US$0.00 / S$0.00** — no AI call, no deploy to the hosted project, and the migration was proved on a **local Supabase stack on Docker** (real Postgres 17.11) rather than by spending. The fal total stands at **≈ S$6.61 / US$5.16** — the two 2026-10-07 Path C runs — i.e. **26%** of the approved US$20 ceiling.*  
 *Updated 2026-10-05 — **SCRUM-41 closed**: the Mastercard rate **1.2808** was read off the statement and applied to every fal.ai row (spike **S$5.75** · PR-3 **≈S$0.51** · SCRUM-59 **≈S$0.12** → **≈ S$6.38 / US$4.98**), superseding the 1.2771 & 1.2900 ⚠ placeholders. Also logged **SCRUM-55 = S$0.00**.*
 *Previous (2026-10-04) — PR-3 verification ≈US$0.40 and the SCRUM-59 stop-rule verification ≈US$0.09 logged (the latter from a mis-fired first run; the corrected path costs nothing — doc 19 §12.5).*
 *Updated 2026-09-25 — page created (session 16); ClinePass + spike budget logged; first-month actual **US$2.12 = S$2.71** recorded, **next charge 2026-10-22**.*

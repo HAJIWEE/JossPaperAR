@@ -38,6 +38,29 @@ import {
 import { QUOTA_SPENT_COPY } from '../../domain/quota.ts';
 import { INITIAL_OFFERING, applyAll, isWaiting, nextAction } from '../../domain/slice.ts';
 import { eventsFromResponse } from '../ritual-map.ts';
+import {
+  ASSIGNABLE_ROLES,
+  BOOK_WINDOW_DAYS,
+  CLANS_PER_USER,
+  HEAD_POWER_ROLES,
+  JOINS_PER_HOUR,
+  MS_PER_DAY,
+  bookProjection,
+  bookWindowStart,
+  canDeleteClan,
+  canEditAncestors,
+  canInvite,
+  canLeaveClan,
+  canOffer,
+  canRemoveMember,
+  canRenameClan,
+  hasHeadPower,
+  isClanRole,
+  isHeadless,
+  isInBookWindow,
+  joinRefusal,
+  roleChangeRefusal,
+} from '../clan-roles.ts';
 
 let passed = 0;
 let failed = 0;
@@ -424,6 +447,80 @@ function serviceChecks(): void {
   check('…and the reused id is the one observed', reusePlan.action === 'reuse' && reusePlan.clanId === 'clan-1');
   check('no clan means CREATE', planClan(null).action === 'create');
   check('⚠️ an empty-string clan id is NOT reused — it creates', planClan('').action === 'create');
+
+  // ── 10 · the clan ladder (SCRUM-46 · doc 15 §3/§5/§7) ───────────────────
+  // The role matrix, the ≥1-head invariant, the anti-abuse numbers and the
+  // Book window — the rules `0012_clan_management_api.sql` enforces, asserted
+  // where they can be asserted without a database.
+  section('10 · The clan ladder (SCRUM-46 · doc 15 §3 · §5.2 · §7)');
+
+  // the two role sets — the distinction every head test depends on
+  check('head power is exactly head + co_head (doc 15 §3)', HEAD_POWER_ROLES.length === 2 &&
+    hasHeadPower('head') && hasHeadPower('co_head') && !hasHeadPower('elder') && !hasHeadPower('member'));
+  check('head is NOT an assignable role — succession runs via co_head', !ASSIGNABLE_ROLES.includes('head'));
+  check('co_head, elder and member ARE assignable', ASSIGNABLE_ROLES.length === 3);
+  check('junk is not a clan role', !isClanRole('owner'));
+
+  // the matrix, row by row (doc 15 §3)
+  check('every role may make an offering', (['head', 'co_head', 'elder', 'member'] as const).every(canOffer));
+  check('an elder may add/remove ancestors', canEditAncestors('elder'));
+  check('⚠️ a member may NOT add/remove ancestors', !canEditAncestors('member'));
+  check('a head may invite', canInvite('head'));
+  check('a co-head may invite (full Head column)', canInvite('co_head'));
+  check('⚠️ an elder may NOT invite — the matrix is Head-only', !canInvite('elder'));
+  check('a member may NOT invite', !canInvite('member'));
+
+  check('a head may rename the clan', canRenameClan('head'));
+  check('an elder may NOT rename the clan', !canRenameClan('elder'));
+  check('a head may remove a member', canRemoveMember('head'));
+  check('a member may NOT remove a member', !canRemoveMember('member'));
+  check('a co-head may delete the clan (full Head column)', canDeleteClan('co_head'));
+  check('an elder may NOT delete the clan', !canDeleteClan('elder'));
+
+  // the role-change rules (mirrors set_member_role)
+  check('a head may promote a member to elder', roleChangeRefusal('head', 'member', 'elder') === null);
+  check('a head may lift an elder to co-head', roleChangeRefusal('head', 'elder', 'co_head') === null);
+  check('a co-head may promote (full Head column)', roleChangeRefusal('co_head', 'member', 'elder') === null);
+  check('⚠️ an elder may NOT promote', roleChangeRefusal('elder', 'member', 'elder') === 'actor_lacks_head_power');
+  check('a member may NOT promote', roleChangeRefusal('member', 'member', 'elder') === 'actor_lacks_head_power');
+  check('⚠️ head is refused as a new role', roleChangeRefusal('head', 'member', 'head') === 'role_not_assignable');
+  check('the founder’s role cannot be changed', roleChangeRefusal('head', 'head', 'elder') === 'target_is_founder');
+  check('a demotion back down is allowed', roleChangeRefusal('head', 'co_head', 'elder') === null);
+
+  // the ≥ 1 head invariant (doc 15 §3)
+  check('a clan of members only IS headless', isHeadless(['member', 'elder']));
+  check('a lone co-head is NOT headless — co-head carries head power', !isHeadless(['co_head']));
+  check('an empty clan is headless', isHeadless([]));
+
+  // leaving — promote-first (doc 15 §5.3 + §10.4)
+  check('a member leaves freely', canLeaveClan(['head', 'member'], 'member'));
+  check('an elder leaves freely', canLeaveClan(['head', 'elder'], 'elder'));
+  check('⚠️ the SOLE head may NOT leave — promote a co-head first', !canLeaveClan(['head', 'member'], 'head'));
+  check('a head MAY leave once a co-head exists', canLeaveClan(['head', 'co_head', 'member'], 'head'));
+  check('a non-member cannot leave', !canLeaveClan(['head'], null));
+
+  // anti-abuse (doc 15 §5.2)
+  check('the clans-per-user limit is 10', CLANS_PER_USER === 10);
+  check('the joins-per-hour limit is 3', JOINS_PER_HOUR === 3);
+  check('⚠️ the joins-per-hour limit is BELOW the clan cap — or the limb is dead logic',
+    JOINS_PER_HOUR < CLANS_PER_USER);
+  check('9 clans is allowed', joinRefusal(CLANS_PER_USER - 1, 0) === null);
+  check('⚠️ the 10th clan is refused', joinRefusal(CLANS_PER_USER, 0) === 'too_many_clans');
+  check('9 joins in an hour is allowed', joinRefusal(0, JOINS_PER_HOUR - 1) === null);
+  check('⚠️ the 10th join in an hour is refused', joinRefusal(0, JOINS_PER_HOUR) === 'too_many_joins');
+  check('the clan count is refused before the join burst', joinRefusal(CLANS_PER_USER, JOINS_PER_HOUR) === 'too_many_clans');
+
+  // the Book window — HIDE, not purge (doc 15 §7 · §10.5)
+  check('the Book window is 30 days', BOOK_WINDOW_DAYS === 30);
+  const nowMs = Date.UTC(2026, 9, 8);
+  check('the window start is 30 days back', bookWindowStart(nowMs) === nowMs - 30 * MS_PER_DAY);
+  check('an entry from 5 days ago is shown', isInBookWindow(nowMs - 5 * MS_PER_DAY, nowMs));
+  check('⚠️ an entry from 45 days ago is HIDDEN (not deleted)', !isInBookWindow(nowMs - 45 * MS_PER_DAY, nowMs));
+  check('a future-dated entry is shown', isInBookWindow(nowMs + MS_PER_DAY, nowMs));
+
+  // the two Book projections (doc 15 §7.2)
+  check('a member sees the full entry', bookProjection(true) === 'full');
+  check('⚠️ a non-member gets the anonymised entry', bookProjection(false) === 'anonymous');
 }
 
 async function main(): Promise<void> {
