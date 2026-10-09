@@ -565,6 +565,32 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.14 · S35b — SCRUM-86: the invite code is elder-and-above, and two traps that nearly produced a false green (2026-10-09)
+
+**The decision.** PM: *"limit link sharing to elder and above seniority."* ⚠️ **This CONFIRMED the spec rather than changing it** — doc 15 §3's matrix has always read `| Invite new members (link · code · QR) | ✅ | ✅ | ❌ |` (Head ✅ · **Elder ✅** · Member ❌). Two things had drifted *from* that row: `canInvite` returned `hasHeadPower` (justified by a comment that **misquoted doc 15** as saying "Elder ❌"), and the database never enforced it at all. ⚠️ **I repeated that misquote in my first SCRUM-86 comment before reading the document** — a claim about a doc is not the doc, and this is the second time in one day a carried-forward claim was wrong (the "12/12" migration count was the first).
+
+**Migration `0015`.** Three parts: the column becomes unreadable to clients · `clan_invite_code(p_clan_id)` (SECURITY DEFINER, gated to elder+) becomes the only path to it · and `reroll_clan_code` is **replaced**, because its `returning code, name` reads a column the role no longer has. ⚠️ That last one is the shape of breakage a column revoke causes: the migration applies cleanly and the feature dies only when a head taps Re-roll.
+
+⚠️ **TRAP A — a column revoke on top of a table-wide grant is a SILENT NO-OP.** Supabase grants `authenticated` **table-wide** SELECT, and **column ACLs are additive**: `revoke select (code)` leaves the table-wide grant standing, so `code` stays readable while the migration looks correct. The table-wide grant must be **dropped** and every *other* column re-granted by name. ⚠️ That re-grant list is now **fail-CLOSED** — a column added to `clans` later is unreadable until listed — and `invite_sharing.sql` **S9** asserts the list covers every column except `code`, so the failure is loud instead of a silent client regression.
+
+⚠️ **TRAP B — `supabase start` does NOT apply new migrations to an existing volume.** The Docker volume `supabase_db_JossPaperAR` **persisted from an earlier session**, so `supabase start` reused it: `START_EXIT=0`, no error, and the stack looked healthy — while `clan_invite_code` **did not exist** and `authenticated` still held SELECT on `code`. **The first "it applied cleanly" was a FALSE GREEN.** It was caught only by querying the database instead of trusting the exit code:
+
+```sql
+select version from supabase_migrations.schema_migrations order by version desc limit 3;
+```
+
+which read `20261008200000` — one migration short. **`npx supabase db reset` re-applies from the files** and fixed it. ⚠️ **The generalisation: a green exit code is evidence that a command finished, not that it did anything.** Verify the STATE, not the status.
+
+**Verified — local.** `clan_management.sql` **109 ✓** (not broken) · `invite_sharing.sql` **25 ✓** (new, self-contained fixtures) · `ai_budget.sql` **17 ✓** · `check:clanapi` **92/92** (was 81). ⚠️ **FAULT-TESTED**: replacing the table-wide revoke with the column-only form turns **S7 + S8 RED**, which proves both that the no-op is real and that the suite catches it.
+
+**Verified — live, by real calls.** `db push` (after a `--dry-run`, and after checking that nothing else reads the column — **no Edge Function references `clans`**, and the revoke is scoped to `authenticated`/`anon` so `service_role` is untouched). Remote is now **15/15, no drift**; the live PostgREST exposes `/rpc/clan_invite_code`; and `GET /rest/v1/clans?select=code` answers **401 `42501 permission denied`**.
+
+⚠️ **A deliberate side effect, recorded rather than hidden:** `anon` now loses SELECT on the **whole table**, not just the column — the unavoidable consequence of dropping a table-wide grant. It is the *tighter* posture, nothing in the client reads `clans` before a session exists, and **PR-3's R4 already tolerates it**: its loop treats a table `anon` cannot read at all as *"also 'reads nothing'"*. Pinned by **S13**.
+
+⚠️ **FOUND, NOT CAUSED — `pr3_verification.sql` is RED on the local stack, with or without this change** (proved by moving the migration aside and re-running). It uses **`set local role authenticated`**, which is a **no-op** under `run-sql-tests.sh` (psql autocommit; `SET LOCAL` outside a transaction warns and does nothing) — so its *"an authenticated INSERT into `ledger_events` is DENIED"* assertion actually runs as the owner. ⚠️ **`clan_management.sql` uses plain `set role`, which is exactly why that file passes** — the house guidance exists and was applied to one file but not the other. Note also that its failure **aborts before its teardown**, and the residue then broke a *later* file's C7 assertion until a `db reset` — the documented residue trap, demonstrated live rather than quoted.
+
+---
+
 ### 12.13 · S35 — the hosted project was THREE MIGRATIONS BEHIND, and a fresh worktree is not linked (2026-10-09)
 
 **The finding, measured.** `npx supabase migration list` read **remote 11 / local 14**. Three migrations — `0012` (*clan_management_api*), `0013` (*clan_head_exit*) and `0014` (*clan_successor_rank*) — had **never been pushed**. So the **entire clan system that `main` had just merged was dead on the live backend**: `set_member_role` · `remove_member` · `leave_clan` · `rename_clan` · `delete_clan` · `clan_book` were all **404 by absence**, and SCRUM-82's fixed award path was running against a schema that predated its own guard.
