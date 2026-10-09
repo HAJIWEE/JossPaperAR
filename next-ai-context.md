@@ -76,7 +76,7 @@
 - **🟡 PM whole-file visual review** — the 47 boards changed by the S21 contrast tranche still need an eyeball. *(It no longer gates anything: `SCRUM-42` and `SCRUM-33` are **Done** in Jira since 30 Sep, so there is no live colour hold — the old wording is in the archive.)*
 - **🟡 Save a named Penpot version** — must be done **in the Penpot UI** (File → Version history); the plugin API exposes undo blocks only.
 - **🟡 Two design decisions from the S19 economy boards** (Decision A · Decision B) — see *What needs you (PM)* below.
-- **Home clan card** — the signed-off Home layout has no free band, so "Home → clan card → invite surface" needs a Home design pass → feeds **SCRUM-46**.
+- **Home clan card** — the signed-off Home layout has no free band, so "Home → clan card → invite surface" needs a Home design pass. ⚠️ **It is now its own DECISION TICKET — `SCRUM-91`** (*🎯 is a scaffold entry enough, or must the card be designed + built?*), which **`blocks` SCRUM-46** — and SCRUM-46 is otherwise **complete and merged**. ⚠️ **The switcher half already exists** — in `clan/manage.tsx`, **not on Home** — which is why this needs a decision rather than a task.
 - **Tap-target / proportion pass** — grow the touch area with an invisible rect rather than the artwork (40–50s hands); decision was closed S9, execution pending.
 
 ### Open questions
