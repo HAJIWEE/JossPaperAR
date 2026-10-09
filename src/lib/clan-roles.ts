@@ -56,12 +56,35 @@ export function canEditAncestors(role: ClanRole | null | undefined): boolean {
 }
 
 /**
- * ⚠️ Invite new members is **Head only** — NOT elder. doc 15 §3's matrix is
- * explicit (Head ✅ · Elder ❌), and it is why `reroll_clan_code` asserts
- * `is_clan_head`. An elder can add tablets but cannot widen the family.
+ * Share the invite (code · link · QR): **elder and above** — **SCRUM-86**,
+ * answered by the PM on 2026-10-09: *"limit link sharing to elder and above
+ * seniority"*.
+ *
+ * ⚠️ **THE PM'S ANSWER *CONFIRMED* doc 15 §3 — IT DID NOT CHANGE IT.** The matrix
+ * has always read `| Invite new members (link · code · QR) | ✅ | ✅ | ❌ |`:
+ * Head ✅ · **Elder ✅** · Member ❌. This function said `hasHeadPower`, which
+ * **contradicted its own spec** — and the comment that used to sit here
+ * ("doc 15 §3's matrix is explicit (Head ✅ · Elder ❌)") was a **misquote of the
+ * document it cited**. The doc was right; the code had drifted from it.
+ *
+ * ⚠️ AND THE DATABASE NEVER ENFORCED IT EITHER: `clans_select_member` is
+ * table-level RLS, so any member could read `clans.code` directly. SCRUM-86
+ * closed both gaps — the ladder here, and the column grant in migration `0015`.
+ * A client-only gate over a readable column would have been **security theatre**.
+ *
+ * ⚠️ RE-ROLLING IS NOT COVERED BY THIS, and stays `hasHeadPower` — ⚠️ **which is
+ * also what the spec already said** (doc 07 §4.6: the code is *"re-rollable by a
+ * head"*; §5.1: *"One active code per clan (Head can re-roll it)"*). Sharing and
+ * retiring are different acts: retiring **invalidates the link every member is
+ * holding**, sharing does not. So an elder may share a link but may not retire
+ * it, and the spec agrees.
  */
+export const ELDER_PLUS_ROLES: readonly ClanRole[] = ['head', 'co_head', 'elder'];
+
 export function canInvite(role: ClanRole | null | undefined): boolean {
-  return hasHeadPower(role);
+  return (
+    role !== null && role !== undefined && (ELDER_PLUS_ROLES as readonly string[]).includes(role)
+  );
 }
 
 /** Promote / rename / remove / delete — the rest of the Head column. */

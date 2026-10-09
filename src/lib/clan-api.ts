@@ -257,26 +257,24 @@ export async function myClans(): Promise<ApiResult<ClanSummary[]>> {
 }
 
 /**
- * The invite code, fetched EXPLICITLY (SCRUM-50 · doc 07 §4.6).
+ * The invite code, fetched EXPLICITLY (SCRUM-50 · doc 07 §4.6; **rewritten for
+ * SCRUM-86 on 2026-10-09**).
  *
- * ⚠️ WHY NOT FROM `myClans()`: that read deliberately returns `code: null`, so a
- * list read cannot hand the invite capability to a member who is not a head. The
- * invite surface has to ASK for it — and asks only when the pure `canInvite(role)`
- * says the viewer may invite (head / co-head, doc 15 §3).
+ * ⚠️ AN RPC, NOT A TABLE READ. As of migration `0015`, `clans.code` is **no
+ * longer granted** to `authenticated`, so `select('code')` fails with
+ * `permission denied for column code`. `clan_invite_code` is the **only**
+ * client-readable path to it, and the server owns the rule:
+ * **elder and above** (SCRUM-86: *"limit link sharing to elder and above
+ * seniority"*).
  *
- * ⚠️ THE SERVER'S REAL POSTURE, measured — not assumed: `clans_select_member` is
- * `using (is_clan_member(id) or created_by = auth.uid())`, a TABLE-level policy,
- * so any member can already read `code` by selecting it. The gate here is
- * therefore a UI gate, and it is honest to say so rather than to imply the code
- * is hidden from plain members. Tightening that is a server-side (RLS) change —
- * a security-posture decision, not a client one. Recorded on SCRUM-50.
+ * ⚠️ The client check below is a UI convenience, never the boundary. This
+ * function USED to be a table read that merely *withheld* the code from a
+ * non-head, over a column any member could select directly — the shortcut
+ * SCRUM-86 option C rejected as security theatre. The gate now lives in the
+ * database, which is why this call can simply be made and trusted.
  */
 export async function fetchClanCode(clanId: string): Promise<ApiResult<string>> {
-  const { data, error } = await supabase()
-    .from('clans')
-    .select('code')
-    .eq('id', clanId)
-    .maybeSingle();
+  const { data, error } = await supabase().rpc('clan_invite_code', { p_clan_id: clanId });
   if (error) return { ok: false, reason: reasonOf(error) };
 
   const code = str(asRecord(data)?.code);

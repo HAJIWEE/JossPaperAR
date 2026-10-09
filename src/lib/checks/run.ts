@@ -513,8 +513,16 @@ function serviceChecks(): void {
   check('⚠️ a member may NOT add/remove ancestors', !canEditAncestors('member'));
   check('a head may invite', canInvite('head'));
   check('a co-head may invite (full Head column)', canInvite('co_head'));
-  check('⚠️ an elder may NOT invite — the matrix is Head-only', !canInvite('elder'));
-  check('a member may NOT invite', !canInvite('member'));
+  // ⚠️ FIXED BY SCRUM-86 (PM, 2026-10-09: "limit link sharing to elder and above
+  // seniority"). This line used to read `!canInvite('elder')`, justified by a
+  // comment claiming doc 15 §3 said "Elder ❌" — ⚠️ **IT DID NOT.** The matrix has
+  // always read `| Invite new members (link · code · QR) | ✅ | ✅ | ❌ |`. So this
+  // assertion was ENFORCING A MISQUOTE OF THE SPEC. It is kept as an assertion
+  // rather than deleted, because a rule stated in two places is exactly what lets
+  // one of them drift — a change here now has to argue with the document.
+  check('⚠️ an elder MAY invite — doc 15 §3, confirmed by SCRUM-86', canInvite('elder'));
+  check('⚠️ a member may NOT invite — the boundary the PM drew', !canInvite('member'));
+  check('an outsider may not invite', !canInvite(null) && !canInvite(undefined));
 
   check('a head may rename the clan', canRenameClan('head'));
   check('an elder may NOT rename the clan', !canRenameClan('elder'));
@@ -750,7 +758,8 @@ function serviceChecks(): void {
     headNeeds.every((a) => headActions.includes(a)));
   const elderActions = actionsFor('elder');
   check('an elder can add ancestors', elderActions.includes('ancestors'));
-  check('⚠️ an elder CANNOT invite — the matrix is Head-only', !elderActions.includes('invite'));
+  check('⚠️ an elder CAN invite — doc 15 §3, confirmed by SCRUM-86',
+    elderActions.includes('invite'));
   check('an elder cannot manage, rename or delete',
     !elderActions.includes('manage') && !elderActions.includes('rename') &&
     !elderActions.includes('delete'));
