@@ -12,7 +12,7 @@ Continue building **JossPaperAR** — an Expo/React Native AR app that replaces 
 
 **Where the project is.** The backend of record is **live and exercised** (Supabase + Postgres + Edge Functions on hosted `yercgevebxvtzkgctfai`), the economy's **AI-cost ceiling is enforced**, the **Android emulator target is live**, and 🎉 **the vertical slice completes a FULL ritual on glass** — capture → cartoonize → burn → award → persist.
 
-**This session's work (S35, 2026-10-09) is on `cline/7421e` — 3 commits — and PR #29 is OPEN into `main` (`0bdbf29`; ⚠️ opened with the GitHub MCP server, because `gh pr create` 403s on this repo — trap 26 already says so).** `main` is now **`b81a86e`**: **PR #28 was MERGED** (2026-10-09 01:35Z, the PM merged it after the S34 wrap note was written).
+**This session's work (S35/S35b, 2026-10-09) is on `cline/7421e` — now 7 commits — and PR #29 is OPEN into `main` (`284124d`; ⚠️ opened with the GitHub MCP server, because `gh pr create` 403s on this repo — trap 26 already says so).** `main` is now **`b81a86e`**: **PR #28 was MERGED** (2026-10-09 01:35Z, the PM merged it after the S34 wrap note was written).
 
 ⚠️ **THE FINDING THAT MATTERED WAS NOT THE TICKET.** `npx supabase migration list` read **remote 11 / local 14** — `0012`, `0013` and `0014` had **never been pushed**, so **the whole merged clan system was dead on the live backend**. The S34 handover's *"verified at 12/12"* was **wrong**. `db push` applied all three (**14/14, no drift**), proved by a real call: the live PostgREST OpenAPI now exposes the full clan RPC surface. ⚠️ **A fresh worktree is NOT linked** (`supabase/.temp` is gitignored, so link state is per-worktree) — **re-link and re-read the remote count before any push.** Full detail: doc 19 **§12.13**.
 
@@ -36,36 +36,37 @@ What S35 delivered:
 
 ## 3 · Do this first, in order
 
-1. Read `next-ai-context.md` (*Quick Reference* → *Start Here*) → `follow-up-items.md` → doc 19 **§12.11 – §12.12e** (the ritual's first complete run, then the clan API, the head-exit ramp, the tutorial, and the successor's rank).
-2. **PR #28 is OPEN and awaiting the PM's merge.** Do not assume it is in. `main` = `a076b88`; `cline/c1292` = `940c85b`. ⚠️ A fresh worktree has **no `node_modules` and no `.env`** — run `npm install` and copy `.env.example` → `.env` before anything else, or the ritual dies at `preparing`. Verify a merge with `git merge-base --is-ancestor <branch> origin/main` — **not** `origin/<branch>`, which `git fetch --prune` deletes *after* a merge.
-3. **Green the local gates before touching anything**, so a red one is definitely yours: `npm run check` + `npx tsc --noEmit`. Expect **`lib` 242**, `check` reporting **14 migrations structurally sound**, and **0** TS errors.
-4. **Start the local stack for the DB gates** — `npx supabase start` (free, no account, applies the migrations **from the files**). Then `npm run check:clanapi` (**81/81**) and the SQL suite (⚠️ **needs `--network host`** — trap 20; without it every file reports `Connection refused` and it *reads* like a failing test).
-5. **Sprint audit** (rule 2). It was clean at the S34 wrap: `SCRUM-46` **In Progress** and `SCRUM-85` **In Review**, both in **Sprint 1 (id 1)**; `SCRUM-50` deliberately left in the backlog. ⚠️ `SCRUM-50` is **`To Do` with no sprint** — if you pick it up, move it in *first*.
+1. Read `next-ai-context.md` (*Quick Reference*) → `follow-up-items.md` → doc 19 **§12.11 – §12.14** (the ritual's first complete run · the clan API · the head-exit ramp · the tutorial · **the invite code made elder-and-above, and the two traps in §12.14**).
+2. ⚠️ **PR #29 is OPEN and awaiting the merge.** ⚠️ **Open PRs with the GitHub MCP server — never `gh`** (its PAT is read-only here and answers 403 even after a successful push; see trap 26). `main` = **`b81a86e`** (PR #28 merged 2026-10-09); `cline/7421e` = **`284124d`** (7 commits). A fresh worktree has **no `node_modules` and no `.env`** — `npm install` and copy `.env.example` → `.env` first, or the ritual dies at `preparing`. Verify a merge with `git merge-base --is-ancestor <branch> origin/main` — **not** `origin/<branch>`, which `git fetch --prune` deletes *after* a merge.
+3. **Green the local gates before touching anything**, so a red one is definitely yours: `npm run check` + `npx tsc --noEmit`. Expect **`lib` 293**, `check` reporting **15 migrations structurally sound**, and **0** TS errors.
+4. **Start the local stack for the DB gates** — `npx supabase start` (free, no account). ⚠️ **`start` does NOT apply new migrations to an existing volume** (doc 19 §12.14 **trap B**): the persisted `supabase_db_JossPaperAR` made a migration look applied while it was absent, and only **`npx supabase db reset`** fixed it. **Verify STATE, not the exit code** (`select version from supabase_migrations.schema_migrations order by version desc limit 3`). Then `npm run check:clanapi` (**92/92**) and the SQL suite — ⚠️ **needs `--network host`** (trap 20), and ⚠️ **`pr3_verification.sql` is RED and KNOWN — `SCRUM-87`**, not your change (`set local role` is a no-op under the runner). Reset before trusting a re-run: a failed file aborts before its teardown and poisons the next one.
+5. **Sprint audit** (rule 2). It must return **nothing** for `sprint is EMPTY AND statusCategory = "In Progress"`. **After the 2026-10-09 board reconciliation** the sprint's in-flight set is: **In Progress** — `SCRUM-53` (⚠️ **correctly open: two acceptance criteria need `SCRUM-52`'s floor device**, which the emulator cannot prove), `SCRUM-56` (PM provisioning), `SCRUM-64` (emulator — recommend Done, awaiting a nod); **In Review** — `SCRUM-46` (⚠️ **merged but NOT done: the design-led Home clan card is unbuilt**), `SCRUM-50` + `SCRUM-86` (both in **PR #29**, unmerged). ✅ `SCRUM-80` · `SCRUM-81` · `SCRUM-82` · `SCRUM-85` were **moved to Done** — they had been merged for days while the board still said `In Review`.
 6. Then pick from §5.
 
 ## 4 · What exists (verified against the repo and the local stack — not asserted)
 
 | | |
 |---|---|
-| `main` | **`a076b88`** — every PR through **#27** merged, CI green |
-| this branch | **`cline/c1292` = `940c85b`** · 13 commits · **PR #28 OPEN** (not merged) |
-| local gates | `npm run check` **all green**: `tokens 36 · domain 45 · slice 36 · throw 33 · ads 51 · wire 52 · session 17 · pathc 38 · sql/migrations 14 · adrs 34 · contrast 22 · responsive 21 · lib 242` |
-| DB gates | `check:clanapi` **81/81** · `clan_management.sql` **109 assertions, exit 0** — both need `npx supabase start`; the SQL suite also needs **`--network host`** (trap 20) |
-| migrations | **14 files on disk.** The hosted project was last verified at **12/12**, so ⚠️ **`0013` and `0014` are almost certainly NOT applied there**, and this worktree is **not linked** (`Cannot find project ref`). `npx supabase link` + `migration list` **before** any `db push` — and expect to push **2** |
+| `main` | **`b81a86e`** — every PR through **#28** merged, CI green |
+| this branch | **`cline/7421e` = `284124d`** · **7 commits** · **PR #29 OPEN** (not merged) — carries `SCRUM-50` + `SCRUM-86` |
+| local gates | `npm run check` **all green**: `tokens 36 · domain 45 · slice 36 · throw 33 · ads 51 · wire 52 · session 17 · pathc 38 · sql/migrations 15 · adrs 34 · contrast 22 · responsive 21 · lib 293` |
+| DB gates | `check:clanapi` **92/92** · `clan_management.sql` **109** · `invite_sharing.sql` **25** · `ai_budget.sql` **17** — all need `npx supabase start` **+ `db reset`**; the SQL suite also needs **`--network host`** (trap 20). ⚠️ **`pr3_verification.sql` is RED and pre-existing — `SCRUM-87`**, not your change |
+| migrations | **15 files on disk, and all 15 ARE applied to the hosted project** — `migration list` reads **15/15, no drift** (S35 pushed `0012`–`0014`; S35b pushed `0015`). ⚠️ A fresh worktree is **not linked** (`supabase/.temp` is gitignored), so `npx supabase link` + `migration list` **before** any `db push` |
 | typecheck | `npx tsc --noEmit` → **0 errors** |
-| screen counts | **5** clan screens · the tutorial branch in `capture → preparing → burn → reward` |
-| spend | fal.ai **≈ US$5.16** of the approved **US$10–20** — **unchanged**: S34 spent **US$0.00** |
+| screen counts | **5** clan screens · the tutorial branch in `capture → preparing → burn → reward` · ⚠️ **new in PR #29:** the shared join body, the **scanner**, and **two `/join` deep-link routes** |
+| spend | fal.ai **≈ US$5.16** of the approved **US$10–20** — **unchanged**: **S34, S35 and S35b all spent US$0.00** |
 
-**The two things S34 deliberately did NOT do:** no **device run** (nothing on glass), and no **`db push`** to the hosted project (migrations were proved on the local stack instead, which is free and equally real).
+**What the S35 sessions deliberately did NOT do:** no **device run** (⚠️ **nothing on glass — still the top unknown**), and the **Home clan card** is unbuilt (which is what keeps `SCRUM-46` in `In Review`).
 
 ## 5 · What's next — the PM picks
 
-1. **⭐ Merge PR #28** *(PM action — everything in it is green)*. It carries `SCRUM-46`'s clan system, `SCRUM-84`'s succession rule and `SCRUM-85`'s tutorial. Until it merges, `main` does not have the clan system at all.
-2. **⭐ The first DEVICE RUN — the highest-value unknown in the project.** Nothing about the clan screens or the tutorial has ever been seen on glass. They are validated only by types, `check:lib` and the `check:clanapi` contract. Run the emulator (traps 1 · 14 · 15 · 16) and drive **tutorial → fork → create → join → manage → book**, then a **second** ritual as a real clan member. ⚠️ Expect this to find defects the gates *cannot* see — S32 found **three** in the write path that had never executed.
-3. **`SCRUM-50` — the QR half of `SCRUM-46`** (generation · scanner · invite deep links). ⚠️ It is **`To Do` with NO sprint** — move it into the active sprint *in the same action* that starts it (rule 2). `clans.code` already exists; the payload is the invite deep link (architecture: doc 07 §4.6).
-4. **The Home clan card** — `SCRUM-46`'s last surface. ⚠️ It needs a **Home design pass**: the signed-off layout has **no free band**, so this is a **design** task before it is a coding one.
-5. **`SCRUM-52` — buy the Tier F floor device** (the named CI phone, four-band acceptance test). A PM purchase, in Sprint 1.
+1. **⭐ Merge PR #29** *(PM action — everything in it is green)*. It carries `SCRUM-50`'s QR invite **and** `SCRUM-86`'s invite-code rule (migration `0015`, **already pushed** to the hosted project). ⚠️ **PR #28 is already merged** (2026-10-09) — that was the S34 hand-off, and it is done.
+2. **⭐ The first DEVICE RUN — the highest-value unknown in the project, and its scope has GROWN.** Nothing about the clan screens, the tutorial **or the new scanner / QR** has ever been on glass. Drive **tutorial → fork → create → join → scan a QR → manage → book**, then a **second** ritual as a real clan member — **and a third as an ELDER**, because the `SCRUM-86` boundary has so far been *asserted* (92 contract checks, 25 SQL assertions) but never *seen*. ⚠️ Expect this to find defects the gates *cannot* — S32 found **three** in the write path that had never executed.
+3. ✅ **`SCRUM-50` is BUILT, in PR #29** — no longer `To Do`, and no longer in the backlog (it was moved into the sprint *in the same action* that started it).
+4. **The Home clan card** — ⚠️ **this is the one thing keeping `SCRUM-46` in `In Review`.** The call is yours: build it (after a **Home design pass** — the signed-off layout has **no free band** for a card, so it is a design task before a coding one), **or** decide a scaffold entry is enough for the slice and **split the designed card into its own ticket**.
+5. **`SCRUM-52` — buy the Tier F floor device** (the named CI phone). ⚠️ **This is now the gate on `SCRUM-53`**: the slice's own acceptance criteria include a run **on the floor device** plus two timing budgets, and the emulator provably cannot settle either.
 6. **`SCRUM-83`'s ZH character-set mismatch** — doc 15 §8 specifies **simplified**, the shipped `i18n.ts` is **traditional**. Small, but it is a real product decision, not a typo.
+7. **`SCRUM-86`** — ✅ answered + built (elder-and-above) · **`SCRUM-87`** — 🐛 the pre-existing SQL red (`bug`/`tests`/`database`). Both in Sprint 1.
 
 **Recommended:** (1) then (2). The device run is where the next real bugs are, and it needs nothing but the emulator.
 
@@ -117,16 +118,19 @@ What S35 delivered:
 npm install                       # node_modules may be absent in a fresh worktree
 cp .env.example .env              # the worktree needs its own (trap 19)
 npx expo start --android          # run the app on the emulator via Expo Go
-npm run check                     # full local gate suite — expect lib 242, 14 migrations sound
-npm run check:clanapi             # client↔server clan CONTRACT — needs `npx supabase start`
+npm run check                     # full local gate suite — expect lib 293, 15 migrations sound
+npm run check:clanapi             # client↔server clan CONTRACT — needs `npx supabase start` + `db reset` (92/92)
 npm run check:db                  # SQL tests (needs docker + supabase/.temp/pooler-url)
 npm run check:budget              # the live stop-rule proof — free by default
 npx tsc --noEmit                  # expect 0 errors
 
-npx supabase start                # local stack: applies the migrations FROM THE FILES (free, no account)
-npx supabase db reset             # re-apply the migration files; also clears residue (trap 9)
-npx supabase migration list       # ⚠️ verify the REMOTE count before any push (trap 8)
-npx supabase db push --yes        # ⚠️ only after `link` + `migration list` — expect to push 2
+npx supabase start                # local stack (free, no account)
+⚠️ it does NOT apply new migrations to an EXISTING volume — a persisted volume made a
+   migration look applied while it was absent (doc 19 §12.14 trap B). Verify STATE:
+   `select version from supabase_migrations.schema_migrations order by version desc limit 3;`
+npx supabase db reset             # ← the fix: re-applies from the files; also clears residue (trap 9)
+npx supabase migration list       # ⚠️ verify the REMOTE count before any push (trap 8) — expect 15/15, no drift
+npx supabase db push --yes        # ⚠️ only after `link` + `migration list` — expect to push 0
 
 # the SQL suite, run the way that actually works locally (trap 6):
 docker run --rm -i --network host postgres:17 psql \
