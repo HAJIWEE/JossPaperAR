@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Share, StyleSheet, Text } from 'react-native';
+import { Alert, StyleSheet, Text } from 'react-native';
 import { router } from 'expo-router';
 
 import {
@@ -14,11 +14,13 @@ import {
   Screen,
   SectionTitle,
 } from '@/components/clan-ui';
+import { InviteCard } from '@/components/invite-qr';
 import {
   type ClanMember,
   type ClanSummary,
   clanMembers,
   deleteClan,
+  fetchClanCode,
   leaveClan,
   myClans,
   removeMember,
@@ -34,9 +36,8 @@ import {
   leaveHintKey,
   promoteLabelKey,
 } from '@/lib/clan-flow';
-import { type ClanRole, type LeaveMember, planLeave } from '@/lib/clan-roles';
-import { activeLocale, t } from '@/lib/i18n';
-import { INVITE_SHARE_COPY, inviteLink } from '@/lib/invites';
+import { type ClanRole, type LeaveMember, canInvite, planLeave } from '@/lib/clan-roles';
+import { t } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 import { text } from '@/theme/tokens';
 
@@ -65,6 +66,8 @@ export default function ClanManageScreen() {
   const [choosingSuccessor, setChoosingSuccessor] = useState(false);
   /** What just happened: who leads now, and whether the SERVER chose for them. */
   const [notice, setNotice] = useState<string | null>(null);
+  /** SCRUM-50 — the invite capability, fetched explicitly and never from a list read. */
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
 
   const clan: ClanSummary | null = clans[index] ?? null;
 
@@ -228,14 +231,31 @@ export default function ClanManageScreen() {
     ]);
   }, [clan]);
 
-  const onShare = useCallback(async () => {
-    if (!clan?.code) {
-      setProblem('clan_code_unavailable');
+  /**
+   * SCRUM-50 — the invite code is fetched EXPLICITLY, and only when the viewer
+   * may invite. `myClans()` returns `code: null` ON PURPOSE (a list read must not
+   * hand the capability to a non-head), so the surface has to ask — and it asks
+   * only after the pure `canInvite(role)` says the viewer may.
+   *
+   * ⚠️ This replaces an `onShare` that read `clan.code` — which `myClans()`
+   * always nulls, so the old code could only ever reach its own
+   * `clan_code_unavailable` branch and the head never saw their own code.
+   */
+  useEffect(() => {
+    const clanId = clan?.clanId;
+    if (!clanId || !canInvite(clan?.role ?? null)) {
+      setInviteCode(null);
       return;
     }
-    const copy = INVITE_SHARE_COPY[activeLocale()](clan.name, clan.code);
-    await Share.share({ message: `${copy}\n${inviteLink(clan.code)}` });
-  }, [clan]);
+    let cancelled = false;
+    void (async () => {
+      const result = await fetchClanCode(clanId);
+      if (!cancelled) setInviteCode(result.ok ? result.data : null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [clan?.clanId, clan?.role]);
 
   if (!busy && clans.length === 0) {
     return (
@@ -283,14 +303,11 @@ export default function ClanManageScreen() {
       {actions.includes('invite') ? (
         <>
           <SectionTitle>{t('clan.inviteFamily')}</SectionTitle>
-          {clan?.code ? (
-            <Text testID="clan-manage-code" selectable style={styles.code}>
-              {clan.code}
-            </Text>
+          {clan && inviteCode ? (
+            <InviteCard clanName={clan.name} code={inviteCode} />
           ) : (
             <Hint>{t('clan.shareCode')}</Hint>
           )}
-          <GhostButton testID="clan-manage-share" label={t('clan.invite')} onPress={() => void onShare()} />
         </>
       ) : null}
 
@@ -424,7 +441,6 @@ export default function ClanManageScreen() {
 const styles = StyleSheet.create({
   rowTitle: { color: text.ink, fontSize: 15, fontWeight: '600' },
   rowMeta: { color: text.muted, fontSize: 12, marginTop: 2 },
-  code: { color: text.ink, fontSize: 24, fontWeight: '700', letterSpacing: 4, marginBottom: 8 },
   /** who leads now — a success line, so malachite (contrast-checked) not cinnabar */
   notice: { color: text.malachite, fontSize: 14, marginTop: 8 },
   problem: { color: text.cinnabar, fontSize: 14, marginTop: 8 },

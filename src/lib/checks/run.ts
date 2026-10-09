@@ -23,6 +23,21 @@ import {
   parseInviteUrl,
   qrPayload,
 } from '../invites.ts';
+import {
+  HELD_INVITE_KEY,
+  HELD_INVITE_KEY_BY_REASON,
+  HELD_INVITE_MAX_AGE_MS,
+  RESOLVE_MESSAGE_KEY,
+  canJoin,
+  isHeldInviteStale,
+  isInvitePayloadSafe,
+  makeHeldInvite,
+  parseHeldInvite,
+  parseInviteCandidate,
+  resolveState,
+  scanDecision,
+  shouldHoldInvite,
+} from '../invite-flow.ts';
 import { LOCALES, MESSAGES, detectLocale, messageKeys, setLocale, t } from '../i18n.ts';
 import { BULK_PREFIX, createSplitStorage, bulkKey } from '../split-storage.ts';
 import {
@@ -795,6 +810,142 @@ function serviceChecks(): void {
   check('⚠️ anything else is NOT a demo — an unreadable flag runs the REAL ritual',
     !isDemo('0') && !isDemo('true') && !isDemo(undefined) && !isDemo('') && !isDemo(' 1'));
   check('the tutorial’s wait is a real beat, not zero', TUTORIAL_WAIT_MS > 0);
+
+  section('13 · Invites on glass — the scanner, the deep link and the held invite (SCRUM-50)');
+
+  // ── the scan decision: the camera fires CONTINUOUSLY while a code is in frame ──
+  const linkPayload = qrPayload('ABCD2345');
+  const first = scanDecision({ payload: linkPayload, lastAccepted: null, busy: false });
+  check('a first scan of the invite QR is ACCEPTED', first.accept === true);
+  check('…and yields the canonical code', first.accept === true && first.code === 'ABCD2345');
+
+  const repeat = scanDecision({ payload: linkPayload, lastAccepted: 'ABCD2345', busy: false });
+  check('⚠️ the SAME payload again is a DUPLICATE, not a second join',
+    repeat.accept === false && repeat.reason === 'duplicate');
+
+  // ⚠️ THE ONE THAT MATTERS: the same code arrives as a LINK from the QR and as a
+  // BARE CODE from a paste box. Comparing raw strings would let both through.
+  const reshaped = scanDecision({ payload: 'ABCD2345', lastAccepted: linkPayload, busy: false });
+  check('⚠️ the same code in a DIFFERENT shape is STILL a duplicate (canonical compare)',
+    reshaped.accept === false && reshaped.reason === 'duplicate');
+
+  const other = scanDecision({ payload: qrPayload('WXYZ6789'), lastAccepted: 'ABCD2345', busy: false });
+  check('a different code is accepted', other.accept === true && other.code === 'WXYZ6789');
+
+  const whileBusy = scanDecision({ payload: linkPayload, lastAccepted: null, busy: true });
+  check('⚠️ busy wins — nothing is accepted while a join is in flight',
+    whileBusy.accept === false && whileBusy.reason === 'busy');
+
+  const junkScan = scanDecision({ payload: 'https://example.com/hello', lastAccepted: null, busy: false });
+  check('⚠️ an unreadable QR is refused, never guessed at', junkScan.accept === false && junkScan.reason === 'unreadable');
+  check('a null / undefined / empty payload is unreadable',
+    !scanDecision({ payload: null, lastAccepted: null, busy: false }).accept &&
+      !scanDecision({ payload: undefined, lastAccepted: null, busy: false }).accept &&
+      !scanDecision({ payload: '', lastAccepted: null, busy: false }).accept);
+  check('a near-miss code (9 chars) is unreadable, not truncated to 8',
+    parseInviteCandidate(inviteLink('ABCD2345') + '9') === null);
+
+  // ── the QR payload carries ONLY the code (doc 13 §4) ──────────────────────
+  check('a real code produces a SAFE payload', isInvitePayloadSafe('ABCD2345'));
+  check('⚠️ the payload is the LINK, not the bare code', qrPayload('ABCD2345') !== 'ABCD2345');
+  check('⚠️ the payload is exactly inviteLink — one payload serves QR · link · share',
+    qrPayload('ABCD2345') === inviteLink('ABCD2345'));
+  check('⚠️ a payload mentioning ancestors or members is refused',
+    !isInvitePayloadSafe('ancestor') && !isInvitePayloadSafe('member!!') && !isInvitePayloadSafe('clan_id'));
+  check('a malformed code produces no payload', !isInvitePayloadSafe('nope'));
+
+  // ── resolve → preview → join (doc 07 §4.6) ────────────────────────────────
+  check('no canonical code yet → empty (nothing was asked of the server)',
+    resolveState({ code: null, looking: false, found: null, transportFailed: false }) === 'empty');
+  check('a request in flight → looking, whatever else is known',
+    resolveState({ code: 'ABCD2345', looking: true, found: true, transportFailed: true }) === 'looking');
+  check('the server said "no such clan" → notFound',
+    resolveState({ code: 'ABCD2345', looking: false, found: false, transportFailed: false }) === 'notFound');
+  check('the server returned a clan → found',
+    resolveState({ code: 'ABCD2345', looking: false, found: true, transportFailed: false }) === 'found');
+
+  // ⚠️ THE REGRESSION THIS SECTION EXISTS FOR. The first implementation collapsed
+  // "bad code" and "could not reach the shrine" into one flag, so going offline
+  // told the user their family's code was wrong — and the invite was never
+  // retried. These two assertions fail together if the states are merged again.
+  const offlineState = resolveState({ code: 'ABCD2345', looking: false, found: null, transportFailed: true });
+  check('⚠️ a transport failure → unreachable, NOT notFound', offlineState === 'unreachable');
+  check('⚠️ …so it does not reuse the invalid-code message',
+    RESOLVE_MESSAGE_KEY.unreachable !== RESOLVE_MESSAGE_KEY.notFound);
+
+  // every non-null message key must actually resolve in BOTH locales
+  for (const state of ['notFound', 'unreachable'] as const) {
+    const key = RESOLVE_MESSAGE_KEY[state];
+    check(`the ${state} message resolves in EN and 中文`,
+      key !== null && messageKeys('en').includes(key) && messageKeys('zh').includes(key));
+  }
+
+  // ── the Join button's enablement ──────────────────────────────────────────
+  check('Join is offered on a real preview', canJoin({ state: 'found', isMember: false, joining: false }));
+  check('⚠️ Join is NOT offered to someone already in the clan',
+    !canJoin({ state: 'found', isMember: true, joining: false }));
+  check('Join is not offered while already joining',
+    !canJoin({ state: 'found', isMember: false, joining: true }));
+  check('⚠️ Join is NOT offered offline — the preview never arrived',
+    !canJoin({ state: 'unreachable', isMember: false, joining: false }));
+  check('Join is not offered for a code that does not resolve',
+    !canJoin({ state: 'notFound', isMember: false, joining: false }));
+  check('Join is not offered before a code is entered',
+    !canJoin({ state: 'empty', isMember: false, joining: false }));
+
+  // ── the HELD invite — doc 07 §4.6: opened before first-run completes ───────
+  check('nothing to hold without a code',
+    shouldHoldInvite({ sessionOk: false, reached: false, code: null }) === null);
+  check('⚠️ no identity yet → HOLD (do not error: the user did nothing wrong)',
+    shouldHoldInvite({ sessionOk: false, reached: true, code: 'ABCD2345' }) === 'no_identity');
+  check('a reachable shrine with a session → proceed, no hold',
+    shouldHoldInvite({ sessionOk: true, reached: true, code: 'ABCD2345' }) === null);
+  check('an unreachable shrine → HOLD, so the invite survives (the queued join)',
+    shouldHoldInvite({ sessionOk: true, reached: false, code: 'ABCD2345' }) === 'offline');
+
+  check('a malformed code cannot be held at all', makeHeldInvite('nope', 'offline', 1) === null);
+
+  const parkedAt = 1_800_000_000_000;
+  const heldRecord = makeHeldInvite('abcd2345', 'no_identity', parkedAt);
+  check('a held invite is stored CANONICAL, not as typed',
+    heldRecord !== null && heldRecord.code === 'ABCD2345');
+  check('a held invite keeps its reason', heldRecord !== null && heldRecord.reason === 'no_identity');
+
+  const roundTrip = parseHeldInvite(JSON.stringify(heldRecord), parkedAt + 1000);
+  check('a held invite survives a storage round-trip',
+    roundTrip !== null && roundTrip.code === 'ABCD2345' && roundTrip.heldAt === parkedAt);
+
+  // ⚠️ AsyncStorage returns whatever a previous build wrote — junk must read as
+  // "nothing held", never as a half-built record that paints a screen with no code.
+  check('⚠️ unparseable junk reads as nothing held',
+    parseHeldInvite('{not json', parkedAt) === null && parseHeldInvite('', parkedAt) === null);
+  check('⚠️ a JSON array or a bare number reads as nothing held',
+    parseHeldInvite('[]', parkedAt) === null && parseHeldInvite('42', parkedAt) === null);
+  check('⚠️ a missing or unknown reason reads as nothing held',
+    parseHeldInvite(JSON.stringify({ code: 'ABCD2345', heldAt: parkedAt }), parkedAt) === null &&
+      parseHeldInvite(JSON.stringify({ code: 'ABCD2345', reason: 'because', heldAt: parkedAt }), parkedAt) === null);
+  check('⚠️ a corrupted code reads as nothing held',
+    parseHeldInvite(JSON.stringify({ code: 'nope', reason: 'offline', heldAt: parkedAt }), parkedAt) === null);
+  check('a missing heldAt reads as held-at-zero, which is stale → nothing held',
+    parseHeldInvite(JSON.stringify({ code: 'ABCD2345', reason: 'offline' }), parkedAt) === null);
+
+  check('an invite held a week ago is honoured',
+    !isHeldInviteStale({ code: 'ABCD2345', reason: 'offline', heldAt: parkedAt }, parkedAt + HELD_INVITE_MAX_AGE_MS));
+  check('⚠️ a hold past the window is NOT honoured (the code may be re-rolled)',
+    isHeldInviteStale({ code: 'ABCD2345', reason: 'offline', heldAt: parkedAt }, parkedAt + HELD_INVITE_MAX_AGE_MS + 1));
+  check('a future heldAt is never treated as stale',
+    !isHeldInviteStale({ code: 'ABCD2345', reason: 'offline', heldAt: parkedAt + 1000 }, parkedAt));
+  check('⚠️ an aged-out hold is refused at READ time, not only at write time',
+    parseHeldInvite(JSON.stringify(heldRecord), parkedAt + HELD_INVITE_MAX_AGE_MS + 1) === null);
+
+  check('the hold slot has a real key', HELD_INVITE_KEY.length > 0);
+  for (const reason of ['no_identity', 'offline'] as const) {
+    const key = HELD_INVITE_KEY_BY_REASON[reason];
+    check(`the ${reason} hold copy resolves in EN and 中文`,
+      messageKeys('en').includes(key) && messageKeys('zh').includes(key));
+    check(`…and its %{code} placeholder interpolates`,
+      t(key, { code: 'ABCD2345' }).includes('ABCD2345'));
+  }
 }
 
 async function main(): Promise<void> {

@@ -257,6 +257,33 @@ export async function myClans(): Promise<ApiResult<ClanSummary[]>> {
 }
 
 /**
+ * The invite code, fetched EXPLICITLY (SCRUM-50 · doc 07 §4.6).
+ *
+ * ⚠️ WHY NOT FROM `myClans()`: that read deliberately returns `code: null`, so a
+ * list read cannot hand the invite capability to a member who is not a head. The
+ * invite surface has to ASK for it — and asks only when the pure `canInvite(role)`
+ * says the viewer may invite (head / co-head, doc 15 §3).
+ *
+ * ⚠️ THE SERVER'S REAL POSTURE, measured — not assumed: `clans_select_member` is
+ * `using (is_clan_member(id) or created_by = auth.uid())`, a TABLE-level policy,
+ * so any member can already read `code` by selecting it. The gate here is
+ * therefore a UI gate, and it is honest to say so rather than to imply the code
+ * is hidden from plain members. Tightening that is a server-side (RLS) change —
+ * a security-posture decision, not a client one. Recorded on SCRUM-50.
+ */
+export async function fetchClanCode(clanId: string): Promise<ApiResult<string>> {
+  const { data, error } = await supabase()
+    .from('clans')
+    .select('code')
+    .eq('id', clanId)
+    .maybeSingle();
+  if (error) return { ok: false, reason: reasonOf(error) };
+
+  const code = str(asRecord(data)?.code);
+  return code ? { ok: true, data: code } : { ok: false, reason: 'clan_code_unreadable' };
+}
+
+/**
  * The roster for the management surface (doc 15 §3). Reads `clan_members`,
  * which members can see — the same policy that makes the role ladder visible.
  */
