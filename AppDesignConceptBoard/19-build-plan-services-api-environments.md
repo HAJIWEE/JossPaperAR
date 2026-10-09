@@ -589,6 +589,8 @@ which read `20261008200000` — one migration short. **`npx supabase db reset` r
 
 ⚠️ **FOUND, NOT CAUSED — `pr3_verification.sql` is RED on the local stack, with or without this change** (proved by moving the migration aside and re-running). It uses **`set local role authenticated`**, which is a **no-op** under `run-sql-tests.sh` (psql autocommit; `SET LOCAL` outside a transaction warns and does nothing) — so its *"an authenticated INSERT into `ledger_events` is DENIED"* assertion actually runs as the owner. ⚠️ **`clan_management.sql` uses plain `set role`, which is exactly why that file passes** — the house guidance exists and was applied to one file but not the other. Note also that its failure **aborts before its teardown**, and the residue then broke a *later* file's C7 assertion until a `db reset` — the documented residue trap, demonstrated live rather than quoted.
 
+⚠️ **The PM ENDORSED option B on 2026-10-09** (*"B option is worth it"*) — the **more invasive** option, chosen deliberately over the cheap one. **A retrospective endorsement, not a new instruction** (B shipped the same day), but the reasoning is the durable part and worth keeping: **A** would have meant editing doc 15 §3 **to match a bug**, over a column any member could still `select`, and **C** would have been **security theatre** — so A and C both leave the rule enforceable **only by the client**, which is the opposite of this project's posture (*the server is the authority*, ADR-005). B is the only one of the three where a determined member **cannot** widen the family. **It cost one migration** — which is the honest measure of whether "worth it" held up.
+
 ---
 
 ### 12.13 · S35 — the hosted project was THREE MIGRATIONS BEHIND, and a fresh worktree is not linked (2026-10-09)
