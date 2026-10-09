@@ -43,6 +43,13 @@
  *  6. `page.findShapes({type:"board"})` includes the "Root Frame" (which holds 157 boards), so a
  *     SUBTREE walk double-counts every panel and would have shifted 136 shapes twice. Walk DIRECT
  *     children (`board.children`) when fixing per-board, and de-duplicate by shape id.
+ *  7. ⚠️ VERIFY IN THE PARENT'S FRAME, NEVER AGAINST ABSOLUTE LITERALS. Recreating the name on
+ *     three boards left it at x=254 — the correct x for board 1 ONLY. On the other three the pill
+ *     sits 470/1020/1490px further right, so the name (and the chip, and the arrow) rendered
+ *     OUTSIDE their board and the pill looked EMPTY to the PM, while every check here still
+ *     passed: those checks compared siblings to each other and used hardcoded 254/444 literals.
+ *     Derive every position from the container's own x (`bg.x + pad`), and assert
+ *     `child.x >= bg.x && child.x + child.w <= bg.x + bg.width` for EVERY child.
  *
  * Penpot API notes (verified live 2026-09-28, re-confirmed 2026-10-09)
  *  - `Page` has no `.boards` / `.children`; entry points are `page.root`,
