@@ -62,7 +62,8 @@ Ladder: **Clan Head → Clan Elder → Member** (the PM's "clan-heads → clan-e
 **Co-head** = an elder lifted to head power ("elders to become co-clan heads who then can delete the clan if they wish" — PM). Full Head column, including the ability to delete the clan; only the founding history differs.
 
 Rules:
-* A clan always has **≥ 1 Head** — the ladder cannot be emptied. A Head who wants out must promote a co-head first, or delete the clan (§10).
+* A clan always has **≥ 1 Head** — the ladder cannot be emptied. ⚠️ **Updated 2026-10-08 (`SCRUM-84`):** a Head who wants out is **no longer stuck** — the ladder prompts them to **name a successor**, else auto-promotes the **oldest elder** (migration `0013`), and refuses only when there is no co-head, no elder *and* nobody named. Deleting the clan remains the other exit.
+* ⚠️ **Headship now has a LINE OF SUCCESSION** (`SCRUM-84` follow-up, migration `0014`): **the successor inherits the departing rank** — a departing `head` hands over to a new `head`, a departing sole `co_head` to a `co_head`, and a head who leaves a co-head behind promotes **nobody**. So `head` is **no longer only the founder's**: `clans.created_by` still records who founded the clan and is **never rewritten** (the *founding* fact is immutable; the *seat* is not). `set_member_role` still refuses `head` — succession is its only path.
 * The founder is not special: any head may rename, invite, promote, delete.
 
 ---
@@ -120,7 +121,7 @@ One active `code` per clan (Head can re-roll it): **link · QR · copyable code*
 |---|---|
 | Member / elder leaves | instant and free; their **past** Book entries stay (the record is the clan's) |
 | Head removes a member | allowed; same history rule |
-| Head leaves | must promote a co-head first — or delete the clan (no headless clans) |
+| Head leaves | ✅ **Answered at SCRUM-84 (2026-10-08) — the ramp.** If a co-head exists, they simply leave. Otherwise they are **prompted to name a successor**; if they name none, the **oldest ELDER by time of joining** is auto-promoted to **co-head**, and then they leave. Refused only when there is no co-head, no elder **and** nobody named (then: promote a co-head, or delete the clan). No headless clans, ever. |
 
 ---
 
@@ -184,6 +185,8 @@ One active `code` per clan (Head can re-roll it): **link · QR · copyable code*
 
 **Terminology (ZH lock — confirm against the design row):** 宗族 clan · 族长 head · 长老 elder · 副族长 co-head · 成员 member · 供奉簿 Book of Tributes · 邀请码 invite code. *(供奉 already means "offering" in the shipped copy — [[10-economy-spec]] §4.)*
 
+> ⚠️ **CHARACTER-SET MISMATCH — measured 2026-10-08, and not silently resolved.** This table is typed in **SIMPLIFIED** (C2's *家人发来了链接？输入邀请码。*), but the shipped `src/lib/i18n.ts` is **TRADITIONAL** (*家人發來了連結？輸入邀請碼。*) — and the code is what the signed-off `ZH · 0e 宗族` boards were built from. The new SCRUM-46 copy was therefore written **traditional**, to match the app rather than this table. **Which character set the Singapore-diaspora audience should read is a product question for the PM** (Singapore is officially simplified, but its traditional-using families are a real segment) — a definitive answer means either a sweep of the i18n table or a correction here. Recorded so a future session does not copy this table into the app and silently half-translate it.
+
 ---
 
 ## 9 · Schema impact → [[07-system-architecture]] (v2.7)
@@ -193,7 +196,7 @@ One active `code` per clan (Head can re-roll it): **link · QR · copyable code*
 | Table | Key columns | Notes |
 |---|---|---|
 | `clans` | `id` uuid PK, `name`, `code`, `created_by`, `created_at`, `archived_at?`, `ancestor_cap` (default **10**) | `name` not unique; server composes `display_name` (suffix on collision); `ancestor_cap` is raised later by **slot purchases** (monetization hook) |
-| `clan_members` | `clan_id`, `user_id`, `role` (`head`\|`co_head`\|`elder`\|`member`), `joined_at` | PK(`clan_id`,`user_id`); **≥1 head** enforced by RPC, not a constraint |
+| `clan_members` | `clan_id`, `user_id`, `role` (`head`\|`co_head`\|`elder`\|`member`), `joined_at` | PK(`clan_id`,`user_id`); **≥1 head-power** enforced by a **`DEFERRABLE INITIALLY DEFERRED` constraint trigger** (migration `0012`), so it fires at COMMIT and never blocks a same-transaction succession |
 
 **Changed tables:**
 
@@ -214,7 +217,7 @@ One active `code` per clan (Head can re-roll it): **link · QR · copyable code*
 | 1 | ~~Offering scope~~ → ✅ **resolved (PM): clan-scoped** — no per-ancestor attribution; *"in real life no one specifies which ancestor"* (§6) | ~~PM~~ ✅ |
 | 2 | ~~Personal vs clan altars~~ → ✅ **resolved (PM): no non-clan altar** — the first-run fork is required (§4/§6) | ~~PM~~ ✅ |
 | 3 | ~~Ancestor cap~~ → ✅ **resolved (PM): cap 10**, extra slots monetized later (§6/§9) | ~~PM~~ ✅ |
-| 4 | Head-exit mechanic — promote-first (proposed) vs auto-promote most-senior elder | PM |
+| 4 | ~~Head-exit mechanic~~ → ✅ **resolved (PM, 2026-10-08 — SCRUM-84)**: a **HYBRID**, neither of the two I offered. **Prompt the leaving head to name a successor; if none is named, auto-promote the OLDEST ELDER by `joined_at`** (ties break on `user_id`, so it is deterministic). The successor becomes **co-head, not `head`** — §3 keeps `head` the founder's immutable fact. ⚠️ **SUPERSEDED the same day (migration `0014`): the successor INHERITS the departing rank** — *"hand over to a new head if no co-head, co-head if co-head already exists."* A departing **`head`** (no co-head) hands over to a new **`head`**; a departing **sole `co_head`** hands over to a `co_head`; a head who leaves a **co-head** behind promotes **nobody** — that co-head carries on. ⚠️ **§3's immutability is NARROWED, not dropped:** `clans.created_by` still records the founder and is never rewritten, but **headship now has a line of succession**, so a clan may have a `head` who did not found it. `set_member_role` still refuses `head` — succession is its only path. Refused only when there is **no co-head AND no elder AND nobody named**. Built in migrations `0013` + `0014`. | ~~PM~~ ✅ |
 | 5 | Book window — hide vs purge rows older than 1 month (13 §2 amendment) | build ticket (SCRUM-46) |
 | 6 | ~~ZH terminology lock~~ → ✅ **locked against the design row (SCRUM-48 Done 2026-10-02)**: **宗族 · 族长 · 长老 · 副族长 · 成员 · 供奉簿 · 邀请码** | ~~design row~~ ✅ |
 | 7 | **Altar display at cap 10** — the art holds 4 tablets; scroll / rows / pages needs a design pass (feeds SCRUM-7/29 boards) | design row |

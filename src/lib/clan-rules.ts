@@ -1,22 +1,23 @@
 /**
- * clan-rules.ts — the PURE rules for the slice's clan bootstrap (SCRUM-82).
+ * clan-rules.ts — the PURE name rule for a clan (SCRUM-46).
  *
- * `submit_burn` is **clan-scoped**: it REQUIRES a `clan_id` and refuses unless
- * the caller has a `clan_members` row in that clan (migration 0004, §226/§252).
- * A fresh anonymous user is in **no** clan, so the slice must give them one —
- * doc 19 §8's "hard-coded clan", implemented the least-invented way.
+ * ── ⚠️ WHAT WAS HERE, AND WHY IT IS NOT ANY MORE ────────────────────────────
+ * This file used to hold the SCRUM-82 **slice shortcut** (`SLICE_CLAN_NAME` +
+ * `planClan`): the slice auto-created a clan called *"My Altar"* on first use,
+ * because `submit_burn` is clan-scoped and there was no clan flow yet.
  *
- * PURE on purpose (imports nothing), so `check:lib` can assert these rules
- * without the native Supabase client — the project's usual pure/device split.
+ * **`SCRUM-83` retired it** (PM, 2026-10-08). The first burn is now a
+ * **tutorial** — no clan, no points — and the **real create/join flow** follows
+ * it (`src/app/clan/`, migration `0012`). One user, one clan, chosen by hand.
  *
- * ⚠️ The auto-create is a slice SHORTCUT for the real "four taps to head" flow
- * (doc 15 §4.2 / SCRUM-46). The slice builds no clan UI, so it stands one up on
- * first use and reuses it thereafter; the real create/join/invite flow is
- * SCRUM-46/50 and replaces this.
+ * `planClan` and `SLICE_CLAN_NAME` were DELETED rather than left commented out:
+ * a helper that says *"the real flow is SCRUM-46/50"* is an invitation for a
+ * future session to wire the shortcut back in. Only the NAME rule survives,
+ * because creating and renaming a clan still need it.
+ *
+ * PURE on purpose (imports nothing), so `check:lib` can assert it without the
+ * native Supabase client — the project's usual pure/device split.
  */
-
-/** The slice's default altar name. `create_clan` requires 2..20 characters. */
-export const SLICE_CLAN_NAME = 'My Altar';
 
 /** `create_clan` rejects a name outside 2..20 chars (measured after trim). */
 export function isValidClanName(name: string): boolean {
@@ -24,13 +25,3 @@ export function isValidClanName(name: string): boolean {
   return trimmed.length >= 2 && trimmed.length <= 20;
 }
 
-/** What the bootstrap should do: keep the clan the caller already has, or make one. */
-export type ClanPlan =
-  | { readonly action: 'reuse'; readonly clanId: string }
-  | { readonly action: 'create' };
-
-export function planClan(existingClanId: string | null | undefined): ClanPlan {
-  return typeof existingClanId === 'string' && existingClanId.length > 0
-    ? { action: 'reuse', clanId: existingClanId }
-    : { action: 'create' };
-}

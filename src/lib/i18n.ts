@@ -71,6 +71,67 @@ export const MESSAGES = {
     'role_elder': 'Elder',
     'role_member': 'Member',
 
+    // ── the clan SCREENS — fork · create · join · manage (SCRUM-46 · doc 15 §4/§8) ──
+    // Written from doc 15 §8's copy table (C1 fork title, C12 promote, C13 offer,
+    // C17 delete) plus the statements §4 names. The screen keys the pure
+    // `clan-flow.ts` returns — `ROLE_LABEL_KEY`, `promoteLabelKey`,
+    // `leaveHintKey` — must exist here, and `check:lib` asserts exactly that.
+    'clan.forkTitle': "Your family's altar",
+    'clan.nameHint': 'e.g. 陳氏 · Tan Family',
+    'clan.create': 'Create',
+    'clan.join': 'Join',
+    'clan.skip': 'Skip',
+    'clan.next': 'Continue',
+    'clan.back': 'Back',
+    'clan.invite': 'Invite family',
+    'clan.copied': 'Invite code copied.',
+    'clan.placeFirstTablet': 'Place your first tablet',
+    'clan.offerTo': "Offer to %{name}'s ancestors",
+    'clan.manage': 'Members',
+    'clan.yourRole': 'Your role',
+    'clan.makeElder': 'Make Elder',
+    'clan.makeCoHead': 'Make Co-Head',
+    'clan.rename': 'Rename',
+    'clan.renamePrompt': 'New clan name',
+    'clan.removeMember': 'Remove',
+    'clan.removeConfirm': 'Remove %{name} from the clan? Their past offerings stay.',
+    'clan.leave': 'Leave this clan',
+    'clan.leaveConfirm': 'Leave this clan? Your past offerings stay.',
+    // ── the SCRUM-84 head-exit ramp (PM-answered 2026-10-08) ──────────────
+    // The prompt is step ONE of the rule, so its copy prepares the head for the
+    // question instead of refusing them.
+    'clan.leaveHint': 'You will be asked who leads the clan next.',
+    'clan.nameSuccessor': 'Name a successor',
+    'clan.successorHint':
+      'Choose who leads the clan after you — or leave it to the longest-standing elder.',
+    'clan.leaveWithoutSuccessor': 'Leave without naming one',
+    // the refusals, so a 中文 reader never meets the server's English sentence
+    'clan.leaveNotMember': 'You are not a member of this clan.',
+    'clan.leaveSelfSuccessor': 'You cannot name yourself as your successor.',
+    'clan.leaveStrangerSuccessor': 'That person is not a member of this clan.',
+    'clan.leaveNoSuccessor':
+      'Nobody can lead after you yet. Promote a co-head first, or delete the clan.',
+    'clan.successorNamed': '%{name} now leads the clan.',
+    'clan.successorAuto':
+      'No successor named — %{name}, the longest-standing elder, now leads the clan.',
+
+    // ── the FIRST-RUN TUTORIAL (SCRUM-85 · the SCRUM-83 answer) ────────────
+    // ⚠️ The copy must be HONEST that nothing is recorded and nothing is spent.
+    // A demo the player mistakes for a real award is worse than no demo at all.
+    'tutorial.badge': 'Demo',
+    'tutorial.intro':
+      'This first offering is a demonstration. Nothing is recorded and no points are earned.',
+    'tutorial.preparing': 'Preparing a demo offering…',
+    'tutorial.preparingNote':
+      'In the real ritual this is where your photo becomes a paper offering.',
+    'tutorial.receiptNote': 'Demo only — no points were earned and no clan was touched.',
+    'tutorial.finish': "Build your family's altar",
+    'tutorial.startHint': 'First time? This one is a guided demo.',
+    'tutorial.noClanNote': 'The demo needs no clan — you will create or join one next.',
+    'clan.deleteClan': 'Delete this clan',
+    'clan.deleteConfirm':
+      'Delete this clan? Every member loses the altar and the Book of Tributes. This cannot be undone.',
+
     // ── the Book of Tributes (doc 15 §7) ──────────────────────────────────
     'book_header': 'Book of Tributes',
     'book_outside': 'A member made this offering.',
@@ -120,6 +181,54 @@ export const MESSAGES = {
     'role_co_head': '副族長',
     'role_elder': '長老',
     'role_member': '成員',
+
+    // ⚠️ TRADITIONAL characters, matching this file (not doc 15 §8's table, which
+    // is typed in SIMPLIFIED — 家人发来了链接 vs the shipped 家人發來了連結).
+    // See the note in the EN block; the mismatch is recorded, not silently resolved.
+    'clan.forkTitle': '您家族的祭壇',
+    'clan.nameHint': '例：陳氏 · Tan Family',
+    'clan.create': '創建',
+    'clan.join': '加入',
+    'clan.skip': '略過',
+    'clan.next': '繼續',
+    'clan.back': '返回',
+    'clan.invite': '邀請家人',
+    'clan.copied': '邀請碼已複製。',
+    'clan.placeFirstTablet': '安放第一塊神主牌',
+    'clan.offerTo': '向%{name}的先人供奉',
+    'clan.manage': '成員',
+    'clan.yourRole': '您的身分',
+    'clan.makeElder': '設為長老',
+    'clan.makeCoHead': '設為副族長',
+    'clan.rename': '重新命名',
+    'clan.renamePrompt': '新的宗族名稱',
+    'clan.removeMember': '移出宗族',
+    'clan.removeConfirm': '將 %{name} 移出宗族？先前的供奉紀錄將保留。',
+    'clan.leave': '離開此宗族',
+    'clan.leaveConfirm': '離開此宗族？先前的供奉紀錄將保留。',
+    // the SCRUM-84 head-exit ramp — the successor prompt and its refusals
+    'clan.leaveHint': '系統將詢問由誰接任帶領宗族。',
+    'clan.nameSuccessor': '指定繼任者',
+    'clan.successorHint': '選擇在您離開後帶領宗族的人，或交由加入最久的長老接任。',
+    'clan.leaveWithoutSuccessor': '不指定直接離開',
+    'clan.leaveNotMember': '您不是此宗族的成員。',
+    'clan.leaveSelfSuccessor': '不能指定自己為繼任者。',
+    'clan.leaveStrangerSuccessor': '此人不是此宗族的成員。',
+    'clan.leaveNoSuccessor': '目前沒有可接任的人。請先設副族長，或刪除宗族。',
+    'clan.successorNamed': '現由 %{name} 帶領宗族。',
+    'clan.successorAuto': '未指定繼任者——由加入最久的長老 %{name} 帶領宗族。',
+
+    // the FIRST-RUN TUTORIAL (SCRUM-85) — parity is enforced, so BOTH locales
+    'tutorial.badge': '示範',
+    'tutorial.intro': '首次供奉為示範。不會留下紀錄，也不會獲得點數。',
+    'tutorial.preparing': '正在製作示範供品…',
+    'tutorial.preparingNote': '在正式儀式中，您的照片會在此化為紙紮供品。',
+    'tutorial.receiptNote': '僅為示範——未獲得點數，也未涉及任何宗族。',
+    'tutorial.finish': '建立您家族的祭壇',
+    'tutorial.startHint': '第一次嗎？這次是引導示範。',
+    'tutorial.noClanNote': '示範不需要宗族——接下來您將建立或加入一個。',
+    'clan.deleteClan': '刪除宗族',
+    'clan.deleteConfirm': '刪除宗族？所有成員將失去祭壇與供奉簿，無法復原。',
 
     'book_header': '供奉簿',
     'book_outside': '由宗族成員供奉。',

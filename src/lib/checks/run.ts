@@ -11,7 +11,7 @@
  * ⚠️ FAULT-TEST IT: change an expected string and confirm it goes RED.
  */
 
-import { SLICE_CLAN_NAME, isValidClanName, planClan } from '../clan-rules.ts';
+import { isValidClanName } from '../clan-rules.ts';
 import { type UuidFactory, isValidIdempotencyKey, newIdempotencyKey } from '../idempotency.ts';
 import {
   CODE_ALPHABET,
@@ -38,6 +38,59 @@ import {
 import { QUOTA_SPENT_COPY } from '../../domain/quota.ts';
 import { INITIAL_OFFERING, applyAll, isWaiting, nextAction } from '../../domain/slice.ts';
 import { eventsFromResponse } from '../ritual-map.ts';
+import {
+  ASSIGNABLE_ROLES,
+  BOOK_WINDOW_DAYS,
+  CLANS_PER_USER,
+  HEAD_POWER_ROLES,
+  JOINS_PER_HOUR,
+  MS_PER_DAY,
+  bookProjection,
+  bookWindowStart,
+  canDeleteClan,
+  canEditAncestors,
+  canInvite,
+  canLeaveClan,
+  canOffer,
+  canRemoveMember,
+  canRenameClan,
+  hasHeadPower,
+  isClanRole,
+  isHeadless,
+  isInBookWindow,
+  joinRefusal,
+  oldestElder,
+  planLeave,
+  roleChangeRefusal,
+  type ClanRole,
+  type LeaveMember,
+} from '../clan-roles.ts';
+import {
+  CREATE_STEPS,
+  FORK,
+  PREVIEW_MESSAGE_KEY,
+  PREVIEW_SHOWS_ANCESTOR_NAMES,
+  ROLE_LABEL_KEY,
+  actionsFor,
+  actionsForOutsider,
+  canSubmitCode,
+  canSubmitName,
+  createStepIndex,
+  isSkippable,
+  leaveHintKey,
+  nextCreateStep,
+  previewArgs,
+  previousCreateStep,
+  promoteLabelKey,
+} from '../clan-flow.ts';
+import {
+  AFTER_TUTORIAL_ROUTE,
+  TUTORIAL_CONSEQUENCES,
+  TUTORIAL_WAIT_MS,
+  demoReceipt,
+  isDemo,
+  needsTutorial,
+} from '../tutorial.ts';
 
 let passed = 0;
 let failed = 0;
@@ -414,16 +467,334 @@ function serviceChecks(): void {
   // `submit_burn` requires a clan_id; the slice stands one up on first use. The
   // default name must satisfy `create_clan`'s 2..20 rule, and a caller who
   // already has a clan must REUSE it rather than make a second altar.
-  section('9 · The slice’s clan bootstrap (SCRUM-82)');
-  check('the default altar name satisfies create_clan (2..20 chars)', isValidClanName(SLICE_CLAN_NAME));
+  // ⚠️ SCRUM-83 RETIRED THE SLICE'S AUTO-CREATE. This section used to assert
+  // `planClan` (reuse-or-create) and the hard-coded `SLICE_CLAN_NAME`; both were
+  // DELETED from `clan-rules.ts`, because the first burn is now a tutorial and
+  // the real fork follows it. The NAME rule survives — create and rename need it.
+  section('9 · The clan NAME rule (the SCRUM-82 shortcut is retired)');
+  check('a 2-character name is accepted', isValidClanName('陳氏'));
+  check('a 20-character name is accepted', isValidClanName('x'.repeat(20)));
   check('a 1-character name is rejected', !isValidClanName('a'));
   check('a 21-character name is rejected', !isValidClanName('x'.repeat(21)));
-  check('surrounding whitespace does not defeat the check', isValidClanName(`  ${SLICE_CLAN_NAME}  `));
-  const reusePlan = planClan('clan-1');
-  check('an existing clan is REUSED', reusePlan.action === 'reuse');
-  check('…and the reused id is the one observed', reusePlan.action === 'reuse' && reusePlan.clanId === 'clan-1');
-  check('no clan means CREATE', planClan(null).action === 'create');
-  check('⚠️ an empty-string clan id is NOT reused — it creates', planClan('').action === 'create');
+  check('surrounding whitespace does not defeat the check', isValidClanName('  Tan Family  '));
+  check('an all-whitespace name is rejected', !isValidClanName('     '));
+
+  // ── 10 · the clan ladder (SCRUM-46 · doc 15 §3/§5/§7) ───────────────────
+  // The role matrix, the ≥1-head invariant, the anti-abuse numbers and the
+  // Book window — the rules `0012_clan_management_api.sql` enforces, asserted
+  // where they can be asserted without a database.
+  section('10 · The clan ladder (SCRUM-46 · doc 15 §3 · §5.2 · §7)');
+
+  // the two role sets — the distinction every head test depends on
+  check('head power is exactly head + co_head (doc 15 §3)', HEAD_POWER_ROLES.length === 2 &&
+    hasHeadPower('head') && hasHeadPower('co_head') && !hasHeadPower('elder') && !hasHeadPower('member'));
+  check('head is NOT an assignable role — succession runs via co_head', !ASSIGNABLE_ROLES.includes('head'));
+  check('co_head, elder and member ARE assignable', ASSIGNABLE_ROLES.length === 3);
+  check('junk is not a clan role', !isClanRole('owner'));
+
+  // the matrix, row by row (doc 15 §3)
+  check('every role may make an offering', (['head', 'co_head', 'elder', 'member'] as const).every(canOffer));
+  check('an elder may add/remove ancestors', canEditAncestors('elder'));
+  check('⚠️ a member may NOT add/remove ancestors', !canEditAncestors('member'));
+  check('a head may invite', canInvite('head'));
+  check('a co-head may invite (full Head column)', canInvite('co_head'));
+  check('⚠️ an elder may NOT invite — the matrix is Head-only', !canInvite('elder'));
+  check('a member may NOT invite', !canInvite('member'));
+
+  check('a head may rename the clan', canRenameClan('head'));
+  check('an elder may NOT rename the clan', !canRenameClan('elder'));
+  check('a head may remove a member', canRemoveMember('head'));
+  check('a member may NOT remove a member', !canRemoveMember('member'));
+  check('a co-head may delete the clan (full Head column)', canDeleteClan('co_head'));
+  check('an elder may NOT delete the clan', !canDeleteClan('elder'));
+
+  // the role-change rules (mirrors set_member_role)
+  check('a head may promote a member to elder', roleChangeRefusal('head', 'member', 'elder') === null);
+  check('a head may lift an elder to co-head', roleChangeRefusal('head', 'elder', 'co_head') === null);
+  check('a co-head may promote (full Head column)', roleChangeRefusal('co_head', 'member', 'elder') === null);
+  check('⚠️ an elder may NOT promote', roleChangeRefusal('elder', 'member', 'elder') === 'actor_lacks_head_power');
+  check('a member may NOT promote', roleChangeRefusal('member', 'member', 'elder') === 'actor_lacks_head_power');
+  check('⚠️ head is refused as a new role', roleChangeRefusal('head', 'member', 'head') === 'role_not_assignable');
+  check('the founder’s role cannot be changed', roleChangeRefusal('head', 'head', 'elder') === 'target_is_founder');
+  check('a demotion back down is allowed', roleChangeRefusal('head', 'co_head', 'elder') === null);
+
+  // the ≥ 1 head invariant (doc 15 §3)
+  check('a clan of members only IS headless', isHeadless(['member', 'elder']));
+  check('a lone co-head is NOT headless — co-head carries head power', !isHeadless(['co_head']));
+  check('an empty clan is headless', isHeadless([]));
+
+  // leaving — THE SCRUM-84 RAMP (PM-answered 2026-10-08). Its MEANING changed:
+  // a sole head is no longer refused, they leave BY PROMOTING. These assertions
+  // replaced five that encoded the old promote-first-only reading.
+  const lm = (userId: string, role: ClanRole, joinedAt: string): LeaveMember => ({ userId, role, joinedAt });
+  const base = [lm('u-head', 'head', '2026-01-01'), lm('u-b', 'member', '2026-02-01')];
+  const withElder = [...base, lm('u-e', 'elder', '2026-02-01')];
+
+  check('a member leaves freely', planLeave(base, 'u-b').action === 'leave');
+  check('an elder leaves freely', planLeave(withElder, 'u-e').action === 'leave');
+  check('a non-member cannot leave',
+    planLeave(base, 'u-nobody').action === 'refuse');
+  check('a head with a co-head simply leaves — nothing to inherit',
+    planLeave([...base, lm('u-c', 'co_head', '2026-03-01')], 'u-head').action === 'leave');
+
+  // ⚠️ SCRUM-84 CLARIFIED 2026-10-08: "if there is a cohead and another cohead
+  // leaves without nominating the cohead becomes the only cohead." So a co-head
+  // leaving needs NO nomination while another head-power holder remains — and the
+  // ramp must NOT fire, even when an elder is available to promote.
+  const twoCoHeads = [
+    lm('u-c1', 'co_head', '2026-01-01'),
+    lm('u-c2', 'co_head', '2026-02-01'),
+    lm('u-e', 'elder', '2026-03-01'),
+  ];
+  check('⚠️ a CO-HEAD leaving with another co-head present just leaves',
+    planLeave(twoCoHeads, 'u-c1').action === 'leave');
+  check('⚠️ …and the ramp does NOT fire, even though an elder is available',
+    planLeave(twoCoHeads, 'u-c1').action !== 'auto_promote_then_leave');
+  const headPlusCoHead = [lm('u-h', 'head', '2026-01-01'), lm('u-c', 'co_head', '2026-02-01')];
+  check('a co-head leaving while the founder remains just leaves',
+    planLeave(headPlusCoHead, 'u-c').action === 'leave');
+  check('…and the founder leaving while a co-head remains just leaves',
+    planLeave(headPlusCoHead, 'u-h').action === 'leave');
+  check('⚠️ the ramp only fires when NO other head-power holder is left',
+    planLeave([lm('u-c1', 'co_head', '2026-01-01'), lm('u-e', 'elder', '2026-02-01')], 'u-c1')
+      .action === 'auto_promote_then_leave');
+
+  // the case the PM's instruction does not cover: no co-head, no elder, nobody named
+  const noSuccessor = planLeave(base, 'u-head');
+  check('⚠️ a sole head with nobody to inherit is REFUSED',
+    noSuccessor.action === 'refuse' && noSuccessor.reason === 'no_successor');
+  check('⚠️ …and a plain MEMBER is never auto-promoted — the fallback is elders only',
+    planLeave(base, 'u-head').action === 'refuse');
+
+  // STEP 1 · the head NAMES a successor
+  const named = planLeave(withElder, 'u-head', 'u-b');
+  check('a NAMED successor is promoted, then the head leaves',
+    named.action === 'promote_then_leave' && named.successorId === 'u-b');
+  const selfNamed = planLeave(withElder, 'u-head', 'u-head');
+  check('naming yourself is refused',
+    selfNamed.action === 'refuse' && selfNamed.reason === 'successor_is_self');
+  const strangerNamed = planLeave(withElder, 'u-head', 'u-nobody');
+  check('naming a non-member is refused',
+    strangerNamed.action === 'refuse' && strangerNamed.reason === 'successor_not_member');
+
+  // STEP 2 · nobody named → the OLDEST ELDER by time of joining
+  const auto = planLeave(withElder, 'u-head');
+  check('⚠️ no successor named → the oldest elder is AUTO-promoted',
+    auto.action === 'auto_promote_then_leave' && auto.successorId === 'u-e');
+
+  const twoElders = [...base, lm('u-late', 'elder', '2026-06-01'), lm('u-early', 'elder', '2026-02-01')];
+  const older = planLeave(twoElders, 'u-head');
+  check('⚠️ with two elders the OLDER one wins, whatever the row order',
+    older.action === 'auto_promote_then_leave' && older.successorId === 'u-early');
+
+  const tied = [...base, lm('u-zzz', 'elder', '2026-02-01'), lm('u-aaa', 'elder', '2026-02-01')];
+  const tie = planLeave(tied, 'u-head');
+  check('⚠️ a tie on joined_at breaks on user_id — the rule is deterministic',
+    tie.action === 'auto_promote_then_leave' && tie.successorId === 'u-aaa');
+  check('oldestElder excludes the departing head',
+    oldestElder(withElder, 'u-e') === null && oldestElder(withElder, 'u-head')?.userId === 'u-e');
+
+  // ⚠️ THE SUCCESSOR'S RANK — SCRUM-84, ANSWERED BY THE PM 2026-10-08:
+  //
+  //   "hand over to a new head if no co-head, co-head if co-head already exists."
+  //
+  // The successor INHERITS the departing rank. These checks are the reason the rank
+  // is carried on the plan at all instead of living inside an `UPDATE`: a fixed
+  // value would pass every other assertion in this file.
+  check('⚠️ a departing HEAD hands over to a new HEAD — not a co-head',
+    named.action === 'promote_then_leave' && named.promoteTo === 'head');
+  check('⚠️ …and the AUTO-promoted oldest elder becomes the HEAD too',
+    auto.action === 'auto_promote_then_leave' && auto.promoteTo === 'head');
+  check('⚠️ …and the OLDER of two elders as well — the rank is not path-dependent',
+    older.action === 'auto_promote_then_leave' && older.promoteTo === 'head');
+
+  // The SOLE-co_head branch — ⚠️ this is the check that stops anyone "simplifying"
+  // promoteTo back to a hard-coded `head`. There is NO `head` row here (reachable
+  // once a founder has gone), so the departing co-head's successor stays a co-head.
+  const soleCoHead = [lm('u-c1', 'co_head', '2026-01-01'), lm('u-e', 'elder', '2026-02-01')];
+  const coNamed = planLeave(soleCoHead, 'u-c1', 'u-e');
+  check('⚠️ a departing SOLE CO-HEAD hands over to a CO-HEAD — never a head',
+    coNamed.action === 'promote_then_leave' && coNamed.promoteTo === 'co_head');
+  const coAuto = planLeave(soleCoHead, 'u-c1');
+  check('⚠️ …and auto-promoting there stays a CO-HEAD as well',
+    coAuto.action === 'auto_promote_then_leave' && coAuto.promoteTo === 'co_head');
+
+  // "co-head if co-head already exists" — the handover goes TO the existing
+  // co-head, so a head who leaves one behind promotes NOBODY.
+  check('⚠️ a head leaving a CO-HEAD behind promotes NOBODY — that co-head carries on',
+    planLeave(headPlusCoHead, 'u-h').action === 'leave');
+
+  // the invariant, stated once: the rank is ALWAYS the departing role
+  check('⚠️ the promoted rank is always the DEPARTING role — never a fixed value',
+    named.promoteTo === 'head' && coNamed.promoteTo === 'co_head');
+  check('…and both candidate ranks are head power, so the clan is never left headless',
+    hasHeadPower('head') && hasHeadPower('co_head'));
+
+  check('canLeaveClan: a sole head CAN leave once an elder exists', canLeaveClan(withElder, 'u-head'));
+  check('canLeaveClan: …and cannot when there is no successor',
+    !canLeaveClan(base, 'u-head'));
+
+  // anti-abuse (doc 15 §5.2)
+  check('the clans-per-user limit is 10', CLANS_PER_USER === 10);
+  check('the joins-per-hour limit is 3', JOINS_PER_HOUR === 3);
+  check('⚠️ the joins-per-hour limit is BELOW the clan cap — or the limb is dead logic',
+    JOINS_PER_HOUR < CLANS_PER_USER);
+  check('9 clans is allowed', joinRefusal(CLANS_PER_USER - 1, 0) === null);
+  check('⚠️ the 10th clan is refused', joinRefusal(CLANS_PER_USER, 0) === 'too_many_clans');
+  check('9 joins in an hour is allowed', joinRefusal(0, JOINS_PER_HOUR - 1) === null);
+  check('⚠️ the 10th join in an hour is refused', joinRefusal(0, JOINS_PER_HOUR) === 'too_many_joins');
+  check('the clan count is refused before the join burst', joinRefusal(CLANS_PER_USER, JOINS_PER_HOUR) === 'too_many_clans');
+
+  // the Book window — HIDE, not purge (doc 15 §7 · §10.5)
+  check('the Book window is 30 days', BOOK_WINDOW_DAYS === 30);
+  const nowMs = Date.UTC(2026, 9, 8);
+  check('the window start is 30 days back', bookWindowStart(nowMs) === nowMs - 30 * MS_PER_DAY);
+  check('an entry from 5 days ago is shown', isInBookWindow(nowMs - 5 * MS_PER_DAY, nowMs));
+  check('⚠️ an entry from 45 days ago is HIDDEN (not deleted)', !isInBookWindow(nowMs - 45 * MS_PER_DAY, nowMs));
+  check('a future-dated entry is shown', isInBookWindow(nowMs + MS_PER_DAY, nowMs));
+
+  // the two Book projections (doc 15 §7.2)
+  check('a member sees the full entry', bookProjection(true) === 'full');
+  check('⚠️ a non-member gets the anonymised entry', bookProjection(false) === 'anonymous');
+
+  // ── 11 · the clan SCREENS (SCRUM-46 · doc 15 §4/§8) ────────────────────
+  // The wizard order, the button gates, the preview card and the RENDERED
+  // action list. ⚠️ The keys the pure module RETURNS are asserted to EXIST in
+  // both locales — the guard that would have caught the dotted-key bug (a key
+  // the code asks for but the table never defined renders `[missing]`).
+  section('11 · The clan screens — fork · create · join · manage (SCRUM-46)');
+
+  const enKeys = new Set(messageKeys('en'));
+  const zhKeys = new Set(messageKeys('zh'));
+  const keyExists = (k: string): boolean => enKeys.has(k) && zhKeys.has(k);
+
+  // the fork — one screen, two cards (doc 15 §4.1)
+  check('the fork is exactly two cards', Object.keys(FORK).length === 2);
+  check('the join card has a title and a hint',
+    FORK.join.titleKey === 'clan.forkJoin' && FORK.join.hintKey === 'clan.forkJoinHint');
+  check('the create card has a title and a hint',
+    FORK.create.titleKey === 'clan.forkCreate' && FORK.create.hintKey === 'clan.forkCreateHint');
+  check('⚠️ all four fork strings exist in BOTH locales',
+    [FORK.join.titleKey, FORK.join.hintKey, FORK.create.titleKey, FORK.create.hintKey].every(keyExists));
+
+  // the wizard — four taps to head (doc 15 §4.2)
+  check('four taps to head', CREATE_STEPS.length === 4);
+  check('⚠️ the invite card comes BEFORE the ancestor sheet (the amended order)',
+    createStepIndex('invite') < createStepIndex('ancestors'));
+  check('the first tap is naming', CREATE_STEPS[0] === 'name');
+  check('the wizard walks forward',
+    nextCreateStep('name') === 'confirm' && nextCreateStep('confirm') === 'invite' &&
+    nextCreateStep('invite') === 'ancestors');
+  check('the wizard ends — the last tap has no successor', nextCreateStep('ancestors') === null);
+  check('the wizard walks BACK',
+    previousCreateStep('ancestors') === 'invite' && previousCreateStep('confirm') === 'name');
+  check('the wizard cannot walk back past the first tap', previousCreateStep('name') === null);
+  check('⚠️ the invite card is skippable (doc 15 §4.2)', isSkippable('invite'));
+  check('the ancestor sheet is skippable too — Skip and Continue both lead into it',
+    isSkippable('ancestors'));
+  check('naming and confirming are NOT skippable', !isSkippable('name') && !isSkippable('confirm'));
+
+  // the two primary buttons
+  check('Create is enabled for a valid name', canSubmitName('Tan Family'));
+  check('Create is DISABLED for a 1-character name', !canSubmitName('a'));
+  check('Create is DISABLED for a 21-character name', !canSubmitName('x'.repeat(21)));
+  check('Create tolerates a padded name', canSubmitName('  Tan Family  '));
+  check('Join is enabled once the code is canonical', canSubmitCode('ABCDEFGH'));
+  check('⚠️ Join normalises lower case — people read these aloud', canSubmitCode('abcdefgh'));
+  check('Join tolerates spaces and hyphens', canSubmitCode('ABCD-EFGH'));
+  check('Join is DISABLED for a 7-character code', !canSubmitCode('ABCDEFG'));
+  check('⚠️ Join is DISABLED for a code with I/L/O/0/1 — not in the alphabet',
+    !canSubmitCode('ABCDEFGI') && !canSubmitCode('ABCDEFG0'));
+
+  // the preview card — counts only, never a name (doc 15 §8 C8 · doc 13 §4)
+  check('previewArgs floors a fractional count', previewArgs('Tan', 2.9, 3.1).ancestors === 2);
+  check('previewArgs clamps a negative count to 0', previewArgs('Tan', -5, 3).ancestors === 0);
+  check('previewArgs clamps NaN to 0',
+    previewArgs('Tan', Number.NaN, 3).ancestors === 0 && previewArgs('Tan', Number.NaN, 3).members === 3);
+  check('the preview copy is owned by i18n, not the module', keyExists(PREVIEW_MESSAGE_KEY));
+  check('⚠️ a preview never shows ancestor names before joining (doc 13 §4)',
+    PREVIEW_SHOWS_ANCESTOR_NAMES === false);
+
+  // role + promote labels (doc 15 §8 C11/C12)
+  check('all four roles have a label', Object.keys(ROLE_LABEL_KEY).length === 4);
+  check('⚠️ every role label is translated in BOTH locales',
+    Object.values(ROLE_LABEL_KEY).every(keyExists));
+  check('promoting to co-head is labelled', promoteLabelKey('co_head') === 'clan.makeCoHead');
+  check('promoting to elder is labelled', promoteLabelKey('elder') === 'clan.makeElder');
+  check('⚠️ head is NOT offered as a promotion — succession runs through co-head',
+    promoteLabelKey('head') === null);
+  check('a member target offers nothing', promoteLabelKey('member') === null);
+  check('both promote labels are translated',
+    keyExists('clan.makeCoHead') && keyExists('clan.makeElder'));
+  check('the leave refusal has copy to show', keyExists(leaveHintKey()));
+
+  // the action list — the matrix AS RENDERED (doc 15 §3)
+  const headActions = actionsFor('head');
+  const headNeeds = ['offer', 'book', 'ancestors', 'invite', 'manage', 'rename', 'delete', 'leave'] as const;
+  check('a head gets offer · book · ancestors · invite · manage · rename · delete · leave',
+    headNeeds.every((a) => headActions.includes(a)));
+  const elderActions = actionsFor('elder');
+  check('an elder can add ancestors', elderActions.includes('ancestors'));
+  check('⚠️ an elder CANNOT invite — the matrix is Head-only', !elderActions.includes('invite'));
+  check('an elder cannot manage, rename or delete',
+    !elderActions.includes('manage') && !elderActions.includes('rename') &&
+    !elderActions.includes('delete'));
+  const memberActions = actionsFor('member');
+  check('a member may offer and read the Book',
+    memberActions.includes('offer') && memberActions.includes('book'));
+  check('⚠️ a member may NOT add ancestors', !memberActions.includes('ancestors'));
+  check('a member may leave', memberActions.includes('leave'));
+  check('a co-head carries the full Head column',
+    actionsFor('co_head').includes('delete') && actionsFor('co_head').includes('invite'));
+  check('⚠️ a NON-member gets the Book ONLY — no Offer, no Leave', actionsFor(null).join() === 'book');
+  check('the outsider helper agrees with it', actionsForOutsider().join() === 'book');
+  check('an unknown role is treated as an outsider', actionsFor(undefined).join() === 'book');
+
+  // ── 12 · the FIRST-RUN TUTORIAL (SCRUM-85 · the SCRUM-83 answer) ────────
+  // ⚠️ THE FIRST ASSERTION IS THE IMPORTANT ONE. If a future change wires the demo
+  // into the server or the AI, it has to delete an assertion that says why — a
+  // per-user ≈US$0.09 cost that would otherwise land silently, before any quota
+  // or clan exists to bound it.
+  section('12 · The first-run tutorial — no clan, no points, no spend (SCRUM-85)');
+
+  check('⚠️ a tutorial creates NO clan', TUTORIAL_CONSEQUENCES.createsClan === false);
+  check('⚠️ a tutorial awards NO points', TUTORIAL_CONSEQUENCES.awardsPoints === false);
+  check('⚠️ a tutorial writes NOTHING to the ledger', TUTORIAL_CONSEQUENCES.writesLedger === false);
+  check('⚠️ a tutorial makes NO server call', TUTORIAL_CONSEQUENCES.callsServer === false);
+  check('⚠️ a tutorial makes NO AI call — this is the ≈US$0.09/user one',
+    TUTORIAL_CONSEQUENCES.callsAi === false);
+  check('every consequence is asserted, not just the convenient ones',
+    Object.values(TUTORIAL_CONSEQUENCES).every((v) => v === false));
+
+  // the first-run decision
+  check('a missing record means the tutorial is still owed', needsTutorial(null));
+  check('an empty record means the tutorial is still owed', needsTutorial({ tutorialDone: false }));
+  check('a completed record means it is NOT', !needsTutorial({ tutorialDone: true }));
+  check('⚠️ anything other than an explicit true replays the tutorial',
+    needsTutorial({ tutorialDone: undefined as unknown as boolean }));
+
+  // option C, after it
+  check('⚠️ the tutorial hands off to the FORK, not an auto-created altar',
+    AFTER_TUTORIAL_ROUTE === '/clan');
+
+  // the demo receipt
+  const devoutDemo = demoReceipt(20);
+  check('the demo receipt is flagged as a demo', devoutDemo.demo === true);
+  check('⚠️ the demo receipt moves NO balance', devoutDemo.balanceDelta === 0);
+  check('the demo uses the REAL award maths, so the number is truthful',
+    devoutDemo.band === 'devout' && devoutDemo.award === 600);
+  check('a bullseye demo reads 800 — 400 base × 2.0, and no bonuses in a demo',
+    demoReceipt(0).award === 800);
+  check('a graze demo reads 400', demoReceipt(70).award === 400);
+  check('a miss demo reads 0', demoReceipt(200).award === 0);
+  check('⚠️ a demo receipt has no balance field to render as real money',
+    !('tribute_balance' in devoutDemo) && !('idempotency_key' in devoutDemo));
+
+  // the flag itself
+  check('the demo marker is read positively', isDemo('1'));
+  check('⚠️ anything else is NOT a demo — an unreadable flag runs the REAL ritual',
+    !isDemo('0') && !isDemo('true') && !isDemo(undefined) && !isDemo('') && !isDemo(' 1'));
+  check('the tutorial’s wait is a real beat, not zero', TUTORIAL_WAIT_MS > 0);
 }
 
 async function main(): Promise<void> {

@@ -28,6 +28,7 @@
 
 import { readBurnParams, readRewardParams, toBurnParams, toRewardParams } from '../route-params.ts';
 import { captureStoragePath } from '../storage-path.ts';
+import { DEMO_VALUE } from '../tutorial.ts';
 import {
   eventsFromResponse,
   httpFailureReason,
@@ -190,6 +191,45 @@ check(
   '⚠️ foldername(key)[1] is the owner — what the RLS policy scopes on',
   capKey.split('/')[0] === 'u1',
 );
+
+// ── 5 · The TUTORIAL flag survives every hop (SCRUM-85) ────────────────────
+// ⚠️ This is the same failure class as section 1, with a dearer consequence. If
+// the demo flag is dropped at ANY hop, a brand-new user's tutorial becomes a real
+// ritual: the photo is uploaded, a Path C generation is requested, and ≈US$0.09
+// is spent before any quota or clan exists to bound it. So the flag is asserted
+// on BOTH builders, BOTH readers, and through a full four-hop chain.
+section('5 · The tutorial flag survives every hop (SCRUM-85)');
+
+const demoTurn = toBurnParams('c1', 'file://x.jpg', true);
+const demoTurnRead = readBurnParams(demoTurn);
+check('toBurnParams carries the demo flag', demoTurn.demo === DEMO_VALUE);
+check('readBurnParams reads it back', demoTurnRead.ok && demoTurnRead.demo === true);
+
+// ⚠️ A REAL ritual's URL must not grow a param it never had.
+const realTurn = toBurnParams('c1', 'file://x.jpg');
+const realTurnRead = readBurnParams(realTurn);
+check('⚠️ a REAL turn carries NO demo param at all', realTurn.demo === undefined);
+check('⚠️ …and reading it back is false, not undefined-ish',
+  realTurnRead.ok && realTurnRead.demo === false);
+
+const demoReward = toRewardParams('c1', 20, 1, true);
+check('toRewardParams carries the demo flag', demoReward.demo === DEMO_VALUE);
+const demoRead = readRewardParams(demoReward);
+check('readRewardParams reads it back', demoRead.ok && demoRead.demo === true);
+const realRead = readRewardParams(toRewardParams('c1', 20, 1));
+check('⚠️ a REAL reward hop reads demo:false', realRead.ok && realRead.demo === false);
+
+// the chain: the params one hop builds feed straight into the next reader
+const hopped = readRewardParams(toRewardParams('c9', 20, 2, true));
+check('⚠️ the flag survives the WHOLE chain burn → reward',
+  hopped.ok && hopped.demo === true && hopped.captureId === 'c9' && hopped.throwNumber === 2);
+
+// ⚠️ AND THE DROP IS DETECTABLE: strip the key (what a forgotten spread does) and
+// the hop degrades to a REAL ritual — which is exactly why this section exists.
+const { demo: _omitted, ...droppedTurn } = toBurnParams('c1', 'file://x.jpg', true);
+const droppedRead = readBurnParams(droppedTurn);
+check('⚠️ a DROPPED flag reads as a real turn — the failure this pins',
+  droppedRead.ok && droppedRead.demo === false);
 
 // ── verdict ─────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(64)}`);

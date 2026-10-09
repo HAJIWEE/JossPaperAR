@@ -70,8 +70,12 @@ export default function BurnScreen() {
    * generic `bad_params`, which meant the slice could never show a receipt.
    * A missing id is now refused by name, at the screen that would have dropped it.
    */
-  const burnParams = readBurnParams(useLocalSearchParams<{ captureId: string; uri: string }>());
+  const burnParams = readBurnParams(
+    useLocalSearchParams<{ captureId: string; uri: string; demo?: string }>(),
+  );
   const captureId = burnParams.ok ? burnParams.captureId : null;
+  /** SCRUM-85 — carried through to `/reward`, which branches on it. */
+  const demo = burnParams.ok ? burnParams.demo : false;
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [preview, setPreview] = useState<Preview | null>(null);
   const [throwNumber, setThrowNumber] = useState(1);
@@ -126,7 +130,7 @@ export default function BurnScreen() {
     if (captureId === null) return;
     router.push({
       pathname: '/reward',
-      params: toRewardParams(captureId, preview.offsetPx, throwNumber),
+      params: toRewardParams(captureId, preview.offsetPx, throwNumber, demo),
     });
   }, [preview, router, throwNumber, captureId]);
 

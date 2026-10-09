@@ -5,6 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AIM_BANDS } from '@/domain/aim';
 import { OFFERINGS, baseValueOf } from '@/domain/catalogue';
 import { DAILY_PHOTO_BURNS, DAILY_STORE_BURNS } from '@/domain/quota';
+import { readFirstRun } from '@/lib/first-run';
+import { DEMO_PARAM, DEMO_VALUE, needsTutorial } from '@/lib/tutorial';
 import { TOUCH_GAP, TOUCH_TARGET, brand, fontSize, fluidSize, onColorCream, radius, space, surface, text } from '@/theme/tokens';
 
 /**
@@ -96,12 +98,43 @@ export default function HomeScaffold() {
       {/* ── the slice begins here (SCRUM-53 / PR-4) ────────────────────────── */}
       <Pressable
         accessibilityRole="button"
+        testID="home-begin"
         onPress={() => {
-          router.push('/capture');
+          // ── SCRUM-85 · the FIRST burn is a TUTORIAL ────────────────────────
+          // ⚠️ Read the first-run record HERE, at the tap, rather than in an
+          // effect: the flag must reflect the device's state at the moment of
+          // the decision, and a stale render must not send an already-tutored
+          // user back through a demo.
+          void (async () => {
+            const firstRun = await readFirstRun();
+            const params = needsTutorial(firstRun)
+              ? { [DEMO_PARAM]: DEMO_VALUE }
+              : {};
+            router.push({ pathname: '/capture', params });
+          })();
         }}
         style={({ pressed }) => [styles.begin, pressed && { opacity: 0.8 }]}
       >
         <Text style={styles.beginLabel}>Begin an offering · 開始供奉</Text>
+      </Pressable>
+
+      {/* ── the clan surface (SCRUM-46) ─────────────────────────────────────
+          ⚠️ A SCAFFOLD ENTRY, not the designed clan card. doc 15 §4 gives the
+          fork a required place in first-run, but the signed-off Home layout has
+          NO free band for a clan card, so "Home → clan card → invite surface"
+          needs a Home design pass (recorded in `next-ai-context.md`). This link
+          makes the screens reachable without inventing that layout, and it does
+          NOT gate first-run — which of the two first-run behaviours stays is
+          `SCRUM-83`, an open PM decision. */}
+      <Pressable
+        accessibilityRole="button"
+        testID="home-clan-entry"
+        onPress={() => {
+          router.push('/clan');
+        }}
+        style={({ pressed }) => [styles.clanEntry, pressed && { opacity: 0.8 }]}
+      >
+        <Text style={styles.clanEntryLabel}>Clan · 宗族</Text>
       </Pressable>
     </ScrollView>
   );
@@ -154,4 +187,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   beginLabel: { color: onColorCream, fontSize: fontSize.bodyLg.at390, fontWeight: '600' },
+  clanEntry: {
+    marginTop: space.md,
+    minHeight: TOUCH_TARGET,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: surface.paperEdge,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clanEntryLabel: { color: text.ink, fontSize: fontSize.body.at390, fontWeight: '600' },
 });

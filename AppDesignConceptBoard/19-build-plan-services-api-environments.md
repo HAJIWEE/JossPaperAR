@@ -565,6 +565,138 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.12 · SCRUM-46 — the clan management API (2026-10-08)
+
+**What was already there.** `clans` · `clan_members` · `create_clan` · `preview_clan` · `join_clan` · `reroll_clan_code` · `save_ancestor` · `is_clan_member` · `clan_role_of` · `is_clan_head` · `enforce_ancestor_cap` all shipped with PR-2/PR-3. What SCRUM-46 adds is the half doc 15 §3 *promises* and nothing implemented: **the role ladder, leaving and removal, rename, delete, and the Book of Tributes read path** — plus the anti-abuse limits §5.2 hands to this ticket.
+
+**Migration `0012` — 12/12, no drift.** The real gap was RLS, not logic: `clan_members` had a **SELECT policy only**, so role changes and leaving had *no path at all* and the tempting fix was SECURITY DEFINER. Adding `clan_members_update_head` · `clan_members_delete_head_or_self` · `clans_delete_head` closes it and keeps **all five management RPCs SECURITY INVOKER** (RULE B). Only `clan_book` is elevated — RULE B's **fifth** named exception, because a NON-member must read the anonymised projection `tributes_select_member` will not grant.
+
+**Three decisions this ticket owned (doc 15 §10), taken and recorded.**
+1. **§10.5 Book window → HIDE, not purge.** The spec's own wording is a *read* rule (*"shows and QUERIES the last month only"*), §5.3 promises a leaver their entries *stay*, and purging needs a scheduler `pg_cron` deliberately has off. Hide → purge stays open later; purge → hide does not.
+2. **§5.2 anti-abuse → 10 clans per user · 3 joins per hour.** doc 11 §5's "≈3× the fastest honest play".
+3. **§10.4 head exit → promote-first**, the spec's own proposal. ⚠️ **The PM confirmation is filed as `SCRUM-84`** — this is the documented reading, not a decision taken here.
+
+**⚠️ Two real defects the verification found — both in this migration's first cut.**
+1. **The joins-per-hour limb was DEAD LOGIC.** It was written as `10`, equal to the clan cap — but a membership *is* a clan, so the clan limb always binds first and the hourly limb can never fire. Now `3`, and both the pure gate and C11 assert the ordering holds.
+2. **The `≥1 head` invariant would have BLOCKED a GDPR deletion.** As a *hard* DB invariant it fires when a co-head who is not the founder erases their data and legitimately orphans a clan — i.e. `delete_my_data()` would have failed. Fixed by exempting the case where the member's **profile** is gone, which works because the trigger is `DEFERRABLE INITIALLY DEFERRED` (by COMMIT the profile is deleted, so `delete_my_data`'s existing order needs no change). Deferral also buys the two things an immediate trigger cannot: `delete_clan`'s cascade works, and **promote-then-leave in one transaction** is allowed — exactly the §10.4 UI.
+
+**The verification — `supabase/tests/clan_management.sql`.** C1–C12 + teardown, every assertion RAISING, so the run is green or red. It drives the API as **real signed-in users** (`set role authenticated` + a real `request.jwt.claims`), not as the owner, so RLS is genuinely in the path. It proves: the founder is the only head · a code joins instantly and a bad one fails loudly · **an elder cannot promote, invite, rename or remove** · head is not assignable and the founder's role is immutable · **the sole head is refused when leaving and the founder may leave once a co-head exists** · the invariant fires **in the database** (`set constraints … immediate` is what makes a *deferred* error observable) · the Book's two projections, the 45-day row hidden **but still present**, and `private` withheld from non-members · delete cascades to members, tributes and burns · **both** anti-abuse limbs.
+
+**⚠️ Two harness facts, measured — they matter to every SQL test here.** `set_config(…, is_local := true)` and `SET LOCAL` **do not survive across statements** under `run-sql-tests.sh` (psql autocommit): each statement is its own transaction, so `SET LOCAL` even warns *"can only be used in transaction blocks"*. Session-scoped `SET ROLE` / `set_config(…, false)` is the form that works in BOTH runners. And a `pg_temp` table grants **nothing** to PUBLIC — the test needs an explicit `grant … to authenticated`, or its first read/write as a user fails. *(`pr3_verification.sql` uses `SET LOCAL`, so it only works on the CLI-migration path, not `run-sql-tests.sh` — recorded, not changed.)*
+
+**Gates:** `tokens 36 · domain 45 · slice 36 · throw 33 · ads 51 · wire 43 · session 17 · pathc 38 · sql 12 · adrs 34 · contrast 22 · responsive 21 · lib 153` (+ the new SQL file, which `run-sql-tests.sh` picks up automatically). **Fault-tested:** flipping the pure rules to 10/10 and to allow-any-role turned **7** `lib` checks red; removing the trigger's profile exemption turned **C12** red with the expected message.
+
+**Spend: US$0.00** — no fal.ai call, no deploy: `npm install`, the local gate suite, and a local Supabase stack on Docker. The invariant, the caps and the Book were proved against a **real Postgres 17.11**, not asserted.
+
+**Left for SCRUM-46:** ⬜ **the QR half** — SCRUM-50 owns the scanner and the rendered QR (needs `react-native-svg` + a QR lib, which are native modules and so want a dev build). ⬜ **the Home clan card**, which needs a Home design pass: the signed-off Home layout has **no free band** for it. ⬜ **first-run routing** — deliberately NOT changed, because whether the fork replaces the slice's auto-create is **`SCRUM-83`**.
+
+### 12.12d · SCRUM-83 answered (option E) — the first burn is a TUTORIAL (2026-10-08)
+
+**The decision**, verbatim: *"the first burn should be a tutorial, a demo to the user. so no clan involved and no real points to contribute to any clan. after the tutorial build the PATH C mentioned in the ticket."* Recorded on `SCRUM-83` (now **Done**); built under **`SCRUM-85`**.
+
+So the first-run sequence is **tutorial → your family's altar** — replacing the silent auto-created *"My Altar"*. Option C (the fork) is now the thing the tutorial hands off **to**, which is the shape none of A–D described.
+
+**⚠️ THE CONSTRAINT THAT SHAPED THE BUILD — the tutorial must not spend AI money.** A demo that ran a real Path C generation would cost **≈ US$0.09 for every new user** — the unmetered bill doc 10 §6 put a ceiling on — and it would be **invisible**, because it happens *before* any quota, clan or `app_config` budget row exists to bound it. So the demo **skips `registerCapture` · `uploadCapture` · `requestCartoonize` entirely**, and the "preparing" beat is a local timer (`TUTORIAL_WAIT_MS`).
+
+A useful consequence: **no new asset was needed.** `burn.tsx` never renders the sprite — it is the offering's *identity*, not its picture — so the tutorial carries the captured photo straight through. A bundled demo sprite would be decoration, not a demo.
+
+**`src/lib/tutorial.ts` — the invariants as DATA.** `TUTORIAL_CONSEQUENCES` states `createsClan · awardsPoints · writesLedger · callsServer · callsAi` — all `false`, and a gate asserts every one. A future change that wires the demo into the server or the AI has to **delete an assertion that says why**, rather than quietly reintroducing a per-user cost.
+
+**`DemoReceipt` is a DIFFERENT TYPE from `BurnReceipt`**, so demo money cannot be rendered by the code that renders the server's. It carries `balanceDelta: 0`, and it uses the **real award maths** (`computeAward`) with no new-ground and no streak bonus — so a Devout throw demos **600**, the real single-burn number. Honest, and banked nowhere.
+
+**`ensureClan` is DELETED, not deprecated.** The SCRUM-82 shortcut is gone from `src/lib/clan.ts` (file removed), along with `planClan` and `SLICE_CLAN_NAME` from `clan-rules.ts`. A helper whose comment says *"the real flow is SCRUM-46/50"* is an invitation to wire the shortcut back in, so `check:lib` §9 was rewritten to assert only the NAME rule that create and rename still need. `reward.tsx` now calls `myClans()`; **no clan** routes to the fork — **not** a retry, because a retry fails identically forever, which is how the old failure presented.
+
+**One latent bug fixed on the way:** `preparing.tsx` was the one hop that **bypassed `toBurnParams`** and pushed raw params — precisely the pattern `route-params.ts` was written to prevent, and the reason a new flag can vanish silently. It now uses the builder.
+
+**Proof.** `check:lib` §12 (20 checks: the five invariants, the first-run decision, the fork hand-off, the demo receipt's arithmetic and shape, the flag's parsing) · **`check:wire` §5** (9 checks: the flag on both builders and both readers, a REAL hop carrying **no** param at all, the four-hop chain, and a deliberately **dropped** flag reading as a real turn). **Fault-tested both ways:** `callsAi: true` turns 2 lib checks red; dropping the flag at the burn hop turns 2 wire checks red.
+
+⚠️ **Parity caught a real miss:** the tutorial copy was added to EN and *not* 中文 — `check:lib`'s locale-parity assertion failed, which is the check doing exactly its job.
+
+**Gates:** `wire 43 → 52` · `lib 210 → 229` · 13 migrations · 0 TS errors. **Spend US$0.00** — the tutorial's whole point is that it costs nothing, and building it cost nothing either.
+
+
+
+**The decision.** The PM answered with a **hybrid**, not either option I offered: *"if there is no co-head, prompt leaving clan head to name a successor, if none named, promote automatically the oldest elder by time of joining the clan."* Recorded on `SCRUM-84` (now **Done**), and folded into doc 15 §3/§5.3/§10 item 4.
+
+**⚠️ This superseded a shipped behaviour.** `0012` implemented pure promote-first — a sole head was **refused**. That is wrong now, so `leave_clan` is **re-specified in migration `0013`**, never edited in place.
+
+**Migration `0013` — the ramp.** A head-power holder leaving: another holder exists → leave; else a **named** successor is promoted to co-head, else the **oldest elder** (`order by joined_at asc, user_id asc`) is promoted, else **refused**. Three implementation notes worth keeping:
+
+* **`drop function` first.** `leave_clan(uuid)` and `leave_clan(uuid, uuid default null)` are *different functions* to Postgres, and the default makes the 2-arg form callable with one argument — leaving both makes every 1-arg call **ambiguous** ("could not choose the best candidate function"). The old signature has to go explicitly.
+* **The successor becomes `co_head`, not `head`.** §3 keeps `head` the founder's immutable fact, `set_member_role` already refuses to assign it, and the deferred ≥1-head trigger counts head *power* (head OR co_head) — so a clan led by a co-head is valid. Making the successor literally `head` would make "who founded this clan" mutable.
+* **The `user_id` tiebreak.** Two elders who joined in the same second must resolve **deterministically**; a rule that picks a different successor on a second run is not a rule.
+
+**⚠️ The one case the instruction does not cover**, flagged on the ticket rather than silently decided: **no co-head, no elder, nobody named**. "Promote the oldest elder" has no candidate, so it **refuses** and names both exits. The alternative — auto-promoting an arbitrary *member* — would invert the ladder in exactly the case where the clan is least supervised.
+
+**Client + screen.** `leaveClan(clanId, successorId?)` returns *what happened* (`successor`, `auto_promoted`), and `planLeave` in `clan-roles.ts` mirrors the ramp purely so the screen can **prompt before the tap**. Two details a screen would have got wrong:
+
+1. **The refusal is decided by the pure mirror BEFORE the call**, so what the user reads is our translated copy. The server's refusal is an English sentence (`42501`) — `LEAVE_REFUSAL_KEY` exists so a 中文 reader does not meet it mid-flow.
+2. **"Leave without naming one" is offered only when the fallback can actually run** (`auto_promote_then_leave`). At any other point it would lead straight into the refusal — a button that lies.
+
+**Proof.** `clan_management.sql` **C13** — five purpose-built fixtures with **explicit `joined_at`** (which also keeps the joins-per-hour limb clear): two elders where the older must win · a named successor · a **same-second tie** · the no-candidate refusal plus both validation refusals · a co-head clan where nobody is promoted. Plus the end state read **as the owner**, so RLS cannot flatter it. And `check:clanapi` grew a **`p_successor`** section — the argument name `tsc` cannot check — with `p_successor` **omitted** (the SQL default) and **named**.
+
+**Fault-tested:** flipping `order by joined_at asc` to `desc` turns C13's *"the OLDEST elder"* assertion **red**.
+
+**Gates:** `tokens 36 · domain 45 · slice 36 · throw 33 · ads 51 · wire 43 · session 17 · pathc 38 · sql 13 · adrs 34 · contrast 22 · responsive 21 · lib 200 → 210` · `check:clanapi 55 → 69`. **Spend US$0.00.**
+
+**⚠️ Clarified by the PM the same day:** *"if there is a cohead and another cohead leaves without nominating the cohead becomes the only cohead."* — i.e. **the ramp does not fire while another head-power holder remains**: a co-head leaving needs no nomination, nobody is promoted, and the survivor is simply the only co-head. That was **already the behaviour** (`v_others` is counted before the ramp), but it **was not asserted** — fixture E only covered *the head* leaving with a co-head present. Two fixtures added, both asserting the **strong** form (*no other member's role changed*, not merely that the leaver got out):
+
+* **F** — founder head + two co-heads + an elder → one co-head leaves → the survivor is the only co-head, the founder is untouched, and **the elder is still an elder**.
+* **G** — **two co-heads and NO `head` row** (reachable once a founder has left) → one leaves → the survivor is the **sole head-power holder** and **the elder is still an elder**. This is the case where a misplaced ramp would have dragged an unrelated elder up the ladder.
+
+Also asserted in the pure mirror (`check:lib`) and over real PostgREST (`check:clanapi` **§9d**) — three layers.
+
+⚠️ **And the fixtures caught a real interaction:** F/G added memberships to u1/u2, and C11's 11 spare-clan heads split across two keepers pushed **u2 to ELEVEN — over the 10-clan cap**. The trigger correctly refused it, which failed the *whole file at its COMMIT* rather than in an assertion (a confusing failure mode, worth knowing). The spares are now spread across **three** keepers and every keeper stays under the cap. `clan_management.sql` GREEN · `check:clanapi` **77/77** · `lib` **234**.
+
+#### ✅ ANSWERED on SCRUM-84 — the RANK a successor is promoted INTO (2026-10-08, later)
+
+The PM's follow-up did not resolve from its wording alone (*"it will depend if the new nominated head is joining a co-head"*), so the question was left open and the code was made to **refuse to let it drift silently** — the rank was pulled out of the `UPDATE` and asserted from three directions. The PM then settled it:
+
+> **"hand over to a new head if no co-head, co-head if co-head already exists."**
+
+That is one sentence of SQL: **the successor INHERITS the rank of the person they succeed** — `set role = v_role`. Migration **`0014`** (a NEW file; `0013` is applied and is never edited).
+
+| Who leaves | Who is promoted | The clan ends up with |
+|---|---|---|
+| a **`head`**, no co-head | the named successor, else the oldest elder → **`head`** | **one `head`** |
+| a **`head`**, with a co-head | **nobody** — that co-head carries on | a **co-head** leads ← *"co-head if co-head already exists"* |
+| a **sole `co_head`** (no `head` row) | → **`co_head`** | a **co-head** leads |
+
+⚠️ **This reverses `0013`'s rationale on `head`, deliberately.** `0013` refused to promote into `head` because `head` was "the founder's immutable fact". **What survives is the FOUNDING fact** — `clans.created_by` still records who founded the clan and is never rewritten (C13 now asserts that *after* a succession has moved the headship). What changes is that **headship no longer dies with the founder**, which is the entire point of a line of succession, and it means a clan may have a `head` who did not found it. ⚠️ `set_member_role` **still refuses** `head`: the ladder appoints co-heads, and **succession is the only path to headship**.
+
+**Asserted as a PAIR, so neither value can be hard-coded.** Fixture **A** (a departing `head` → `head`) and the NEW fixture **H** (**no `head` row** at all, a sole co-head → `co_head`) are deliberately opposite: hard-code *either* value and one passes while the other fails. Plus:
+
+| Layer | What pins it |
+|---|---|
+| `check:lib` | the pure plan carries **`promoteTo`** — the rank was pulled out of the `UPDATE` and made reviewable — and **8** checks pin the rule (both ranks, both paths, the "co-head already exists" branch, and the invariant stated once) |
+| `check:clanapi` **§9b/§9c** | the promoted successor's **actual role read back from `clan_members`** over PostgREST — the strongest form, because it exercises the *real* function rather than trusting a duplicated literal |
+| `clan_management.sql` **C13 A + H** | the end state read **as the OWNER**, so RLS cannot flatter it — and `created_by` is asserted to **survive** the succession |
+
+⚠️ **The change went into a NEW migration rather than editing `0013`'s body.** `0013` may already be applied on the hosted project and this worktree has **no `supabase link`** (`Cannot find project ref`), so an edit to it could not be verified against remote migration history — and an unverifiable edit is how drift starts. `0014` uses `create or replace` on the **same signature**, deliberately: `0013`'s header warns that a stray `leave_clan(uuid)` would make every 1-arg call ambiguous.
+
+⚠️ **A harness trap re-confirmed:** `run-sql-tests.sh` calls `docker run` **without `--network host`**, so `127.0.0.1:54322` resolves to the *throwaway client container's own* loopback and every file reports `Connection refused` — which reads exactly like a failing test. The SQL suite must be run with `--network host` (or a non-loopback URL) locally. `clan_management.sql` GREEN that way; `check:clanapi` **81/81**; `lib` **240**.
+
+⚠️ **FAULT-TESTED, both ways — and the pair is what makes it a gate rather than a decoration.** Before the decision landed, the fault test also proved the `head` promotion was *possible*: no constraint, no trigger and no RLS policy refused it, so the answer's cost turned out to be **one line rather than a schema change**. (⚠️ Two `head` rows exist **momentarily** while the promotion runs before the departing head's row is deleted — safe, because there is no uniqueness constraint on `head` and the deferred ≥1-head trigger is a **minimum**, not a maximum.) After it landed, forcing `set role` back to the old literal `'co_head'` turns fixture **A** red; forcing `'head'` turns fixture **H** red. **`set role = v_role` is the only value that passes both.**
+
+
+
+**The gap this closed.** The RPCs existed and were proved, but **nothing called them**: the only `.rpc()` site in `src/` was `create_clan` in the SCRUM-82 shortcut. So the app could not invite, promote, remove, rename, leave, delete or read the Book at all.
+
+**`src/lib/clan-api.ts` — the device half.** Eleven typed wrappers (create · preview · join · reroll · myClans · clanMembers · setMemberRole · removeMember · leaveClan · renameClan · deleteClan · clanBook). They normalise their inputs through the PURE modules (`normaliseClanCode`, `isValidClanName`) so the client and the server agree on what a code and a name are, and they parse responses defensively because **there are no generated DB types** — a cast would turn a server change into a silent `undefined` on a screen.
+
+**`src/lib/clan-flow.ts` — the pure rules of the screens.** The wizard order, the button gates, the preview args and the **rendered action list**, delegating every permission to `clan-roles.ts` (which mirrors the SQL) rather than restating `role === 'head'` in a component. Two things it decided that a screen would have got wrong:
+
+1. **The invite card comes BEFORE the ancestor sheet** — the amended order, now asserted, so swapping them in a component is a red gate rather than a silent product regression.
+2. **A non-member's action list is the Book and nothing else.** The first cut appended `leave` unconditionally, which rendered a **Leave** button — and an **Offer** — on a clan the viewer was not in. Caught by writing the assertion.
+
+**`src/components/clan-ui.tsx` + five screens** — `clan/index` (the fork), `clan/create` (four taps), `clan/join` (code → preview → join), `clan/manage` (card · roster · ladder · rename · leave · delete) and `clan/book`. Destructive actions confirm, and the **leave refusal is passed through verbatim** so a sole head reads *"promote a co-head first"* rather than a generic failure.
+
+**⚠️ `npm run check:clanapi` — a new gate, for a gap nothing else covered.** With no generated types, nothing static checks that the argument names `clan-api.ts` sends (`p_clan_id`, `p_user_id`, `p_role`, `p_code`, `p_name`, `p_limit`) or the response fields it reads (`clan_id` · `ancestor_count` · `was` · `entries` …) match the database. `tsc` is blind to it and it fails only on a device, as an empty screen. The test drives the **real RPCs over real PostgREST** with the real arg names and asserts the real fields — **55 checks, all passing**, and **fault-tested**: renaming `p_clan_id` → `p_clanid` turns **22 of 55 red**.
+
+**Verification.** `tsc` clean · `lib` 153 → **200** (47 new checks in the screens group, fault-tested — swapping the wizard order and deleting the outsider guard turned **7** red) · `check:clanapi` **55/55** · the full suite green. **Spend US$0.00** — a local Supabase stack on Docker, no AI call, no deploy. The screens are validated by types and by the contract; **no device run was made this session**, so `testID`s are in place for one.
+
+
+
 ### 12.11 · SCRUM-82 — the clan bootstrap, and the first complete ritual (2026-10-07)
 
 **The blocker.** `submit_burn` is clan-scoped: it requires `clan_id` (migration 0004 §226) **and** the caller's `clan_members` row (§252). The slice's `submitBurn` sent only `{ capture_id, accuracy }`, and a fresh anonymous user is in no clan — so `award-service` answered **400** and `burns` stayed **0**. §12.10 proved everything upstream; this was the last step.
