@@ -565,6 +565,31 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.16 · S36b — the PM's pill review: three defects, and the measurement error underneath them (2026-10-09)
+
+**The review found three things the `0 collisions` check could not see:** the clan-head chip looked misaligned, the streak panel was top-aligned, and the drop-down arrow was inconsistent. ⚠️ **The first two share one root cause, and it was mine: I checked the pill against LAYOUT boxes (`shape.width`/`height`) when a Penpot `Text` reports a box that is not its inked glyphs.** The house tooling already said so — [[penpot-sweeps/occlusion-contrast-audit-v3.js]]: *"a Text shape reports a LAYOUT box far wider than the inked glyphs... measure with `textBounds`"*. I had read that file and still built the pill on layout boxes. **A gate that measures the wrong box passes.**
+
+**What the ink said.** `EN · 1h`, name: box 80 wide, ink **51.9 × 39.2** → `lines: 2.2`. ⚠️ **"Tan Family" was WRAPPING to two lines** — and at `lineHeight 1.2` inside a 44 px pill that reads as *"misaligned"* even though every box was centred to 0.2 px. The chip was also cramped: ink 77.4 inside an 84 box = **3.3 px padding**. And the streak panel's content ink sat **1.8 px from its top vs 10.4 px from its bottom**.
+
+**Fixed the measure, not the symptom.** Name re-flowed to one line (**it needs 84.2 px, not 80**); chip re-padded to **8 px** and re-seated from the name's *ink* edge; the affordance unified to **ONE glyph family** — `›` (**U+203A**), with the open state that **same glyph rotated 90°**. The old pairing was `›` vs `▾` (**U+25BE**, a filled geometric triangle): different Unicode blocks, different weights (ink 3.9 vs 6.0 wide) — inconsistent *by construction*.
+
+⚠️ **The panel defect was on 35 boards, not one.** The streak and tribute panels are copies of a single component and every copy carried the identical error (streak −4.3, tribute +2.7). Fixed **136 shapes across 34 boards** (streak +4, tribute −3), so the fix did not ship on four boards and stay broken on thirty. Re-measured: **68 panels, max deviation 0.3 px, 0 still off.**
+
+⚠️ **Six Penpot traps, each of which silently produced a wrong result** (recorded in the sweep's header, because they will recur):
+1. **A `Text` keeps its OLD WRAP until its content is rewritten.** Widening the box does nothing on its own. This is why the name wrapped on three boards *after* I had "fixed" it.
+2. **`verticalAlign` is a NO-OP when set to its current value** — restoring a box's height does not re-centre the text. Toggle it, with a re-flow between.
+3. **`growType = 'auto-width'` COLLAPSES the height** (44 → 18) and leaves the text anchored where it was.
+4. **`rotate()` is INCREMENTAL, not absolute** — two calls of 90° gave **180°**. Use the `rotation` property, and rotate about the box's own centre or the glyph walks off-centre.
+5. **A freshly created `Text` reports `textBounds` as ALL ZEROS** until it has been laid out — reading it immediately placed a sibling at `x=0`, off the board. Re-measure in a *later* call, and guard with a measured constant.
+6. **`findShapes({type:"board"})` includes the "Root Frame" (which holds 157 boards)**, so a *subtree* walk double-counts every panel and would have shifted those 136 shapes **twice**. Walk **direct children** and de-duplicate by shape id. ⚠️ **The dry run caught this before the write** — which is the only reason it is a footnote and not a defect.
+
+⚠️ **Corollary, and a correction to this session's own docs: the file has 161 real boards, not 162.** Every count taken this session ("158 → 162") includes the Root Frame; the honest figures are **157 → 161**. The **+4 delta is unaffected**, and the *conclusions* do not move — but this is now the **third** time a carried-forward number has needed re-deriving (§12.13's "12/12", §12.14's doc-15 misquote, and this).
+
+Checkpointed as named version **`S36b · Home alignment fixes (pill ink + panels + one chevron)`**. **Spend US$0.00** — Penpot only, no AI call.
+
+---
+
+
 ### 12.15 · S36 — the Home "clan card" is a PILL: the layout was measured, and the answer changed (2026-10-09)
 
 **The task.** `SCRUM-91` asked whether a scaffold entry satisfies *"Home is clan-scoped (clan card / switcher)"*, or whether the card must be **designed + built** — the last item holding `SCRUM-46` open. The PM took the design pass first (option A).

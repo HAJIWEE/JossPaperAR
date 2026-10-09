@@ -24,6 +24,26 @@
  *           angle-quote family (`< Back to the fork`), so the "open" state must be a
  *           ROTATED `>`, never a mixed-family glyph.
  *
+ * TRAPS FOUND WHILE FIXING THIS (2026-10-09, S36b) — each one silently produced a wrong result
+ *  1. A Text keeps its OLD WRAP until its content is rewritten. The pill's name read `h: 39.2`
+ *     (2 lines) in an 80px box because it had NEVER been re-flowed since creation. Widening the
+ *     box does nothing on its own; re-write `characters` (append a space, set it back) to force
+ *     the re-flow. "Tan Family" needs 84.2px, not the 80 it was given.
+ *  2. `verticalAlign` is a NO-OP when set to its CURRENT value — so restoring a box's height does
+ *     not re-centre the text. Toggle it ('top' then 'center') WITH a re-flow between.
+ *  3. `growType = 'auto-width'` COLLAPSES the height (a 44px box became 18px) and the text stays
+ *     anchored where it was. Prefer `fixed` with a measured width for anything that must sit on an
+ *     axis. If you must use auto-width, set the height AFTER, and re-verify.
+ *  4. `rotate(angle)` is INCREMENTAL, not absolute. Two calls of 90 gave 180. Use the `rotation`
+ *     property for an absolute value, and rotate about the box's OWN centre
+ *     (`rotate(90, {x: cx, y: cy})`) or the glyph walks off-centre.
+ *  5. A freshly created Text reports `textBounds` as ALL ZEROS until it has been laid out. Reading
+ *     it immediately yields 0 and silently places siblings at x=0. Re-measure in a LATER call, and
+ *     guard with a measured constant.
+ *  6. `page.findShapes({type:"board"})` includes the "Root Frame" (which holds 157 boards), so a
+ *     SUBTREE walk double-counts every panel and would have shifted 136 shapes twice. Walk DIRECT
+ *     children (`board.children`) when fixing per-board, and de-duplicate by shape id.
+ *
  * Penpot API notes (verified live 2026-09-28, re-confirmed 2026-10-09)
  *  - `Page` has no `.boards` / `.children`; entry points are `page.root`,
  *    `page.findShapes({...})`, `page.getShapeById(id)`.
