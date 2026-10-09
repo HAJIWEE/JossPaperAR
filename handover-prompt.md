@@ -12,7 +12,7 @@ Continue building **JossPaperAR** — an Expo/React Native AR app that replaces 
 
 **Where the project is.** The backend of record is **live and exercised** (Supabase + Postgres + Edge Functions on hosted `yercgevebxvtzkgctfai`), the economy's **AI-cost ceiling is enforced**, the **Android emulator target is live**, and 🎉 **the vertical slice completes a FULL ritual on glass** — capture → cartoonize → burn → award → persist.
 
-**This session's work (S35, 2026-10-09) is on `cline/7421e` — commit `e3823fb`, ⚠️ the PR into `main` was NOT opened.** `main` is now **`b81a86e`**: **PR #28 was MERGED** (2026-10-09 01:35Z, the PM merged it after the S34 wrap note was written).
+**This session's work (S35, 2026-10-09) is on `cline/7421e` — 3 commits — and PR #29 is OPEN into `main` (`0bdbf29`; ⚠️ opened with the GitHub MCP server, because `gh pr create` 403s on this repo — trap 26 already says so).** `main` is now **`b81a86e`**: **PR #28 was MERGED** (2026-10-09 01:35Z, the PM merged it after the S34 wrap note was written).
 
 ⚠️ **THE FINDING THAT MATTERED WAS NOT THE TICKET.** `npx supabase migration list` read **remote 11 / local 14** — `0012`, `0013` and `0014` had **never been pushed**, so **the whole merged clan system was dead on the live backend**. The S34 handover's *"verified at 12/12"* was **wrong**. `db push` applied all three (**14/14, no drift**), proved by a real call: the live PostgREST OpenAPI now exposes the full clan RPC surface. ⚠️ **A fresh worktree is NOT linked** (`supabase/.temp` is gitignored, so link state is per-worktree) — **re-link and re-read the remote count before any push.** Full detail: doc 19 **§12.13**.
 
@@ -23,7 +23,7 @@ What S35 delivered:
 - ⚠️ **FOUR defects fixed** — **three found by writing the intent down as a test** (a nine-character code was **truncated** rather than refused · the scan duplicate check compared **raw payloads** · the join screen **collapsed offline into "bad code"**, so an invite was **never retried**), plus **the manage invite surface was dead** (it read `clan.code`, which `myClans()` nulls on purpose — a head could never see their own code).
 - ✅ **Both new gates fault-tested RED, then restored green.**
 
-**Left for next session:** ⚠️ **open the PR** (`cline/7421e` → `main`) · **the first DEVICE RUN** of the clan screens, the tutorial **and the new scanner** — **nothing has been seen on glass** · the **Home clan card** (needs a Home design pass) · **`SCRUM-52`** (the device purchase) · **`SCRUM-83`'s ZH character-set mismatch** (the doc says simplified, the shipped i18n is traditional) · ⚠️ **the universal link needs the domain** (doc 19 §6.2 item 6) — the route and the QR payload are already correct, `josspaperar://` works today.
+**Left for next session:** ⚠️ **the first DEVICE RUN** of the clan screens, the tutorial **and the new scanner** — **nothing has been seen on glass** · the **Home clan card** (needs a Home design pass) · **`SCRUM-52`** (the device purchase) · **`SCRUM-86`** (⚠️ the invite-code posture — a `🎯 Decide:` ticket waiting on the PM) · **`SCRUM-83`'s ZH character-set mismatch** (the doc says simplified, the shipped i18n is traditional) · ⚠️ **the universal link needs the domain** (doc 19 §6.2 item 6) — the route and the QR payload are already correct, `josspaperar://` works today.
 
 ## 2 · The PM's working rules (non-negotiable)
 
