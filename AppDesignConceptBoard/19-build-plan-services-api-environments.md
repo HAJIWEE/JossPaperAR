@@ -565,6 +565,36 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.15 · S36 — the Home "clan card" is a PILL: the layout was measured, and the answer changed (2026-10-09)
+
+**The task.** `SCRUM-91` asked whether a scaffold entry satisfies *"Home is clan-scoped (clan card / switcher)"*, or whether the card must be **designed + built** — the last item holding `SCRUM-46` open. The PM took the design pass first (option A).
+
+⚠️ **The pass changed the answer, because the premise — a clan *card* — had never been checked against the board.** Two earlier sessions *stated* "the signed-off Home layout has no free band" and [[next-ai-context]] carried it as fact. This session **measured** it: rasterise all **35** Home layers and solve for the largest empty rectangle. Exactly **one** region comes back — **`x 230–486, y 180–280`**, the **header row** between the app mark and `btn · settings`:
+
+| Band (board y) | Occupant |
+| --- | --- |
+| 229–282 | app mark · settings |
+| 280–328 | tribute panel · streak panel |
+| 332–350 | "altar state" caption |
+| 340–760 | altar halo (art) |
+| 856–922 | Make an Offering CTA |
+| 944–1024 | tab bar |
+
+⚠️ **My own first attempt got this wrong, and the check caught it.** I placed a full-width bar at **y 282–338** on the strength of a **truncated** layer dump that hid the tribute/streak panels — i.e. I contradicted a recorded fact on partial evidence, the same failure class as the "12/12" migration count (§12.13) and the doc-15 misquote (§12.14). The difference: a **collision check** was cheap enough to run, so it failed loudly in a work board instead of shipping. **When a layout claim can be tested in one call, test it before writing it down.**
+
+**The design.** A **header pill**, not a card — it occupies space that is *already* empty and moves **nothing** that was signed off. Four new boards (`EN · 1h` · `EN · 1h2` · `ZH · 1h` · `ZH · 1h2`), EN + ZH, each on a **clone** of its own Home board, so **no signed-off board was mutated**. Spec: `240,234` · **236×44** (≥44 px target) · r14 · `#eae2d2` + 2.5 px `#1a1a1a` inner stroke — the **`btn · settings` treatment**, so it reads as chrome, not content. Clan name `Noto Serif SC` 700/15, shown **plain** (§2.1) and deliberately **not localised** — matching the existing `0e3` pair, which already renders `Tan Family` on the ZH board. Role chip `#d4af37` r12 carrying the **locked** vocabulary (`Clan Head` · `族长`). Affordance `›` (one clan) → `▾` (2+), because ⚠️ **the switcher already exists** in `clan/manage.tsx` — the pill only has to *say* that it opens it, so no second switcher is built. Checkpointed in Penpot as named version **`S36 · Home clan pill (SCRUM-91 option A)`**.
+
+**Proved, not asserted.** Collision check — pill box against all 35 layers: **0 collisions on all four boards**, inner boxes strictly sequential (name 254–334 · chip 342–426 · affordance 426–462). Contrast **re-derived** from the fills: name **13.52** · affordance **7.28** · chip label **8.28** — all pass AA. (Penpot's plugin API *does* expose `file.saveVersion(label)`, so the "versions can only be saved in the UI" note that has sat in [[next-ai-context]] for several sessions is wrong — it was a claim about the API, not a call against it.)
+
+⚠️ **A defect found in a signed-off board — by having to pick a compliant colour.** The existing `0e3` role chip (`EN · 0e3` **and** `ZH · 0e3`, `👑 …` at 13 px / 700) is `#7b621f` on `#d4af37` = **2.77:1** — failing AA (4.5) *and* even the 3:1 large-text floor. The new pill uses `#1a1a1a` on gold (**8.28**), so the failure is **not** propagated. Filed **`SCRUM-93`** — and the durable half is not the chip but the gate: **`check:contrast` reads `tokens.css` and the app source, so it structurally cannot see a Penpot board.** A chip can fail AA there indefinitely while every gate stays green, *despite* S21 having cleared 132 AA failures in this same file. **A signed-off board is not a checked board.**
+
+**Filed, not decided.** `SCRUM-92` (build the pill — `blocks` `SCRUM-46`) and `SCRUM-93` (the contrast defect), both in Sprint 1. ⚠️ **Nothing was marked `Done` on the strength of the design pass alone** — the PM's call on *build-now vs close-`SCRUM-46`-and-split* is what the ticket still carries.
+
+**Spend: US$0.00** — Penpot only; no AI call, no deploy ([[project-costs]]).
+
+---
+
+
 ### 12.14 · S35b — SCRUM-86: the invite code is elder-and-above, and two traps that nearly produced a false green (2026-10-09)
 
 **The decision.** PM: *"limit link sharing to elder and above seniority."* ⚠️ **This CONFIRMED the spec rather than changing it** — doc 15 §3's matrix has always read `| Invite new members (link · code · QR) | ✅ | ✅ | ❌ |` (Head ✅ · **Elder ✅** · Member ❌). Two things had drifted *from* that row: `canInvite` returned `hasHeadPower` (justified by a comment that **misquoted doc 15** as saying "Elder ❌"), and the database never enforced it at all. ⚠️ **I repeated that misquote in my first SCRUM-86 comment before reading the document** — a claim about a doc is not the doc, and this is the second time in one day a carried-forward claim was wrong (the "12/12" migration count was the first).
@@ -866,3 +896,4 @@ One **real defect in the check itself** was found this way and fixed: the *"reco
 
 *Created 2026-10-03 (Session 27) — the stand-it-up plan for [[07-system-architecture]]: service build order · the complete API surface (3 Edge Fns · 11 RPCs · storage · realtime) · the 3-ring environment with the local toolchain audited · the exact SDK-57 package manifest + install traps · the build-vs-provision split (A–J ↔ #1–#10, filed as **SCRUM-57** / **SCRUM-56**) · and 4 doc-07 inconsistencies found while mapping the build against the architecture. Path C endpoints and prices verified live: **ADR-002's cost model still holds exactly.***
 *Updated 2026-10-05 (S29c) — **§12.7**: SCRUM-53 started; the slice's three client rules are now a typed state machine with a fault-tested gate (`npm run check:slice`), and the emulator interim target is filed as **SCRUM-64**.*
+*Updated 2026-10-09 (S36) — **§12.15**: the Home *"clan card"* is a **pill**, because the layout was finally **measured** instead of assumed — one empty rectangle on the whole board, the header row. Found and filed an **AA failure in a signed-off board** (`SCRUM-93`: `0e3`'s chip is 2.77:1, and `check:contrast` cannot see Penpot at all), and filed the build as **`SCRUM-92`**. **US$0.00.***
