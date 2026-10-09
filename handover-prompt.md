@@ -1,6 +1,6 @@
 # 🤝 Hand-over prompt — next AI session
 
-> **Written 2026-10-07 (S33 wrap) · rewritten 2026-10-08 (S34 wrap).** Paste everything below the rule into a fresh session's first message.
+> **Written 2026-10-07 (S33 wrap) · rewritten 2026-10-08 (S34 wrap) · rewritten 2026-10-09 (S35).** Paste everything below the rule into a fresh session's first message.
 > It is deliberately self-contained: goal · state · what to do first · traps · files.
 > The living versions are **[[next-ai-context]]** (state) · **[[follow-up-items]]** (open work) · **[[completed-work-archive]]** (history) · **[[AppDesignConceptBoard/19-build-plan-services-api-environments|doc 19]] §12** (what the backend found).
 
@@ -8,19 +8,22 @@
 
 ## 1 · Goal
 
-Continue building **JossPaperAR** — an Expo/React Native AR app that replaces physical joss-paper burning with a digital ritual. Repo: `github.com/HAJIWEE/JossPaperAR` — work on a **`cline/<id>` worktree**, then PR into `main` (S34 used `/home/gweejiahan/.cline/worktrees/c1292/JossPaperAR` on `cline/c1292`) · the vault worktree is `~/Documents/Obsidian Vault/Projects/JossPaperAR` · Jira `hajiwee9411.atlassian.net` (project **SCRUM**, the source of truth for decisions).
+Continue building **JossPaperAR** — an Expo/React Native AR app that replaces physical joss-paper burning with a digital ritual. Repo: `github.com/HAJIWEE/JossPaperAR` — work on a **`cline/<id>` worktree**, then PR into `main` (S35 used `/home/gweejiahan/.cline/worktrees/7421e/JossPaperAR` on **`cline/7421e`** — S34 used `cline/c1292`) · the vault worktree is `~/Documents/Obsidian Vault/Projects/JossPaperAR` · Jira `hajiwee9411.atlassian.net` (project **SCRUM**, the source of truth for decisions).
 
 **Where the project is.** The backend of record is **live and exercised** (Supabase + Postgres + Edge Functions on hosted `yercgevebxvtzkgctfai`), the economy's **AI-cost ceiling is enforced**, the **Android emulator target is live**, and 🎉 **the vertical slice completes a FULL ritual on glass** — capture → cartoonize → burn → award → persist.
 
-**This session's work is on `cline/c1292` in PR #28 — OPEN, NOT MERGED.** `main` is still **`a076b88`**; the branch is **`940c85b`** (13 commits, CI green on every one). Nothing has been merged.
+**This session's work (S35, 2026-10-09) is on `cline/7421e` — commit `e3823fb`, ⚠️ the PR into `main` was NOT opened.** `main` is now **`b81a86e`**: **PR #28 was MERGED** (2026-10-09 01:35Z, the PM merged it after the S34 wrap note was written).
 
-What S34 added, all committed and gated:
+⚠️ **THE FINDING THAT MATTERED WAS NOT THE TICKET.** `npx supabase migration list` read **remote 11 / local 14** — `0012`, `0013` and `0014` had **never been pushed**, so **the whole merged clan system was dead on the live backend**. The S34 handover's *"verified at 12/12"* was **wrong**. `db push` applied all three (**14/14, no drift**), proved by a real call: the live PostgREST OpenAPI now exposes the full clan RPC surface. ⚠️ **A fresh worktree is NOT linked** (`supabase/.temp` is gitignored, so link state is per-worktree) — **re-link and re-read the remote count before any push.** Full detail: doc 19 **§12.13**.
 
-- ✅ **`SCRUM-46` — the clan system, end to end.** Backend: migrations **`0012`** (the role ladder + the Book read path + RLS + anti-abuse), **`0013`** (the head-exit ramp), **`0014`** (the successor's rank). Frontend: `clan-api.ts` (11 RPC wrappers) · `clan-flow.ts` · `clan-ui.tsx` · five screens (`clan/index|create|join|manage|book`). New gate **`check:clanapi`**.
-- ✅ **`SCRUM-84` — ANSWERED and built.** The successor **inherits the departing rank** (`set role = v_role`): a departing `head` hands over to a new **`head`**, a departing **sole `co_head`** to a `co_head`, and a head leaving a co-head behind promotes **nobody**. ⚠️ This **reverses `0013`'s own rationale** that `head` was "the founder's immutable fact" — what survives is the **founding** fact (`clans.created_by` is never rewritten); headship now has a **line of succession**.
-- ✅ **`SCRUM-85` — BUILT** (the `SCRUM-83` answer, option E): the first burn is a **tutorial** — no clan, no points, **no AI spend** — then the fork.
+What S35 delivered:
 
-**Left for next session:** merge PR #28 · **the first device run** of the clan screens and the tutorial (nothing has been seen on glass) · **`SCRUM-50`** (the QR half — ⚠️ still in the **backlog**, so move it into the sprint *when you start it*) · the **Home clan card** (needs a Home design pass) · **`SCRUM-52`** (the device purchase) · **`SCRUM-83`'s ZH character-set mismatch** (the doc says simplified, the shipped i18n is traditional).
+- ✅ **`SCRUM-50` — the QR invite.** The pure half is new and gated (+50 assertions; `lib` **242 → 292**): `invite-flow.ts` (the **scan debounce** · the **resolve state** · **the HELD invite**). The surfaces: `invite-qr.tsx` (a RUNTIME QR, never the design's non-scannable placeholder) · `clan-join.tsx` (**one** join body, two entry points) · `clan/scan.tsx` (**`expo-camera` `CameraView` + `barcodeScannerSettings: ['qr']`** — no new native module) · `join/index.tsx` + `join/[code].tsx` (both link shapes) · `invite-entry.tsx` + `held-invite.ts` · `InviteCard` in create + manage.
+- ✅ **Deps verified BEFORE use** — `react-native-svg` (SDK 57 pins **15.15.4**) + `react-native-qrcode-svg`; the SDK docs list `react-native-svg` as **"Included in Expo Go"**, which matters because there is **no `expo-dev-client`**. `bundle:android` exports clean (**4.5 MB**) · **`expo-doctor` 21/21**.
+- ⚠️ **FOUR defects fixed** — **three found by writing the intent down as a test** (a nine-character code was **truncated** rather than refused · the scan duplicate check compared **raw payloads** · the join screen **collapsed offline into "bad code"**, so an invite was **never retried**), plus **the manage invite surface was dead** (it read `clan.code`, which `myClans()` nulls on purpose — a head could never see their own code).
+- ✅ **Both new gates fault-tested RED, then restored green.**
+
+**Left for next session:** ⚠️ **open the PR** (`cline/7421e` → `main`) · **the first DEVICE RUN** of the clan screens, the tutorial **and the new scanner** — **nothing has been seen on glass** · the **Home clan card** (needs a Home design pass) · **`SCRUM-52`** (the device purchase) · **`SCRUM-83`'s ZH character-set mismatch** (the doc says simplified, the shipped i18n is traditional) · ⚠️ **the universal link needs the domain** (doc 19 §6.2 item 6) — the route and the QR payload are already correct, `josspaperar://` works today.
 
 ## 2 · The PM's working rules (non-negotiable)
 
@@ -139,7 +142,7 @@ fal.ai credit: **≈ US$5.16 spent** of the approved **US$10–20** (≈ **S$6.6
 
 **You may spend freely inside the budget — no need to ask.** ⚠️ Re-derive the total from `project-costs.md` rather than trusting this line; it goes stale silently.
 
-⚠️ **S34 spent US$0.00, and that is the pattern worth copying:** a migration can be proved against a **local Supabase stack on Docker** (real Postgres 17.11 + real PostgREST) for free, so **prefer the local stack to a hosted push** when the goal is verification rather than deployment. The only thing that costs money here is **fal.ai**, and the tutorial exists precisely so that new users never trigger it.
+⚠️ **S35 spent US$0.00 as well (branch `cline/7421e`, `/home/gweejiahan/.cline/worktrees/7421e/JossPaperAR`), and it went one better than S34:** the migrations were pushed to the **hosted** project (free) because the goal there was **deployment**, not verification — and the push was still made safe by a `--dry-run` first. ⚠️ **S34 spent US$0.00, and that is the pattern worth copying:** a migration can be proved against a **local Supabase stack on Docker** (real Postgres 17.11 + real PostgREST) for free, so **prefer the local stack to a hosted push** when the goal is verification rather than deployment. The only thing that costs money here is **fal.ai**, and the tutorial exists precisely so that new users never trigger it.
 
 
 

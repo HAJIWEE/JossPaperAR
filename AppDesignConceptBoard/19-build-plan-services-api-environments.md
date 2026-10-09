@@ -565,6 +565,24 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.13 · S35 — the hosted project was THREE MIGRATIONS BEHIND, and a fresh worktree is not linked (2026-10-09)
+
+**The finding, measured.** `npx supabase migration list` read **remote 11 / local 14**. Three migrations — `0012` (*clan_management_api*), `0013` (*clan_head_exit*) and `0014` (*clan_successor_rank*) — had **never been pushed**. So the **entire clan system that `main` had just merged was dead on the live backend**: `set_member_role` · `remove_member` · `leave_clan` · `rename_clan` · `delete_clan` · `clan_book` were all **404 by absence**, and SCRUM-82's fixed award path was running against a schema that predated its own guard.
+
+⚠️ **The S34 handover asserted "the hosted project was last verified at 12/12" — it was 11.** A remembered number is not a measurement. This is the second time this project has been bitten by a carried-forward total (see [[project-costs]]'s rule about re-deriving a figure from its inputs), and the honest generalisation is the one already in AGENTS.md: **re-derive, don't copy forward.**
+
+**The trap that made it invisible — a fresh worktree is NOT linked.** `supabase link` writes `supabase/.temp/` (project ref, pooler URL) and `.temp` is **gitignored**, so **local link state is per-worktree**. A session that notes "the CLI is linked" is describing *its own worktree*; the next session's fresh worktree is unlinked, and every `migration list` / `db push` fails with *"Cannot find project ref. Have you run supabase link?"* — which reads like a missing credential, not like "you are about to check the wrong thing". **Re-link and re-read the remote count before any push** (this is trap 8's rule, and it is now the first thing the S35 session did).
+
+**The fix.** `db push --dry-run` first (to print the exact pending set rather than trusting a count), then `db push --yes` — all three applied. `migration list` now reads **14/14, no drift**. ⚠️ Checked first that none of the three touches `app_config` (the kill switch): **they do not** — the ability to kill every user's session is not something to discover mid-push. No spend: a push is free.
+
+**Proved by a real call, not by a count.** With the service-role key, `GET /rest/v1/` (the PostgREST OpenAPI root) now lists the full clan surface — **14 clan/role RPCs**: `create_clan` · `join_clan` · `leave_clan` · `set_member_role` · `remove_member` · `rename_clan` · `delete_clan` · `clan_book` · `clan_role_of` · `is_clan_head` · `is_clan_member` · `preview_clan` · `new_clan_code` · `reroll_clan_code`. ⚠️ The `anon` key **cannot** read that root any more — it answers **401 `Invalid API key` / *"Only the `service_role` API key can be used for this endpoint"*** — so the introspection itself needs the service key (a read, not a mutation).
+
+**A posture finding, recorded rather than "fixed".** `clans_select_member` is `using (is_clan_member(id) or created_by = auth.uid())` — a **table-level** policy, so **any member can read `clans.code` by selecting it**. The client's gate on the invite surface is therefore a **UI** gate, not a security boundary. Tightening it is an **RLS / security-posture decision** (a PM call), not a client change — and a new `clan_invite_code` RPC gated to head-power would be **security theatre** while `clans` stays member-readable. Recorded on **SCRUM-50**.
+
+**Client defects this session's gate found** (full detail on [[follow-up-items]]): `invites.ts` **truncated a nine-character code** (`/join/ABCDEFGHJ` returned `ABCDEFGH` — the guess its own contract forbids) · the scan duplicate check compared **raw payloads**, so the same code as a link and then as a paste read as **two** scans · the join screen **collapsed "bad code" into "offline"**, so an unreachable shrine told a user their family's code was wrong and the invite was **never retried**. All three were found by writing the intended behaviour down as a **test** rather than as a comment.
+
+---
+
 ### 12.12 · SCRUM-46 — the clan management API (2026-10-08)
 
 **What was already there.** `clans` · `clan_members` · `create_clan` · `preview_clan` · `join_clan` · `reroll_clan_code` · `save_ancestor` · `is_clan_member` · `clan_role_of` · `is_clan_head` · `enforce_ancestor_cap` all shipped with PR-2/PR-3. What SCRUM-46 adds is the half doc 15 §3 *promises* and nothing implemented: **the role ladder, leaving and removal, rename, delete, and the Book of Tributes read path** — plus the anti-abuse limits §5.2 hands to this ticket.
