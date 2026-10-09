@@ -586,6 +586,8 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 Fixed in **`S36c`** (revn 283): every position re-derived from the pill background, re-verified with an explicit `OUTSIDE_PILL` assertion — **0 offenders on all four boards**.
 
+✅ **AND THE PM APPROVED IT (2026-10-09: *"looks good"*)** — the Home clan pill is **signed off**, which **unblocks `SCRUM-92`** and completes the design half of `SCRUM-91`'s option A. ⚠️ **Build from `S36c`**; `S36` and `S36b` each carry defects. ⚠️ **Two rounds of review, and each round the PM found something my gates had blessed** — the pattern recorded above is the most useful thing this section holds, and it generalises: *a check that compares a shape to its sibling cannot see a fault the siblings share.*
+
 ⚠️ **Corollary, and a correction to this session's own docs: the file has 161 real boards, not 162.** Every count taken this session ("158 → 162") includes the Root Frame; the honest figures are **157 → 161**. The **+4 delta is unaffected**, and the *conclusions* do not move — but this is now the **third** time a carried-forward number has needed re-deriving (§12.13's "12/12", §12.14's doc-15 misquote, and this).
 
 Checkpointed as named version **`S36b · Home alignment fixes (pill ink + panels + one chevron)`**. **Spend US$0.00** — Penpot only, no AI call.
