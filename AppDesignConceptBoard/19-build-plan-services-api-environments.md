@@ -565,6 +565,48 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.36 · S44–S45 — the PM's four rulings, and why three of them were "no change" (2026-10-10)
+
+The PM closed the outstanding decision queue in one batch: *"for 104 i can accept it for now, will decide again on actual device, 105 is also fine, 94 is also fine … i checked the price 103.3 is good."* Six tickets closed on it — **`SCRUM-94` · `SCRUM-96` · `SCRUM-103` · `SCRUM-104` · `SCRUM-105`** — and ⚠️ **four of the five rulings required NO change at all**, which is the interesting part.
+
+| ruling | what it decided | what it required |
+|---|---|---|
+| `SCRUM-94` — *"94 is also fine"* | keep the darkened `0e8` disc (`--disc-gold #887023`) | ✅ **nothing** — the fix was already in `main` |
+| `SCRUM-105` — *"105 is also fine"* | `Tan Family` is the demo clan's canonical name | ✅ **nothing** — already standardised (10 layers / 8 boards) |
+| `SCRUM-103.1` — *"go with Joss Paper Stack"* | the bundle's name | ✅ **nothing** — `SCRUM-100` had already corrected the boards (5 visible names + 22 layer names); **`Cash Bundle` is confirmed STALE, not a pending rename** |
+| `SCRUM-103.2` — *"楼房 sounds more grand its fine"* | the House's 中文 name | ✅ **nothing** — `楼房` stands; ⚠️ **`祖屋` is now explicitly DECLINED** and should not be re-raised |
+| `SCRUM-103.3` — *"i checked the price 103.3 is good"* | the boards' base values vs doc 10 | ✅ **nothing** — ⚠️ **and doc 10, a LOCKED economy document, was NOT moved** |
+
+⚠️ **That is the outcome worth recording: a decision batch that ratifies reality rather than generating work is the cheapest possible kind — and it is only cheap because the earlier sessions had already shipped the changes and left the rulings as the last step.**
+
+✅ **`SCRUM-103.3`'s sequencing was honoured exactly as the PM asked** (*"after you fix scrum 101 i will have to check again"*): `SCRUM-101` landed, 103.3 was **brought back for the re-check rather than decided unilaterally**, and the PM then confirmed. ⚠️ **The alternative would have been editing a locked economy spec to match a design board** — deferring cost two sessions and avoided that.
+
+### `SCRUM-104` — the one ruling that was PARTIAL, and the discipline it triggered
+
+*"i can accept it for now, will decide again on actual device"* is **not** an acceptance of the criterion, it is a **deferral of it**. Its AC 1 says *"confirm … **and ideally on glass**"*, and the fix changes the height of **six signed-off boards** while the sweep's surface resolver is only an approximation (no groups, shadows, gradients or masks; siblings walked in paint order rather than rendered). So the `on glass` half was **split out, not cut** into **`SCRUM-106`** (Sprint 2, linked, AC 1 carried **verbatim**) — the same discipline `SCRUM-88`/`89`/`90` used for `SCRUM-50`. ⚠️ **The rule this follows: a future decision that belongs to the PM goes to Jira, never to a comment or a hand-off doc.**
+
+⚠️ **And a closing checked the SHIPPED state rather than the branch's:** before marking anything `Done`, `git diff origin/main HEAD -- design-system/ src/` was verified **empty** and `penpot-pairs.json` read **17 pairs in BOTH** — because `Done` is a claim about what users have, not about what a branch contains.
+
+
+### 12.35 · S43 — SCRUM-87: the local SQL suite is GREEN, and the ticket's two defects were four (2026-10-10)
+
+`SCRUM-87` said *"the local SQL suite cannot be green: `pr3_verification.sql` fails"* and named **two** defects. There were **four** — and ⚠️ **the two the ticket could not see are the ones that matter**, because `assert_true` **RAISES**: the file aborts at its **first** failure, so *a pre-existing red masks a new red* and **nothing downstream had ever executed**. `pr3_verification.sql` is now **87 assertions, exit 0**, and the whole suite (**ai_budget 17 · clan_management 109 · invite_sharing 25 · pr3 87 · rethrow_cap 8 = 246**) is green in one pass.
+
+**(a) `SET LOCAL ROLE` is a NO-OP under the runner — and its twin was missed.** `set local role authenticated` runs outside a transaction block (psql autocommit), so it warned and did nothing: the `$auth$` block ran as the **database owner**, and *"an authenticated INSERT into `ledger_events` is DENIED"* saw the insert **succeed**. ✅ **Fault-tested, not assumed** — reverting to `set local` reproduces `✗ FAIL: authenticated INSERT into ledger_events — expected an error, but the statement succeeded`, and ⚠️ **it reproduces at the ticket's own line 483, which `git show HEAD:` shows is `$auth$;` — the block's terminator, i.e. exactly how psql reports a failure *inside* it.** So the ticket's diagnosis was right, and is now demonstrated rather than believed. ⚠️ **And the ticket's stated fix is INCOMPLETE:** `set_config('request.jwt.claims', …, is_local := true)` **on its own statement** is the same transaction-scoped trap, so it evaporated before the block ran. Both are now the **session-scoped** form (`set role` · `is_local := false`), which works in **both** runners. The `perform set_config(…, true)` calls **inside** the DO blocks are correct and were left alone — they are in the same statement.
+
+**(b) The 1,650 assertion was made unreachable by `SCRUM-79`** — the cap grades every **second+** throw on a capture **Devout**, and the file burned **five times on one capture**, so `正中 + new ground + streak = 1,650` graded **1,250**. Fixed with a **fresh capture** for the first-throw case, and ⚠️ **the shared-capture burn was kept rather than deleted — it is now an assertion of the NEW rule** (`a RETHROW sending accuracy 0 is CAPPED at 虔诚 Devout — never 正中`).
+
+**(c) ⚠️ A raw table read that only ever worked as the owner.** `select id::text from public.clans where code = 'PR3TESTX'` — migration `0015` grants SELECT **column-by-column** and `code` is deliberately **not** granted (`SCRUM-86`), so the **filter itself** is refused. This line could not fail while the role switch was broken, and it **appeared the moment (a) was fixed**. Now resolved through `preview_clan` → `clan_id`, i.e. **the only path a client actually has** — which is the point of the test, not a workaround.
+
+**(d) ⚠️ The harness counted its own leftover residue.** `count(* from integrity_flags where signal='daily_award_ceiling') = 1` read **2**, because `integrity_flags.user_id` is `ON DELETE SET NULL`: the pre-clean deletes the **profiles**, which **orphans** a previous run's flags instead of removing them. That is not hypothetical — a run **succeeded through `$svc$` (committing its rows) and then died at the auth trap**, so the foot's teardown never ran and the debris survived (found as `proposed: 1650, already: 49400`, `user_id` NULL). ✅ **The durable fix is not another delete list: the pre-clean and the teardown are now LITERALLY THE SAME FUNCTION** (`pg_temp.pr3_teardown()`, hoisted above the fixtures), because *"undo a previous run"* and *"undo this run"* are the same job — and the pre-clean **had already drifted**, re-implementing 3 of the 4 deletes and missing exactly this one.
+
+**(e) A second-order effect of the cap: the per-minute limiter.** The cap's new burns pushed the section that tests the **daily** ceiling to its **7th** `submit_burn` in the minute, so it was refused as `shrine is busy` — a *different* rule's failure wearing the mask of the one under test. That section now clears `rate_counters` first, as the **6/min** section below it already did.
+
+**Proved, not asserted:** ✅ **87/87, exit 0** · ✅ **three consecutive runs from a deliberately DIRTY database, all exit 0** — the re-run safety the file claims in its own header and did not have · ✅ **BOTH runners, which also CLOSES the ticket's last open note:** autocommit (as `run-sql-tests.sh` runs it) **and `psql -1` single-transaction (as the documented throwaway-migration path runs it)** — ⚠️ the ticket's *"`psql -1` is not a drop-in fix; it then fails at *the ceiling breach is LOGGED to integrity_flags*"* **was the RESIDUE and nothing else** — that is the stale flag the pre-clean now sweeps, so the file is genuinely runner-independent, as its header always claimed · ✅ **the full suite in glob order, 246 assertions, one pass** — so the *"one red file makes a second file look broken"* failure mode is gone too · ✅ **fault-tested twice** (the 1,650 number → RED; `set local` → RED) · ✅ **zero residue** afterwards (`auth.users` · `profiles` · `clans` · `integrity_flags` · `burns` all 0). `npm run check` **exit 0** (16 migrations · 34 ADR · 387 lib · 40 contrast · 13 credits-ladder · …). ⚠️ **And note what this does NOT buy: CI coverage.** The behavioural SQL suite needs a **local stack**, so **CI runs the STRUCTURAL `check:sql` (16/16) but not these 87 assertions** — the green below is proven **locally**, which is exactly this ticket's scope (*"`npm run check:db` against a local stack is red"*). Adding the suite to CI is a **separate** change and is not claimed here. **US$0.00** — local stack, local runs, no fal.ai call, nothing deployed.
+
+⚠️ **The lesson, and it is the same one this project keeps relearning:** *when you change behaviour that a red file asserts, **diff the failure LINE, not red-vs-green*** — and be suspicious of a harness whose clean-up is written **twice**.
+
+
 ### 12.34 · S41 — SCRUM-79: the rethrow cap is enforced on the SERVER, and the client never had to be trusted (2026-10-10)
 
 `SCRUM-23`'s cap — *"a rethrow caps at 虔诚 Devout, never 正中 Bullseye"* — lived **only in the client** (`src/domain/throw.ts` `gradeThrow`). ADR-005's premise is that a client-side cap is not a cap: a tampered client simply does not call `gradeThrow`, and `aim_band_for(p_offset)` has no idea which throw it is — so **`accuracy: 0` on a SECOND throw graded Bullseye ×2.0**. doc 16 §5 pre-commits the cap to the cultural reviewer, so this was a promise the app did not keep.
@@ -606,9 +648,13 @@ The option said *"pass a per-capture attempt count into `submit_burn`"*. ⚠️ 
 
 ⚠️ **My first `R7` was wrong, and its failure was the finding:** I asserted another member burning my capture would be uncapped; the server **refused it outright** (*"is not a styled capture owned by the actor"*). So the per-actor scope is belt-and-braces and the **ownership** check is what holds.
 
-### ⚠️ Not yet live
+### ✅ Now LIVE — pushed, and verified in production
 
-**The cap is verified against a LOCAL stack and has NOT been pushed to the hosted project**, because a fresh worktree is not linked (`supabase/.temp` is gitignored — §12.13). ⚠️ **Until `db push` runs, a tampered client on the deployed backend can still farm bullseyes.** That is why the ticket is `In Review`, not `Done`.
+The PM deployed it, and it was verified **three ways via the Supabase connector**: the history row (`20261010100000`), **16 remote / 16 local — no drift**, ⚠️ **and `pg_proc.prosrc` for `submit_burn` actually CONTAINS the cap** — the comment at offset **9271**, `capture_id = v_capture_id` at **10283**, `v_band := 'devout'` at **10326**.
+
+⚠️ **That third check is the one that matters, and the one the CLI cannot do.** `supabase migration list` proves a **version string** is recorded; it does **not** prove the **function body** changed. **A history row can exist while the body is the old one** — exactly the false-green S35b hit when a persisted volume made a migration *look* applied while it was absent. Reading `prosrc` is the difference between *"the file was accepted"* and *"the enforcement is running"*.
+
+⚠️ **So the deployed backend no longer lets a tampered client farm Bullseyes**, and the promise to the cultural reviewer is kept by the **server**, not by the client's goodwill.
 
 ### Also this session
 
