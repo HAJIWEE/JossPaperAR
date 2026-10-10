@@ -63,6 +63,8 @@
 
 | 2026-10-10 | **S39b — the PM's decision batch (SCRUM-90 · 101 · 102 · 103) + `SCRUM-101` implemented** | Record six rulings in Jira; re-base the credit shelf to doc 10's `$1.55/1,000`; fix the board's `功德`; assert the clan-name script-blindness rule | **US$0.00** — Penpot edits, the plugin's read-backs, and local Node gates (`check:credits` · `check:lib` · `npm run check`). **No fal.ai call, no migration, nothing deployed** | — | **S$0.00** | ✅ **no spend** — logged so the zero is on the record rather than absent. fal.ai total unchanged at ≈ **US$5.16 / S$6.61** of the approved US$10–20. |
 
+| 2026-10-10 | **S40 — `SCRUM-104`: the six confirm dialogs' escaped Cancel/No-thanks label** | Confirm the sweep's lead, then grow each dialog card by 54px so the label sits ON the card; extend `penpot-pairs.json` **11 → 17 pairs** and fault-test the gate | **US$0.00** — Penpot edits and read-backs plus local Node gates. **No fal.ai call, no migration, nothing deployed** | — | **S$0.00** | ✅ **no spend** — logged so the zero is on the record rather than absent. fal.ai total unchanged at ≈ **US$5.16 / S$6.61** of the approved US$10–20. |
+
 <!-- APPEND-NEW-ONEOFF-COSTS-ABOVE -->
 
 ---

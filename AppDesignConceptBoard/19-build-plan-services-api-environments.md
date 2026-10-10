@@ -565,6 +565,41 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.33 · S40 — SCRUM-104: the label had ESCAPED its dialog card, and the fix was LAYOUT (2026-10-10)
+
+Filed from the `SCRUM-93`/`94` sweep as a **LEAD**, not a verdict — `otherFindings` are **reported and never asserted**, because the surface resolver does not model groups, gradients, images, strokes or masks. So the ticket's first task was to **confirm it**, and the confirmation is worth recording because **one of the checks was itself wrong first**:
+
+- **geometry** — the label's top sits **exactly 14 px below the dialog card's bottom edge, on all six boards identically**;
+- **paint order** — `overlay · scrim` (33) → `dialog (bg)` (34) → title/body/button → **the label (39)**, so the scrim is the only opaque thing under it;
+- **the resolver's blind spots** — no gradients, images or shadows over the label; the only strokes are on a background row.
+
+⚠️ **And my first pass carried a false positive.** I tested for a mask with `!!s.isMask` — **`isMask` is a FUNCTION, not a boolean** — so it read `true` for **everything**, and my initial *"the scrim is masked"* note was meaningless. **A check that is always true is not a check**, and this is a fresh instance of the class this project keeps catching.
+
+### The root cause, uniform across all six
+
+Restricting to the dialog's **own** paint stack (after the scrim, inside the card's x-range) gives the same shape on every board: `card (bg) → dialog · title [24..45] → dialog · body → btn · buy/watch`, **and then the label, below the card**. ⚠️ **The card's bottom padding below its LAST CONTENT is exactly 20 px on all six boards** — and the label sits 14 px past that edge, i.e. **it had escaped its own card.**
+
+### The fix
+
+**Each card grew by exactly 54 px** = the label's height (20) + **the same 20 px padding the card already used** + the 14 px gap. So the card simply contains the label with its own established padding, and **nothing else moved**.
+
+| Board | card | → |
+|---|---|---|
+| `EN · 9f Credits · confirm` | 230 | **284** |
+| `ZH · 9f 点数 · 确认` | 279 | **333** |
+| `EN · 9b Buy offerings · confirm` | 230 | **284** |
+| `ZH · 9b 购买供品 · 确认` | 279 | **333** |
+| `EN · 5b Reward / one more offering` | 279 | **333** |
+| `ZH · 5b 酬报 / 再备一份供品` | 340 | **394** |
+
+⚠️ **The label's COLOUR was not touched** — `--ink-soft #4a463f` is correct on a light surface; a colour swap would have been the wrong fix, exactly as the ticket said.
+
+### Verified, and gated
+
+✅ **`#4a463f` on the card `#f5f0e8` = 8.27:1** (was **2.37–2.60:1**), needs 4.5, on all six. ✅ **The whole-file sweep now reports 0 below-threshold findings** — the six are gone. ✅ **`penpot-pairs.json` 11 → 17 pairs**, fault-tested: the six put back on the scrim (`#88837d`) → **✗ 6 failed, all at 2.50:1** → restore → **✓ 18/18 pass**, file unchanged. Penpot version **`S40`**.
+
+⚠️ **Parked `In Review`, not `Done`:** the fix has **never been seen** — it changes the dialog height on **six signed-off boards**, and AC 1's *"ideally on glass"* is unmet because the device has not arrived. If the taller card reads too tall, the padding is one number.
+
 ### 12.32 · S39b — the PM's decision batch, and SCRUM-101: the shelf was UNDER-CHARGING doc 10 (2026-10-10)
 
 **Six rulings across four decision tickets, recorded in Jira, and one of them shipped.** This section covers the shipped one; the rulings themselves live on their tickets.
