@@ -27,6 +27,27 @@
 
 *Decision: pick 1 of 3 at the repo+CI milestone; record the exact model in this table and in SCRUM-15. Sizing rule of thumb: **if it runs Android Go well, it runs our app.***
 
+### ✅ The named device (chosen 2026-10-10 · `SCRUM-52`) — **POCO C81 Pro**
+
+| Field | Value | Tier F floor | Verdict |
+|---|---|---|---|
+| Model | **POCO C81 Pro** (released 2026-04-27) | — | ⚠️ **not one of the 3 shortlisted candidates** — the PM bought the cheapest available |
+| Price | **S$157.73** | ~S$100–150 | ⚠️ **S$7.73 over budget** |
+| RAM | **4 GB** | 3 GB | ✅ **meets** — ⚠️ but this is the **top edge** of the band (see below) |
+| Storage | **64 GB** + dedicated microSD | 32 GB | ✅ exceeds |
+| OS | **Android 15** (HyperOS 3, up to 4 major upgrades) | Android 11+ | ✅ exceeds |
+| Display | **6.9″ IPS · 720×1600** · 120 Hz | 720p | ✅ meets |
+| SoC / GPU | Unisoc T7250 (2×A75 + 6×A55) · Mali-G57 MP1 | Android Go-class | ✅ in class |
+| Battery | 6,000 mAh | — | ✅ (relevant to **N10**) |
+| Network | **LTE only (no 5G)** — usable for **N7** shaping | — | ✅ fine |
+
+**Why this is NOT an ADR-level change.** `N1`'s rule is *"never **raise** the floor silently"*. This device **meets or exceeds every Tier F row**, so the floor is **unchanged** — nothing is raised, and nothing is dropped either. It is a **named-device substitution inside the existing tier**, which is what §4 decision 3 anticipated.
+
+⚠️ **The honest limit, recorded rather than glossed:** Tier F is *"3 GB · Go-class"* and this device is **4 GB**, i.e. the **top** of the band. So it proves *"a 4 GB budget Android passes"* — it **does not** prove the strict **3 GB Go-class** case, which is where the rural target actually sits. Treat every device-check result as bounded by that until a true 3 GB handset is run. *(The `N1` "if missed" lever — reach vs cost — is the PM's to pull; not a blocker for M1.)*
+
+Cost → [[project-costs]] · Jira → `SCRUM-52`.
+
+
 **Min/target OS:** `minSdk 24` (Android 7 — free with Expo, no test obligation) · `targetSdk` = latest as Play requires at submission (compatibility is Play-enforced, not ours to age).
 
 ---
@@ -67,7 +88,7 @@
 
 1. **07 §7 Q1 (offline queue):** **session-independent, persists across days** — local SQLite, replay idempotently on launch; `idempotency_key` kept until acked server-side (the unique constraint is permanent anyway — 11 §4). Rural connectivity made this the default answer.
 2. **Floor = Tier F (3GB / Android 11 / Go-class)**, legacy L = install-only; **below 3GB = untested non-goal** (revisit with telemetry).
-3. **The named floor device** (shortlist §1) → SCRUM-15's CI device. *Buying one is a ~S$100–150 decision for the PM at the repo+CI milestone.*
+3. **The named floor device** (shortlist §1) → SCRUM-15's CI device. *Buying one is a ~S$100–150 decision for the PM at the repo+CI milestone.* ✅ **CLOSED 2026-10-10 (`SCRUM-52`): POCO C81 Pro, S$157.73** — meets/exceeds Tier F, so the floor stands; ⚠️ 4 GB is the band's top edge, so the strict 3 GB case stays unproven (§1).
 4. **30 fps is the floor, 60 fps the target** — honest for RN on low-end; the *aim bands*, not fps vanity, are the acceptance test.
 
 ## 5 · Open / deferred

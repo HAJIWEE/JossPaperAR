@@ -61,7 +61,7 @@
 | Gate | State | Blocks |
 |---|---|---|
 | **G1 · Repo + CI + dev environment** (SCRUM-15) | ✅ **cleared 2026-10-02** (PRs #1–#3, CI green) | — |
-| **G2 · Tier-F floor device** (SCRUM-52) — *a PM purchase, ~S$100–150* | 🔴 **open** | every **device-measured** step: the slice's device check, the AR-fire spike (SCRUM-51), all of N1–N12 |
+| **G2 · Tier-F floor device** (SCRUM-52) — *a PM purchase, ~S$100–150* | ✅ **cleared 2026-10-10** — **POCO C81 Pro, S$157.73** (⚠️ not a shortlisted model · S$7.73 over budget; ✅ meets/exceeds Tier F, so the floor is unchanged — ⚠️ 4 GB is the band's top edge, so the strict 3 GB case is unproven) | — |
 | **G3 · Backend of record** (Supabase project + the §5 schema subset + `cartoonize-orchestrator` / `award-service`) | 🔴 **open — no ticket existed until now** | E2 · E5 · E7 · E8 · E10 |
 | **G4 · ADR-006 burn-limit semantics** | 🟠 unwritten (spec is [[10-economy-spec]]) | final E8 rule + copy |
 | **G5 · ADR-008 ad posture** (*may ads ever enter the ritual flow?*) | 🟠 unwritten — **a product call** | the ad SDK, the rewarded photo, monetization planning — **not** the slice |
@@ -100,7 +100,7 @@
 | Ticket | Kind | Depends on | Blocks | Milestone |
 |---|---|---|---|---|
 | **SCRUM-15** ✅ | build | — | — | M0 |
-| **SCRUM-52** floor device | PM action | — | SCRUM-51 · slice device check | M0 → M1/M2 |
+| **SCRUM-52** floor device | PM action | ✅ **done 2026-10-10** (POCO C81 Pro) | SCRUM-51 · slice device check | M0 → M1/M2 |
 | **SCRUM-53** *(new)* build the vertical slice | build | G1 ✅ · **G3** · SCRUM-52 | everything | M1 |
 | **SCRUM-54** *(new)* Supabase backend of record | build | G1 ✅ (no device needed) | SCRUM-53 · 11 · 12 · 46 | M1 |
 | **SCRUM-51** AR-fire spike | spike | G2 · 17 (plan) | SCRUM-13 | M2 |
@@ -207,7 +207,7 @@ Two honest caveats before reading the table:
 | R5 | **Privacy of the most personal data imaginable** — family objects, ancestors' names, where they burn | 2 | 5 | retention windows · delete-all · names never in analytics/logs/shares (13 §4) · 4-block cells with **no trails** · ADR-007 | an ancestor name appearing in any log, crash report, or share card | PM + build |
 | R6 | **The first native build takes far longer than estimated** (first Expo/RN + Supabase project for a non-mobile dev) | 4 | 3 | front-load it (M1) · keep the slice deliberately thin (one object, hard-coded clan) · `expo-doctor` + typecheck in CI from day one | the slice still not running on device at the end of Sprint 2 | build |
 | R7 | **Screen build (Penpot → RN) is the hidden cost** — 153 boards are a design, not code | 4 | 3 | ~30 unique screens; build screens **as the flow needs them**, not board-by-board; reuse the design-system tokens | the alpha date moving while features are done but screens are not | build |
-| R8 | **G2 device purchase stalls the whole measurement track** | 3 | 3 | it is a ~S$100–150 one-line PM action with 3 candidates listed; authoring (SCRUM-54, ADR-55) does **not** need it | Sprint 1 closes with SCRUM-52 still open | **PM** |
+| R8 | ~~**G2 device purchase stalls the whole measurement track**~~ ✅ **did not materialise** — bought 2026-10-10 (POCO C81 Pro) | 3 | 3 | it is a ~S$150 one-line PM action with 3 candidates listed; authoring (SCRUM-54, ADR-55) does **not** need it | ~~Sprint 1 closes with SCRUM-52 still open~~ ✅ closed | **PM** |
 | R9 | **`ADR-008` (ad posture) is unanswered**, so monetization planning and the rewarded photo cannot be finished | 4 | 2 | it is a product question, not a technical one — one PM decision releases ADR-008, the ad SDK and the rewarded photo | alpha end with no monetization decision recorded | **PM** |
 | R10 | **Solo capacity** — one PM + AI, no deadline, competing life demands | 4 | 3 | the timeline is effort-based, not date-based (§5); the scope rule (§2.2) keeps the list closed; every milestone is resumable | sessions/week falling below ~2 for more than two weeks | **PM** |
 | R11 | **Cultural misstep lands after code is frozen** | 2 | 5 | consultation planned **before** the family alpha is public (doc 16); pre-decided change policy; copy edits land in one pass | review surfaces a change that touches data model, not copy | **PM** (SCRUM-49) |
@@ -261,7 +261,7 @@ The prototype's habit is the standard: **behaviour is checked by a machine that 
 
 | # | Decision / input | Why it matters here | Cost |
 |---|---|---|---|
-| D1 | **Buy the floor device** — 1 of 3 in doc 14 §1 (Galaxy A05s · Redmi A5 · Nokia C-series) | gates G2 → the slice's device check + the spike | ~S$100–150 · 5 min (SCRUM-52) |
+| D1 | **Buy the floor device** — ~~1 of 3 in doc 14 §1 (Galaxy A05s · Redmi A5 · Nokia C-series)~~ ✅ **DONE 2026-10-10: POCO C81 Pro** | ~~gates G2 → the slice's device check + the spike~~ ✅ **G2 cleared** | **S$157.73** (⚠️ S$7.73 over the ~S$100–150 guide; not a shortlisted model) · 2026-10-10 (SCRUM-52) |
 | D2 | **Ad posture — may ads ever appear inside the ritual flow?** | releases ADR-008 → the ad SDK, the rewarded photo, monetization (R9) | one call (SCRUM-55) |
 | D3 | **Pick the slice's object + ancestor** (SCRUM-17 asked this and it stayed open) | a *real* family object is the strongest possible demo — and the fastest way to flush out D5 | one choice |
 | D4 | **Pick the alpha's festival framing** — Qingming (~5 Apr 2027) vs Hungry Ghost (~Aug) | decides whether the public moment is M5 (Apr) or later; campaign + copy depend on it | one call |
