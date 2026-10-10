@@ -143,17 +143,27 @@ function main() {
   const winners = bundles.filter((b) => b.credits === data.bestValueCredits);
   ok(winners.length === 1, 'the winner is unique', `${winners.length} bundles claim ${data.bestValueCredits}`);
 
-  // 6 · ⚠️ POSITIVE CONTROLS — prove the two rules above actually BITE.
-  //     (a) undercut the SMALLEST bundle and the premium is broken…
-  const undercut = [...bundles.map((b) => (b.credits === 500 ? { ...b, priceCents: 55 } : b))]
+  // 6 · ⚠️ POSITIVE CONTROLS — prove the two rules above BITE.
+  //     ⚠️ Both are DATA-DERIVED, never hard-coded. The first version named the 500 bundle
+  //     explicitly; when the 500 was withdrawn its mutation matched nothing, the ladder came
+  //     back unbroken, and the control FAILED — ⚠️ loudly, which is the point. A control that
+  //     cannot bite is not a control, and a hard-coded one stops biting the moment the data
+  //     it names goes away.
+  //     (a) undercut the SMALLEST bundle — by one cent per 1,000 below its neighbour's rate,
+  //         so the price is still legal (above the floor) and only the PREMIUM is broken.
+  const smallest = desc[desc.length - 1];
+  const nextUp = desc[desc.length - 2];
+  const undercutCents = Math.round((per1000(nextUp) - 1) * smallest.credits / 1000);
+  const undercut = [...bundles.map((b) => (b.credits === smallest.credits ? { ...b, priceCents: undercutCents } : b))]
     .sort((a, b) => b.credits - a.credits);
   ok(!undercut.slice(1).every((b, i) => per1000(b) > per1000(undercut[i])),
-    'control: undercutting the SMALLEST bundle breaks the premium — the check bites');
-  //     (b) …and hand-tweak one price and it no longer follows the rule.
-  const tweaked = [...bundles.map((b) => (b.credits === 6000 ? { ...b, priceCents: 700 } : b))]
+    `control: undercutting the SMALLEST bundle (${smallest.credits}) breaks the premium — the check bites`,
+    `undercut to ${money(undercutCents)} = $${(per1000({ credits: smallest.credits, priceCents: undercutCents }) / 100).toFixed(2)}/1,000 vs ${nextUp.credits} at $${(per1000(nextUp) / 100).toFixed(2)}`);
+  //     (b) …and hand-tweak one price by a single cent and it no longer follows the rule.
+  const tweaked = [...bundles.map((b) => (b.credits === desc[1].credits ? { ...b, priceCents: b.priceCents + 1 } : b))]
     .sort((a, b) => b.credits - a.credits);
   ok(tweaked.filter((b, i) => b.priceCents !== expected(b.credits, i)).length > 0,
-    'control: a hand-tweaked price no longer follows the ladder rule — the check bites');
+    `control: one cent off on the ${desc[1].credits} bundle breaks the ladder rule — the check bites`);
 
   report();
 }

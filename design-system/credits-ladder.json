@@ -15,19 +15,20 @@
     "baseCentsPer1000": 120,
     "premiumStepCents": 2,
     "rule": "The LARGEST bundle costs the base rate; each step DOWN the ladder adds one premium step per 1,000. An appreciating premium: the less you commit, the more each credit costs. PM-set 2026-10-10 ($1.20 at 10,000, $1.22 at 6,000, …).",
-    "worked": "10,000 → $1.20 · 6,000 → $1.22 · 3,000 → $1.24 · 1,000 → $1.26 · 500 → $1.28 per 1,000"
+    "worked": "10,000 → $1.20 · 6,000 → $1.22 · 3,000 → $1.24 · 1,000 → $1.26 per 1,000",
+    "_indexedFromLargest": "⚠️ The step is indexed from the LARGEST bundle, not counted up from the smallest — which is why retiring the 500 tier (2026-10-10) moved NO surviving price. Retiring the smallest tier is therefore free; retiring the largest would re-price everything below it."
   },
 
   "photoFeeCredits": 150,
   "_photoFee": "doc 10: one photo offering costs 150 credits — the second locked number the page is built on, used for the ≈ N offerings lines.",
 
   "bundles": [
-    { "credits": 500, "priceCents": 64 },
     { "credits": 1000, "priceCents": 126 },
     { "credits": 3000, "priceCents": 372 },
     { "credits": 6000, "priceCents": 732 },
     { "credits": 10000, "priceCents": 1200 }
   ],
+  "_retired": "⚠️ The 500-credit bundle was WITHDRAWN by the PM on 2026-10-10 ('just offer the 4 left'). It was the only tier priced below a plausible app-store minimum — 64¢ against Google Play's and the App Store's ~99¢ floor — so retiring it removes the one price that could not have been sold as-is. Its row was deleted from all four boards; the four survivors kept their exact rates.",
 
   "bestValueRule": "argmin(priceCents / credits) — the cheapest credit per 1,000.",
   "_bestValueNote": "With the volume ladder there is now a UNIQUE winner: the largest bundle, 10,000 at $1.20/1,000. No tie-break is needed. `bestValueTieBreak` is retained only so a future flat ladder still resolves deterministically.",
