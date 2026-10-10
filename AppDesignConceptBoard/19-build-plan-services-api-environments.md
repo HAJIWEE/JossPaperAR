@@ -565,6 +565,56 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.34 · S41 — SCRUM-79: the rethrow cap is enforced on the SERVER, and the client never had to be trusted (2026-10-10)
+
+`SCRUM-23`'s cap — *"a rethrow caps at 虔诚 Devout, never 正中 Bullseye"* — lived **only in the client** (`src/domain/throw.ts` `gradeThrow`). ADR-005's premise is that a client-side cap is not a cap: a tampered client simply does not call `gradeThrow`, and `aim_band_for(p_offset)` has no idea which throw it is — so **`accuracy: 0` on a SECOND throw graded Bullseye ×2.0**. doc 16 §5 pre-commits the cap to the cultural reviewer, so this was a promise the app did not keep.
+
+**The PM chose option A** — make the server throw-aware.
+
+### ⚠️ The option as written would have been bypassable, and did not need to be
+
+The option said *"pass a per-capture attempt count into `submit_burn`"*. ⚠️ **A client-supplied attempt count is bypassable by construction** — a tampered client sends `1` forever. It turns out the count does not need to be supplied at all, because **a miss still writes a `burns` row** (S9 — *"a miss returns the offering … it still writes a `burns` row so the rethrow is a NEW burn, never an edit"*, doc 07 §6). So:
+
+```
+"a prior burns row exists for this (actor, capture)"  ≡  "this is a rethrow"
+```
+
+**No new column, no new argument, and nothing the caller can lie about.** The cap needs no client cooperation — which is the whole point of ADR-005.
+
+⚠️ **Scoped to `(p_actor, v_capture_id)`**, so another member cannot cap *your* first throw. ⚠️ **Capped BEFORE the multiplier is read**, so the award, the streak and the Book all see the capped band — it cannot be half-applied. A store burn (`v_capture_id is null`) is skipped: there is no capture to rethrow against.
+
+### The migration
+
+**`0016 · 20261010100000_rpc_rethrow_cap_server_side.sql`.** ⚠️ **A new version number, not an edit** — plpgsql has no partial replace, and an applied migration must never be edited. The body is **0007's, byte-for-byte, plus the cap**; the signature and GRANTs are unchanged.
+
+### Verification, and the fault test
+
+✅ `npm run check:sql` — **16/16 structurally sound** · ✅ `db reset` — **16/16 applied from the files** · ✅ **new `supabase/tests/rethrow_cap.sql` — 8/8, exit 0**.
+
+⚠️ **Self-contained on purpose.** `pr3_verification.sql` is the natural home and is **RED on the unrelated pre-existing `SCRUM-87`** — and because `assert_true` RAISES, a red run **aborts before any later assertion**. A test that cannot run is not a test.
+
+| | assertion |
+|---|---|
+| **R1** | **CONTROL** — the first throw on a capture grades bullseye (the cap does not fire) |
+| **R2** | a rethrow sending `accuracy: 0` is **capped at devout** ← the defect; the **award follows** (600, not 1,600) |
+| **R3/R4** | ⚠️ **the case the mechanic actually creates: a MISS, then a retry — still capped.** A cap written on "prior *bullseye* exists" would never fire here |
+| **R5** | per-capture, not per-day — a fresh capture is a first throw |
+| **R6** | the cap never rescues a miss |
+| **R7** | a capture belongs to one actor |
+
+⚠️⚠️ **FAULT-TESTED, and the fault is the proof:** re-applying **0007** turns **R2 RED with `got bullseye`** — the defect reproduced exactly — while **R1 stays GREEN**. Restored → 8/8.
+
+⚠️ **My first `R7` was wrong, and its failure was the finding:** I asserted another member burning my capture would be uncapped; the server **refused it outright** (*"is not a styled capture owned by the actor"*). So the per-actor scope is belt-and-braces and the **ownership** check is what holds.
+
+### ⚠️ Not yet live
+
+**The cap is verified against a LOCAL stack and has NOT been pushed to the hosted project**, because a fresh worktree is not linked (`supabase/.temp` is gitignored — §12.13). ⚠️ **Until `db push` runs, a tampered client on the deployed backend can still farm bullseyes.** That is why the ticket is `In Review`, not `Done`.
+
+### Also this session
+
+- **The device tickets were deferred to a NEW `SCRUM Sprint 2`** (id **34**, 2026-10-16 → 10-30) — ⚠️ **there was no Sprint 2; it had to be created.** `SCRUM-88` (the device run) and `SCRUM-92` (device-screenshot-blocked) moved, both **read back**. `SCRUM-53` was not moved — it is a build ticket.
+- **`josspaperar.app` was bought** → `SCRUM-56` #6 done, `SCRUM-89` unblocked. ⚠️ **Unblocked ≠ done:** `SCRUM-89` still needs a host, the signing-cert SHA-256 (⚠️ which differs debug vs release) and a **real tap** — and the tap is device-gated, so **89 cannot close in Sprint 1 either**. ⚠️ And the domain unblocks **only** the canonical `https://` link; the custom scheme and the in-app QR path already worked.
+
 ### 12.33 · S40 — SCRUM-104: the label had ESCAPED its dialog card, and the fix was LAYOUT (2026-10-10)
 
 Filed from the `SCRUM-93`/`94` sweep as a **LEAD**, not a verdict — `otherFindings` are **reported and never asserted**, because the surface resolver does not model groups, gradients, images, strokes or masks. So the ticket's first task was to **confirm it**, and the confirmation is worth recording because **one of the checks was itself wrong first**:
