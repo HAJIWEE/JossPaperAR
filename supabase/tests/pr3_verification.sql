@@ -66,6 +66,55 @@ begin
 end;
 $$;
 
+-- ═══ TEARDOWN — the run leaves NO trace (and re-running stays safe) ════════
+-- ⚠️ A SECURITY DEFINER helper, not a bare DO block: `RESET ROLE` inside a
+-- plpgsql block does NOT restore the session role (verified), so a DO-block
+-- teardown that follows the anon block still runs as `anon` and is refused.
+-- Defining the teardown in pg_temp AS postgres sidesteps the role question
+-- entirely — it always executes with the owner's rights.
+--
+-- ⚠️ SCRUM-87 · DEFINED ABOVE THE FIXTURES BECAUSE THE PRE-CLEAN *CALLS* IT.
+-- "Undo a previous run" and "undo this run" are the same job, so they are now
+-- the same function. The pre-clean used to re-implement 3 of these 4 deletes
+-- and had already drifted — the integrity_flags sweep was missing — so a run
+-- that succeeded through `$svc$` and then died at the auth trap below left a
+-- flag behind, and the NEXT run's `count(… 'daily_award_ceiling') = 1` read 2.
+-- ⚠️ That is the same shape as the bug this ticket was filed for: nobody saw
+-- the drift, because the file was ALREADY red and aborts at its first failure.
+create or replace function pg_temp.pr3_teardown()
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_u1 uuid := '11111111-1111-1111-1111-111111111111';
+  v_u2 uuid := '22222222-2222-2222-2222-222222222222';
+begin
+  -- clans first: clans.created_by has no ON DELETE cascade, so deleting the
+  -- profile first would be refused
+  delete from public.clans      where created_by in (v_u1, v_u2);
+  delete from public.grid_cells where cell_id like 'pr3cell%';
+  -- ⚠️ ORDER MATTERS HERE: deleting the profile NULLs integrity_flags.user_id
+  -- via ON DELETE SET NULL, so the null-keyed sweep must run AFTER it. Sweeping
+  -- both before (by uid) and after (by NULL) makes a re-run safe either way.
+  delete from public.integrity_flags
+   where user_id in (v_u1, v_u2)
+     and signal in ('daily_award_ceiling', 'rate_limit_submit_burn',
+                    'idempotency_key_reuse', 'idempotency_key_payload_mismatch');
+  -- deleting the profile cascades every personal table (burns · ledger_events ·
+  -- quotas · streaks · cell_burns · inventory · captures · cartoonize_jobs …)
+  delete from public.profiles   where user_id in (v_u1, v_u2);
+  delete from public.integrity_flags
+   where user_id is null
+     and signal in ('daily_award_ceiling', 'rate_limit_submit_burn',
+                    'idempotency_key_reuse', 'idempotency_key_payload_mismatch');
+  -- …and the auth row itself
+  delete from auth.users        where id      in (v_u1, v_u2);
+end;
+$$;
+
+
 -- ═══ FIXTURES (as the database owner) ══════════════════════════════════════
 do $setup$
 declare
@@ -73,10 +122,12 @@ declare
   v_u2 uuid := '22222222-2222-2222-2222-222222222222';
 begin
   -- ── pre-clean: make a RE-RUN safe after a failed run ─────────────────────
-  delete from public.clans    where created_by in (v_u1, v_u2);
-  delete from public.profiles where user_id   in (v_u1, v_u2);
-  delete from public.grid_cells where cell_id like 'pr3cell%';
-  delete from auth.users       where id        in (v_u1, v_u2);
+  -- ⚠️ SCRUM-87 · THE SAME FUNCTION THE FOOT CALLS. A previous run really can
+  -- die before its teardown — one did: `$svc$` succeeded (committing its rows)
+  -- and the auth trap below failed, so the foot never ran at all. Re-implementing
+  -- the clean-up here had already drifted (no integrity_flags sweep), which is
+  -- why the flag survived to be counted twice by the next run.
+  perform pg_temp.pr3_teardown();
 
   insert into auth.users (
     id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -106,6 +157,7 @@ declare
   v_u1  uuid := '11111111-1111-1111-1111-111111111111';
   v_clan uuid;
   v_cap  uuid;
+  v_cap_c uuid;   -- ⚠️ SCRUM-79: a SECOND capture — the 1,650 case needs a FIRST throw
   v_r    jsonb;
   v_err  text;
   v_key  text := 'pr3-burn-key-0001';
@@ -201,13 +253,35 @@ begin
   values (v_u1, 1, public.burn_day() - 1)
   on conflict (user_id) do update
     set current_days = 1, last_burn_date = public.burn_day() - 1;
+
+  -- ⚠️ SCRUM-79 — this needs a FRESH capture. 1,650 requires a 正中 Bullseye, and the
+  -- server-side rethrow cap makes every SECOND+ throw on a capture 虔诚 Devout.
+  -- `v_cap` already carries two burns by here, so re-using it graded **1,250** and
+  -- this assertion became unreachable — the file's FIRST failure moved from line 483
+  -- to here the moment the cap shipped, and ⚠️ nothing noticed, because a
+  -- pre-existing red masks a new red.
+  insert into public.captures (user_id, storage_path, status)
+  values (v_u1, v_u1::text || '/pr3-capture-cap.jpg', 'styled') returning id into v_cap_c;
   v_r := public.submit_burn(v_u1, jsonb_build_object(
-           'capture_id', v_cap, 'clan_id', v_clan, 'accuracy', 0,
+           'capture_id', v_cap_c, 'clan_id', v_clan, 'accuracy', 0,
            'cell_hash', 'pr3cellC'), 'pr3-burn-key-0003');
+  perform pg_temp.assert_true(v_r->>'band' = 'bullseye',
+    'the FIRST throw on a fresh capture is 正中 — not capped (got ' || (v_r->>'band') || ')');
   perform pg_temp.assert_true((v_r->>'award')::int = 1650,
     '正中 + new ground + streak = 1,650 — THE CAP (got ' || (v_r->>'award') || ')');
   perform pg_temp.assert_true((v_r->>'streak_day')::int = 2, 'the streak advanced to day 2');
   perform pg_temp.assert_true((v_r->>'award')::int <= 1650, 'no burn can exceed 1,650');
+
+  -- ── ⚠️ SCRUM-79 · THE SAME THROW ON A SHARED CAPTURE IS A RETHROW, AND CAPPED ──
+  -- Kept deliberately rather than deleted: this asserts the rule the cap introduced,
+  -- on the very capture the case above can no longer use.
+  v_r := public.submit_burn(v_u1, jsonb_build_object(
+           'capture_id', v_cap, 'clan_id', v_clan, 'accuracy', 0,
+           'cell_hash', 'pr3cellE'), 'pr3-burn-key-0003b');
+  perform pg_temp.assert_true(v_r->>'band' = 'devout',
+    'a RETHROW sending accuracy 0 is CAPPED at 虔诚 Devout — never 正中 (got ' || (v_r->>'band') || ')');
+  perform pg_temp.assert_true((v_r->>'award')::int < 1650,
+    '…and the award follows the capped band, so 1,650 is unreachable on a rethrow (got ' || (v_r->>'award') || ')');
 
   -- ── S9 · THE RETHROW — a miss RETURNS the offering (the 0007 regression) ─
   insert into public.inventory (user_id, item_code, qty, acquired_via)
@@ -231,6 +305,12 @@ begin
     'S9  a scoring throw CONSUMES exactly one offering from inventory');
 
   -- ── the 49,500/day second belt: fill the day, then a burn MUST clamp ────
+  -- ⚠️ SCRUM-79 — clear the per-MINUTE counters first. This section tests the DAILY
+  -- ceiling, not the 6/min limiter (which is asserted on its own below and clears
+  -- them for exactly this reason). The rethrow-cap assertions added above spend
+  -- tokens, so without this the clamp burn is refused as "shrine is busy" instead
+  -- — a second-order effect of the cap, and one the per-minute rule made invisible.
+  delete from public.rate_counters where user_id = v_u1 and endpoint = 'submit_burn';
   select 49500 - 100 - coalesce(sum(amount), 0) into v_fill
     from public.ledger_events
    where user_id = v_u1 and currency = 'tribute' and type = 'award';
@@ -291,9 +371,19 @@ end
 $svc$;
 
 -- ═══ AS A SIGNED-IN USER (RLS is on; auth.uid() is real) ══════════════════
-set local role authenticated;
+-- ⚠️ SCRUM-87 · `SET ROLE`, NOT `SET LOCAL ROLE`, AND `is_local := FALSE`.
+-- `SET LOCAL` is a no-op outside a transaction block, and `run-sql-tests.sh` runs
+-- each statement in AUTOCOMMIT — so `set local role` warned and did nothing, the
+-- `$auth$` block below ran as the session OWNER (postgres), and the INSERT this
+-- section expects to be DENIED simply succeeded (R1 failed). The same trap
+-- applies to `set_config(…, is_local := true)`: it is transaction-scoped, so on
+-- its own statement it evaporated before the DO block ran. Both are now the
+-- SESSION-scoped form, which works in both runners (run-sql-tests.sh AND a
+-- hand-run `psql -f`). ⚠️ The `perform set_config(…, true)` calls INSIDE the DO
+-- blocks below are fine and are left alone: they are in the same statement.
+set role authenticated;
 select set_config('request.jwt.claims',
-  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
+  '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', false);
 
 do $auth$
 declare
@@ -302,6 +392,7 @@ declare
   v_err  text;
   v_r    jsonb;
   v_code text;
+  v_clan_id uuid;   -- ⚠️ SCRUM-87: the id must come from the RPC, never a table read
   v_n    bigint;
 begin
   -- ── R1 · THE LEDGER IS CLOSED TO A SIGNED-IN CLIENT ────────────────────
@@ -394,15 +485,23 @@ begin
   -- ── save_ancestor: the role ladder (doc 15 §3) ────────────────────────
   perform set_config('request.jwt.claims',
     json_build_object('sub', v_u1, 'role', 'authenticated')::text, true);
-  v_code := (select id::text from public.clans where code = 'PR3TESTX');
-  v_r := public.save_ancestor(v_code::uuid, '陳', '大文', '祖父');
+  -- ⚠️ SCRUM-87 · resolve the code through the RPC — the ONLY path a client has.
+  -- `select id from public.clans where code = '…'` is DENIED, because migration
+  -- 0015 grants SELECT COLUMN-BY-COLUMN and `code` is deliberately not among the
+  -- granted columns (SCRUM-86) — so the *filter* is refused, not just the column.
+  -- `preview_clan` returns `clan_id` for a code, which is exactly why the app
+  -- resolves a clan through an RPC and never by reading the table.
+  -- ⚠️ This line only ever "worked" because the role switch above was a no-op, so
+  -- the whole block ran as the database OWNER — fix the role, and the shortcut dies.
+  v_clan_id := (public.preview_clan('PR3TESTX')->>'clan_id')::uuid;
+  v_r := public.save_ancestor(v_clan_id, '陳', '大文', '祖父');
   perform pg_temp.assert_true((v_r->>'slot')::int = 0, 'save_ancestor allocates the first free altar slot');
   perform pg_temp.assert_true(v_r->>'surname' = '陳', 'the tablet records the surname');
 
   perform set_config('request.jwt.claims',
     json_build_object('sub', v_u2, 'role', 'authenticated')::text, true);
   v_err := pg_temp.expect_error(
-    format('select public.save_ancestor(%L::uuid, %L)', v_code, '林'),
+    format('select public.save_ancestor(%L::uuid, %L)', v_clan_id, '林'),
     'a MEMBER adding a tablet');
   perform pg_temp.assert_true(v_err like '42501%',
     'a plain member may not add tablets — the ladder holds (got ' || v_err || ')');
@@ -484,7 +583,9 @@ $auth$;
 reset role;
 
 -- ═══ AS AN ANONYMOUS USER (no JWT at all) ═════════════════════════════════
-set local role anon;
+-- ⚠️ SCRUM-87 — session-scoped, same reason as above (`reset role;` at the foot
+-- of the `$auth$` block restores the owner first).
+set role anon;
 
 do $anon$
 declare
@@ -526,42 +627,6 @@ $anon$;
 reset role;
 
 -- ═══ TEARDOWN — the run leaves NO trace (and re-running stays safe) ════════
--- ⚠️ A SECURITY DEFINER helper, not a bare DO block: `RESET ROLE` inside a
--- plpgsql block does NOT restore the session role (verified), so a DO-block
--- teardown that follows the anon block still runs as `anon` and is refused.
--- Defining the teardown in pg_temp AS postgres sidesteps the role question
--- entirely — it always executes with the owner's rights.
-create or replace function pg_temp.pr3_teardown()
-returns void
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_u1 uuid := '11111111-1111-1111-1111-111111111111';
-  v_u2 uuid := '22222222-2222-2222-2222-222222222222';
-begin
-  -- clans first: clans.created_by has no ON DELETE cascade, so deleting the
-  -- profile first would be refused
-  delete from public.clans      where created_by in (v_u1, v_u2);
-  delete from public.grid_cells where cell_id like 'pr3cell%';
-  -- ⚠️ ORDER MATTERS HERE: deleting the profile NULLs integrity_flags.user_id
-  -- via ON DELETE SET NULL, so the null-keyed sweep must run AFTER it. Sweeping
-  -- both before (by uid) and after (by NULL) makes a re-run safe either way.
-  delete from public.integrity_flags
-   where user_id in (v_u1, v_u2)
-     and signal in ('daily_award_ceiling', 'rate_limit_submit_burn',
-                    'idempotency_key_reuse', 'idempotency_key_payload_mismatch');
-  -- deleting the profile cascades every personal table (burns · ledger_events ·
-  -- quotas · streaks · cell_burns · inventory · captures · cartoonize_jobs …)
-  delete from public.profiles   where user_id in (v_u1, v_u2);
-  delete from public.integrity_flags
-   where user_id is null
-     and signal in ('daily_award_ceiling', 'rate_limit_submit_burn',
-                    'idempotency_key_reuse', 'idempotency_key_payload_mismatch');
-  -- …and the auth row itself
-  delete from auth.users        where id      in (v_u1, v_u2);
-end;
-$$;
-
+-- ⚠️ SCRUM-87 · `pg_temp.pr3_teardown()` is defined ABOVE THE FIXTURES, so the
+-- pre-clean and this call are *literally the same function* and cannot drift.
 select pg_temp.pr3_teardown();

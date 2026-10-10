@@ -67,6 +67,9 @@
 
 | 2026-10-10 | **S41 — `SCRUM-79`: the rethrow cap moved to the SERVER (PM option A); the device tickets deferred to a new Sprint 2** | Add migration `0016` (a whole-function replace of `submit_burn` that caps a rethrow at Devout, derived from `burns`), a self-contained SQL test, and create + populate `SCRUM Sprint 2` | **US$0.00** — a **local Supabase stack on Docker** (16/16 migrations applied from the files), local SQL tests and local gates. **No fal.ai call; the hosted push is free and the PM ran it** | — | **S$0.00** | ✅ **no spend** — logged so the zero is on the record rather than absent. ✅ **The migration was PUSHED to the hosted project and verified live** — the PM ran the deploy, and the cap was confirmed **present in the deployed `submit_burn`** via the Supabase connector (`pg_proc.prosrc`), with remote **16** / local **16**, no drift. fal.ai total unchanged at ≈ **US$5.16 / S$6.61** of the approved US$10–20. |
 
+| 2026-10-10 | **S43 — `SCRUM-87`: the local SQL suite can be GREEN — `pr3_verification.sql` now 87 checks, exit 0** | Fix the two defects the ticket named, ⚠️ **plus two it could not see** (the file was red and `assert_true` RAISES, so nothing past the first failure had ever run), and make the harness genuinely re-runnable | **US$0.00** — a **local Supabase stack on Docker**, local SQL runs and local gates. **No fal.ai call, no migration, nothing deployed** | — | **S$0.00** | ✅ **no spend** — logged so the zero is on the record rather than absent. fal.ai total unchanged at ≈ **US$5.16 / S$6.61** of the approved US$10–20. |
+
+
 <!-- APPEND-NEW-ONEOFF-COSTS-ABOVE -->
 
 ---
