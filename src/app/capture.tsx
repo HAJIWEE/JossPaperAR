@@ -34,6 +34,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { INITIAL_OFFERING, transition, type Offering } from '@/domain/slice';
+import { t } from '@/lib/i18n';
 import { DEMO_PARAM, DEMO_VALUE, isDemo } from '@/lib/tutorial';
 import { TOUCH_TARGET, brand, fontSize, onColorCream, radius, space, surface, text } from '@/theme/tokens';
 
@@ -104,11 +105,8 @@ export default function CaptureScreen() {
   if (permission && !permission.granted) {
     return (
       <View style={[styles.gate, { paddingTop: insets.top + space.xl }]}>
-        <Text style={styles.gateTitle}>The camera is needed</Text>
-        <Text style={styles.gateBody}>
-          The offering is the object you would like to burn. Nothing leaves this phone without
-          your permission to photograph it.
-        </Text>
+        <Text style={styles.gateTitle}>{t('capture.cameraNeeded')}</Text>
+        <Text style={styles.gateBody}>{t('capture.cameraWhy')}</Text>
         <Pressable
           accessibilityRole="button"
           onPress={() => {
@@ -116,7 +114,7 @@ export default function CaptureScreen() {
           }}
           style={({ pressed }) => [styles.button, pressed && styles.pressed]}
         >
-          <Text style={styles.buttonLabel}>Allow the camera</Text>
+          <Text style={styles.buttonLabel}>{t('invite.grantCamera')}</Text>
         </Pressable>
       </View>
     );
@@ -128,7 +126,7 @@ export default function CaptureScreen() {
 
       {/* The camera is the whole screen — the ritual is not a form. */}
       <View style={[styles.hud, { paddingTop: insets.top + space.md }]} pointerEvents="none">
-        <Text style={styles.hint}>Photograph the offering</Text>
+        <Text style={styles.hint}>{t('capture.photoHint')}</Text>
       </View>
 
       <View
@@ -137,7 +135,7 @@ export default function CaptureScreen() {
       >
         {phase.kind === 'failed' ? (
           <View style={styles.failRow}>
-            <Text style={styles.failText}>The photo was not taken — nothing has been used.</Text>
+            <Text style={styles.failText}>{t('capture.failed')}</Text>
             <Pressable
               accessibilityRole="button"
               onPress={() => {
@@ -146,7 +144,7 @@ export default function CaptureScreen() {
               }}
               style={styles.smallButton}
             >
-              <Text style={styles.smallButtonLabel}>Try again</Text>
+              <Text style={styles.smallButtonLabel}>{t('capture.tryAgain')}</Text>
             </Pressable>
           </View>
         ) : (

@@ -42,40 +42,51 @@ export function baseValueOf(price: number): number {
   return Math.round(price * BASE_VALUE_RATIO);
 }
 
+/**
+ * ⚠️ **The `zh` names were ADDED 2026-10-10 (SCRUM-97), because they did not exist** — so
+ * `localized(o.name)` rendered English on a 中文 panel, which is the same defect as the
+ * hardcoded screen copy. They are taken from the design's `ZH · 7 Store / 商店` board
+ * (`金银纸 · 金条 · 手机 · 楼房 · 财富套装`), matched BY NAME — **not** by base value, because
+ * the board's metas (`Cash Bundle 基础 480 · Gold Bar 基础 960 · House 基础 1,440`) do not
+ * line up with doc 10's prices, which is a pre-existing drift worth its own look.
+ * ⚠️ Two further design inconsistencies seen while doing this, recorded not fixed:
+ * the board calls this item **"Cash Bundle"** in EN where the catalogue says *"Joss Paper
+ * Stack"*, and the House is **楼房** in the store but **祖屋** in the collection board.
+ */
 export const OFFERINGS: readonly Offering[] = [
   {
     code: 'joss_paper_stack',
     tier: 1,
     price: 400,
-    name: { en: 'Joss Paper Stack' },
+    name: { en: 'Joss Paper Stack', zh: '金银纸' },
     priceSource: 'documented',
   },
   {
     code: 'gold_bar',
     tier: 2,
     price: 600,
-    name: { en: 'Gold Bar' },
+    name: { en: 'Gold Bar', zh: '金条' },
     priceSource: 'documented',
   },
   {
     code: 'smartphone',
     tier: 3,
     price: 800,
-    name: { en: 'Smartphone' },
+    name: { en: 'Smartphone', zh: '手机' },
     priceSource: 'documented',
   },
   {
     code: 'house',
     tier: 4,
     price: 1200,
-    name: { en: 'House' },
+    name: { en: 'House', zh: '楼房' },
     priceSource: 'derived',
   },
   {
     code: 'wealth_bundle',
     tier: 5,
     price: 2000,
-    name: { en: 'Wealth Bundle' },
+    name: { en: 'Wealth Bundle', zh: '财富套装' },
     priceSource: 'documented',
     composedOf: ['joss_paper_stack', 'gold_bar', 'smartphone', 'house'],
   },
@@ -141,7 +152,7 @@ export interface Decoration {
 
 export const DECORATIONS: readonly Decoration[] = [
   { code: 'spring_couplets', name: { en: 'Spring Couplets', zh: '春联' }, category: 'side', price: null },
-  { code: 'zhong_kui', name: { en: 'Zhong Kui Print', zh: '鍾馗像' }, category: 'background', price: null },
+  { code: 'zhong_kui', name: { en: 'Zhong Kui Print', zh: '钟馗像' }, category: 'background', price: null },
   { code: 'door_gods', name: { en: 'Door Gods', zh: '门神' }, category: 'side', price: null },
   { code: 'lanterns', name: { en: 'Lanterns', zh: '灯笼' }, category: 'top', price: null },
   { code: 'festive_set', name: { en: 'Festive Set', zh: '新春套装' }, category: 'side', price: null },

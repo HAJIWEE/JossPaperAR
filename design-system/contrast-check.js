@@ -209,12 +209,61 @@ function lintStylesheet() {
   }
 }
 
+/* ── part 3: the Penpot board pairs ───────────────────────────────────────── */
+/* WHY THIS EXISTS: parts 1 and 2 read tokens.css and the app stylesheet, so
+   NEITHER can see a Penpot board. The 0e3 role chip sat at 2.77:1 on a
+   SIGNED-OFF board (EN + ZH) while every gate stayed green — which is exactly
+   why SCRUM-93 had to exist. `penpot-pairs.json` is a frozen snapshot of the
+   board colours; penpot-sweeps/penpot-contrast-sweep.js refreshes it.
+
+   ⚠️ A snapshot is NOT a sweep, and the difference is printed below rather than
+   implied: this asserts the pairs in the file, so a pair newly added to a board
+   stays invisible until the sweep is re-run. */
+const PENPOT_PAIRS = path.join(__dirname, 'penpot-pairs.json');
+/* large text = >=24px, or >=18.66px bold */
+const TEXT_MIN = { normal: AA_BODY, large: 3.0 };
+
+function checkPenpotPairs() {
+  section('Penpot board pairs — the board colours neither token table can see');
+
+  let doc;
+  try { doc = JSON.parse(fs.readFileSync(PENPOT_PAIRS, 'utf8')); }
+  catch (e) { ok(false, 'penpot-pairs.json is missing or is not valid JSON: ' + e.message); return; }
+
+  const pairs = doc && doc.pairs;
+  /* An empty or gutted manifest must never read green. */
+  ok(Array.isArray(pairs) && pairs.length > 0,
+    Array.isArray(pairs) ? 'the manifest lists ' + pairs.length + ' board pair(s)'
+                         : 'the manifest has no `pairs` array');
+
+  for (const p of (Array.isArray(pairs) ? pairs : [])) {
+    const where = (p.board || '?') + ' / ' + (p.layer || '?');
+    /* The requirement is DERIVED from the text size and then asserted, so `min`
+       cannot be quietly lowered to make a failing pair pass. */
+    const want = TEXT_MIN[p.text];
+    if (!want) { ok(false, where + ' — text must be "normal" or "large", got ' + JSON.stringify(p.text)); continue; }
+    if (p.min != null && Math.abs(p.min - want) > 1e-9) {
+      ok(false, where + ' — min ' + p.min + ' contradicts text:"' + p.text + '" (must be ' + want + ')');
+      continue;
+    }
+    let r;
+    try { r = ratio(p.fg, p.bg); }
+    catch (e) { ok(false, where + ' — unreadable colour: ' + e.message); continue; }
+    ok(r >= want,
+      where + '  →  ' + r.toFixed(2) + ':1  (' + p.fg + ' on ' + p.bg + ', needs ' + want + ')');
+  }
+
+  console.log('  ⚠ a snapshot, not a sweep — re-run penpot-sweeps/penpot-contrast-sweep.js after any');
+  console.log('    Penpot colour change. A pair added to a board is invisible to this gate until then.');
+}
+
 function main() {
   console.log('contrast-check · WCAG 2.x relative luminance');
-  if (ONLY && ONLY !== 'tokens' && ONLY !== 'lint')
-    throw new Error('--only=' + ONLY + ' matches no part (try: tokens · lint)');
+  if (ONLY && !['tokens', 'lint', 'penpot'].includes(ONLY))
+    throw new Error('--only=' + ONLY + ' matches no part (try: tokens · lint · penpot)');
   if (!ONLY || ONLY === 'tokens') checkTokens();
   if (!ONLY || ONLY === 'lint') lintStylesheet();
+  if (!ONLY || ONLY === 'penpot') checkPenpotPairs();
   console.log('\n' + (fail ? '✗ ' + fail + ' failed · ' + pass + ' passed' : '✓ all ' + pass + ' contrast checks passed'));
   process.exit(fail ? 1 : 0);
 }

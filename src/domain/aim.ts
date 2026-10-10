@@ -10,8 +10,8 @@
  * heart. A smaller offset is a better throw.
  *
  *   正中 Bullseye  ±14.55  → ×2.0
- *   虔誠 Devout    ±39.40  → ×1.5
- *   擦邊 Graze     ±96.97  → ×1.0
+ *   虔诚 Devout    ±39.40  → ×1.5
+ *   擦边 Graze     ±96.97  → ×1.0
  *   偏失 Miss      beyond  → ×0     (the offering RETURNS — S9; never destroyed)
  *
  * ⚠️ THE CLIENT MUST NOT SEND `band`. It sends `accuracy` (the offset); the
@@ -43,13 +43,13 @@ export const AIM_BANDS: readonly AimBand[] = [
     id: 'devout',
     maxOffsetPx: 39.4,
     multiplier: 1.5,
-    label: { en: 'Devout', zh: '虔誠' },
+    label: { en: 'Devout', zh: '虔诚' },
   },
   {
     id: 'graze',
     maxOffsetPx: 96.97,
     multiplier: 1.0,
-    label: { en: 'Graze', zh: '擦邊' },
+    label: { en: 'Graze', zh: '擦边' },
   },
 ] as const;
 

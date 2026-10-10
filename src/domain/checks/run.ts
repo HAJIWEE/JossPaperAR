@@ -80,8 +80,8 @@ const gra = computeAward({ offsetPx: 60, newGround: true, streakActive: true });
 const mis = computeAward({ offsetPx: 200, newGround: true, streakActive: true });
 
 check('正中 + new ground + streak = 1,650', bull.award === 1650, `got ${bull.award}`);
-check('虔誠 + new ground + streak = 1,250', dev.award === 1250, `got ${dev.award}`);
-check('擦邊 + new ground + streak = 850', gra.award === 850, `got ${gra.award}`);
+check('虔诚 + new ground + streak = 1,250', dev.award === 1250, `got ${dev.award}`);
+check('擦边 + new ground + streak = 850', gra.award === 850, `got ${gra.award}`);
 check('偏失 = 0', mis.award === 0, `got ${mis.award}`);
 check('a miss earns nothing even on new ground + streak', mis.newGroundBonus === 0 && mis.streakBonus === 0);
 check('the cap is 1,650 and cannot be exceeded', MAX_AWARD === 1650 && bull.award <= MAX_AWARD);

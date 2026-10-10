@@ -45,6 +45,34 @@ export const MESSAGES = {
     'common.done': 'Return to the shrine',
     'quota_spent': QUOTA_SPENT_COPY.en,
 
+    // ── the RITUAL screens' copy (burn · capture · reward · Home) ────────────
+    // ⚠️ These lived as HARDCODED literals inside the screens, several of them
+    // *bilingually* (`开始 · Begin`), so a panel marked `zh` showed English and an EN
+    // panel showed Chinese. Where a design board already carries the ZH it is used
+    // verbatim; the rest is new copy and is listed for review in `SCRUM-97`.
+    'common.begin': 'Begin',
+    'common.confirm': 'Confirm',
+    'capture.cameraNeeded': 'The camera is needed',
+    'capture.cameraWhy':
+      'The offering is the object you would like to burn. Nothing leaves this phone without your permission to photograph it.',
+    'capture.photoHint': 'Photograph the offering',
+    'capture.failed': 'The photo was not taken — nothing has been used.',
+    'capture.tryAgain': 'Try again',
+    'burn.aimHint': 'Swipe up and aim for the heart',
+    'burn.dragHint': 'Drag up from here, and release over the fire.',
+    'burn.lostPlace': 'This offering lost its place — begin again.',
+    'burn.returns': 'Missed the heart — the offering returns to you. Nothing is lost, nothing is earned.',
+    'burn.capped': 'A rethrow reaches at most Devout — never Bullseye.',
+    'burn.exhausted': 'The offering rests.',
+    'burn.rethrow': 'Throw again',
+    'reward.safe': 'Your offering is safe — nothing has been recorded.',
+    'reward.tributeUnit': 'tribute',
+    'reward.alreadyRecorded': 'Already recorded',
+    'reward.capped': 'Capped',
+    'reward.balance': 'Balance %{points}',
+    'home.begin': 'Begin an offering',
+    'home.clanEntry': 'Clan',
+
     // ── the throw (doc 05 §2 — the four bands) ────────────────────────────
     'band_bullseye': 'Bullseye',
     'band_devout': 'Devout',
@@ -99,7 +127,7 @@ export const MESSAGES = {
     // `clan-flow.ts` returns — `ROLE_LABEL_KEY`, `promoteLabelKey`,
     // `leaveHintKey` — must exist here, and `check:lib` asserts exactly that.
     'clan.forkTitle': "Your family's altar",
-    'clan.nameHint': 'e.g. 陳氏 · Tan Family',
+    'clan.nameHint': 'e.g. 陈氏 · Tan Family',
     'clan.create': 'Create',
     'clan.join': 'Join',
     'clan.skip': 'Skip',
@@ -111,6 +139,10 @@ export const MESSAGES = {
     'clan.offerTo': "Offer to %{name}'s ancestors",
     'clan.manage': 'Members',
     'clan.yourRole': 'Your role',
+    /* SCRUM-92 — the Home pill's accessibility label (the visible text is the clan
+       name + the role chip). ⚠️ The ZH side below stays TRADITIONAL, matching this
+       table; the simplified/traditional question is SCRUM-95, not a per-string call. */
+    'clan.pillA11y': 'Open your clan, %{name}',
     'clan.makeElder': 'Make Elder',
     'clan.makeCoHead': 'Make Co-Head',
     'clan.rename': 'Rename',
@@ -170,113 +202,148 @@ export const MESSAGES = {
   zh: {
     'app_name': 'Joss Paper AR',
 
-    'ritual_preparing': '供品製作中…',
-    'ritual_busy': '神龛正繁忙，您的供品稍後即成。',
-    'ritual.cannotPrepare': '此供品無法製作。',
-    'ritual.offeringPrepared': '您的供品已備好。',
-    'ritual.refundReturned': '供品未能製成，點數已退回。',
-    'common.retry': '再試一次',
+    'ritual_preparing': '供品制作中…',
+    'ritual_busy': '神龛正繁忙，您的供品稍后即成。',
+    'ritual.cannotPrepare': '此供品无法制作。',
+    'ritual.offeringPrepared': '您的供品已备好。',
+    'ritual.refundReturned': '供品未能制成，点数已退回。',
+    'common.retry': '再试一次',
     'common.recapture': '重新供相',
     'common.done': '回到神龛',
     'quota_spent': QUOTA_SPENT_COPY.zh,
 
+    // ── the RITUAL screens' copy (burn · capture · reward · Home) ────────────
+    // The ZH where a design board already carries it is used verbatim
+    // (上滑对准火心抛入 · 未中火心 · 重投最高至虔诚 ×1.5 · 三次已尽 · 再次投掷 · 功德点);
+    // the remainder is NEW copy and is listed for review in `SCRUM-97`.
+    'common.begin': '开始',
+    'common.confirm': '确认',
+    'capture.cameraNeeded': '需要使用相机',
+    'capture.cameraWhy': '供品就是您想焚烧的物品。未获得您的拍照许可，任何内容都不会离开这台手机。',
+    'capture.photoHint': '拍摄供品',
+    'capture.failed': '未能拍下照片——未消耗任何内容。',
+    'capture.tryAgain': '再试一次',
+    'burn.aimHint': '上滑对准火心抛入',
+    'burn.dragHint': '从这里上滑，在火上松开。',
+    'burn.lostPlace': '供品已失去记录，请重新开始。',
+    'burn.returns': '未中火心 · 供品回到您手中——未失未得。',
+    'burn.capped': '重投最高至虔诚 ×1.5 —— 永不为正中 ×2.0。',
+    'burn.exhausted': '三次已尽。',
+    'burn.rethrow': '再次投掷',
+    'reward.safe': '供品安然无恙——未记录任何内容。',
+    'reward.tributeUnit': '功德点',
+    'reward.alreadyRecorded': '已记录',
+    'reward.capped': '已达上限',
+    'reward.balance': '余额 %{points}',
+    'home.begin': '开始供奉',
+    'home.clanEntry': '宗族',
+
     'band_bullseye': '正中',
-    'band_devout': '虔誠',
-    'band_graze': '擦邊',
+    'band_devout': '虔诚',
+    'band_graze': '擦边',
     'band_miss': '偏失',
     'reward.newGround': '新地',
 
     'clan.forkJoin': '加入宗族',
-    'clan.forkJoinHint': '家人發來了連結？輸入邀請碼。',
-    'clan.forkCreate': '創建宗族',
-    'clan.forkCreateHint': '建立您家族的祭壇。',
-    'clan_name': '宗族名稱',
-    'clan.youWillBeHead': '您將成為族長。',
-    'clan_code': '輸入邀請碼',
-    'clan_preview': '%{name} · 先人 %{ancestors} 位 · 成員 %{members} 位',
-    'clan_welcome': '歡迎加入%{name}。',
-    'clan.alreadyMember': '您已是此宗族的成員。',
-    'clan.invalidCode': '邀請碼無效。',
-    'clan.unreachableCode': '無法連上神龕。邀請碼沒有錯——請再試一次。',
-    'clan.inviteFamily': '邀請家人加入',
-    'clan.shareCode': '分享邀請碼 · 顯示二維碼 · 複製連結',
+    'clan.forkJoinHint': '家人发来了链接？输入邀请码。',
+    'clan.forkCreate': '创建宗族',
+    'clan.forkCreateHint': '建立您家族的祭坛。',
+    'clan_name': '宗族名称',
+    'clan.youWillBeHead': '您将成为族长。',
+    'clan_code': '输入邀请码',
+    'clan_preview': '%{name} · 先人 %{ancestors} 位 · 成员 %{members} 位',
+    'clan_welcome': '欢迎加入%{name}。',
+    'clan.alreadyMember': '您已是此宗族的成员。',
+    'clan.invalidCode': '邀请码无效。',
+    'clan.unreachableCode': '无法连上神龛。邀请码没有错——请再试一次。',
+    'clan.inviteFamily': '邀请家人加入',
+    'clan.shareCode': '分享邀请码 · 显示二维码 · 复制链接',
 
-    // ── 邀請：二維碼 · 掃描 · 暫存的連結（SCRUM-50 · doc 07 §4.6）──
-    'invite.scan': '掃描二維碼',
-    'invite.scanHint': '將鏡頭對準家人的邀請碼。',
-    'invite.typeCode': '改為輸入邀請碼',
-    'invite.scanNeedsCamera': '掃描需要相機權限',
-    'invite.scanNeedsCameraBody': '允許使用相機以讀取家人的邀請，或改為輸入邀請碼。',
-    'invite.grantCamera': '允許使用相機',
-    'invite.unreadableLink': '此連結沒有邀請碼。',
-    'invite.waiting': '您有一個待加入的邀請',
-    'invite.waitingHint': '輕點即可加入。',
-    'invite.heldNoIdentity': '邀請碼 %{code} 已儲存。帳號就緒後將帶您加入宗族。',
-    'invite.heldOffline': '邀請碼 %{code} 已儲存。目前無法連上神龕——請於連線後再試。',
-    'invite.qrFailed': '無法繪製二維碼——請改為分享邀請碼。',
-    'invite.qrUnavailable': '二維碼暫不可用——請改為分享邀請碼。',
-    'role_head': '族長',
-    'role_co_head': '副族長',
-    'role_elder': '長老',
-    'role_member': '成員',
+    // ── 邀请：二维码 · 扫描 · 暂存的链接（SCRUM-50 · doc 07 §4.6）──
+    'invite.scan': '扫描二维码',
+    'invite.scanHint': '将镜头对准家人的邀请码。',
+    'invite.typeCode': '改为输入邀请码',
+    'invite.scanNeedsCamera': '扫描需要相机权限',
+    'invite.scanNeedsCameraBody': '允许使用相机以读取家人的邀请，或改为输入邀请码。',
+    'invite.grantCamera': '允许使用相机',
+    'invite.unreadableLink': '此链接没有邀请码。',
+    'invite.waiting': '您有一个待加入的邀请',
+    'invite.waitingHint': '轻点即可加入。',
+    'invite.heldNoIdentity': '邀请码 %{code} 已储存。账号就绪后将带您加入宗族。',
+    'invite.heldOffline': '邀请码 %{code} 已储存。目前无法连上神龛——请于连线后再试。',
+    'invite.qrFailed': '无法绘制二维码——请改为分享邀请码。',
+    'invite.qrUnavailable': '二维码暂不可用——请改为分享邀请码。',
+    'role_head': '族长',
+    'role_co_head': '副族长',
+    'role_elder': '长老',
+    'role_member': '成员',
 
-    // ⚠️ TRADITIONAL characters, matching this file (not doc 15 §8's table, which
-    // is typed in SIMPLIFIED — 家人发来了链接 vs the shipped 家人發來了連結).
-    // See the note in the EN block; the mismatch is recorded, not silently resolved.
-    'clan.forkTitle': '您家族的祭壇',
-    'clan.nameHint': '例：陳氏 · Tan Family',
-    'clan.create': '創建',
+    // ✅ SIMPLIFIED — SCRUM-95, answered by the PM on 2026-10-10: *"Simplified Chinese.
+    // Has a significant larger market."* This table was TRADITIONAL until then, while
+    // doc 15 §8 and all four S36 ZH design boards were already simplified — so the code
+    // was the one holdout. It is now simplified throughout, and `check:lib` asserts it
+    // (section 15), so it cannot drift back.
+    // ⚠️ Character conversion is not WORD conversion: 連結 → 链接 and 身分 → 身份 were
+    // fixed by hand against doc 15 §8 (C2/C10) and the `ZH · 0e9` board, because a
+    // char-level pass yields 连结/身分 — both wrong for a simplified-mainland reader.
+    'clan.forkTitle': '您家族的祭坛',
+    'clan.nameHint': '例：陈氏 · Tan Family',
+    'clan.create': '创建',
     'clan.join': '加入',
-    'clan.skip': '略過',
-    'clan.next': '繼續',
+    'clan.skip': '略过',
+    'clan.next': '继续',
     'clan.back': '返回',
-    'clan.invite': '邀請家人',
-    'clan.copied': '邀請碼已複製。',
-    'clan.placeFirstTablet': '安放第一塊神主牌',
+    'clan.invite': '邀请家人',
+    'clan.copied': '邀请码已复制。',
+    'clan.placeFirstTablet': '安放第一块神主牌',
     'clan.offerTo': '向%{name}的先人供奉',
-    'clan.manage': '成員',
-    'clan.yourRole': '您的身分',
-    'clan.makeElder': '設為長老',
-    'clan.makeCoHead': '設為副族長',
+    'clan.manage': '成员',
+    'clan.yourRole': '您的身份',
+    /* SCRUM-92 — the Home pill's accessibility label. ✅ Simplified, like the rest of
+       this table since SCRUM-95, so the pill and its board now agree on BOTH the
+       character set and the wording (`role_head` → 族长, matching the board's chip). */
+    'clan.pillA11y': '开启您的宗族：%{name}',
+    'clan.makeElder': '设为长老',
+    'clan.makeCoHead': '设为副族长',
     'clan.rename': '重新命名',
-    'clan.renamePrompt': '新的宗族名稱',
+    'clan.renamePrompt': '新的宗族名称',
     'clan.removeMember': '移出宗族',
-    'clan.removeConfirm': '將 %{name} 移出宗族？先前的供奉紀錄將保留。',
-    'clan.leave': '離開此宗族',
-    'clan.leaveConfirm': '離開此宗族？先前的供奉紀錄將保留。',
+    'clan.removeConfirm': '将 %{name} 移出宗族？先前的供奉纪录将保留。',
+    'clan.leave': '离开此宗族',
+    'clan.leaveConfirm': '离开此宗族？先前的供奉纪录将保留。',
     // the SCRUM-84 head-exit ramp — the successor prompt and its refusals
-    'clan.leaveHint': '系統將詢問由誰接任帶領宗族。',
-    'clan.nameSuccessor': '指定繼任者',
-    'clan.successorHint': '選擇在您離開後帶領宗族的人，或交由加入最久的長老接任。',
-    'clan.leaveWithoutSuccessor': '不指定直接離開',
-    'clan.leaveNotMember': '您不是此宗族的成員。',
-    'clan.leaveSelfSuccessor': '不能指定自己為繼任者。',
-    'clan.leaveStrangerSuccessor': '此人不是此宗族的成員。',
-    'clan.leaveNoSuccessor': '目前沒有可接任的人。請先設副族長，或刪除宗族。',
-    'clan.successorNamed': '現由 %{name} 帶領宗族。',
-    'clan.successorAuto': '未指定繼任者——由加入最久的長老 %{name} 帶領宗族。',
+    'clan.leaveHint': '系统将询问由谁接任带领宗族。',
+    'clan.nameSuccessor': '指定继任者',
+    'clan.successorHint': '选择在您离开后带领宗族的人，或交由加入最久的长老接任。',
+    'clan.leaveWithoutSuccessor': '不指定直接离开',
+    'clan.leaveNotMember': '您不是此宗族的成员。',
+    'clan.leaveSelfSuccessor': '不能指定自己为继任者。',
+    'clan.leaveStrangerSuccessor': '此人不是此宗族的成员。',
+    'clan.leaveNoSuccessor': '目前没有可接任的人。请先设副族长，或删除宗族。',
+    'clan.successorNamed': '现由 %{name} 带领宗族。',
+    'clan.successorAuto': '未指定继任者——由加入最久的长老 %{name} 带领宗族。',
 
     // the FIRST-RUN TUTORIAL (SCRUM-85) — parity is enforced, so BOTH locales
-    'tutorial.badge': '示範',
-    'tutorial.intro': '首次供奉為示範。不會留下紀錄，也不會獲得點數。',
-    'tutorial.preparing': '正在製作示範供品…',
-    'tutorial.preparingNote': '在正式儀式中，您的照片會在此化為紙紮供品。',
-    'tutorial.receiptNote': '僅為示範——未獲得點數，也未涉及任何宗族。',
-    'tutorial.finish': '建立您家族的祭壇',
-    'tutorial.startHint': '第一次嗎？這次是引導示範。',
-    'tutorial.noClanNote': '示範不需要宗族——接下來您將建立或加入一個。',
-    'clan.deleteClan': '刪除宗族',
-    'clan.deleteConfirm': '刪除宗族？所有成員將失去祭壇與供奉簿，無法復原。',
+    'tutorial.badge': '示范',
+    'tutorial.intro': '首次供奉为示范。不会留下纪录，也不会获得点数。',
+    'tutorial.preparing': '正在制作示范供品…',
+    'tutorial.preparingNote': '在正式仪式中，您的照片会在此化为纸扎供品。',
+    'tutorial.receiptNote': '仅为示范——未获得点数，也未涉及任何宗族。',
+    'tutorial.finish': '建立您家族的祭坛',
+    'tutorial.startHint': '第一次吗？这次是引导示范。',
+    'tutorial.noClanNote': '示范不需要宗族——接下来您将建立或加入一个。',
+    'clan.deleteClan': '删除宗族',
+    'clan.deleteConfirm': '删除宗族？所有成员将失去祭坛与供奉簿，无法复原。',
 
     'book_header': '供奉簿',
-    'book_outside': '由宗族成員供奉。',
-    'book_window': '僅顯示最近一個月。',
+    'book_outside': '由宗族成员供奉。',
+    'book_window': '仅显示最近一个月。',
 
     'privacy.firstRun':
-      '您的照片、先人姓名與祭拜位置只屬於您的帳號，僅用於製作供品。我們絕不出售這些資料。',
-    'privacy.rawPhotoNote': '供品完成後，您的原始照片將於一週內自動刪除。',
-    'delete_title': '刪除所有資料',
-    'delete_confirm': '確定刪除所有資料？此操作無法復原。',
+      '您的照片、先人姓名与祭拜位置只属于您的账号，仅用于制作供品。我们绝不出售这些资料。',
+    'privacy.rawPhotoNote': '供品完成后，您的原始照片将于一周内自动删除。',
+    'delete_title': '删除所有资料',
+    'delete_confirm': '确定删除所有资料？此操作无法复原。',
   },
 } as const;
 
@@ -322,6 +389,30 @@ export function setLocale(locale: Locale): void {
 export function activeLocale(): Locale {
   const current = i18n.locale;
   return (LOCALES as readonly string[]).includes(current) ? (current as Locale) : DEFAULT_LOCALE;
+}
+
+/**
+ * Pick the ACTIVE locale's field from a bilingual value — the `{ en, zh }` shape used by
+ * `domain/aim.ts`, `domain/catalogue.ts` and `domain/throw.ts`.
+ *
+ * ⚠️ **This exists because screens used to render `{value.zh} {value.en}`** — BOTH
+ * languages, in EVERY locale — which is exactly how a panel marked `zh` still showed an
+ * English label (and an EN panel showed Chinese). It is now the only supported way to
+ * read such a field, and `check:lib` section 16 fails on user-visible copy that does not
+ * go through `t()` or this.
+ *
+ * ⚠️ It reads the locale at CALL time, so a screen re-renders correctly after
+ * `setLocale`. Call it inside the render, never once at module scope.
+ */
+export function localized(value: { readonly en: string; readonly zh?: string }): string {
+  if (activeLocale() !== 'zh') return value.en;
+  /**
+   * ⚠️ A MISSING translation must not silently pass. `check:lib` section 15 asserts that
+   * every bilingual value in the domain (`AIM_BANDS`, `OFFERINGS`) carries BOTH fields, so
+   * this fallback is unreachable in practice — it exists only so a gap degrades to
+   * readable English rather than to a blank label.
+   */
+  return value.zh ?? value.en;
 }
 
 /** Translate. Interpolation uses i18n-js's `%{name}` placeholders. */

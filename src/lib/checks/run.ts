@@ -38,7 +38,7 @@ import {
   scanDecision,
   shouldHoldInvite,
 } from '../invite-flow.ts';
-import { LOCALES, MESSAGES, detectLocale, messageKeys, setLocale, t } from '../i18n.ts';
+import { LOCALES, MESSAGES, detectLocale, localized, messageKeys, setLocale, t } from '../i18n.ts';
 import { BULK_PREFIX, createSplitStorage, bulkKey } from '../split-storage.ts';
 import {
   MAX_ATTEMPTS,
@@ -51,10 +51,13 @@ import {
   replayOrder,
 } from '../queue.ts';
 import { QUOTA_SPENT_COPY } from '../../domain/quota.ts';
+import { AIM_BANDS } from '../../domain/aim.ts';
+import { OFFERINGS } from '../../domain/catalogue.ts';
 import { INITIAL_OFFERING, applyAll, isWaiting, nextAction } from '../../domain/slice.ts';
 import { eventsFromResponse } from '../ritual-map.ts';
 import {
   ASSIGNABLE_ROLES,
+  CLAN_ROLES,
   BOOK_WINDOW_DAYS,
   CLANS_PER_USER,
   HEAD_POWER_ROLES,
@@ -98,6 +101,18 @@ import {
   previousCreateStep,
   promoteLabelKey,
 } from '../clan-flow.ts';
+import {
+  AFFORDANCE_GLYPH,
+  CONTENT_PAD_H,
+  HEADER_SPEC,
+  NAME_WIDTH,
+  PILL_SPEC,
+  PILL_X_ON_REFERENCE,
+  pillRoute,
+  pillView,
+} from '../clan-pill.ts';
+import { CHINESE_SCRIPT_PAIRS, toSimplified, traditionalCharsIn } from '../zh-script.ts';
+import { DESIGN_REFERENCE_WIDTH, TOUCH_TARGET, radius } from '../../theme/tokens.ts';
 import {
   AFTER_TUTORIAL_ROUTE,
   TUTORIAL_CONSEQUENCES,
@@ -197,7 +212,7 @@ setLocale('zh');
 check('the Chinese quota copy is the domain module\u2019s copy (one source of truth)', t('quota_spent') === QUOTA_SPENT_COPY.zh);
 setLocale('en');
 check('the English quota copy matches the domain module', t('quota_spent') === QUOTA_SPENT_COPY.en);
-check('interpolation works', t('clan_welcome', { name: '陳氏' }).includes('陳氏'));
+check('interpolation works', t('clan_welcome', { name: '陈氏' }).includes('陈氏'));
 
 /*
  * ⚠️ RESOLVABILITY — NOT parity, and the gap between the two is the whole point.
@@ -487,7 +502,7 @@ function serviceChecks(): void {
   // DELETED from `clan-rules.ts`, because the first burn is now a tutorial and
   // the real fork follows it. The NAME rule survives — create and rename need it.
   section('9 · The clan NAME rule (the SCRUM-82 shortcut is retired)');
-  check('a 2-character name is accepted', isValidClanName('陳氏'));
+  check('a 2-character name is accepted', isValidClanName('陈氏'));
   check('a 20-character name is accepted', isValidClanName('x'.repeat(20)));
   check('a 1-character name is rejected', !isValidClanName('a'));
   check('a 21-character name is rejected', !isValidClanName('x'.repeat(21)));
@@ -957,10 +972,188 @@ function serviceChecks(): void {
   }
 }
 
+/**
+ * 14 · The Home clan pill (SCRUM-92 · SCRUM-91 option A).
+ *
+ * ⚠️ The numbers below are the **SIGNED-OFF design**, read off Penpot on
+ * 2026-10-10 — frozen here so a later edit cannot drift from the approved board,
+ * and so a "tidy-up" that rounds 14 to `radius.lg` (16) fails loudly instead of
+ * silently moving the pill 2 px within a layout whose whole point is that it moves
+ * **nothing** that was signed off.
+ */
+function clanPillChecks(): void {
+  section('14 · The Home clan pill — the signed-off geometry (SCRUM-92 · SCRUM-91 option A)');
+
+  // ── the measured geometry ──────────────────────────────────────────────────
+  check('the pill is 236×44 — the header rectangle SCRUM-91 measured',
+    PILL_SPEC.width === 236 && PILL_SPEC.height === 44);
+  check('the radius is 14, NOT `radius.lg` (16)', PILL_SPEC.radius === 14 && PILL_SPEC.radius !== radius.lg);
+  check('the stroke is 2.5 and inner, so it does not add to the 44', PILL_SPEC.borderWidth === 2.5);
+  check('the pill clears the 44 px touch floor', PILL_SPEC.height >= TOUCH_TARGET);
+
+  // ── the header arithmetic: inside the empty rectangle, overlapping neither neighbour
+  check('the pill starts at x 80 on the 390 px reference', PILL_X_ON_REFERENCE === 80, String(PILL_X_ON_REFERENCE));
+  check('…which is RIGHT of `icon · app mark` ending at 68.5 (AC 4)',
+    PILL_X_ON_REFERENCE > HEADER_SPEC.markRight);
+  check('…and ends at 316, clear of `btn · settings` starting at 326 (AC 4)',
+    PILL_X_ON_REFERENCE + PILL_SPEC.width === 316);
+  check('the pill + gap + settings slot + right margin re-add to the reference',
+    HEADER_SPEC.rightPad + HEADER_SPEC.settingsSlot + HEADER_SPEC.settingsGap + PILL_SPEC.width
+      + PILL_X_ON_REFERENCE === DESIGN_REFERENCE_WIDTH);
+
+  // ── the two derived values that could silently move the pill ───────────────
+  check('RN padding is 11.5, not 14 — RN draws the border INSIDE the box',
+    CONTENT_PAD_H === 11.5, String(CONTENT_PAD_H));
+  check('the name box (chip.dx − name.dx) equals the board\'s own 92',
+    NAME_WIDTH === PILL_SPEC.name.width && NAME_WIDTH === 92);
+
+  // ── ⚠️ ONE glyph, TWO states (the S36b lesson) ─────────────────────────────
+  check('the affordance is U+203A, the angle-quote family',
+    AFFORDANCE_GLYPH.codePointAt(0) === 0x203a && AFFORDANCE_GLYPH.length === 1);
+  const oneClan = pillView([{ name: 'Tan Family', role: 'head' }]);
+  const twoClans = pillView([
+    { name: 'Tan Family', role: 'head' },
+    { name: 'Lim Household', role: 'member' },
+  ]);
+  check('one clan is NOT rotated', oneClan.glyphRotated === false);
+  check('2+ clans rotates — the SAME glyph, never a second character',
+    twoClans.glyphRotated === true && twoClans.glyph === oneClan.glyph);
+  check('…and the open rotation is 90°', PILL_SPEC.affordance.rotationOpenDeg === 90);
+
+  // ── real data, and the routes ──────────────────────────────────────────────
+  check('no clan shows NO pill — the design has no clan-less pill', pillView([]).show === false);
+  check('the name comes from the data, not a literal', oneClan.name === 'Tan Family');
+  check('the pill routes to the switcher, not the fork', pillRoute(oneClan.target) === '/clan/manage');
+  check('the no-clan target is the fork', pillRoute(pillView([]).target) === '/clan');
+
+  // ── the vocabulary guard — the pill must NOT fork the ZH table ──────────────
+  // The pill returns an i18n KEY, never a literal. That mattered while the table was
+  // traditional and this AC asked for the board's simplified `族长`; SCRUM-95 has since
+  // flipped the whole table (PM, 2026-10-10), so the key now resolves to 族长 and the
+  // pill matches its board with no hardcoded string. Asserted role by role so a future
+  // edit cannot silently fork the vocabulary; section 15 proves the strings are all
+  // simplified.
+  for (const role of CLAN_ROLES) {
+    const view = pillView([{ name: 'X', role }]);
+    check(`the ${role} chip reuses the shipped label key`, view.roleLabelKey === ROLE_LABEL_KEY[role]);
+    check(`…and that key resolves in EN and 中文`,
+      view.roleLabelKey !== null
+        && messageKeys('en').includes(view.roleLabelKey)
+        && messageKeys('zh').includes(view.roleLabelKey));
+  }
+  check('the a11y key exists in BOTH locales', 
+    messageKeys('en').includes('clan.pillA11y') && messageKeys('zh').includes('clan.pillA11y'));
+  check('the a11y label interpolates the clan name',
+    t('clan.pillA11y', { name: 'Tan Family' }).includes('Tan Family'));
+}
+
+/**
+ * 15 · The ZH copy is SIMPLIFIED (SCRUM-95).
+ *
+ * ⚠️ The decision — PM, 2026-10-10: *"Simplified Chinese. Has a significant larger
+ * market."* — is enforced here rather than trusted to a comment, because the table was
+ * traditional for months while doc 15 §8 and all four ZH design boards were simplified,
+ * and nothing failed.
+ *
+ * ⚠️ **What this CANNOT check, stated rather than implied:** it is character-level. A
+ * WORD-level difference is not a character substitution — `連結` must become `链接` (a
+ * character pass yields the wrong-looking `连结`) and `身分` must become `身份`. Those two
+ * are asserted individually below, from doc 15 §8 (C2/C10) and the `ZH · 0e9` board;
+ * everything else remains a review step against doc 15 §8.
+ */
+function zhScriptChecks(): void {
+  section('15 · The ZH copy is SIMPLIFIED — and stays that way (SCRUM-95)');
+
+  check('the guard carries a real dictionary', CHINESE_SCRIPT_PAIRS > 2500, String(CHINESE_SCRIPT_PAIRS));
+  check('toSimplified maps a traditional form', toSimplified('族長') === '族长');
+  check('…leaves simplified text alone', toSimplified('族长') === '族长');
+  check('…and leaves EN alone', toSimplified('Clan Head') === 'Clan Head');
+
+  const zh = MESSAGES.zh as unknown as Record<string, string>;
+  const keys = Object.keys(zh);
+  const offenders = keys.filter((k) => traditionalCharsIn(zh[k]).length > 0);
+  check(`${keys.length} zh messages carry no traditional character`,
+    offenders.length === 0,
+    offenders.slice(0, 4).map((k) => `${k}="${zh[k]}"`).join(' · '));
+
+  for (const band of AIM_BANDS) {
+    check(`the ${band.id} band label is simplified`, traditionalCharsIn(band.label.zh).length === 0, band.label.zh);
+  }
+  check('the quota copy is simplified', traditionalCharsIn(QUOTA_SPENT_COPY.zh).length === 0, QUOTA_SPENT_COPY.zh);
+  const tradOfferings = OFFERINGS.filter((o) => traditionalCharsIn(o.name.zh ?? '').length > 0);
+  check(`${OFFERINGS.length} catalogue zh names are simplified`, tradOfferings.length === 0,
+    tradOfferings.map((o) => o.name.zh).join(' · '));
+
+  // ⚠️ the two word-level cases a character pass gets wrong
+  check('the link copy is 链接, not 连结 (doc 15 §8 C10)', zh['clan.shareCode'].includes('链接'));
+  check('the role label is 身份, not 身分 (the ZH · 0e9 board)', zh['clan.yourRole'].includes('身份'));
+
+  // ✅ SCRUM-92 AC 5, now satisfiable: the pill's key resolves to its board's string
+  check('the pill chip label is 族长 — matching its ZH board (SCRUM-92 AC 5)', zh['role_head'] === '族长', zh['role_head']);
+
+  check('EN and 中文 still define the same key set', messageKeys('en').length === messageKeys('zh').length);
+
+  // ⚠️ The domain's bilingual values are DATA, not messages, so the parity check above
+  // cannot see them. A missing `zh` would fall back to English on a 中文 panel — which is
+  // the exact defect this whole area was fixed for — so it is asserted here.
+  const bilingual = [...AIM_BANDS.map((b) => b.label), ...OFFERINGS.map((o) => o.name)];
+  const missingZh = bilingual.filter((v) => v.zh === undefined || v.zh === '');
+  check(`every bilingual domain value carries 中文 (${bilingual.length} checked)`,
+    missingZh.length === 0, `${missingZh.length} fall back to English`);
+}
+
+/**
+ * 16 · The ritual screens' copy is LOCALISED (SCRUM-97).
+ *
+ * ⚠️ A reviewer opened a screen marked 中文 and found **English labels on its buttons and
+ * titles**. Two causes, both invisible to every existing gate:
+ *   · `burn.tsx` and `capture.tsx` never imported `t` at all — 18 literals, several of
+ *     them bilingual (`开始 · Begin`), so 中文 showed English and EN showed Chinese;
+ *   · four sites rendered `{value.zh} {value.en}` — BOTH languages, in EVERY locale.
+ *
+ * `check:copy` proves no literal escapes. THIS proves the replacements are actually
+ * Chinese — which is the thing the screenshot showed, and the part `tsc` cannot see.
+ */
+function screenCopyChecks(): void {
+  section('16 · The ritual screens\' copy — 中文 is actually Chinese (SCRUM-97)');
+
+  /** The copy that was hardcoded, now keyed. Each `zh` must carry no Latin text. */
+  const KEYS = [
+    'common.begin', 'common.confirm', 'home.begin', 'home.clanEntry',
+    'capture.cameraNeeded', 'capture.cameraWhy', 'capture.photoHint', 'capture.failed', 'capture.tryAgain',
+    'burn.aimHint', 'burn.dragHint', 'burn.lostPlace', 'burn.returns', 'burn.capped',
+    'burn.exhausted', 'burn.rethrow',
+    'reward.safe', 'reward.tributeUnit', 'reward.alreadyRecorded', 'reward.capped', 'reward.balance',
+  ];
+  const zh = MESSAGES.zh as unknown as Record<string, string>;
+  const en = MESSAGES.en as unknown as Record<string, string>;
+  /** `%{points}` is a placeholder, not prose — strip it before looking for Latin text. */
+  const latinIn = (s: string): string[] => s.replace(/%\{[a-z]+\}/g, '').match(/[A-Za-z]+/g) ?? [];
+
+  for (const key of KEYS) {
+    check(`${key} is defined in both locales`, typeof zh[key] === 'string' && typeof en[key] === 'string');
+    const latin = latinIn(zh[key] ?? '');
+    check(`…its 中文 carries no Latin text`, latin.length === 0, `${latin.join(', ')} in "${zh[key]}"`);
+  }
+
+  // the shared picker the four bilingual sites now use
+  setLocale('en');
+  check('localized() answers EN under the en locale', localized({ en: 'Devout', zh: '虔诚' }) === 'Devout');
+  setLocale('zh');
+  check('…and 中文 under the zh locale', localized({ en: 'Devout', zh: '虔诚' }) === '虔诚');
+  check('…and NEVER both at once', localized({ en: 'Devout', zh: '虔诚' }).length === 2);
+  check('…and degrades to EN when a 中文 field is missing',
+    localized({ en: 'Devout', zh: undefined }) === 'Devout');
+  setLocale('en');
+}
+
 async function main(): Promise<void> {
   await storageChecks();
   await drainChecks();
   serviceChecks();
+  clanPillChecks();
+  zhScriptChecks();
+  screenCopyChecks();
 
   check('guard: a 5-character key is NOT valid', !isValidIdempotencyKey('12345'));
   check('guard: junk is NOT a clan code', normaliseClanCode('not-a-code!!') === null);

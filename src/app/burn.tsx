@@ -35,6 +35,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { BandId } from '@/domain/aim';
 import { MAX_THROWS, bandLabel, canThrow, gradeThrow, offsetFromHeart } from '@/domain/throw';
+import { localized, t } from '@/lib/i18n';
 import { readBurnParams, toRewardParams } from '@/lib/route-params';
 import { TOUCH_TARGET, fontSize, onColorCream, radius, space, surface, text } from '@/theme/tokens';
 
@@ -162,10 +163,9 @@ export default function BurnScreen() {
           { paddingTop: insets.top + space.xl, paddingBottom: insets.bottom + space.xl },
         ]}
       >
-        <Text style={styles.caption}>This offering lost its place — begin again.</Text>
-        <Text style={styles.caption}>供品已失去記錄，請重新開始。</Text>
+        <Text style={styles.caption}>{t('burn.lostPlace')}</Text>
         <Pressable accessibilityRole="button" onPress={() => router.replace('/capture')} style={styles.button}>
-          <Text style={styles.buttonLabel}>開始 · Begin</Text>
+          <Text style={styles.buttonLabel}>{t('common.begin')}</Text>
         </Pressable>
       </View>
     );
@@ -184,7 +184,7 @@ export default function BurnScreen() {
       </View>
 
       <View style={[styles.hud, { paddingTop: insets.top + space.md }]} pointerEvents="none">
-        <Text style={styles.hint}>上滑對準火心拋入 · Swipe up &amp; aim for the heart</Text>
+        <Text style={styles.hint}>{t('burn.aimHint')}</Text>
         <Text style={styles.throws}>
           {throwNumber} / {MAX_THROWS}
         </Text>
@@ -192,38 +192,34 @@ export default function BurnScreen() {
 
       <View style={[styles.result, { paddingBottom: insets.bottom + space.lg }]} pointerEvents="box-none">
         {preview === null ? (
-          <Text style={styles.caption}>Drag up from here, and release over the fire.</Text>
+          <Text style={styles.caption}>{t('burn.dragHint')}</Text>
         ) : (
           <>
-            <Text style={styles.bandText}>
-              {bandLabel(preview.band).zh} {bandLabel(preview.band).en}
-            </Text>
+            <Text style={styles.bandText}>{localized(bandLabel(preview.band))}</Text>
             <Text style={styles.offsetText}>±{preview.offsetPx.toFixed(2)} px</Text>
 
             {preview.returns ? (
-              <Text style={styles.caption}>
-                未中火心 · 供品回到您手中 — nothing is lost, nothing is earned.
-              </Text>
+              <Text style={styles.caption}>{t('burn.returns')}</Text>
             ) : (
               <Text style={styles.caption}>
                 {/* SCRUM-23: a rethrow is capped at Devout — say so rather than
                     silently grading it lower than the player aimed. */}
-                {preview.capped ? 'A rethrow reaches at most 虔誠 Devout.' : ' '}
+                {preview.capped ? t('burn.capped') : ' '}
               </Text>
             )}
 
             {exhausted ? (
-              <Text style={styles.caption}>The offering rests. 三次已盡。</Text>
+              <Text style={styles.caption}>{t('burn.exhausted')}</Text>
             ) : (
               <View style={styles.row}>
                 {preview.returns && (
                   <Pressable accessibilityRole="button" onPress={rethrow} style={styles.button}>
-                    <Text style={styles.buttonLabel}>再試 · Try again</Text>
+                    <Text style={styles.buttonLabel}>{t('burn.rethrow')}</Text>
                   </Pressable>
                 )}
                 {!preview.returns && (
                   <Pressable accessibilityRole="button" onPress={confirm} style={styles.button}>
-                    <Text style={styles.buttonLabel}>確認 · Confirm</Text>
+                    <Text style={styles.buttonLabel}>{t('common.confirm')}</Text>
                   </Pressable>
                 )}
               </View>

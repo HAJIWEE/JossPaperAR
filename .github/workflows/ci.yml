@@ -1,10 +1,14 @@
 name: CI
 
 # SCRUM-15 — repo + CI. Runs the machine-readable design-system gates on every
-# push and PR to main: WCAG contrast on tokens + decorative-token lint, and the
-# responsive-foundation invariants (type scale, safe areas, touch targets).
+# push and PR to main: WCAG contrast on tokens + decorative-token lint + the
+# frozen Penpot board pairs (SCRUM-93), and the responsive-foundation invariants
+# (type scale, safe areas, touch targets).
 # Both scripts report `skipped` — never a false green — for the build-stylesheet
 # scan until the real app stylesheet exists.
+# ⚠️ The Penpot part asserts `design-system/penpot-pairs.json`, a FROZEN snapshot
+# of board colours — CI cannot reach Penpot. Refresh it with the sweep in
+# `penpot-sweeps/penpot-contrast-sweep.js` after any design-file colour change.
 
 on:
   push:
@@ -36,6 +40,14 @@ jobs:
       # without a guard is exactly the drift that bit this project once.
       - name: Token parity (src/theme/tokens.ts ↔ design-system/tokens.css)
         run: node src/theme/checks/parity.ts
+
+      # ⚠️ The credit shelf's pricing RULE, not the numbers: the largest bundle costs the
+      # base rate and each step DOWN adds a premium step per 1,000 — plus the ceiling, the
+      # floor, and the assertion that BEST VALUE is where the formula puts it. A price
+      # change must move the badge with it or this fails. Frozen manifest
+      # (`design-system/credits-ladder.json`) because CI cannot reach Penpot.
+      - name: Credits ladder (pricing rule · appreciating premium · BEST VALUE formula)
+        run: node design-system/credits-check.js
 
       # THE ACCEPTANCE TEST: the four aim bands + the award maths + the wallet
       # invariant. Zero dependencies (Node 22 strips the types). This is the
@@ -122,6 +134,12 @@ jobs:
       # dependency-free one above.
       - name: Client-library checks (idempotency · invites · i18n · split storage · queue)
         run: npm run check:lib
+
+      # SCRUM-97 — the COPY gate. A 中文 screen shipped English button labels because copy
+      # that never went through `t()` is invisible to `tsc` and to check:lib (which only
+      # sees the message table). A reviewer's screenshot caught it, not a gate.
+      - name: Copy checks (no user-visible literal outside t() / localized())
+        run: npm run check:copy
 
       - name: Expo doctor
         run: npx expo-doctor

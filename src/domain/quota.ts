@@ -52,5 +52,5 @@ export function remaining(state: QuotaState, kind: BurnKind, today: string): num
 /** The quota copy the UI shows once the allowance is spent (doc 10 §4, EN). */
 export const QUOTA_SPENT_COPY = {
   en: "Today's offerings are complete. Return tomorrow.",
-  zh: '今日的供奉已圓滿，明日再續。',
+  zh: '今日的供奉已圆满，明日再续。',
 } as const;

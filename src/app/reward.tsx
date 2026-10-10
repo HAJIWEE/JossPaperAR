@@ -27,7 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { myClans } from '@/lib/clan-api';
 import { markTutorialDone } from '@/lib/first-run';
-import { t } from '@/lib/i18n';
+import { localized, t } from '@/lib/i18n';
 import { submitBurn, type BurnReceipt } from '@/lib/ritual';
 import { readRewardParams } from '@/lib/route-params';
 import { AFTER_TUTORIAL_ROUTE, demoReceipt, type DemoReceipt } from '@/lib/tutorial';
@@ -142,7 +142,7 @@ export default function Reward(): React.JSX.Element {
     return (
       <View style={[styles.root, { paddingTop: insets.top + space.xl }]}>
         <Text style={styles.title}>{t('ritual.cannotPrepare')}</Text>
-        <Text style={styles.body}>Your offering lost its place - begin again.</Text>
+        <Text style={styles.body}>{t('burn.lostPlace')}</Text>
         <Pressable
           style={styles.button}
           onPress={() => router.replace('/capture')}
@@ -167,7 +167,7 @@ export default function Reward(): React.JSX.Element {
     return (
       <View style={[styles.root, { paddingTop: insets.top + space.xl }]}>
         <Text style={styles.title}>{t('ritual.cannotPrepare')}</Text>
-        <Text style={styles.body}>Your offering is safe - nothing has been recorded.</Text>
+        <Text style={styles.body}>{t('reward.safe')}</Text>
         <Pressable style={styles.button} onPress={() => void submit()} accessibilityRole="button">
           <Text style={styles.buttonText}>{t('common.retry')}</Text>
         </Pressable>
@@ -185,11 +185,9 @@ export default function Reward(): React.JSX.Element {
     return (
       <View style={[styles.root, { paddingTop: insets.top + space.xl }]}>
         <Text style={styles.tag}>{t('tutorial.badge')}</Text>
-        <Text style={styles.title}>
-          {demoLabel.zh} {demoLabel.en}
-        </Text>
+        <Text style={styles.title}>{localized(demoLabel)}</Text>
         <Text style={styles.award}>{phase.receipt.award}</Text>
-        <Text style={styles.caption}>tribute</Text>
+        <Text style={styles.caption}>{t('reward.tributeUnit')}</Text>
         <Text style={styles.body}>{t('tutorial.receiptNote')}</Text>
         <Text style={styles.body}>{t('tutorial.noClanNote')}</Text>
         <Pressable
@@ -212,23 +210,21 @@ export default function Reward(): React.JSX.Element {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + space.xl }]}>
-      <Text style={styles.title}>
-        {label.zh} {label.en}
-      </Text>
+      <Text style={styles.title}>{localized(label)}</Text>
 
       {/* The award is the RECEIPT's number, not the client's own arithmetic. */}
       <Text style={styles.award}>{receipt.award}</Text>
-      <Text style={styles.caption}>tribute</Text>
+      <Text style={styles.caption}>{t('reward.tributeUnit')}</Text>
 
       {receipt.new_ground ? <Text style={styles.tag}>{t('reward.newGround')}</Text> : null}
       {receipt.idempotent_replay ? (
         // Worth saying out loud: the player pressed retry and the server paid
         // once. Silence here would make correct idempotency look like a bug.
-        <Text style={styles.tag}>Already recorded</Text>
+        <Text style={styles.tag}>{t('reward.alreadyRecorded')}</Text>
       ) : null}
-      {receipt.clamped ? <Text style={styles.tag}>Capped</Text> : null}
+      {receipt.clamped ? <Text style={styles.tag}>{t('reward.capped')}</Text> : null}
 
-      <Text style={styles.body}>Balance {receipt.tribute_balance}</Text>
+      <Text style={styles.body}>{t('reward.balance', { points: receipt.tribute_balance })}</Text>
 
       <Pressable
         style={styles.button}
