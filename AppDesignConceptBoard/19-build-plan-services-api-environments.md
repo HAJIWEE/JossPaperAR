@@ -565,6 +565,29 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.36 · S44–S45 — the PM's four rulings, and why three of them were "no change" (2026-10-10)
+
+The PM closed the outstanding decision queue in one batch: *"for 104 i can accept it for now, will decide again on actual device, 105 is also fine, 94 is also fine … i checked the price 103.3 is good."* Six tickets closed on it — **`SCRUM-94` · `SCRUM-96` · `SCRUM-103` · `SCRUM-104` · `SCRUM-105`** — and ⚠️ **four of the five rulings required NO change at all**, which is the interesting part.
+
+| ruling | what it decided | what it required |
+|---|---|---|
+| `SCRUM-94` — *"94 is also fine"* | keep the darkened `0e8` disc (`--disc-gold #887023`) | ✅ **nothing** — the fix was already in `main` |
+| `SCRUM-105` — *"105 is also fine"* | `Tan Family` is the demo clan's canonical name | ✅ **nothing** — already standardised (10 layers / 8 boards) |
+| `SCRUM-103.1` — *"go with Joss Paper Stack"* | the bundle's name | ✅ **nothing** — `SCRUM-100` had already corrected the boards (5 visible names + 22 layer names); **`Cash Bundle` is confirmed STALE, not a pending rename** |
+| `SCRUM-103.2` — *"楼房 sounds more grand its fine"* | the House's 中文 name | ✅ **nothing** — `楼房` stands; ⚠️ **`祖屋` is now explicitly DECLINED** and should not be re-raised |
+| `SCRUM-103.3` — *"i checked the price 103.3 is good"* | the boards' base values vs doc 10 | ✅ **nothing** — ⚠️ **and doc 10, a LOCKED economy document, was NOT moved** |
+
+⚠️ **That is the outcome worth recording: a decision batch that ratifies reality rather than generating work is the cheapest possible kind — and it is only cheap because the earlier sessions had already shipped the changes and left the rulings as the last step.**
+
+✅ **`SCRUM-103.3`'s sequencing was honoured exactly as the PM asked** (*"after you fix scrum 101 i will have to check again"*): `SCRUM-101` landed, 103.3 was **brought back for the re-check rather than decided unilaterally**, and the PM then confirmed. ⚠️ **The alternative would have been editing a locked economy spec to match a design board** — deferring cost two sessions and avoided that.
+
+### `SCRUM-104` — the one ruling that was PARTIAL, and the discipline it triggered
+
+*"i can accept it for now, will decide again on actual device"* is **not** an acceptance of the criterion, it is a **deferral of it**. Its AC 1 says *"confirm … **and ideally on glass**"*, and the fix changes the height of **six signed-off boards** while the sweep's surface resolver is only an approximation (no groups, shadows, gradients or masks; siblings walked in paint order rather than rendered). So the `on glass` half was **split out, not cut** into **`SCRUM-106`** (Sprint 2, linked, AC 1 carried **verbatim**) — the same discipline `SCRUM-88`/`89`/`90` used for `SCRUM-50`. ⚠️ **The rule this follows: a future decision that belongs to the PM goes to Jira, never to a comment or a hand-off doc.**
+
+⚠️ **And a closing checked the SHIPPED state rather than the branch's:** before marking anything `Done`, `git diff origin/main HEAD -- design-system/ src/` was verified **empty** and `penpot-pairs.json` read **17 pairs in BOTH** — because `Done` is a claim about what users have, not about what a branch contains.
+
+
 ### 12.35 · S43 — SCRUM-87: the local SQL suite is GREEN, and the ticket's two defects were four (2026-10-10)
 
 `SCRUM-87` said *"the local SQL suite cannot be green: `pr3_verification.sql` fails"* and named **two** defects. There were **four** — and ⚠️ **the two the ticket could not see are the ones that matter**, because `assert_true` **RAISES**: the file aborts at its **first** failure, so *a pre-existing red masks a new red* and **nothing downstream had ever executed**. `pr3_verification.sql` is now **87 assertions, exit 0**, and the whole suite (**ai_budget 17 · clan_management 109 · invite_sharing 25 · pr3 87 · rethrow_cap 8 = 246**) is green in one pass.
