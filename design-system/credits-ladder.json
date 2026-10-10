@@ -2,31 +2,37 @@
   "_what": "The credit-bundle shelf as DRAWN on the Credits boards, plus the rule that decides which row may carry BEST VALUE. Frozen here because CI cannot reach Penpot — exactly like penpot-pairs.json. `npm run check:credits` asserts this file against the economy rule, so a price change cannot land without the badge moving with it.",
   "_refresh": "Re-run penpot-sweeps/credits-best-value.js after any price change: it reads the boards, recomputes, and prints this file.",
 
-  "lockedRate": {
+  "ceiling": {
     "centsPer1000": 155,
-    "source": "doc 10 line 13 · doc 09 §7.7 — US$1.55 per 1,000 credits (break-even $1.19 + 30% worst-case margin). PM-locked 2026-09-26."
+    "source": "doc 10 line 13 · doc 09 §7.7 — US$1.55 per 1,000 credits (break-even $1.19 + 30% worst-case margin), PM-locked 2026-09-26. The CEILING: no bundle may ever cost more per credit than this."
   },
   "floor": {
     "centsPer1000": 119,
-    "rule": "doc 10: 'bundles must average ≥ floor' — a volume discount may never take a bundle below $1.19/1,000."
+    "source": "doc 10 — the break-even floor. 'bundles must average ≥ floor'."
+  },
+
+  "pricing": {
+    "baseCentsPer1000": 120,
+    "premiumStepCents": 2,
+    "rule": "The LARGEST bundle costs the base rate; each step DOWN the ladder adds one premium step per 1,000. An appreciating premium: the less you commit, the more each credit costs. PM-set 2026-10-10 ($1.20 at 10,000, $1.22 at 6,000, …).",
+    "worked": "10,000 → $1.20 · 6,000 → $1.22 · 3,000 → $1.24 · 1,000 → $1.26 · 500 → $1.28 per 1,000"
   },
 
   "photoFeeCredits": 150,
   "_photoFee": "doc 10: one photo offering costs 150 credits — the second locked number the page is built on, used for the ≈ N offerings lines.",
 
   "bundles": [
-    { "credits": 500, "priceCents": 78 },
-    { "credits": 1000, "priceCents": 155 },
-    { "credits": 3000, "priceCents": 465 },
-    { "credits": 6000, "priceCents": 930 },
-    { "credits": 10000, "priceCents": 1550 }
+    { "credits": 500, "priceCents": 64 },
+    { "credits": 1000, "priceCents": 126 },
+    { "credits": 3000, "priceCents": 372 },
+    { "credits": 6000, "priceCents": 732 },
+    { "credits": 10000, "priceCents": 1200 }
   ],
 
-  "bestValueRule": "argmin(priceCents / credits) — the cheapest credit per 1,000. Tie-break: SMALLEST credits, i.e. the cheapest way to reach the best rate, and the least commitment to ask of a user. Switch the tie-break to 'largest' to prefer the biggest absolute bundle; the formula itself does not change.",
+  "bestValueRule": "argmin(priceCents / credits) — the cheapest credit per 1,000.",
+  "_bestValueNote": "With the volume ladder there is now a UNIQUE winner: the largest bundle, 10,000 at $1.20/1,000. No tie-break is needed. `bestValueTieBreak` is retained only so a future flat ladder still resolves deterministically.",
   "bestValueTieBreak": "smallest",
-  "bestValueCredits": 1000,
-
-  "_asDrawn": "On 2026-10-10 the ladder is LINEAR at the locked rate, so 1,000 / 3,000 / 6,000 / 10,000 all tie at exactly $1.55 per 1,000 and the 500 is the only bundle worse than the rate ($1.56, because 155¢ × 500 = 77.5¢ rounds UP to 78¢). ⚠️ So BEST VALUE on the 1,000 row is the TIE-BREAK's answer, not a unique fact — a volume discount (permitted down to $1.19) is what would make it unique, and that is a pricing decision, not a labelling one.",
+  "bestValueCredits": 10000,
 
   "boards": [
     "EN · 9e Credits",
@@ -35,3 +41,4 @@
     "ZH · 9f 点数 · 确认"
   ]
 }
+

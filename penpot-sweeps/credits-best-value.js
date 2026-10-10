@@ -15,16 +15,18 @@
  * Run it (in the Penpot plugin context, via the MCP) after ANY price change, then update
  * `design-system/credits-ladder.json` with what it prints.
  *
- * ⚠️ Today's ladder is LINEAR at the locked $1.55/1,000, so the "winner" is a TIE-BREAK
- * answer, not a unique fact: 1,000 / 3,000 / 6,000 / 10,000 all cost $1.55 per 1,000 and
- * the 500 is the only bundle WORSE than the rate ($1.56 — 155¢ × 500 = 77.5¢ rounds up).
- * A volume discount (permitted down to the $1.19 floor) is what would make it unique —
- * and this sweep picks that up automatically, because nothing here hard-codes 1,000.
+ * ⚠️ The ladder is now an APPRECIATING PREMIUM (PM, 2026-10-10): the largest bundle costs
+ * $1.20/1,000 and each step DOWN adds $0.02/1,000 — 6,000 → $1.22, 3,000 → $1.24,
+ * 1,000 → $1.26, 500 → $1.28. So there is a UNIQUE winner (the 10,000 bundle) and the
+ * tie-break below is retained only for a ladder that ever ties again. ⚠️ A smaller bundle
+ * must NEVER undercut a larger one — that is the whole point of the premium.
  */
 
-const CENTS_PER_1000 = 155;              // doc 10 line 13: US$1.55 / 1,000 (PM-locked)
+const CEILING_CENTS_PER_1000 = 155;      // doc 10 line 13: US$1.55 / 1,000 — the ceiling, never exceeded
 const FLOOR_CENTS_PER_1000 = 119;        // doc 10: "bundles must average ≥ floor"
-const TIE_BREAK = 'smallest';            // 'smallest' | 'largest'
+const BASE_CENTS_PER_1000 = 120;         // PM 2026-10-10: the LARGEST bundle costs this
+const PREMIUM_STEP_CENTS = 2;            // …and each step DOWN the ladder adds this, per 1,000
+const TIE_BREAK = 'smallest';            // retained for a ladder that ever ties
 
 const BOARDS = ['EN · 9e Credits', 'ZH · 9e 点数', 'EN · 9f Credits · confirm', 'ZH · 9f 点数 · 确认'];
 
@@ -91,8 +93,9 @@ return {
   perBoard: result,
   frozenManifest: first
     ? {
-        lockedRate: { centsPer1000: CENTS_PER_1000 },
+        ceiling: { centsPer1000: CEILING_CENTS_PER_1000 },
         floor: { centsPer1000: FLOOR_CENTS_PER_1000 },
+        pricing: { baseCentsPer1000: BASE_CENTS_PER_1000, premiumStepCents: PREMIUM_STEP_CENTS },
         bundles: readBoard(BOARDS[0]).bundles.map((b) => ({ credits: b.credits, priceCents: b.priceCents })),
         bestValueTieBreak: TIE_BREAK,
         bestValueCredits: Number(first.formulaWinner),

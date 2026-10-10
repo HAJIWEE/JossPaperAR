@@ -70,18 +70,35 @@ function main() {
     return report();
   }
 
-  const rate = data.lockedRate.centsPer1000;
+  const ceiling = data.ceiling.centsPer1000;
+  const base = data.pricing.baseCentsPer1000;
+  const step = data.pricing.premiumStepCents;
   const floor = data.floor.centsPer1000;
   const bundles = data.bundles;
   const tieBreak = data.bestValueTieBreak === 'largest' ? 'largest' : 'smallest';
 
-  // 1 · ⚠️ the shelf may never exceed the locked rate. It may go BELOW it — a volume
-  //     discount is explicitly permitted — but only down to the floor, asserted next.
-  //     (±1 cent tolerance: 155¢ × 500 = 77.5¢, and rounding UP puts the 500 at $1.56/1,000.)
-  const overRate = bundles.filter((b) => b.priceCents > priceCentsFor(b.credits, rate) + 1);
-  ok(overRate.length === 0,
-    `no bundle is priced above the locked $${(rate / 100).toFixed(2)}/1,000`,
-    overRate.map((b) => `${b.credits}: ${money(b.priceCents)} vs rate ${money(priceCentsFor(b.credits, rate))}`).join(' · '));
+  // 1 · ⚠️ THE SHELF *IS* THE LADDER RULE, not five hand-typed numbers.
+  //     Largest = base rate; every step DOWN adds one premium step per 1,000.
+  //     Change base or step and the prices must follow — that is what "formulaic" means.
+  const desc = [...bundles].sort((a, b) => b.credits - a.credits);   // largest first
+  const expected = (credits, i) => Math.round(((base + step * i) * credits) / 1000);
+  const offRule = desc.filter((b, i) => b.priceCents !== expected(b.credits, i));
+  ok(offRule.length === 0,
+    `every bundle follows the ladder rule ($${(base / 100).toFixed(2)} base, +$${(step / 100).toFixed(2)}/1,000 per step down)`,
+    offRule.map((b) => `${b.credits}: ${money(b.priceCents)} should be ${money(expected(b.credits, desc.indexOf(b)))}`).join(' · '));
+
+  // 2 · the APPRECIATING PREMIUM — the less you commit, the more each credit costs.
+  //     ⚠️ This is the PM's intent in one line: a smaller bundle may never undercut a larger one.
+  const brokenSteps = desc.slice(1).filter((b, i) => per1000(b) <= per1000(desc[i]));
+  ok(brokenSteps.length === 0,
+    'the ladder is an appreciating premium — every step down costs more per 1,000',
+    brokenSteps.map((b) => `${b.credits} at $${(per1000(b) / 100).toFixed(2)}/1,000 does not beat ${desc[desc.indexOf(b) - 1].credits}`).join(' · '));
+
+  // 3 · the ceiling still binds: no bundle may cost more per credit than doc 10's rate
+  const overCeiling = bundles.filter((b) => b.priceCents > priceCentsFor(b.credits, ceiling) + 1);
+  ok(overCeiling.length === 0,
+    `no bundle is priced above the $${(ceiling / 100).toFixed(2)}/1,000 ceiling (doc 10)`,
+    overCeiling.map((b) => `${b.credits}: ${money(b.priceCents)}`).join(' · '));
 
   // 2 · the floor binds, and the average must clear it (doc 10's own constraint on bundles)
   const belowFloor = bundles.filter((b) => per1000(b) < floor);
@@ -104,19 +121,17 @@ function main() {
   const winners = bundles.filter((b) => b.credits === data.bestValueCredits);
   ok(winners.length === 1, 'the winner is unique', `${winners.length} bundles claim ${data.bestValueCredits}`);
 
-  // 5 · ⚠️ POSITIVE CONTROL — prove the rule is LIVE, not a hard-coded 1,000.
-  //     Discount the largest bundle to $13.00 (a permitted $1.30/1,000, above the floor)
-  //     and the winner MUST move. If this stops moving, the gate is decorative.
-  const discounted = bundles.map((b) =>
-    b.credits === 10000 ? { ...b, priceCents: 1300 } : b);
-  const ctrl = bestValue(discounted, tieBreak);
-  ok(ctrl.winner.credits === 10000,
-    'control: discounting 10,000 to $13.00 moves BEST VALUE to 10,000',
-    `the rule still picked ${ctrl.winner.credits}`);
-
-  // 6 · …and the control must itself respect the floor, or the test proves nothing
-  ok(per1000({ credits: 10000, priceCents: 1300 }) >= floor,
-    'control: that discount is still above the floor, so it is a legal price');
+  // 6 · ⚠️ POSITIVE CONTROLS — prove the two rules above actually BITE.
+  //     (a) undercut the SMALLEST bundle and the premium is broken…
+  const undercut = [...bundles.map((b) => (b.credits === 500 ? { ...b, priceCents: 55 } : b))]
+    .sort((a, b) => b.credits - a.credits);
+  ok(!undercut.slice(1).every((b, i) => per1000(b) > per1000(undercut[i])),
+    'control: undercutting the SMALLEST bundle breaks the premium — the check bites');
+  //     (b) …and hand-tweak one price and it no longer follows the rule.
+  const tweaked = [...bundles.map((b) => (b.credits === 6000 ? { ...b, priceCents: 700 } : b))]
+    .sort((a, b) => b.credits - a.credits);
+  ok(tweaked.filter((b, i) => b.priceCents !== expected(b.credits, i)).length > 0,
+    'control: a hand-tweaked price no longer follows the ladder rule — the check bites');
 
   report();
 }

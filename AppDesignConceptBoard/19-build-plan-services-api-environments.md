@@ -565,7 +565,29 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
-### 12.27 · S38q — SCRUM-100: `BEST VALUE` is a formula now, and the formula is gated (2026-10-10)
+### 12.28 · S38r — SCRUM-100: the PM set a volume ladder, and the badge finally sits on a fact (2026-10-10)
+
+**The PM:** *"Use $1.20 per 1000 tokens rate at the 10,000 credits offering then apply an appreciating premium on offerings that offer less than that, so 1.22 per 1000 tokens for the 6000 credits offering and so on."*
+
+⚠️ **Encoded as a RULE, not five numbers** — because that is what the previous turn's requirement ("formulaic even in future price adjustments") means when applied to the pricing itself: **largest bundle = `baseCentsPer1000` ($1.20); each step DOWN the ladder adds `premiumStepCents` ($0.02) per 1,000.** So:
+
+| Bundle | Price | Per 1,000 |
+|---|---|---|
+| 500 | $0.64 | $1.28 |
+| 1,000 | $1.26 | $1.26 |
+| 3,000 | $3.72 | $1.24 |
+| 6,000 | $7.32 | $1.22 |
+| **10,000** | **$12.00** | **$1.20** ← BEST VALUE |
+
+⚠️ **Every price is EXACT** — `rate × credits ÷ 1000` lands on a whole number of cents for all five, so nothing rounds and the ladder cannot drift by a cent. ✅ Average **$1.24/1,000**: above doc 10's **$1.19 floor**, below the **$1.55 ceiling**.
+
+⚠️ **AND THE WINNER IS NOW UNIQUE — the 10,000 bundle.** The four-way tie is gone, so **`BEST VALUE` states a fact rather than a tie-break's preference** — which is what §12.27 said it would take. The badge moved on all four boards, and ⚠️ **the list was reordered ascending** (500 → 10,000): it had been `1,000, 500, 3,000…`, an artefact of the old featured-first layout, and **a price list that jumps backwards is indefensible once the winner is the last row.**
+
+**The gate grew to 9 checks and now enforces the RULE**, fault-tested in four directions: baseline ✓9 · a hand-tweaked price ✗ *("$7.00 should be $7.32")* · ⚠️ **the 500 undercutting the 1,000** ✗ *("500 at $1.10/1,000 does not beat 1000")* · a bundle pushed above the ceiling ✗ · restored ✓9. ⚠️ **The newest assertion is the one that matters: the ladder is an APPRECIATING PREMIUM — a smaller bundle may never undercut a larger one** — the PM's intent written as a rule that a future edit cannot quietly violate.
+
+⚠️ **Two notes, recorded not "fixed":** **(a)** ⚠️ **$0.64 is below Google Play's and the App Store's minimum price point** (~$0.99 typical) — the 500 bundle is the concrete casualty of the rate-vs-shelf gap; **(b)** ⚠️ **doc 10 §3 still says `cash shop ($1.55/1,000)`, which is now the CEILING, not what anyone pays** — the ladder satisfies doc 10's *"bundles must average ≥ floor"* ✅, but the line should point at the ladder, and ⚠️ **editing a locked economy doc is not a call to make unprompted.**
+
+
 
 **The PM:** *"what is the real best value option now. The BEST VALUE Label should be truthful… should be formulaic even in future price adjustments and should truly reflect which IS the BEST VALUE."*
 
