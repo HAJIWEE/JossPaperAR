@@ -565,7 +565,25 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
-### 12.25 · S38h–j — SCRUM-100: the Credits page was credits *in the copy* and offerings *in the artwork* (2026-10-10)
+### 12.26 · S38k–o — SCRUM-100: the Credits page re-designed as a purse + price list (2026-10-10)
+
+**The PM:** *"after removing the offerings from the credits page now its too empty. can you re-design the whole thing, do not follow the decorations store or offering store design."*
+
+⚠️ **Why the old layout failed once the art went: it was a product grid with no product.** Cards need illustrations; a credit balance is not a product. Removing the offering art left empty boxes — **the layout was wrong for the content, not merely missing pictures.**
+
+**The new page (all four boards, versions `S38k`–`S38o`):** a **gold-stroked hero panel** carrying `CREDITS BALANCE / 1,750 / ≈ 11 offerings`, then a **`Buy credits` price list** — five rows of `N credits` → `≈ N offerings` → price, with a `BEST VALUE` badge overlapping the 1,000-credit row's edge, then the relation note. Header (back · title · cash chip · switcher) unchanged. ⚠️ **A price list, not a grid, because buying credits *is* a price list** — and the balance is the **hero** rather than one card among five.
+
+⚠️ **Everything came from the file.** Styling is **copied from the file's own shapes** (panel `#fbf7ee`, ink `2.5` stroke, `r14`, the gold `#d4af37`). ⚠️ **And the build caught a styling bug in itself:** the first pass inherited **`Noto Serif SC` for everything**, because that is the *title* face — **this file uses `sourcesanspro` for data and labels and the serif only for display**, so all data is `sourcesanspro` and **only the hero numeral keeps the serif**. ⚠️ **The `≈ N offerings` figures are ARITHMETIC, not invention** — derived from the locked **150 credits per offering**: 500→3 · 1,000→6 · 3,000→20 · 6,000→40 · 10,000→66. ⚠️ **Prices stay `TBD` except the locked one**; doc 10 pins **$1.55 / 1,000** and nothing else, so the other four rows keep their placeholder rather than a number I made up.
+
+⚠️ **FOUR DEFECTS THE BUILD CAUGHT IN ITSELF, and each is a repeat of a class from this session:**
+1. **The credits balance appeared twice** — the header chip *and* the hero. ⚠️ The chip is gone; the hero owns the balance, and the header keeps only **Cash**.
+2. ⚠️ **`toLocaleString` silently produced `1000`** — the plugin runtime has **no ICU**. Separators are now formatted by hand; every board reads `1,000 / 3,000 / 6,000 / 10,000`. ⚠️ *A formatting call that degrades silently is the same failure shape as a gate that cannot fail.*
+3. ⚠️ **An orphaned empty pill survived on three boards** — ZH names its chip layers differently, so a **name-based** removal missed the background. Found by **comparing pill rects against labels in the chip band** (geometry, not names).
+4. ⚠️⚠️ **On the confirm boards the new content was appended ABOVE the scrim**, which would have drawn the rows over the confirm dialog. Scrim + six sheet layers restacked, **verified by index: every row sits below the scrim**.
+
+✅ **Structurally verified on all four boards:** nothing outside the board bounds; every text's ink fits its box; no row collides with the hero, the section label or the note; the confirm sheet is above the content. ⚠️ **Stated plainly: I cannot see images, so the aesthetic judgement is the PM's.** The board exports to a 390×844 PNG and the geometry above is what can be proved. ⚠️ Unchanged: the credit bundles other than $1.55 still read `TBD`, and the offering illustrations stay hidden — ⚠️ **the new design needs no illustration at all, which is the point.**
+
+
 
 **The PM, on the page I had just built:** *"9e should not have offerings at all. It should be just Credits and their cash value. Emphasize on the credits. You can show the relation to how much offerings they can buy, but offerings should not be the focus."*
 
