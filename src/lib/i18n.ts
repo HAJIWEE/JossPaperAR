@@ -45,6 +45,34 @@ export const MESSAGES = {
     'common.done': 'Return to the shrine',
     'quota_spent': QUOTA_SPENT_COPY.en,
 
+    // ── the RITUAL screens' copy (burn · capture · reward · Home) ────────────
+    // ⚠️ These lived as HARDCODED literals inside the screens, several of them
+    // *bilingually* (`开始 · Begin`), so a panel marked `zh` showed English and an EN
+    // panel showed Chinese. Where a design board already carries the ZH it is used
+    // verbatim; the rest is new copy and is listed for review in `SCRUM-97`.
+    'common.begin': 'Begin',
+    'common.confirm': 'Confirm',
+    'capture.cameraNeeded': 'The camera is needed',
+    'capture.cameraWhy':
+      'The offering is the object you would like to burn. Nothing leaves this phone without your permission to photograph it.',
+    'capture.photoHint': 'Photograph the offering',
+    'capture.failed': 'The photo was not taken — nothing has been used.',
+    'capture.tryAgain': 'Try again',
+    'burn.aimHint': 'Swipe up and aim for the heart',
+    'burn.dragHint': 'Drag up from here, and release over the fire.',
+    'burn.lostPlace': 'This offering lost its place — begin again.',
+    'burn.returns': 'Missed the heart — the offering returns to you. Nothing is lost, nothing is earned.',
+    'burn.capped': 'A rethrow reaches at most Devout — never Bullseye.',
+    'burn.exhausted': 'The offering rests.',
+    'burn.rethrow': 'Throw again',
+    'reward.safe': 'Your offering is safe — nothing has been recorded.',
+    'reward.tributeUnit': 'tribute',
+    'reward.alreadyRecorded': 'Already recorded',
+    'reward.capped': 'Capped',
+    'reward.balance': 'Balance %{points}',
+    'home.begin': 'Begin an offering',
+    'home.clanEntry': 'Clan',
+
     // ── the throw (doc 05 §2 — the four bands) ────────────────────────────
     'band_bullseye': 'Bullseye',
     'band_devout': 'Devout',
@@ -183,6 +211,32 @@ export const MESSAGES = {
     'common.recapture': '重新供相',
     'common.done': '回到神龛',
     'quota_spent': QUOTA_SPENT_COPY.zh,
+
+    // ── the RITUAL screens' copy (burn · capture · reward · Home) ────────────
+    // The ZH where a design board already carries it is used verbatim
+    // (上滑对准火心抛入 · 未中火心 · 重投最高至虔诚 ×1.5 · 三次已尽 · 再次投掷 · 功德点);
+    // the remainder is NEW copy and is listed for review in `SCRUM-97`.
+    'common.begin': '开始',
+    'common.confirm': '确认',
+    'capture.cameraNeeded': '需要使用相机',
+    'capture.cameraWhy': '供品就是您想焚烧的物品。未获得您的拍照许可，任何内容都不会离开这台手机。',
+    'capture.photoHint': '拍摄供品',
+    'capture.failed': '未能拍下照片——未消耗任何内容。',
+    'capture.tryAgain': '再试一次',
+    'burn.aimHint': '上滑对准火心抛入',
+    'burn.dragHint': '从这里上滑，在火上松开。',
+    'burn.lostPlace': '供品已失去记录，请重新开始。',
+    'burn.returns': '未中火心 · 供品回到您手中——未失未得。',
+    'burn.capped': '重投最高至虔诚 ×1.5 —— 永不为正中 ×2.0。',
+    'burn.exhausted': '三次已尽。',
+    'burn.rethrow': '再次投掷',
+    'reward.safe': '供品安然无恙——未记录任何内容。',
+    'reward.tributeUnit': '功德点',
+    'reward.alreadyRecorded': '已记录',
+    'reward.capped': '已达上限',
+    'reward.balance': '余额 %{points}',
+    'home.begin': '开始供奉',
+    'home.clanEntry': '宗族',
 
     'band_bullseye': '正中',
     'band_devout': '虔诚',
@@ -335,6 +389,30 @@ export function setLocale(locale: Locale): void {
 export function activeLocale(): Locale {
   const current = i18n.locale;
   return (LOCALES as readonly string[]).includes(current) ? (current as Locale) : DEFAULT_LOCALE;
+}
+
+/**
+ * Pick the ACTIVE locale's field from a bilingual value — the `{ en, zh }` shape used by
+ * `domain/aim.ts`, `domain/catalogue.ts` and `domain/throw.ts`.
+ *
+ * ⚠️ **This exists because screens used to render `{value.zh} {value.en}`** — BOTH
+ * languages, in EVERY locale — which is exactly how a panel marked `zh` still showed an
+ * English label (and an EN panel showed Chinese). It is now the only supported way to
+ * read such a field, and `check:lib` section 16 fails on user-visible copy that does not
+ * go through `t()` or this.
+ *
+ * ⚠️ It reads the locale at CALL time, so a screen re-renders correctly after
+ * `setLocale`. Call it inside the render, never once at module scope.
+ */
+export function localized(value: { readonly en: string; readonly zh?: string }): string {
+  if (activeLocale() !== 'zh') return value.en;
+  /**
+   * ⚠️ A MISSING translation must not silently pass. `check:lib` section 15 asserts that
+   * every bilingual value in the domain (`AIM_BANDS`, `OFFERINGS`) carries BOTH fields, so
+   * this fallback is unreachable in practice — it exists only so a gap degrades to
+   * readable English rather than to a blank label.
+   */
+  return value.zh ?? value.en;
 }
 
 /** Translate. Interpolation uses i18n-js's `%{name}` placeholders. */

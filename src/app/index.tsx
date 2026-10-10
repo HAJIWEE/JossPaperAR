@@ -10,6 +10,7 @@ import { DAILY_PHOTO_BURNS, DAILY_STORE_BURNS } from '@/domain/quota';
 import { myClans } from '@/lib/clan-api';
 import { HEADER_SPEC, type PillClan } from '@/lib/clan-pill';
 import { readFirstRun } from '@/lib/first-run';
+import { localized, t } from '@/lib/i18n';
 import { DEMO_PARAM, DEMO_VALUE, needsTutorial } from '@/lib/tutorial';
 import { TOUCH_GAP, TOUCH_TARGET, brand, fontSize, fluidSize, onColorCream, radius, space, surface, text } from '@/theme/tokens';
 
@@ -98,7 +99,7 @@ export default function HomeScaffold() {
         <View key={band.id} style={styles.row}>
           <View style={[styles.swatch, { backgroundColor: brand.gold }]} />
           <Text style={styles.rowLabel}>
-            {band.label.zh} {band.label.en}
+            {localized(band.label)}
           </Text>
           <Text style={styles.rowValue}>
             ±{band.maxOffsetPx} ×{band.multiplier.toFixed(1)}
@@ -107,7 +108,7 @@ export default function HomeScaffold() {
       ))}
       <View style={styles.row}>
         <View style={[styles.swatch, { backgroundColor: text.muted }]} />
-        <Text style={styles.rowLabel}>偏失 Miss</Text>
+        <Text style={styles.rowLabel}>{t('band_miss')}</Text>
         <Text style={styles.rowValue}>— ×0 · returns</Text>
       </View>
 
@@ -115,7 +116,7 @@ export default function HomeScaffold() {
       <Text style={styles.caption}>doc 10 §1 · S13d. The 20% accrual keeps the store a sink.</Text>
       {OFFERINGS.map((o) => (
         <View key={o.code} style={styles.row}>
-          <Text style={styles.rowLabel}>{o.name.en}</Text>
+          <Text style={styles.rowLabel}>{localized(o.name)}</Text>
           <Text style={styles.rowValue}>
             {o.price} / {baseValueOf(o.price)}
             {o.priceSource === 'derived' ? ' *' : ''}
@@ -159,7 +160,7 @@ export default function HomeScaffold() {
         }}
         style={({ pressed }) => [styles.begin, pressed && { opacity: 0.8 }]}
       >
-        <Text style={styles.beginLabel}>Begin an offering · 开始供奉</Text>
+        <Text style={styles.beginLabel}>{t('home.begin')}</Text>
       </Pressable>
 
       {/* ── the clan surface, for a user with NO clan (SCRUM-92) ─────────────
@@ -179,7 +180,7 @@ export default function HomeScaffold() {
           }}
           style={({ pressed }) => [styles.clanEntry, pressed && { opacity: 0.8 }]}
         >
-          <Text style={styles.clanEntryLabel}>Clan · 宗族</Text>
+          <Text style={styles.clanEntryLabel}>{t('home.clanEntry')}</Text>
         </Pressable>
       ) : null}
       </ScrollView>

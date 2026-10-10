@@ -38,7 +38,7 @@ import {
   scanDecision,
   shouldHoldInvite,
 } from '../invite-flow.ts';
-import { LOCALES, MESSAGES, detectLocale, messageKeys, setLocale, t } from '../i18n.ts';
+import { LOCALES, MESSAGES, detectLocale, localized, messageKeys, setLocale, t } from '../i18n.ts';
 import { BULK_PREFIX, createSplitStorage, bulkKey } from '../split-storage.ts';
 import {
   MAX_ATTEMPTS,
@@ -1092,6 +1092,59 @@ function zhScriptChecks(): void {
   check('the pill chip label is 族长 — matching its ZH board (SCRUM-92 AC 5)', zh['role_head'] === '族长', zh['role_head']);
 
   check('EN and 中文 still define the same key set', messageKeys('en').length === messageKeys('zh').length);
+
+  // ⚠️ The domain's bilingual values are DATA, not messages, so the parity check above
+  // cannot see them. A missing `zh` would fall back to English on a 中文 panel — which is
+  // the exact defect this whole area was fixed for — so it is asserted here.
+  const bilingual = [...AIM_BANDS.map((b) => b.label), ...OFFERINGS.map((o) => o.name)];
+  const missingZh = bilingual.filter((v) => v.zh === undefined || v.zh === '');
+  check(`every bilingual domain value carries 中文 (${bilingual.length} checked)`,
+    missingZh.length === 0, `${missingZh.length} fall back to English`);
+}
+
+/**
+ * 16 · The ritual screens' copy is LOCALISED (SCRUM-97).
+ *
+ * ⚠️ A reviewer opened a screen marked 中文 and found **English labels on its buttons and
+ * titles**. Two causes, both invisible to every existing gate:
+ *   · `burn.tsx` and `capture.tsx` never imported `t` at all — 18 literals, several of
+ *     them bilingual (`开始 · Begin`), so 中文 showed English and EN showed Chinese;
+ *   · four sites rendered `{value.zh} {value.en}` — BOTH languages, in EVERY locale.
+ *
+ * `check:copy` proves no literal escapes. THIS proves the replacements are actually
+ * Chinese — which is the thing the screenshot showed, and the part `tsc` cannot see.
+ */
+function screenCopyChecks(): void {
+  section('16 · The ritual screens\' copy — 中文 is actually Chinese (SCRUM-97)');
+
+  /** The copy that was hardcoded, now keyed. Each `zh` must carry no Latin text. */
+  const KEYS = [
+    'common.begin', 'common.confirm', 'home.begin', 'home.clanEntry',
+    'capture.cameraNeeded', 'capture.cameraWhy', 'capture.photoHint', 'capture.failed', 'capture.tryAgain',
+    'burn.aimHint', 'burn.dragHint', 'burn.lostPlace', 'burn.returns', 'burn.capped',
+    'burn.exhausted', 'burn.rethrow',
+    'reward.safe', 'reward.tributeUnit', 'reward.alreadyRecorded', 'reward.capped', 'reward.balance',
+  ];
+  const zh = MESSAGES.zh as unknown as Record<string, string>;
+  const en = MESSAGES.en as unknown as Record<string, string>;
+  /** `%{points}` is a placeholder, not prose — strip it before looking for Latin text. */
+  const latinIn = (s: string): string[] => s.replace(/%\{[a-z]+\}/g, '').match(/[A-Za-z]+/g) ?? [];
+
+  for (const key of KEYS) {
+    check(`${key} is defined in both locales`, typeof zh[key] === 'string' && typeof en[key] === 'string');
+    const latin = latinIn(zh[key] ?? '');
+    check(`…its 中文 carries no Latin text`, latin.length === 0, `${latin.join(', ')} in "${zh[key]}"`);
+  }
+
+  // the shared picker the four bilingual sites now use
+  setLocale('en');
+  check('localized() answers EN under the en locale', localized({ en: 'Devout', zh: '虔诚' }) === 'Devout');
+  setLocale('zh');
+  check('…and 中文 under the zh locale', localized({ en: 'Devout', zh: '虔诚' }) === '虔诚');
+  check('…and NEVER both at once', localized({ en: 'Devout', zh: '虔诚' }).length === 2);
+  check('…and degrades to EN when a 中文 field is missing',
+    localized({ en: 'Devout', zh: undefined }) === 'Devout');
+  setLocale('en');
 }
 
 async function main(): Promise<void> {
@@ -1100,6 +1153,7 @@ async function main(): Promise<void> {
   serviceChecks();
   clanPillChecks();
   zhScriptChecks();
+  screenCopyChecks();
 
   check('guard: a 5-character key is NOT valid', !isValidIdempotencyKey('12345'));
   check('guard: junk is NOT a clan code', normaliseClanCode('not-a-code!!') === null);

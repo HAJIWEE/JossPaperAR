@@ -565,7 +565,27 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
-### 12.19 · S37d — SCRUM-95: simplified Chinese, and the check that could not have caught its own mistake (2026-10-10)
+### 12.20 · S37e — SCRUM-97: the copy gate that was blind, and the screenshot that caught what four gates could not (2026-10-10)
+
+**Found by the reviewer, not by a gate.** *"Some Chinese panels which are marked zh still have English labels in the buttons and titles."* At that moment `tsc`, `check:lib` (382 checks) and `check:contrast` were **all green**. The lesson is the project's oldest one in a new costume: **the gates only see what they were built to see.**
+
+**Three causes, each invisible to a different gate.**
+
+1. ⚠️ **`burn.tsx` and `capture.tsx` did not import `t` at all.** 18 literals across four screens, several **bilingual** — `开始 · Begin`, `确认 · Confirm`, `上滑对准火心抛入 · Swipe up & aim for the heart`. So a 中文 panel showed **English* and an EN panel showed **Chinese**: the worst of both.
+2. ⚠️ **Four sites rendered `{value.zh} {value.en}` — BOTH languages, in EVERY locale.** `burn.tsx`, `reward.tsx` ×2, `index.tsx`. This is not a translation gap but a **missing concept**: there was no supported way to read a bilingual `{ en, zh }` value in the active locale. Fixed with `localized()` in `i18n.ts`, which reads the locale **at call time** so a `setLocale` re-renders correctly.
+3. ⚠️ **The catalogue had no Chinese at all.** `OFFERINGS[].name` was `{ en }` only — the five store items had no `zh`, so `localized(o.name)` returned English on a 中文 panel. **This one was found by a new assertion, not by the report** — and it is the argument for writing the assertion even when you think you know the scope.
+
+**⚠️⚠️ The most transferable part: my first copy gate was BLIND and reported a clean pass.** It skipped any line containing `style=` — which is nearly **every JSX line**, since `style={styles.x}` is on almost all of them. So the fault test I ran (hardcoding `Swipe up and aim for the heart` back into `burn.tsx`) was skipped and the gate printed **✓ all 3 copy checks passed** over the defect it had just been handed. It was caught only because the fault test produced **no failure output**, which is not what a working gate looks like. The fix strips non-copy attribute **values** rather than skipping **lines**, and the gate now carries a **positive control that runs every time** — the detector must fire on a synthetic literal and a synthetic bilingual line, and stay quiet on a localised line and a `testID`-only line. **A blind gate is worse than no gate: it manufactures confidence.**
+
+**The gate is wired, not just written.** `check:copy` (`src/lib/checks/copy.ts`) is in `npm run check` **and** in a new `ci.yml` step — the same discipline `SCRUM-93` forced on `check:contrast`, and the same trap: a gate that is not run is not a gate.
+
+**Copy provenance, kept honest.** The 中文 for the ritual screens is taken **verbatim from the design boards where they carry it** (`上滑对准火心抛入` · `未中火心 · 供品回到您手中——未失未得。` · `重投最高至虔诚 ×1.5 —— 永不为正中 ×2.0。` · `三次已尽。` · `再次投掷` · `功德点`); **the remainder is new copy** written for this fix and listed in the PR. The five store names come from `ZH · 7 Store / 商店` (`金银纸 · 金条 · 手机 · 楼房 · 财富套装`), matched **by name, not by base value** — because the board's metas (`Gold Bar 基础 960`) **disagree with doc 10's prices**, which is a pre-existing drift now recorded in `SCRUM-96` along with two more: the board says **"Cash Bundle"** where the catalogue says *"Joss Paper Stack"*, and the House is **楼房** in the store but **祖屋** in the collection.
+
+**One exemption, printed rather than silent.** `src/app/index.tsx` is the `SCRUM-53` scaffold and its prose documents the *numbers* for a reviewer; localising developer documentation is wasted work. Its **controls** are localised, and rule 2 will cover the file the moment it leaves the exemption list — the gate prints the exemption on every run so it cannot pass unnoticed.
+
+**Verified.** `npm run check` **exit 0** (15 gates) · `check:lib` **382** (section 16 asserts the 21 `zh` strings carry **no Latin text** *and* exercises `localized()` across locales) · `check:copy` **7**. **Fault-tested red three ways, restored byte-identical:** a hardcoded literal, the both-languages pattern, and a `zh` string made English. ⚠️ **Not verified on glass** — that rides on `SCRUM-88`, because no device has been delivered.
+
+
 
 **The decision.** PM: *"Simplified Chinese. Has a significant larger market."* That closes option **B** of the three `SCRUM-95` offered. ⚠️ **It was a cultural call, not an engineering one** — the audience is Chinese-reading families in the 40–50s diaspora band, Singapore is officially simplified but has a real traditional-using segment, and `AGENTS.md` calls cultural sensitivity non-negotiable. It had sat **untracked** since S31, visible only as an `⚠️ TRADITIONAL` comment in `i18n.ts` and a line in the handover.
 

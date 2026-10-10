@@ -127,5 +127,11 @@ jobs:
       - name: Client-library checks (idempotency · invites · i18n · split storage · queue)
         run: npm run check:lib
 
+      # SCRUM-97 — the COPY gate. A 中文 screen shipped English button labels because copy
+      # that never went through `t()` is invisible to `tsc` and to check:lib (which only
+      # sees the message table). A reviewer's screenshot caught it, not a gate.
+      - name: Copy checks (no user-visible literal outside t() / localized())
+        run: npm run check:copy
+
       - name: Expo doctor
         run: npx expo-doctor
