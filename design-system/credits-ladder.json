@@ -2,9 +2,9 @@
   "_what": "The credit-bundle shelf as DRAWN on the Credits boards, plus the rule that decides which row may carry BEST VALUE. Frozen here because CI cannot reach Penpot — exactly like penpot-pairs.json. `npm run check:credits` asserts this file against the economy rule, so a price change cannot land without the badge moving with it.",
   "_refresh": "Re-run penpot-sweeps/credits-best-value.js after any price change: it reads the boards, recomputes, and prints this file.",
 
-  "ceiling": {
+  "referenceRate": {
     "centsPer1000": 155,
-    "source": "doc 10 line 13 · doc 09 §7.7 — US$1.55 per 1,000 credits (break-even $1.19 + 30% worst-case margin), PM-locked 2026-09-26. The CEILING: no bundle may ever cost more per credit than this."
+    "source": "doc 10 line 13 · doc 09 §7.7 — US$1.55 per 1,000 credits (break-even $1.19 + 30% worst-case margin), PM-locked 2026-09-26. ⚠️ NOT a ceiling. PM, 2026-10-10 (S39): \"USD1.55 per 1000 credits should be the lowest floor price which should be the BEST VALUE which is the 10000tokens offer price.\" So doc 10's rate is the rate the BEST VALUE bundle CARRIES, and the LOWEST rate anywhere in the shelf — which means every smaller bundle is, of necessity, priced ABOVE it. ⚠️ The old 'ceiling: nobody pays it' reading was wrong, and the shipped base of $1.20 was UNDER-charging the rate the viability study derived."
   },
   "floor": {
     "centsPer1000": 119,
@@ -12,13 +12,13 @@
   },
 
   "pricing": {
-    "baseCentsPer1000": 120,
+    "baseCentsPer1000": 155,
     "premiumStepCents": 2,
     "roundingStepCents": 5,
-    "rule": "The LARGEST bundle costs the base rate; each step DOWN the ladder adds one premium step per 1,000. An appreciating premium: the less you commit, the more each credit costs. PM-set 2026-10-10 ($1.20 at 10,000, $1.22 at 6,000, …), then the exact price is ROUNDED TO THE NEAREST 5 CENTS (PM, 2026-10-10).",
-    "worked": "1,000 → $1.25 · 3,000 → $3.70 · 6,000 → $7.30 · 10,000 → $12.00 per 1,000 at 1.250 / 1.233 / 1.217 / 1.200",
+    "rule": "The LARGEST bundle costs the base rate — and the base rate IS doc 10's $1.55/1,000 (PM, 2026-10-10 S39: 'we should follow doc 10'). Each step DOWN the ladder adds one premium step per 1,000. An appreciating premium: the less you commit, the more each credit costs. The exact price is then ROUNDED TO THE NEAREST 5 CENTS (PM, 2026-10-10).",
+    "worked": "1,000 → $1.60 · 3,000 → $4.75 · 6,000 → $9.40 · 10,000 → $15.50 per 1,000 at 1.600 / 1.583 / 1.567 / 1.550",
     "_indexedFromLargest": "⚠️ The step is indexed from the LARGEST bundle, not counted up from the smallest — which is why retiring the 500 tier (2026-10-10) moved NO surviving price. Retiring the smallest tier is therefore free; retiring the largest would re-price everything below it.",
-    "_roundingNote": "⚠️ 5¢ rounding moves the SMALL bundle's rate most — one cent on 1,000 credits is a whole cent per 1,000 — so it is the one step that could invert the premium. It does not here: the rates still fall strictly as the bundle grows (1.250 > 1.233 > 1.217 > 1.200), and `check:credits` asserts exactly that, on the ROUNDED prices rather than on the rule's ideal.",
+    "_roundingNote": "⚠️ 5¢ rounding moves the SMALL bundle's rate most — one cent on 1,000 credits is a whole cent per 1,000 — so it is the one step that could invert the premium. It does not here: the rates still fall strictly as the bundle grows (1.600 > 1.583 > 1.567 > 1.550), and `check:credits` asserts exactly that, on the ROUNDED prices rather than on the rule's ideal.",
     "_roundingIsNotStoreTiers": "⚠️ A multiple of 5¢ is a DISPLAY convention, not an app-store price point. Play and the App Store sell in fixed tiers (≈$0.99 / $1.49 / $1.99 …), so these will snap again when IAP lands — see §12.28."
   },
 
@@ -26,15 +26,15 @@
   "_photoFee": "doc 10: one photo offering costs 150 credits — the second locked number the page is built on, used for the ≈ N offerings lines.",
 
   "bundles": [
-    { "credits": 1000, "priceCents": 125 },
-    { "credits": 3000, "priceCents": 370 },
-    { "credits": 6000, "priceCents": 730 },
-    { "credits": 10000, "priceCents": 1200 }
+    { "credits": 1000, "priceCents": 160 },
+    { "credits": 3000, "priceCents": 475 },
+    { "credits": 6000, "priceCents": 940 },
+    { "credits": 10000, "priceCents": 1550 }
   ],
   "_retired": "⚠️ The 500-credit bundle was WITHDRAWN by the PM on 2026-10-10 ('just offer the 4 left'). It was the only tier priced below a plausible app-store minimum — 64¢ against Google Play's and the App Store's ~99¢ floor — so retiring it removes the one price that could not have been sold as-is. Its row was deleted from all four boards; the four survivors kept their exact rates.",
 
   "bestValueRule": "argmin(priceCents / credits) — the cheapest credit per 1,000.",
-  "_bestValueNote": "With the volume ladder there is now a UNIQUE winner: the largest bundle, 10,000 at $1.20/1,000. No tie-break is needed. `bestValueTieBreak` is retained only so a future flat ladder still resolves deterministically.",
+  "_bestValueNote": "With the volume ladder there is now a UNIQUE winner: the largest bundle, 10,000 at $1.55/1,000 — exactly doc 10's reference rate. No tie-break is needed. `bestValueTieBreak` is retained only so a future flat ladder still resolves deterministically.",
   "bestValueTieBreak": "smallest",
   "bestValueCredits": 10000,
 

@@ -565,6 +565,168 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.34 · S41 — SCRUM-79: the rethrow cap is enforced on the SERVER, and the client never had to be trusted (2026-10-10)
+
+`SCRUM-23`'s cap — *"a rethrow caps at 虔诚 Devout, never 正中 Bullseye"* — lived **only in the client** (`src/domain/throw.ts` `gradeThrow`). ADR-005's premise is that a client-side cap is not a cap: a tampered client simply does not call `gradeThrow`, and `aim_band_for(p_offset)` has no idea which throw it is — so **`accuracy: 0` on a SECOND throw graded Bullseye ×2.0**. doc 16 §5 pre-commits the cap to the cultural reviewer, so this was a promise the app did not keep.
+
+**The PM chose option A** — make the server throw-aware.
+
+### ⚠️ The option as written would have been bypassable, and did not need to be
+
+The option said *"pass a per-capture attempt count into `submit_burn`"*. ⚠️ **A client-supplied attempt count is bypassable by construction** — a tampered client sends `1` forever. It turns out the count does not need to be supplied at all, because **a miss still writes a `burns` row** (S9 — *"a miss returns the offering … it still writes a `burns` row so the rethrow is a NEW burn, never an edit"*, doc 07 §6). So:
+
+```
+"a prior burns row exists for this (actor, capture)"  ≡  "this is a rethrow"
+```
+
+**No new column, no new argument, and nothing the caller can lie about.** The cap needs no client cooperation — which is the whole point of ADR-005.
+
+⚠️ **Scoped to `(p_actor, v_capture_id)`**, so another member cannot cap *your* first throw. ⚠️ **Capped BEFORE the multiplier is read**, so the award, the streak and the Book all see the capped band — it cannot be half-applied. A store burn (`v_capture_id is null`) is skipped: there is no capture to rethrow against.
+
+### The migration
+
+**`0016 · 20261010100000_rpc_rethrow_cap_server_side.sql`.** ⚠️ **A new version number, not an edit** — plpgsql has no partial replace, and an applied migration must never be edited. The body is **0007's, byte-for-byte, plus the cap**; the signature and GRANTs are unchanged.
+
+### Verification, and the fault test
+
+✅ `npm run check:sql` — **16/16 structurally sound** · ✅ `db reset` — **16/16 applied from the files** · ✅ **new `supabase/tests/rethrow_cap.sql` — 8/8, exit 0**.
+
+⚠️ **Self-contained on purpose.** `pr3_verification.sql` is the natural home and is **RED on the unrelated pre-existing `SCRUM-87`** — and because `assert_true` RAISES, a red run **aborts before any later assertion**. A test that cannot run is not a test.
+
+| | assertion |
+|---|---|
+| **R1** | **CONTROL** — the first throw on a capture grades bullseye (the cap does not fire) |
+| **R2** | a rethrow sending `accuracy: 0` is **capped at devout** ← the defect; the **award follows** (600, not 1,600) |
+| **R3/R4** | ⚠️ **the case the mechanic actually creates: a MISS, then a retry — still capped.** A cap written on "prior *bullseye* exists" would never fire here |
+| **R5** | per-capture, not per-day — a fresh capture is a first throw |
+| **R6** | the cap never rescues a miss |
+| **R7** | a capture belongs to one actor |
+
+⚠️⚠️ **FAULT-TESTED, and the fault is the proof:** re-applying **0007** turns **R2 RED with `got bullseye`** — the defect reproduced exactly — while **R1 stays GREEN**. Restored → 8/8.
+
+⚠️ **My first `R7` was wrong, and its failure was the finding:** I asserted another member burning my capture would be uncapped; the server **refused it outright** (*"is not a styled capture owned by the actor"*). So the per-actor scope is belt-and-braces and the **ownership** check is what holds.
+
+### ⚠️ Not yet live
+
+**The cap is verified against a LOCAL stack and has NOT been pushed to the hosted project**, because a fresh worktree is not linked (`supabase/.temp` is gitignored — §12.13). ⚠️ **Until `db push` runs, a tampered client on the deployed backend can still farm bullseyes.** That is why the ticket is `In Review`, not `Done`.
+
+### Also this session
+
+- **The device tickets were deferred to a NEW `SCRUM Sprint 2`** (id **34**, 2026-10-16 → 10-30) — ⚠️ **there was no Sprint 2; it had to be created.** `SCRUM-88` (the device run) and `SCRUM-92` (device-screenshot-blocked) moved, both **read back**. `SCRUM-53` was not moved — it is a build ticket.
+- **`josspaperar.app` was bought** → `SCRUM-56` #6 done, `SCRUM-89` unblocked. ⚠️ **Unblocked ≠ done:** `SCRUM-89` still needs a host, the signing-cert SHA-256 (⚠️ which differs debug vs release) and a **real tap** — and the tap is device-gated, so **89 cannot close in Sprint 1 either**. ⚠️ And the domain unblocks **only** the canonical `https://` link; the custom scheme and the in-app QR path already worked.
+
+### 12.33 · S40 — SCRUM-104: the label had ESCAPED its dialog card, and the fix was LAYOUT (2026-10-10)
+
+Filed from the `SCRUM-93`/`94` sweep as a **LEAD**, not a verdict — `otherFindings` are **reported and never asserted**, because the surface resolver does not model groups, gradients, images, strokes or masks. So the ticket's first task was to **confirm it**, and the confirmation is worth recording because **one of the checks was itself wrong first**:
+
+- **geometry** — the label's top sits **exactly 14 px below the dialog card's bottom edge, on all six boards identically**;
+- **paint order** — `overlay · scrim` (33) → `dialog (bg)` (34) → title/body/button → **the label (39)**, so the scrim is the only opaque thing under it;
+- **the resolver's blind spots** — no gradients, images or shadows over the label; the only strokes are on a background row.
+
+⚠️ **And my first pass carried a false positive.** I tested for a mask with `!!s.isMask` — **`isMask` is a FUNCTION, not a boolean** — so it read `true` for **everything**, and my initial *"the scrim is masked"* note was meaningless. **A check that is always true is not a check**, and this is a fresh instance of the class this project keeps catching.
+
+### The root cause, uniform across all six
+
+Restricting to the dialog's **own** paint stack (after the scrim, inside the card's x-range) gives the same shape on every board: `card (bg) → dialog · title [24..45] → dialog · body → btn · buy/watch`, **and then the label, below the card**. ⚠️ **The card's bottom padding below its LAST CONTENT is exactly 20 px on all six boards** — and the label sits 14 px past that edge, i.e. **it had escaped its own card.**
+
+### The fix
+
+**Each card grew by exactly 54 px** = the label's height (20) + **the same 20 px padding the card already used** + the 14 px gap. So the card simply contains the label with its own established padding, and **nothing else moved**.
+
+| Board | card | → |
+|---|---|---|
+| `EN · 9f Credits · confirm` | 230 | **284** |
+| `ZH · 9f 点数 · 确认` | 279 | **333** |
+| `EN · 9b Buy offerings · confirm` | 230 | **284** |
+| `ZH · 9b 购买供品 · 确认` | 279 | **333** |
+| `EN · 5b Reward / one more offering` | 279 | **333** |
+| `ZH · 5b 酬报 / 再备一份供品` | 340 | **394** |
+
+⚠️ **The label's COLOUR was not touched** — `--ink-soft #4a463f` is correct on a light surface; a colour swap would have been the wrong fix, exactly as the ticket said.
+
+### Verified, and gated
+
+✅ **`#4a463f` on the card `#f5f0e8` = 8.27:1** (was **2.37–2.60:1**), needs 4.5, on all six. ✅ **The whole-file sweep now reports 0 below-threshold findings** — the six are gone. ✅ **`penpot-pairs.json` 11 → 17 pairs**, fault-tested: the six put back on the scrim (`#88837d`) → **✗ 6 failed, all at 2.50:1** → restore → **✓ 18/18 pass**, file unchanged. Penpot version **`S40`**.
+
+⚠️ **Parked `In Review`, not `Done`:** the fix has **never been seen** — it changes the dialog height on **six signed-off boards**, and AC 1's *"ideally on glass"* is unmet because the device has not arrived. If the taller card reads too tall, the padding is one number.
+
+### 12.32 · S39b — the PM's decision batch, and SCRUM-101: the shelf was UNDER-CHARGING doc 10 (2026-10-10)
+
+**Six rulings across four decision tickets, recorded in Jira, and one of them shipped.** This section covers the shipped one; the rulings themselves live on their tickets.
+
+### SCRUM-101 — the credit shelf re-based to doc 10's rate
+
+**The PM:** *"we should follow doc 10, infact that was what i was asking last session regarding the economic viability study we did. So USD1.55 per 1000 credits should be the lowest floor price which should be the BEST VALUE which is the 10000tokens offer price."*
+
+⚠️ **This overruled the ticket's own premise.** `SCRUM-101` had asked whether to rewrite doc 10 §3 so that `$1.55/1,000` became a **CEILING** — *"the most anyone may ever be charged, and nobody pays it"*. **The answer is no: doc 10 stands, and the SHELF was what was wrong.** `$1.55/1,000` is the rate the **viability study** derived (break-even `$1.19` + 30% worst-case margin); the shipped base of `$1.20` at the 10,000 was **under-charging the very rate the study produced**. **doc 10 is not edited.**
+
+| Bundle | before | **after** | per 1,000 |
+|---|---|---|---|
+| 1,000 | $1.25 | **$1.60** | 1.600 |
+| 3,000 | $3.70 | **$4.75** | 1.583 |
+| 6,000 | $7.30 | **$9.40** | 1.567 |
+| **10,000** | $12.00 | **$15.50** | **1.550 ← lowest rate, BEST VALUE** |
+
+`pricing.baseCentsPer1000` **120 → 155**; the **+$0.02/1,000 step and the 5¢ grid are unchanged** (both PM-set 2026-10-10). All three of the PM's clauses hold: the **10,000 is the best value**, its rate is **exactly `$1.55/1,000`**, and that rate is the **lowest in the shelf** (the premium rises as the bundle shrinks).
+
+### ⚠️ The gate had to change, and the replacement is STRONGER
+
+The old `$1.55` **ceiling** assertion would now **fail a correct shelf** — with the best rate pinned at the spec, every smaller bundle is *necessarily* above `$1.55` (1.600 · 1.583 · 1.567). It is replaced by two assertions that **pin the shelf to the spec rather than cap it**:
+
+- **the largest bundle carries doc 10's `$1.55/1,000`** (an exact `priceCentsFor` comparison, no tolerance), and
+- **that rate is the CHEAPEST credit in the shelf** — so the BEST VALUE is the biggest offer.
+
+The `$1.19` cost floor and the appreciating-premium check are unchanged. `check:credits` is now **13 checks**.
+
+**Fault-tested both ways, sequentially:** the 10,000 → `$12.00` = **3 failed** (ladder rule · the pinned rate · the cheapest-rate check) · the 1,000 → `$1.50` = **4 failed** (including the premium and the badge) · restore → **13/13 green**, file unchanged by the test.
+
+**Boards:** all **16 prices re-drawn** across `EN · 9e` / `ZH · 9e 点数` / `EN · 9f` / `ZH · 9f 点数 · 确认`, **read back**, and the `BEST VALUE` badge is still the formula's winner on all four. Whole-file read-back: `$1.60 / $4.75 / $9.40 / $15.50` at `1.600 / 1.583 / 1.567 / 1.550`, weighted average **$1.563**. Penpot version **`S39b · SCRUM-101 — shelf re-based to doc 10 ($1.55/1,000 at the 10,000)`**.
+
+### ✅ Both questions ANSWERED — the shelf is CORRECT as built, and `SCRUM-101` closed `Done`
+
+Both were put to the PM, and both came back in the shelf's favour:
+
+1. **Is `$1.55` the *lowest* rate (nothing discounted), or a list price bundles discount below?** → **The lowest rate.** The PM: *"1.55 is our economic floor pricing for economic viability so that is the lowest we can charge."* ⚠️ **So `$1.55/1,000` is the price FLOOR** — the cheapest anyone may ever pay — and the `$1.19` in doc 09/10 is the **cost break-even**, not the price floor. The shelf as built (1.600 / 1.583 / 1.567 / **1.550**) is exactly that.
+2. **Is the +$0.02/step still right on a `$1.55` base?** → **Retained unchanged.** Nothing in the confirmation asks it to move.
+
+⚠️ **doc 10 was NOT edited throughout**, and the *"`$1.55` is a ceiling nobody pays"* framing the ticket opened with was simply **wrong** — the shelf was the thing that disagreed with the spec, not the spec with the shelf.
+
+### SCRUM-102.3 — clan names are not localised, and it is now ASSERTED
+
+The PM's rule: a clan is named in **whatever script the user types**, and the app **never translates it** in either direction. The app already obeyed it — `isValidClanName` (`src/lib/clan-rules.ts`) measures **length only, after a trim**, and every render site passes the raw value (`{view.name}`, `{c.name}`, `clan.name`). What was missing was the **assertion**, so `check:lib` §9 now proves the rule is **script-blind**: 中文, English and **mixed-script** names are all accepted as typed, 中文 is measured **by character** (20 accepted, 21 refused), and equal-length names in different scripts are judged identically. **`lib` 382 → 387.**
+
+⚠️ **And implementing it exposed a contradiction in the design file** — the demo clan **was inconsistent across the boards**: the **EN** boards showed `陈氏` on some and `Tan Family` on others, and the **ZH** boards likewise. ⚠️ **My first write-up said it was locale-mapped (EN `陈氏` / ZH `Tan Family`) — that was an over-generalisation and it was WRONG**: it varies **board-by-board in both locales**, which is `SCRUM-98`'s class again (*same-state proves the state, not the quality*). Filed as **`SCRUM-105`**, then fixed.
+
+**✅ `SCRUM-105` — standardised to `Tan Family`, and the rule extended to TABLET names.** The PM: *"Clan names and tablet names should just show whatever the user inputed language agnostic."* The demo clan's own name was changed on **10 layers / 8 boards** (`0e7`/`0e8`/`0e9`/`0e12`, EN + ZH), each edit **asserting its previous value first** so a drifted layer could not be silently overwritten; read-back confirms **`Tan Family` on 22 layers / 16 boards**. `Tan Family` was chosen because the file's **own recorded convention** already names it the un-localised demo name (`SCRUM-98`'s *"legitimate Latin — do NOT fix"* list) and the **newest** boards already used it. ⚠️⚠️ **`陈氏` IS ALSO A TABLET NAME** (`tablet · right (陈氏)`, the matriarch) — a naive search-replace would have **renamed a dead ancestor**, so the tablets were located by their own layer names and **excluded**. ✅ **And the tablets already obeyed the rule**: the **EN** boards render **Chinese** tablet names (陈德海 · 陈大文 · 陈氏) — the input, untranslated — ⚠️ **which looks like a defect to a copy sweep and is the rule working.** ⚠️ **Not touched, deliberately:** `Xiao Chen` (an invitee) and the **create-name hint chips** (`陈氏` · `林氏` · `Tan Family`, in **both** locales) — the clearest statement of the rule in the file.
+
+### The rest of the batch
+
+- **`SCRUM-90` → `Done`** — *"option A is fine"*: **hold + resume stands, no automatic drain.** Recorded explicitly that this does **not** claim doc-14 queue semantics — the join resolves **with one tap**, not by itself.
+- **`SCRUM-102` → `Done`** — the 15 中文 strings **accepted for now**; **`功德点` is correct**, so the board's `功德` was fixed (`ZH · 8c 历史`, `+1,350 功德` → `+1,350 功德点`) to match the app's `reward.tributeUnit`.
+- **`SCRUM-103` → `In Review`** — **`Joss Paper Stack`** ✓ (already the shipped name) and **`楼房`** ✓ (declined `祖屋`); **103.3 DEFERRED** because the PM re-checks the boards' base values **after 101**. ⚠️ **So `SCRUM-96` stays `In Review`** — it is parked on that residual.
+
+**Outcome:** `npm run check` **exit 0** · `tsc` **0 errors** · **US$0.00**.
+
+### 12.31 · S39 — SCRUM-94: two board colours fixed, and the emoji's fill was DISPROVED (2026-10-10)
+
+`SCRUM-93`'s sweep left two findings behind, filed as **`SCRUM-94`**. ⚠️ **The session started BLOCKED:** both Penpot MCP tools answered *"No Penpot instance connected for user token"*, and since both findings are **artwork** changes — and AC 1 requires re-deriving the pairs from the **live** fills — nothing was touched until Penpot was connected. The block was recorded in Jira, not worked around.
+
+**Finding 1 — the `0e8` success disc: `--gold` where a DISC token belongs.** `card · disc` was **`#d4af37` (`--gold`)** carrying a `--on-color-cream` glyph = **1.99:1** at 36 px → against the **3:1** large-text bar. ⚠️ **Re-derived, not copied** — and the survey settled the fix: `--disc-gold #887023` is **already used in the file**, on **four League `row N · avatar` ellipses**, and `tokens.css` L95 documents it as *"4.52 · was #D4AF37 @ 1.99 — the worst in app"*. The `0e8` disc was not a colour choice; it was the **outlier** — the one disc that never got the token. Fixed to **`#887023` = 4.52** on **EN + ZH**.
+
+⚠️⚠️ **AND THE TICKET'S EMOJI CAVEAT IS NOW A MEASUREMENT, NOT A GUESS.** The ticket said *"state explicitly whether the emoji's fill is rendered."* It is **not**, and here is the proof: **export the layer with its own `#fff8e8`, then with `#ff0000` — the PNGs are byte-identical** (same hash, same length), while **the same test DOES change a normal text layer's bytes**, so the apparatus can detect a rendered fill. **The 1.99 is therefore NOMINAL on screen** — the emoji paints in its own colours. The disc is darkened **anyway**, on the ticket's own *"the disc's fill is wrong either way"*: the **declared** pair must be compliant for any renderer without a colour-emoji font, and the disc had drifted off the token provided for exactly this pair. ⚠️ **My first version of that test was FLAKY and I nearly shipped its verdict** — with no tick between the fill write and the export, one **control** shape reported `rendered:false` and another `true`. Redone with a delay, **two** controls and a repeat: consistent. *(A test whose own control disagrees with itself is not evidence.)*
+
+**Finding 2 — the `7 Store` "Owned" chip: a DISC colour used as TEXT.** `card · House owned` was **`#07795c` — `--malachite-deep`**, which `tokens.css` lists in **`DISCS_ALREADY_OK`**. The file uses it **correctly** on four League avatar ellipses, and as **text** here = **4.42:1**, 0.08 short. Swapped to **`--malachite-text #0a7359` = 4.77** — the value the file **already uses for green-on-light text** (the four League "weekly move" labels). ⚠️ **This is `SCRUM-93`'s exact class: not a bad colour, a colour used on the wrong surface.**
+
+⚠️ **AND THE BACKDROP IS THE CARD, NOT `--paper`.** The chip's `#0e9b78 @ fillOpacity 0.12` sits on **`card · House (bg)` = `#fbf7ee`**, so it composites to **`#dfece0`** — the ticket's number. Over `--paper #f5f0e8` it would be `#d9e6db` / **4.18**, *worse*, and it is the wrong surface. The ticket warned about exactly this; compositing over the wrong base would have produced a confident, wrong fix.
+
+**The gate and the fault test.** `design-system/penpot-pairs.json` grew **7 → 11 pairs**. **Fault-tested both ways, sequentially:** disc → `#d4af37` = **2 failed / 1.99** · chip → `#07795c` = **2 failed / 4.42** · restore → **12/12 green**, file unchanged by the test. ✅ Whole-file sweep after the edits: **126 chip pairs, 0 failures**. ✅ Named Penpot version **`S39 · SCRUM-94 — 0e8 disc + 7 Store Owned chip (revn 358)`**.
+
+⚠️ **Two process notes.** **(1)** I first ran the three fault-test shell commands **concurrently** and got a **muddled, self-contradicting** result; re-run **sequentially** with `grep -c` proving each edit applied. Commands that mutate one file are not independent, even when they look it. **(2)** My first pass wrote *"the plugin API exposes no version endpoint"* into the manifest — ⚠️ **repeating a three-session-old claim `follow-up-items.md` had already disproved**; `penpot.currentFile.saveVersion()` **exists** and the version above was saved with it. Corrected.
+
+**Filed, not fixed — `SCRUM-104`.** The same sweep reports **6 modal boards** where the `btn · cancel` / `no thanks` label sits **below its own dialog card** and lands on the `overlay · scrim` at **≈2.4–2.6:1** (on `EN · 9f Credits · confirm`: scrim **33** → dialog **34**, bottom edge y **9910** → label **39**, y **9924** — **14 px past** the card). ⚠️ A **LAYOUT** fix, not a colour swap, and **reported-not-asserted** by the sweep, so it is a lead until an eyeball confirms it.
+
+**Outcome:** `npm run check` **exit 0** · `tsc` **0 errors** · **US$0.00**. ⚠️ **Parked `In Review`, not `Done`:** the disc change is visible on two **signed-off** boards and buys **no on-screen contrast** (the emoji is colour), so the PM may prefer the bright gold — a one-line revert.
+
 ### 12.28 · S38r — SCRUM-100: the PM set a volume ladder, and the badge finally sits on a fact (2026-10-10)
 
 **The PM:** *"Use $1.20 per 1000 tokens rate at the 10,000 credits offering then apply an appreciating premium on offerings that offer less than that, so 1.22 per 1000 tokens for the 6000 credits offering and so on."*
