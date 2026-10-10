@@ -38,6 +38,7 @@ const CEILING_CENTS_PER_1000 = 155;      // doc 10 line 13: US$1.55 / 1,000 — 
 const FLOOR_CENTS_PER_1000 = 119;        // doc 10: "bundles must average ≥ floor"
 const BASE_CENTS_PER_1000 = 120;         // PM 2026-10-10: the LARGEST bundle costs this
 const PREMIUM_STEP_CENTS = 2;            // …and each step DOWN the ladder adds this, per 1,000
+const ROUNDING_STEP_CENTS = 5;           // ⚠️ and the exact price is rounded to the nearest 5¢
 const TIE_BREAK = 'smallest';            // retained for a ladder that ever ties
 
 const BOARDS = ['EN · 9e Credits', 'ZH · 9e 点数', 'EN · 9f Credits · confirm', 'ZH · 9f 点数 · 确认'];
@@ -138,7 +139,7 @@ return {
     ? {
         ceiling: { centsPer1000: CEILING_CENTS_PER_1000 },
         floor: { centsPer1000: FLOOR_CENTS_PER_1000 },
-        pricing: { baseCentsPer1000: BASE_CENTS_PER_1000, premiumStepCents: PREMIUM_STEP_CENTS },
+        pricing: { baseCentsPer1000: BASE_CENTS_PER_1000, premiumStepCents: PREMIUM_STEP_CENTS, roundingStepCents: ROUNDING_STEP_CENTS },
         bundles: readBoard(BOARDS[0]).bundles.map((b) => ({ credits: b.credits, priceCents: b.priceCents })),
         bestValueTieBreak: TIE_BREAK,
         bestValueCredits: Number(first.formulaWinner),

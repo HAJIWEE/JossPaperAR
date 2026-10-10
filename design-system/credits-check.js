@@ -81,11 +81,24 @@ function main() {
   //     Largest = base rate; every step DOWN adds one premium step per 1,000.
   //     Change base or step and the prices must follow — that is what "formulaic" means.
   const desc = [...bundles].sort((a, b) => b.credits - a.credits);   // largest first
-  const expected = (credits, i) => Math.round(((base + step * i) * credits) / 1000);
+  // ⚠️ THE PREMIUM IS INDEXED FROM THE LARGEST BUNDLE (i = 0 at the biggest), and the exact
+  //    price is then rounded to the PM's 5¢ grid. ⚠️ Get the index direction wrong and you
+  //    invert the ladder while still producing a perfectly monotone-looking shelf — I did
+  //    exactly that in Penpot on 2026-10-10, and my verifier asserted the rates ASCEND with
+  //    credits, i.e. the inverse of the rule, so it passed a backwards shelf as correct.
+  const roundStep = data.pricing.roundingStepCents;
+  const exact = (credits, i) => Math.round(((base + step * i) * credits) / 1000);
+  const expected = (credits, i) => Math.round(exact(credits, i) / roundStep) * roundStep;
   const offRule = desc.filter((b, i) => b.priceCents !== expected(b.credits, i));
   ok(offRule.length === 0,
-    `every bundle follows the ladder rule ($${(base / 100).toFixed(2)} base, +$${(step / 100).toFixed(2)}/1,000 per step down)`,
+    `every bundle follows the ladder rule ($${(base / 100).toFixed(2)} base, +$${(step / 100).toFixed(2)}/1,000 per step down, rounded to ${roundStep}¢)`,
     offRule.map((b) => `${b.credits}: ${money(b.priceCents)} should be ${money(expected(b.credits, desc.indexOf(b)))}`).join(' · '));
+
+  // 1b · the shelf is priced in whole ROUNDING steps — a price off the grid is a typo, not a rate
+  const offStep = bundles.filter((b) => b.priceCents % roundStep !== 0);
+  ok(offStep.length === 0,
+    `every price is a multiple of ${roundStep}¢`,
+    offStep.map((b) => `${b.credits}: ${money(b.priceCents)}`).join(' · '));
 
   // 2 · the APPRECIATING PREMIUM — the less you commit, the more each credit costs.
   //     ⚠️ This is the PM's intent in one line: a smaller bundle may never undercut a larger one.
@@ -164,6 +177,9 @@ function main() {
     .sort((a, b) => b.credits - a.credits);
   ok(tweaked.filter((b, i) => b.priceCents !== expected(b.credits, i)).length > 0,
     `control: one cent off on the ${desc[1].credits} bundle breaks the ladder rule — the check bites`);
+  //     (c) …and a price one cent off the 5¢ grid is caught by the grid check too.
+  ok([{ credits: 1000, priceCents: expected(1000, desc.length - 1) + 1 }].filter((b) => b.priceCents % roundStep !== 0).length > 0,
+    `control: a price off the ${roundStep}¢ grid is caught — the grid check bites`);
 
   report();
 }

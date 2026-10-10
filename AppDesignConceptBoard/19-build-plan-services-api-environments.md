@@ -605,6 +605,24 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **US$0.00 / S$0.00.** No paid work. ⚠️ **One item still open, unchanged from §12.28:** doc 10 §3's `$1.55/1,000` now describes the **ceiling**, not what anyone pays.
 
+### 12.30 · S38t — SCRUM-100: prices rounded to the nearest 5¢ — and a verifier that passed a backwards shelf (2026-10-10)
+
+**The PM:** *"can you round the prices to 5cents I personally just dont like it so round to the nearest multiple of 5cents."* ✅ Applied — the **exact** price from the ladder rule is now rounded to the **nearest 5¢**:
+
+| Bundle | exact | **rounded** | per 1,000 |
+|---|---|---|---|
+| 1,000 | $1.26 | **$1.25** | 1.250 |
+| 3,000 | $3.72 | **$3.70** | 1.233 |
+| 6,000 | $7.32 | **$7.30** | 1.217 |
+| **10,000** | $12.00 | **$12.00** | **1.200** ← cheapest |
+
+⚠️ **Why this was not cosmetic: 5¢ rounding moves the SMALL bundle's rate most.** One cent on 1,000 credits is a **whole cent per 1,000**, so the 1,000 bundle's rate fell 1.260 → **1.250**, while the 10,000 did not move at all. **Rounding is the one step that could invert the premium** — it does not here (`1.250 > 1.233 > 1.217 > 1.200`, still strictly falling as the bundle grows ✅), but the gate now **asserts the premium on the ROUNDED prices, not on the rule's ideal**, so a future rounding change cannot slip past it.
+
+⚠️⚠️ **AND I INVERTED THE LADDER ON THE FIRST ATTEMPT — while my own verifier reported it GREEN.** I wrote the pricing loop over an **ascending** array, which handed the **base rate to the 1,000** and the premium to the **10,000**: it wrote `$1.20 / $3.65 / $7.45 / $12.60` to all four boards — a shelf where **the biggest bundle was the worst value and the badge sat on it**. ⚠️ **My verifier then asserted "the rates ascend as credits ascend" — the exact inverse of the rule** — so it printed `premiumSurvived: true` over a backwards shelf. It was **a check that could not fail the right way**, which is the **seventh sighting of this session's one recurring class** — and the most dangerous form, because the output looked *positive*.
+✅ **Caught in the same turn**, by re-reading the numbers rather than the verdict: `1000: $1.26 -> $1.20` is self-evidently wrong (the 1,000 can never be the cheapest credit). ✅ Corrected with the index taken **from the largest** and the assertion **pointed at the requirement** — *as credits increase, the rate per 1,000 must FALL* — then re-read from the boards: ✅ all four prices correct, ✅ all multiples of 5¢, ✅ premium holds, ✅ badge agrees with the formula. ⚠️ **Penpot version `S38t` holds the inverted shelf — build from `S38t2` or later.**
+
+⚠️ **`check:credits` is now 12 checks** (the rule now includes the rounding step; a new assertion that **every price is a multiple of 5¢**; and a third control for the grid). Fault-tested: **$1.26 → both the rule and the grid go red** · **the 1,000 undercut to $1.10 → four checks red, including the premium** · restored green · full suite **16 steps, exit 0**. Weighted average **$1.21/1,000**, above the $1.19 floor. ⚠️ And noted in the manifest: **a multiple of 5¢ is a DISPLAY convention, not an app-store tier** — Play and the App Store sell in fixed price points (≈$0.99/$1.49/$1.99), so these snap again when IAP lands.
+
 
 
 **The PM:** *"what is the real best value option now. The BEST VALUE Label should be truthful… should be formulaic even in future price adjustments and should truly reflect which IS the BEST VALUE."*
