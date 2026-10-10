@@ -57,11 +57,11 @@ What S35 delivered:
 | this branch | **`cline/scrum-52-device` = `a1b07f5`** · **PR #30 OPEN** (not merged) — ⚠️ **carries EIGHT tickets**, not the one its branch name implies |
 | local gates | `npm run check` → **exit 0**, **16 chained steps / 15 reporting suites**: `tokens 36 · domain 45 · slice 36 · throw 33 · ads 51 · wire 52 · session 17 · pathc 38 · sql/migrations 15 · adrs 34 · contrast 30 · credits 12 · responsive 21 · lib 382 · copy 7` ⚠️ **`typecheck` is silent on success — that is why 16 steps print 15 lines** |
 | DB gates | ⚠️ **NOT re-run in S38 — do not carry these forward.** Last measured: `check:clanapi` **92/92** · `clan_management.sql` **109** · `invite_sharing.sql` **25** · `ai_budget.sql` **17**. All need `npx supabase start` **+ `db reset`**, and the SQL suite needs **`--network host`** (trap 6). ⚠️ **`pr3_verification.sql` is RED and pre-existing — `SCRUM-87`** |
-| migrations | **15 files on disk, all 15 applied** to the hosted project at last check (S35b pushed `0015`) — ⚠️ **not re-verified in S38.** A fresh worktree is **not linked** (`supabase/.temp` is gitignored): `npx supabase link` + `migration list` **before** any `db push` |
+| migrations | **16 files on disk, all 16 applied** to the hosted project — ⚠️ **re-verified 2026-10-10 (S41)** and not by count alone (see §7). A fresh worktree is **not linked** (`supabase/.temp` is gitignored): `npx supabase link` + `migration list` **before** any `db push` |
 | typecheck | `npx tsc --noEmit` → **0 errors** (re-run by CI this session: green) |
 | screen counts | **5** clan screens · the tutorial branch in `capture → preparing → burn → reward` · the shared join body, the **scanner**, and **two `/join` deep-link routes** |
 | DB gates | `check:clanapi` **92/92** · `clan_management.sql` **109** · `invite_sharing.sql` **25** · `ai_budget.sql` **17** — all need `npx supabase start` **+ `db reset`**; the SQL suite also needs **`--network host`** (trap 20). ⚠️ **`pr3_verification.sql` is RED and pre-existing — `SCRUM-87`**, not your change |
-| migrations | **15 files on disk, and all 15 ARE applied to the hosted project** — `migration list` reads **15/15, no drift** (S35 pushed `0012`–`0014`; S35b pushed `0015`). ⚠️ A fresh worktree is **not linked** (`supabase/.temp` is gitignored), so `npx supabase link` + `migration list` **before** any `db push` |
+| migrations | **16 files on disk, and all 16 ARE applied to the hosted project** — `migration list` reads **16/16, no drift** (S35 pushed `0012`–`0014`; S35b `0015`; ⚠️ **S41 pushed `0016`, the rethrow cap, and verified it in the function BODY**). ⚠️ A fresh worktree is **not linked** (`supabase/.temp` is gitignored), so `npx supabase link` + `migration list` **before** any `db push` |
 | typecheck | `npx tsc --noEmit` → **0 errors** |
 | screen counts | **5** clan screens · the tutorial branch in `capture → preparing → burn → reward` · ⚠️ **new in PR #29:** the shared join body, the **scanner**, and **two `/join` deep-link routes** |
 | spend | fal.ai **≈ US$5.16** of the approved **US$10–20** — **unchanged**: **S34, S35, S35b and S36 all spent US$0.00** (S36 was Penpot-only) |
@@ -140,8 +140,14 @@ npx supabase start                # local stack (free, no account)
    migration look applied while it was absent (doc 19 §12.14 trap B). Verify STATE:
    `select version from supabase_migrations.schema_migrations order by version desc limit 3;`
 npx supabase db reset             # ← the fix: re-applies from the files; also clears residue (trap 9)
-npx supabase migration list       # ⚠️ verify the REMOTE count before any push (trap 8) — expect 15/15, no drift
+npx supabase migration list       # ⚠️ verify the REMOTE count before any push (trap 8) — expect 16/16, no drift
 npx supabase db push --yes        # ⚠️ only after `link` + `migration list` — expect to push 0
+# ⚠️ A HISTORY ROW IS NOT THE CHANGE. `migration list` proves a version STRING is recorded, not
+# that the function BODY changed — S41 found a stray persisted volume that made a migration look
+# applied while it was absent. Verify the body too, via the Supabase connector (it can read
+# `pg_proc.prosrc`; the CLI cannot):
+#   select proname, position('RETHROW CAP' in prosrc) from pg_proc
+#    where proname = 'submit_burn';          -- > 0 means the cap is really deployed
 
 # the SQL suite, run the way that actually works locally (trap 6):
 docker run --rm -i --network host postgres:17 psql \
