@@ -565,7 +565,25 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
-### 12.22 · S37i — SCRUM-96/98: the boards now hold ZERO traditional characters — and the copy method inherits its twin's defects (2026-10-10)
+### 12.23 · S38a/b — SCRUM-99/100: the offerings store sold *credits* with a *photo counter* on it, and the offering name was a year-old one (2026-10-10)
+
+**The report.** *"In the shop EN-9 and ZH-9 we are using the number of credits instead of the name of the offerings as the title of the offerings, and on the same pages we are using number of photos in the yellow option — which is wrong. Standardize to the same design as the decorations. There should be no 'Credits' for Buying offerings; 'Credits' should only be for Making offerings."*
+
+⚠️ **Board `9` was a credits shop wearing an offerings-store title.** `hud · screen title = Buy offerings`, yet every card's **title was a credit amount** (`1,000 credits` · `500 credits` · `3,000 credits` …), every price read **`price TBD`**, the value slot on the yellow card showed **photo counts** (`6 photos` · `≈20 photos` · `≈66 photos`), and the balance chip was **`Credits 1,750`** with **no cash chip at all**. ⚠️ **And board `7 Store` already did it right** — offering names, `base 480/960/1,440/720`, `$X.XX` + `NNN pts`, both balance chips. **So the fix was to make `9`/`9b` behave like `7`/`7b`/`7e`** — a copy, not a redesign.
+
+**Done — 104 edits on `9` + `9b` (EN and ZH), versions `S38a`/`S38b`:** titles are offering names; prices are cash + Store Points; ⚠️ **the photo counts are gone** from the yellow option; the credits chip became the **cash** chip (layer renamed too); the credits-framed intro and note were replaced with the store's cash/points copy; the switcher was restored from stale `Daily gift / Credits` labels to `Offerings / Decorations`. ✅ **Verified: 84 layers measure byte-identical in ink AND box to the board each value was copied from** — the offerings store is now *literally* the decorations-store design, with zero reflow. **0 credits or photo mentions remain.**
+
+⚠️ **The stale name, found while doing it.** The boards said **`Cash Bundle`** — which is the **old** name. The README changelog (2026-09-25, the icon redraw) records *"**Cash Bundle → joss-paper stack** (foil square + tie), Gold Bar → an LBMA-tapered block, House → big modern house, Phone → a real smartphone"*. **The boards were drawn before that rename**, so they were stale and the catalogue's `Joss Paper Stack` was correct. **5 visible names fixed** + **22 layer names** (`card · Cash Bundle *` → `card · Joss Paper Stack *`, both languages) so future sweeps match by layer name. ⚠️ **The generalisable lesson: when a board and the code disagree, do not assume the board is newer — check the changelog. I had it backwards until the changelog said otherwise.**
+
+**⚠️ Three questions the boards cannot settle, filed as `SCRUM-99` (a `🎯 Decide:` ticket):**
+
+1. **The House is four-way inconsistent** — `House` (`7 Store` · `8c` · `2e`) vs `Family House` (`8 Collection`); `楼房` (`7 Store`) vs `祖屋` (`8` · `8c` · `2e`) — and they **pair up wrongly across languages** (`House` beside `祖屋`). ⚠️ **Evidence points both ways**: the icon spec says the item became a *"big modern house"* (→ `House / 楼房`), but the **Collection** pairs `Family House / 祖屋` and ZH says 祖屋 on 3 of 4 boards.
+2. ⚠️ **`点数` means BOTH currencies in 中文** — **Store Points** on `7d`/`7e` (`1,000 点数`, `商店点数 1,480`) and **credits** on `3c`/`9c`/`9d` (`点数已退回`, `点数 1,750`), while `5b` · `7 Store` · `9b` use **`积分`** for Store Points. A reader cannot tell the two apart. Doc 10's own UX copy uses 点数 for *credits*, so `积分 = Store Points · 点数 = credits` is the doc-aligned reading (4 layers change).
+3. ⚠️⚠️ **Where are credits BOUGHT?** **Doc 10 §3 says `photo_credits in: cash shop ($1.55/1,000)`** — and README 2026-09-26 records it as **locked**. **Board `9` *was* that shop.** Converting it to an offerings store means **the spec'd credit source has no screen**: either (a) credits become grant-only (starter 2,000 + sign-in 150/day) and **doc 10 §3 + its runway arithmetic must be updated**, or (b) the cash shop stays and **this board-9 work reverts**. ⚠️ **I am not choosing (a) merely because I implemented it** — that is the "decision recorded as unmade" this project keeps catching.
+
+⚠️ **Also recorded, not fixed:** the board *names* (`EN · 9 Cash shop / credits` · `ZH · 9 商店 / 点数充值` = *"store / point top-up"*) are now stale; and `9`/`9b` have **no `card · House owned` state** where `7 Store` does, so the fourth card shows a name and a base value with **no price and no owned tag**.
+
+
 
 **The sweep, done from the vendored table rather than from memory.** `SCRUM-95` had already burned on a hand-typed traditional list that missed 13 characters, so this time the check was **derived from the vendored OpenCC table** (`src/lib/zh-script.ts`, 2,965 pairs): dump the **distinct characters** used across every ZH board text (`1364 layers`), intersect, convert the hits.
 
