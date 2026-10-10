@@ -565,6 +565,18 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.22 · S37i — SCRUM-96/98: the boards now hold ZERO traditional characters — and the copy method inherits its twin's defects (2026-10-10)
+
+**The sweep, done from the vendored table rather than from memory.** `SCRUM-95` had already burned on a hand-typed traditional list that missed 13 characters, so this time the check was **derived from the vendored OpenCC table** (`src/lib/zh-script.ts`, 2,965 pairs): dump the **distinct characters** used across every ZH board text (`1364 layers`), intersect, convert the hits.
+
+**Exactly 6 traditional characters were present** — `誠 → 诚` · `對 → 对` · `準 → 准` · `邊 → 边` · `拋 → 抛` · `鍾 → 钟` — on **15 layers across 6 boards** (`4 Burn` · `4b` · `4s` · `5 Reward` · `5b` · `7b`). Converted at version **`S37i`**, then re-dumped and re-intersected: **0 remaining.** ⚠️ All are **1:1 substitutions**, so the strings are identical in length — **a reflow is impossible**, which is why this one needs no ink comparison.
+
+⚠️ **My own hand-typed attempt was wrong twice, in public.** It **missed `拋`** — so `上滑對準火心拋入` is traditional in **four** characters, not two — and it **invented five false positives** (`分` · `身` · `馗` · `擦` · `虔`, all **identical in both scripts**). Built from a remembered list, the scan reported **58 hits of which ~4 were real.** ⚠️ **That is `SCRUM-95`'s missed-13 reproduced one session later on a different surface** — the lesson is not "be careful", it is **do not hand-type the reference set; load it**.
+
+⚠️ **AND A REAL LIMITATION OF THE `SCRUM-98` METHOD, found here and recorded rather than quietly repaired: copy-from-a-twin copies the twin's SCRIPT too.** `ZH · 4 Burn / 焚烧` was **traditional**, so copying its strings into the untranslated `4b`/`4s` clones **propagated `對準火心 —` and `虔誠 ×1.5` into them** — those two boards read traditional where they had read **English**. Net still an improvement, but **not script-clean by construction**; fixed by this sweep. ⚠️ **The generalisation: a twin can pass the same-state test and still be wrong on another axis — script, terminology, currency. Same-state proves the state, not the quality.**
+
+---
+
 ### 12.21 · S37f/g — SCRUM-98: `ZH · 1g` was an untranslated CLONE, and "at least" was right — 24 boards (2026-10-10)
 
 **The report.** *"Zh-1g is still bilingual at least."* ⚠️ **`ZH · 1g 首页 / 离线` was not bilingual — it was an untranslated clone of its EN board.** Ten strings were pure English (`Shrine` · `League` · `Profile` · `Store` · `TRIBUTE POINTS` · `12-day streak` · `Your altar is empty — tap ＋ to add a tablet.` · `Offer something meaningful, once a day` · `Make an Offering` · `Everything here is customizable`), with only the offline banner in Chinese. And *"at least"* was correct: **24 ZH boards, 107 strings.**
