@@ -70,7 +70,7 @@ function main() {
     return report();
   }
 
-  const ceiling = data.ceiling.centsPer1000;
+  const reference = data.referenceRate.centsPer1000;   // ⚠️ doc 10's rate — CARRIED by the BEST VALUE bundle, not a ceiling
   const base = data.pricing.baseCentsPer1000;
   const step = data.pricing.premiumStepCents;
   const floor = data.floor.centsPer1000;
@@ -107,11 +107,21 @@ function main() {
     'the ladder is an appreciating premium — every step down costs more per 1,000',
     brokenSteps.map((b) => `${b.credits} at $${(per1000(b) / 100).toFixed(2)}/1,000 does not beat ${desc[desc.indexOf(b) - 1].credits}`).join(' · '));
 
-  // 3 · the ceiling still binds: no bundle may cost more per credit than doc 10's rate
-  const overCeiling = bundles.filter((b) => b.priceCents > priceCentsFor(b.credits, ceiling) + 1);
-  ok(overCeiling.length === 0,
-    `no bundle is priced above the $${(ceiling / 100).toFixed(2)}/1,000 ceiling (doc 10)`,
-    overCeiling.map((b) => `${b.credits}: ${money(b.priceCents)}`).join(' · '));
+  // 3 · ⚠️ THE RATE IS PINNED TO THE SPEC — this replaced a CEILING check, and the replacement is
+  //     STRONGER. doc 10's $1.55/1,000 is not "the most anyone may pay": it is the rate the
+  //     BEST VALUE bundle CARRIES and the LOWEST rate in the shelf (PM, 2026-10-10 S39: "USD1.55
+  //     per 1000 credits should be the lowest floor price which should be the BEST VALUE which is
+  //     the 10000tokens offer price"). ⚠️ A cheaper shelf UNDER-charges the viability study; a
+  //     dearer biggest bundle breaks the promise the badge makes. The old ceiling check would have
+  //     failed a correct shelf, because every smaller bundle is now necessarily ABOVE $1.55.
+  const largestBundle = desc[0];                      // desc is largest-first
+  ok(largestBundle.priceCents === priceCentsFor(largestBundle.credits, reference),
+    `the largest bundle (${largestBundle.credits.toLocaleString('en-US')}) carries doc 10's $${(reference / 100).toFixed(2)}/1,000`,
+    `${money(largestBundle.priceCents)} is $${(per1000(largestBundle) / 100).toFixed(3)}/1,000, but doc 10 says $${(reference / 100).toFixed(3)}`);
+  const cheapestRate = Math.min(...bundles.map(per1000));
+  ok(cheapestRate === reference,
+    '…and that rate is the CHEAPEST credit in the shelf — so doc 10\u2019s rate IS the best value',
+    `the cheapest credit is $${(cheapestRate / 100).toFixed(3)}/1,000`);
 
   // 2 · the floor binds, and the average must clear it (doc 10's own constraint on bundles)
   const belowFloor = bundles.filter((b) => per1000(b) < floor);

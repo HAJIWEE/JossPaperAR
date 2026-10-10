@@ -61,6 +61,8 @@
 
 | 2026-10-10 | **S39 — `SCRUM-94`: the two Penpot findings the `SCRUM-93` sweep left behind — closed** | Fix the `0e8` success disc (`--gold #d4af37` → **`--disc-gold #887023`**) and the `7 Store` "Owned" chip (`--malachite-deep #07795c` → **`--malachite-text #0a7359`**) on **EN + ZH**; extend `design-system/penpot-pairs.json` **7 → 11 pairs** and fault-test the gate both ways | **US$0.00** — Penpot edits, the plugin's own PNG exports (used to prove the 🧧 emoji's fill is not rendered), and local Node arithmetic + `npm run check`. **No fal.ai call, no migration, nothing deployed** | — | **S$0.00** | ✅ **no spend** — logged so the zero is on the record rather than absent. fal.ai total unchanged at ≈ **US$5.16 / S$6.61** of the approved US$10–20. |
 
+| 2026-10-10 | **S39b — the PM's decision batch (SCRUM-90 · 101 · 102 · 103) + `SCRUM-101` implemented** | Record six rulings in Jira; re-base the credit shelf to doc 10's `$1.55/1,000`; fix the board's `功德`; assert the clan-name script-blindness rule | **US$0.00** — Penpot edits, the plugin's read-backs, and local Node gates (`check:credits` · `check:lib` · `npm run check`). **No fal.ai call, no migration, nothing deployed** | — | **S$0.00** | ✅ **no spend** — logged so the zero is on the record rather than absent. fal.ai total unchanged at ≈ **US$5.16 / S$6.61** of the approved US$10–20. |
+
 <!-- APPEND-NEW-ONEOFF-COSTS-ABOVE -->
 
 ---

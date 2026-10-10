@@ -19,6 +19,17 @@
  * native Supabase client — the project's usual pure/device split.
  */
 
+/**
+ * ⚠️ **A CLAN NAME IS NOT LOCALISED — PM, 2026-10-10 (SCRUM-102.3).**
+ * A clan is named in **whatever script the user types**, and the app renders it
+ * **byte-for-byte**. The app language changes UI copy and nothing else: a 中文 name is
+ * **not** translated to English when the language is English, and an English name is
+ * **not** translated to 中文 when the language is 中文. So this rule measures LENGTH
+ * only — it is **script-blind by construction**, and it must stay that way. The trim
+ * below is the app's **only** transform on a name; there is no localiser, and adding
+ * one would break the rule. `check:lib` §9 asserts the script-blindness.
+ */
+
 /** `create_clan` rejects a name outside 2..20 chars (measured after trim). */
 export function isValidClanName(name: string): boolean {
   const trimmed = name.trim();

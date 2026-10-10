@@ -16,8 +16,8 @@
  * `design-system/credits-ladder.json` with what it prints.
  *
  * ⚠️ The ladder is an APPRECIATING PREMIUM (PM, 2026-10-10): the largest bundle costs
- * $1.20/1,000 and each step DOWN adds $0.02/1,000 — 6,000 → $1.22, 3,000 → $1.24,
- * 1,000 → $1.26. So there is a UNIQUE winner (the 10,000 bundle) and the tie-break below is
+ * $1.55/1,000 — doc 10's rate — and each step DOWN adds $0.02/1,000. So there is a UNIQUE
+ * winner (the 10,000 bundle) and the tie-break below is
  * retained only for a ladder that ever ties again. ⚠️ A smaller bundle must NEVER undercut a
  * larger one — that is the whole point of the premium. ⚠️ The step is indexed from the
  * LARGEST bundle, so retiring the smallest tier (the 500, withdrawn 2026-10-10) moved no
@@ -34,9 +34,9 @@
  * `bringToFront()` on a confirm board, which lifts the badge over the scrim.
  */
 
-const CEILING_CENTS_PER_1000 = 155;      // doc 10 line 13: US$1.55 / 1,000 — the ceiling, never exceeded
+const REFERENCE_CENTS_PER_1000 = 155;    // doc 10 line 13: US$1.55 / 1,000 — ⚠️ the rate the BEST VALUE bundle CARRIES and the LOWEST in the shelf (PM, 2026-10-10 S39), NOT a ceiling
 const FLOOR_CENTS_PER_1000 = 119;        // doc 10: "bundles must average ≥ floor"
-const BASE_CENTS_PER_1000 = 120;         // PM 2026-10-10: the LARGEST bundle costs this
+const BASE_CENTS_PER_1000 = 155;         // PM 2026-10-10 (S39): 'follow doc 10' — the LARGEST bundle carries doc 10's rate
 const PREMIUM_STEP_CENTS = 2;            // …and each step DOWN the ladder adds this, per 1,000
 const ROUNDING_STEP_CENTS = 5;           // ⚠️ and the exact price is rounded to the nearest 5¢
 const TIE_BREAK = 'smallest';            // retained for a ladder that ever ties
@@ -137,7 +137,7 @@ return {
   perBoard: result,
   frozenManifest: first
     ? {
-        ceiling: { centsPer1000: CEILING_CENTS_PER_1000 },
+        referenceRate: { centsPer1000: REFERENCE_CENTS_PER_1000 },
         floor: { centsPer1000: FLOOR_CENTS_PER_1000 },
         pricing: { baseCentsPer1000: BASE_CENTS_PER_1000, premiumStepCents: PREMIUM_STEP_CENTS, roundingStepCents: ROUNDING_STEP_CENTS },
         bundles: readBoard(BOARDS[0]).bundles.map((b) => ({ credits: b.credits, priceCents: b.priceCents })),

@@ -565,6 +565,57 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.32 · S39b — the PM's decision batch, and SCRUM-101: the shelf was UNDER-CHARGING doc 10 (2026-10-10)
+
+**Six rulings across four decision tickets, recorded in Jira, and one of them shipped.** This section covers the shipped one; the rulings themselves live on their tickets.
+
+### SCRUM-101 — the credit shelf re-based to doc 10's rate
+
+**The PM:** *"we should follow doc 10, infact that was what i was asking last session regarding the economic viability study we did. So USD1.55 per 1000 credits should be the lowest floor price which should be the BEST VALUE which is the 10000tokens offer price."*
+
+⚠️ **This overruled the ticket's own premise.** `SCRUM-101` had asked whether to rewrite doc 10 §3 so that `$1.55/1,000` became a **CEILING** — *"the most anyone may ever be charged, and nobody pays it"*. **The answer is no: doc 10 stands, and the SHELF was what was wrong.** `$1.55/1,000` is the rate the **viability study** derived (break-even `$1.19` + 30% worst-case margin); the shipped base of `$1.20` at the 10,000 was **under-charging the very rate the study produced**. **doc 10 is not edited.**
+
+| Bundle | before | **after** | per 1,000 |
+|---|---|---|---|
+| 1,000 | $1.25 | **$1.60** | 1.600 |
+| 3,000 | $3.70 | **$4.75** | 1.583 |
+| 6,000 | $7.30 | **$9.40** | 1.567 |
+| **10,000** | $12.00 | **$15.50** | **1.550 ← lowest rate, BEST VALUE** |
+
+`pricing.baseCentsPer1000` **120 → 155**; the **+$0.02/1,000 step and the 5¢ grid are unchanged** (both PM-set 2026-10-10). All three of the PM's clauses hold: the **10,000 is the best value**, its rate is **exactly `$1.55/1,000`**, and that rate is the **lowest in the shelf** (the premium rises as the bundle shrinks).
+
+### ⚠️ The gate had to change, and the replacement is STRONGER
+
+The old `$1.55` **ceiling** assertion would now **fail a correct shelf** — with the best rate pinned at the spec, every smaller bundle is *necessarily* above `$1.55` (1.600 · 1.583 · 1.567). It is replaced by two assertions that **pin the shelf to the spec rather than cap it**:
+
+- **the largest bundle carries doc 10's `$1.55/1,000`** (an exact `priceCentsFor` comparison, no tolerance), and
+- **that rate is the CHEAPEST credit in the shelf** — so the BEST VALUE is the biggest offer.
+
+The `$1.19` cost floor and the appreciating-premium check are unchanged. `check:credits` is now **13 checks**.
+
+**Fault-tested both ways, sequentially:** the 10,000 → `$12.00` = **3 failed** (ladder rule · the pinned rate · the cheapest-rate check) · the 1,000 → `$1.50` = **4 failed** (including the premium and the badge) · restore → **13/13 green**, file unchanged by the test.
+
+**Boards:** all **16 prices re-drawn** across `EN · 9e` / `ZH · 9e 点数` / `EN · 9f` / `ZH · 9f 点数 · 确认`, **read back**, and the `BEST VALUE` badge is still the formula's winner on all four. Whole-file read-back: `$1.60 / $4.75 / $9.40 / $15.50` at `1.600 / 1.583 / 1.567 / 1.550`, weighted average **$1.563**. Penpot version **`S39b · SCRUM-101 — shelf re-based to doc 10 ($1.55/1,000 at the 10,000)`**.
+
+### ⚠️ Two things left to the PM — both flagged on the ticket, which stays `In Review`
+
+1. **`$1.55` as the *lowest* rate means nothing is discounted.** doc 09 §7.7 literally reads *"Price: 1,000 credits = US$1.55"* with *"never discount below $1.19 … bundles must average ≥ that"* — which permits bundles **below** `$1.55` so long as the **average** clears `$1.19`. The new shelf does the opposite. ✅ **doc 10's constraint still holds** (weighted average **$1.56 ≥ $1.19**), so nothing is contradicted — but if the intent was *"`$1.55` is the list price and bundles discount toward the cost floor"*, then the base stays `155` with a **negative** step. **One config line either way**, boards included.
+2. **The +$0.02 step was carried forward unchanged** — the premium was set against a `$1.20` base, and a `$1.55` base may want a different one. One number.
+
+### SCRUM-102.3 — clan names are not localised, and it is now ASSERTED
+
+The PM's rule: a clan is named in **whatever script the user types**, and the app **never translates it** in either direction. The app already obeyed it — `isValidClanName` (`src/lib/clan-rules.ts`) measures **length only, after a trim**, and every render site passes the raw value (`{view.name}`, `{c.name}`, `clan.name`). What was missing was the **assertion**, so `check:lib` §9 now proves the rule is **script-blind**: 中文, English and **mixed-script** names are all accepted as typed, 中文 is measured **by character** (20 accepted, 21 refused), and equal-length names in different scripts are judged identically. **`lib` 382 → 387.**
+
+⚠️ **And implementing it exposed a contradiction in the design file** — the demo clan **is localised**: the **EN** boards show `陈氏` while the **ZH** boards show `Tan Family`, i.e. the name *is* translated, which the rule forbids. Filed as **`SCRUM-105`** for the PM to name the one canonical demo name. ⚠️ **Not a defect:** `Xiao Chen` (an invitee), and the **create-name hint chips** (`陈氏` *and* `Tan Family`, in **both** locales) — those correctly demonstrate that either script is accepted.
+
+### The rest of the batch
+
+- **`SCRUM-90` → `Done`** — *"option A is fine"*: **hold + resume stands, no automatic drain.** Recorded explicitly that this does **not** claim doc-14 queue semantics — the join resolves **with one tap**, not by itself.
+- **`SCRUM-102` → `Done`** — the 15 中文 strings **accepted for now**; **`功德点` is correct**, so the board's `功德` was fixed (`ZH · 8c 历史`, `+1,350 功德` → `+1,350 功德点`) to match the app's `reward.tributeUnit`.
+- **`SCRUM-103` → `In Review`** — **`Joss Paper Stack`** ✓ (already the shipped name) and **`楼房`** ✓ (declined `祖屋`); **103.3 DEFERRED** because the PM re-checks the boards' base values **after 101**. ⚠️ **So `SCRUM-96` stays `In Review`** — it is parked on that residual.
+
+**Outcome:** `npm run check` **exit 0** · `tsc` **0 errors** · **US$0.00**.
+
 ### 12.31 · S39 — SCRUM-94: two board colours fixed, and the emoji's fill was DISPROVED (2026-10-10)
 
 `SCRUM-93`'s sweep left two findings behind, filed as **`SCRUM-94`**. ⚠️ **The session started BLOCKED:** both Penpot MCP tools answered *"No Penpot instance connected for user token"*, and since both findings are **artwork** changes — and AC 1 requires re-deriving the pairs from the **live** fills — nothing was touched until Penpot was connected. The block was recorded in Jira, not worked around.

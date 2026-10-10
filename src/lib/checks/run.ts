@@ -508,6 +508,20 @@ function serviceChecks(): void {
   check('a 21-character name is rejected', !isValidClanName('x'.repeat(21)));
   check('surrounding whitespace does not defeat the check', isValidClanName('  Tan Family  '));
   check('an all-whitespace name is rejected', !isValidClanName('     '));
+  // ⚠️ SCRUM-102.3 (PM, 2026-10-10) — A CLAN NAME IS NOT LOCALISED, AND IT IS NOT TRANSLATED.
+  // The PM's rule, in their words: *"if the clan wants a chinese character clan name, they can
+  // input it in Chinese and we shall accept it. if they input english clan name while the app
+  // language is chinese do not translate, same for the opposite scenario."* So the name rule must
+  // be SCRIPT-AGNOSTIC: it measures LENGTH and must never require, convert or transliterate a
+  // script. ⚠️ Asserted here because the trim is the app's ONLY transform on a name — there is no
+  // name localiser to test, and `check:copy` cannot see a value that arrives through a variable.
+  check('a 中文 clan name is accepted AS TYPED', isValidClanName('陈氏'));
+  check('an English clan name is accepted AS TYPED', isValidClanName('Tan Family'));
+  check('a MIXED-script clan name is accepted', isValidClanName('陈氏 Tan'));
+  check('…中文 is measured by CHARACTER, not by any transliteration',
+    isValidClanName('陈'.repeat(20)) && !isValidClanName('陈'.repeat(21)));
+  check('…so the rule is SCRIPT-BLIND: equal lengths judge identically across scripts',
+    isValidClanName('陈氏家族祠堂') === isValidClanName('abcdef'));
 
   // ── 10 · the clan ladder (SCRUM-46 · doc 15 §3/§5/§7) ───────────────────
   // The role matrix, the ≥1-head invariant, the anti-abuse numbers and the
