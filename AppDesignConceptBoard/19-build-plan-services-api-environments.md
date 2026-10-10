@@ -565,7 +565,25 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
-### 12.23 · S38a/b — SCRUM-99/100: the offerings store sold *credits* with a *photo counter* on it, and the offering name was a year-old one (2026-10-10)
+### 12.24 · S38c–g — SCRUM-99: the decisions landed, the Credits page was never missing, and I had broken it (2026-10-10)
+
+**The PM answered all three (`SCRUM-99`), and `SCRUM-100` did not revert.**
+
+**(1) House** — *"use 楼房"*: `祖屋 → 楼房` on `8c` · `8 Collection` · `2e`, `Family House → House` on `8 Collection`, layers renamed. Store, Collection, History and the picker now all read **`House` / `楼房`** ✅ — the pairing the icon spec (*"big modern house"*) argues for. **(2) Currencies** — *"积分 = 商店点数 · 点数 = 点数"*: **Store Points is 积分 everywhere; 点数 means credits only.** ⚠️ The sweep caught **seven more than I had found**, on `ZH · 7c`, where every decoration card was priced in 点数.
+
+⚠️ **(3) The decision that mattered — and it proved I had broken a working screen.** The PM pointed out the Daily gift page is **orphaned** (wire it from the Home streak) and that the **Credits page is missing** from the Credits tab. ⚠️ **It was not missing — board `9` WAS the Credits page, and my `S38a` conversion had turned it into an offerings store.** The evidence was in the **interaction destinations**, which I had never read:
+
+* **`9c`/`9d`'s `Credits` tab already pointed at board `9`** ✅ → board 9 was the Credits page, which is exactly why the PM found it missing after I changed it.
+* **`EN · 9 / switcher · Decorations` was labelled `Daily gift` and correctly linked to `9c`** ⚠️ → the store screen carried a `[Daily gift | Credits]` switcher whose **labels and links were right**; only the **layer names** were stale. ⚠️ **In `S38a` I "fixed" the labels to `Offerings/Decorations` — I trusted the layer names and broke a correct link.**
+* **`EN · 9 / btn · back → EN · 7 Store`** ✅ → board 9 is also the offerings purchase screen, so **both readings were true** and both were needed.
+
+⚠️ **THE TWO LESSONS, AND THEY ARE MIRRORS.** With the offering name, **the board was right and the code was stale** — I had it backwards until the changelog said so. With the switcher, **the labels were right and the LAYER NAMES were stale** — I trusted the names and inverted a correct link. ⚠️ **A layer name is not evidence about the label; the interaction destination is.** Reading the 1,333 existing interactions before editing would have prevented both.
+
+**✅ Done (`S38d`–`S38g`):** ⚠️ **the Credits page CREATED** — `EN · 9e Credits` · `ZH · 9e 点数` + `EN · 9f Credits · confirm` · `ZH · 9f 点数 · 确认`, cloned from `9`/`9b` with the **credits content restored verbatim from the board's own pre-conversion text** (nothing invented), placed on the file's real row pattern (EN `180+1840n`, ZH `1100+1840n`) with **no collisions**. `9c`/`9d`'s Credits tab re-pointed to it. ⚠️ **The orphan is fixed: Daily gift's `inbound` went `2 → 36`** — **all 34 Home streak layers** (`panel · streak flame` + `panel · streak label`, EN+ZH) now navigate to `9c`. ⚠️ **And two more wrong links fell out of the same audit:** the offerings store's `Decorations` tab pointed at **Daily gift** → now `7b`; Daily gift's back button pointed at the **offerings store** → now **Home**. ⚠️ **Board names renamed off "credits"** (`EN · 9 Cash shop / credits` → **`EN · 9 Buy offerings`**, `ZH · 9 商店 / 点数充值` → **`ZH · 9 购买供品`**) — ⚠️ **those names are what made the page look missing in the first place.** ✅ **`doc 10 §3` stands unchanged**: the Credits page *is* its `$1.55/1,000` cash shop.
+
+⚠️ **Verified:** no dead ends — Home **—streak→** `9c` **—Credits→** `9e` **—card→** `9f`; and `9` **—card→** `9b`, its `Decorations` tab → `7b`. ⚠️ **Two gaps recorded, not hidden:** the Credits page's value lines still read **`≈20 photos`** — the board's own text, restored verbatim, ⚠️ **and photo counts are the thing that was reported wrong**, so it is flagged for confirmation; and the non-featured credit bundles still read **`price TBD`** (doc 10 pins only `$1.55/1,000`).
+
+
 
 **The report.** *"In the shop EN-9 and ZH-9 we are using the number of credits instead of the name of the offerings as the title of the offerings, and on the same pages we are using number of photos in the yellow option — which is wrong. Standardize to the same design as the decorations. There should be no 'Credits' for Buying offerings; 'Credits' should only be for Making offerings."*
 
