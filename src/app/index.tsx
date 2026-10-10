@@ -1,10 +1,14 @@
+import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ClanPill } from '@/components/clan-pill';
 import { AIM_BANDS } from '@/domain/aim';
 import { OFFERINGS, baseValueOf } from '@/domain/catalogue';
 import { DAILY_PHOTO_BURNS, DAILY_STORE_BURNS } from '@/domain/quota';
+import { myClans } from '@/lib/clan-api';
+import { HEADER_SPEC, type PillClan } from '@/lib/clan-pill';
 import { readFirstRun } from '@/lib/first-run';
 import { DEMO_PARAM, DEMO_VALUE, needsTutorial } from '@/lib/tutorial';
 import { TOUCH_GAP, TOUCH_TARGET, brand, fontSize, fluidSize, onColorCream, radius, space, surface, text } from '@/theme/tokens';
@@ -21,23 +25,63 @@ import { TOUCH_GAP, TOUCH_TARGET, brand, fontSize, fluidSize, onColorCream, radi
  *
  * It deliberately renders the aim bands and the catalogue, because those are the
  * values a reviewer should be able to eyeball against docs 05/10 without opening
- * a test file. The real Home (altar, tablets, clan card) is designed and lands
- * with the slice.
+ * a test file. The real Home (altar, tablets, terrain) is designed and lands with
+ * the slice.
+ *
+ * ✅ SCRUM-92 (2026-10-10): the **clan pill** has landed in the header — the one
+ * element that makes *"Home is clan-scoped"* true, and SCRUM-46's last unmet scope
+ * item. It is a real component (`src/components/clan-pill.tsx`) on real
+ * `myClans()` data, at the geometry SCRUM-91 measured. Its rules live in
+ * `src/lib/clan-pill.ts` so `check:lib` asserts them without a device.
  */
 
 export default function HomeScaffold() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const [clans, setClans] = useState<readonly PillClan[]>([]);
+
+  // The header pill must reflect a clan created or joined *after* Home first
+  // mounted, so this re-reads on every focus (the `clan/index.tsx` pattern).
+  // ⚠️ A failed read hides the pill rather than showing a stale clan.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      void (async () => {
+        const mine = await myClans();
+        if (!cancelled) {
+          setClans(mine.ok ? mine.data.map((c) => ({ name: c.name, role: c.role })) : []);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, []),
+  );
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={[
-        styles.content,
-        // safe-area, stacked (design-system/responsive.css pattern)
-        { paddingTop: insets.top + space.lg, paddingBottom: insets.bottom + space.lg },
-      ]}
-    >
+    <View style={styles.screen}>
+      {/* ── the header (SCRUM-92) ────────────────────────────────────────────
+          The pill's x is board-relative, so the row reserves `btn · settings`
+          (44×44) to its right: 390 − 20 − 44 − 10 − 236 puts the pill at **x 80 … 316**,
+          the ONLY empty rectangle on the signed-off Home (SCRUM-91 measured it).
+          ⚠️ Neither neighbour is built yet — the app mark is art and the settings
+          screen does not exist (both belong to the shrine, SCRUM-53) — so the slot
+          is left EMPTY but reserved, which is what keeps the pill from having to
+          move when they land. */}
+      <View style={[styles.header, { paddingTop: insets.top }]}>
+        <View style={styles.headerSpacer} />
+        <ClanPill clans={clans} />
+        <View style={styles.settingsSlot} />
+      </View>
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.content,
+          // safe-area, stacked (design-system/responsive.css pattern)
+          { paddingBottom: insets.bottom + space.lg },
+        ]}
+      >
       <Text style={styles.eyebrow}>Joss Paper AR · scaffold</Text>
       <Text style={styles.title}>The shell is alive</Text>
       <Text style={styles.body}>
@@ -118,30 +162,50 @@ export default function HomeScaffold() {
         <Text style={styles.beginLabel}>Begin an offering · 開始供奉</Text>
       </Pressable>
 
-      {/* ── the clan surface (SCRUM-46) ─────────────────────────────────────
-          ⚠️ A SCAFFOLD ENTRY, not the designed clan card. doc 15 §4 gives the
-          fork a required place in first-run, but the signed-off Home layout has
-          NO free band for a clan card, so "Home → clan card → invite surface"
-          needs a Home design pass (recorded in `next-ai-context.md`). This link
-          makes the screens reachable without inventing that layout, and it does
-          NOT gate first-run — which of the two first-run behaviours stays is
-          `SCRUM-83`, an open PM decision. */}
-      <Pressable
-        accessibilityRole="button"
-        testID="home-clan-entry"
-        onPress={() => {
-          router.push('/clan');
-        }}
-        style={({ pressed }) => [styles.clanEntry, pressed && { opacity: 0.8 }]}
-      >
-        <Text style={styles.clanEntryLabel}>Clan · 宗族</Text>
-      </Pressable>
-    </ScrollView>
+      {/* ── the clan surface, for a user with NO clan (SCRUM-92) ─────────────
+          ⚠️ The header PILL above replaced this always-on scaffold entry. This
+          fallback survives for the one state the design does NOT cover: SCRUM-91
+          drew only the 1-clan and 2+-clan pills, so with zero clans Home has no
+          designed clan control — and while `AFTER_TUTORIAL_ROUTE` sends a new user
+          to the fork, the fork's Skip can return them here. Deleting this would
+          leave a clan-less user with no route from Home, so it stays, un-designed
+          and explicitly labelled as a GAP rather than dressed up as the pill. */}
+      {clans.length === 0 ? (
+        <Pressable
+          accessibilityRole="button"
+          testID="home-clan-entry"
+          onPress={() => {
+            router.push('/clan');
+          }}
+          style={({ pressed }) => [styles.clanEntry, pressed && { opacity: 0.8 }]}
+        >
+          <Text style={styles.clanEntryLabel}>Clan · 宗族</Text>
+        </Pressable>
+      ) : null}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: surface.paper },
+  scroll: { flex: 1 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    /* 20 = the board's outer margin (HEADER_SPEC.rightPad). */
+    paddingHorizontal: HEADER_SPEC.rightPad,
+    paddingBottom: space.sm,
+  },
+  headerSpacer: { flex: 1 },
+  /* ⚠️ RESERVED but EMPTY: `btn · settings` (44×44) is not built yet, and its SPACE
+     is what puts the pill at x 80 of the 390 px reference. Do not collapse it — the
+     pill would slide 54 px right of where the board signed it off. */
+  settingsSlot: {
+    width: HEADER_SPEC.settingsSlot,
+    height: HEADER_SPEC.settingsSlot,
+    marginLeft: HEADER_SPEC.settingsGap,
+  },
   content: { paddingHorizontal: space.lg },
   eyebrow: {
     color: text.muted,

@@ -55,6 +55,7 @@ import { INITIAL_OFFERING, applyAll, isWaiting, nextAction } from '../../domain/
 import { eventsFromResponse } from '../ritual-map.ts';
 import {
   ASSIGNABLE_ROLES,
+  CLAN_ROLES,
   BOOK_WINDOW_DAYS,
   CLANS_PER_USER,
   HEAD_POWER_ROLES,
@@ -98,6 +99,17 @@ import {
   previousCreateStep,
   promoteLabelKey,
 } from '../clan-flow.ts';
+import {
+  AFFORDANCE_GLYPH,
+  CONTENT_PAD_H,
+  HEADER_SPEC,
+  NAME_WIDTH,
+  PILL_SPEC,
+  PILL_X_ON_REFERENCE,
+  pillRoute,
+  pillView,
+} from '../clan-pill.ts';
+import { DESIGN_REFERENCE_WIDTH, TOUCH_TARGET, radius } from '../../theme/tokens.ts';
 import {
   AFTER_TUTORIAL_ROUTE,
   TUTORIAL_CONSEQUENCES,
@@ -957,10 +969,84 @@ function serviceChecks(): void {
   }
 }
 
+/**
+ * 14 · The Home clan pill (SCRUM-92 · SCRUM-91 option A).
+ *
+ * ⚠️ The numbers below are the **SIGNED-OFF design**, read off Penpot on
+ * 2026-10-10 — frozen here so a later edit cannot drift from the approved board,
+ * and so a "tidy-up" that rounds 14 to `radius.lg` (16) fails loudly instead of
+ * silently moving the pill 2 px within a layout whose whole point is that it moves
+ * **nothing** that was signed off.
+ */
+function clanPillChecks(): void {
+  section('14 · The Home clan pill — the signed-off geometry (SCRUM-92 · SCRUM-91 option A)');
+
+  // ── the measured geometry ──────────────────────────────────────────────────
+  check('the pill is 236×44 — the header rectangle SCRUM-91 measured',
+    PILL_SPEC.width === 236 && PILL_SPEC.height === 44);
+  check('the radius is 14, NOT `radius.lg` (16)', PILL_SPEC.radius === 14 && PILL_SPEC.radius !== radius.lg);
+  check('the stroke is 2.5 and inner, so it does not add to the 44', PILL_SPEC.borderWidth === 2.5);
+  check('the pill clears the 44 px touch floor', PILL_SPEC.height >= TOUCH_TARGET);
+
+  // ── the header arithmetic: inside the empty rectangle, overlapping neither neighbour
+  check('the pill starts at x 80 on the 390 px reference', PILL_X_ON_REFERENCE === 80, String(PILL_X_ON_REFERENCE));
+  check('…which is RIGHT of `icon · app mark` ending at 68.5 (AC 4)',
+    PILL_X_ON_REFERENCE > HEADER_SPEC.markRight);
+  check('…and ends at 316, clear of `btn · settings` starting at 326 (AC 4)',
+    PILL_X_ON_REFERENCE + PILL_SPEC.width === 316);
+  check('the pill + gap + settings slot + right margin re-add to the reference',
+    HEADER_SPEC.rightPad + HEADER_SPEC.settingsSlot + HEADER_SPEC.settingsGap + PILL_SPEC.width
+      + PILL_X_ON_REFERENCE === DESIGN_REFERENCE_WIDTH);
+
+  // ── the two derived values that could silently move the pill ───────────────
+  check('RN padding is 11.5, not 14 — RN draws the border INSIDE the box',
+    CONTENT_PAD_H === 11.5, String(CONTENT_PAD_H));
+  check('the name box (chip.dx − name.dx) equals the board\'s own 92',
+    NAME_WIDTH === PILL_SPEC.name.width && NAME_WIDTH === 92);
+
+  // ── ⚠️ ONE glyph, TWO states (the S36b lesson) ─────────────────────────────
+  check('the affordance is U+203A, the angle-quote family',
+    AFFORDANCE_GLYPH.codePointAt(0) === 0x203a && AFFORDANCE_GLYPH.length === 1);
+  const oneClan = pillView([{ name: 'Tan Family', role: 'head' }]);
+  const twoClans = pillView([
+    { name: 'Tan Family', role: 'head' },
+    { name: 'Lim Household', role: 'member' },
+  ]);
+  check('one clan is NOT rotated', oneClan.glyphRotated === false);
+  check('2+ clans rotates — the SAME glyph, never a second character',
+    twoClans.glyphRotated === true && twoClans.glyph === oneClan.glyph);
+  check('…and the open rotation is 90°', PILL_SPEC.affordance.rotationOpenDeg === 90);
+
+  // ── real data, and the routes ──────────────────────────────────────────────
+  check('no clan shows NO pill — the design has no clan-less pill', pillView([]).show === false);
+  check('the name comes from the data, not a literal', oneClan.name === 'Tan Family');
+  check('the pill routes to the switcher, not the fork', pillRoute(oneClan.target) === '/clan/manage');
+  check('the no-clan target is the fork', pillRoute(pillView([]).target) === '/clan');
+
+  // ── ⚠️ the vocabulary guard — the pill must NOT fork the ZH table ──────────
+  // SCRUM-92's AC 5 asks for the board's SIMPLIFIED ZH while the shipped table is
+  // TRADITIONAL, so a hardcoded `族长` here would put simplified text on a screen
+  // whose neighbours read `族長`/`成員`. The script is SCRUM-95's decision; until
+  // then the pill returns the SHIPPED key, which this asserts role by role.
+  for (const role of CLAN_ROLES) {
+    const view = pillView([{ name: 'X', role }]);
+    check(`the ${role} chip reuses the shipped label key`, view.roleLabelKey === ROLE_LABEL_KEY[role]);
+    check(`…and that key resolves in EN and 中文`,
+      view.roleLabelKey !== null
+        && messageKeys('en').includes(view.roleLabelKey)
+        && messageKeys('zh').includes(view.roleLabelKey));
+  }
+  check('the a11y key exists in BOTH locales', 
+    messageKeys('en').includes('clan.pillA11y') && messageKeys('zh').includes('clan.pillA11y'));
+  check('the a11y label interpolates the clan name',
+    t('clan.pillA11y', { name: 'Tan Family' }).includes('Tan Family'));
+}
+
 async function main(): Promise<void> {
   await storageChecks();
   await drainChecks();
   serviceChecks();
+  clanPillChecks();
 
   check('guard: a 5-character key is NOT valid', !isValidIdempotencyKey('12345'));
   check('guard: junk is NOT a clan code', normaliseClanCode('not-a-code!!') === null);

@@ -111,6 +111,10 @@ export const MESSAGES = {
     'clan.offerTo': "Offer to %{name}'s ancestors",
     'clan.manage': 'Members',
     'clan.yourRole': 'Your role',
+    /* SCRUM-92 — the Home pill's accessibility label (the visible text is the clan
+       name + the role chip). ⚠️ The ZH side below stays TRADITIONAL, matching this
+       table; the simplified/traditional question is SCRUM-95, not a per-string call. */
+    'clan.pillA11y': 'Open your clan, %{name}',
     'clan.makeElder': 'Make Elder',
     'clan.makeCoHead': 'Make Co-Head',
     'clan.rename': 'Rename',
@@ -236,6 +240,9 @@ export const MESSAGES = {
     'clan.offerTo': '向%{name}的先人供奉',
     'clan.manage': '成員',
     'clan.yourRole': '您的身分',
+    /* SCRUM-92 — the Home pill's accessibility label. TRADITIONAL, like the rest of
+       this table (⚠️ the design boards are simplified — that is SCRUM-95's question). */
+    'clan.pillA11y': '開啟您的宗族：%{name}',
     'clan.makeElder': '設為長老',
     'clan.makeCoHead': '設為副族長',
     'clan.rename': '重新命名',

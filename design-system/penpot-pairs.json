@@ -59,6 +59,15 @@
       "bg": "#f5f0e8",
       "text": "normal",
       "why": "ZH control pair, same role."
+    },
+    {
+      "board": "EN · 1h Home / clan pill",
+      "layer": "clan · role chip (label)",
+      "on": "clan · role chip (bg)",
+      "fg": "#1a1a1a",
+      "bg": "#d4af37",
+      "text": "normal",
+      "why": "The PILL the build now SHIPS (SCRUM-92). Deliberately the same pair as the clan chips — ink on gold — so the control that ships and the boards SCRUM-93 fixed cannot drift apart. The sweep measured 0 failures across all 8 role-chip pairs."
     }
   ]
 }

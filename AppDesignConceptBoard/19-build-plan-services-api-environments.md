@@ -565,7 +565,32 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
-### 12.17 · S37 — SCRUM-93: the chip was the symptom; the gate was the defect (2026-10-10)
+### 12.18 · S37b — SCRUM-92: the Home clan pill is BUILT, and it reuses the design rather than re-deciding it (2026-10-10)
+
+**What landed.** `src/lib/clan-pill.ts` (the pure rules) · `src/components/clan-pill.tsx` (the render) · a header row in `src/app/index.tsx` · **34 new `check:lib` assertions** (`321`, was 287 at S36).
+
+**The geometry was READ, not re-invented.** The signed-off board was measured with the Penpot plugin rather than eyeballed: pill **236×44 · r14** · name dx 14 · chip dx 106 dy 10 **h 24 · r12** · affordance dx 204 **18×18** — identical on all four boards (`EN|ZH` × 1 / 2+ clans). `check:lib` freezes every number, so a later "tidy-up" that rounds 14 to `radius.lg` (16) **fails**, which is the point: this control's whole justification is that it *moves nothing* signed off.
+
+**Two derived values that would have moved the pill silently:**
+
+- ⚠️ **RN draws `borderWidth` INSIDE the layout box**, but the board measures the name box 14 px from the pill's **outer** edge while its stroke is `alignment: inner`. So the RN padding is **11.5**, not 14 — typed naively the whole content shifts +2.5 px right of the signed-off position. Derived as `PILL_SPEC.name.dx − PILL_SPEC.borderWidth` and asserted.
+- ⚠️ **The name box width is derived, not typed**: `chip.dx − name.dx` = **92**, which happens to equal the board's own 92. Asserting the two agree is what catches an edit to either one.
+
+**The next exercise caught my own arithmetic.** A first `check` asserted the header re-adds to `330`; it is **310** (I had counted the right margin twice), and the gate went red on the first run. The assertion is now the identity that actually matters — `rightPad + settingsSlot + settingsGap + pillWidth + PILL_X === 390` — which ties the measured `x = 80` back to the 390 px reference instead of to a hand-summed constant.
+
+**⚠️ The affordance is ONE glyph in TWO states.** `›` (U+203A) in both; the 2+ state is the **same glyph rotated 90°**. S36b fixed exactly this class of bug — `›` is punctuation and `▾` is a geometric shape, different Unicode blocks, so different weight and optical size. The gate asserts the codepoint *and* that both states return the identical string.
+
+**⚠️ The pill reuses the switcher; it does not build one.** Tapping routes to `/clan/manage`, where the switcher already lives (S36's note: *"do not build a second switcher"*). The active clan is `clans[0]` — the same default `manage.tsx` uses — so the two cannot disagree; a **persisted** active clan does not exist yet and is deliberately not invented here.
+
+**⚠️ One acceptance criterion is NOT met, and the ticket is `In Review` rather than `Done` because of it.** AC 6 requires a **device screenshot**, and the floor device has been **purchased but not delivered**. `SCRUM-64` states the emulator is *"a development target, not an acceptance target"*, so it cannot stand in. The build is proven by **types + 321 gate assertions + a four-way fault test** and by nothing on glass.
+
+**⚠️ AC 5 could not be met as written, and I did not fake it.** It asks for the board's **simplified** ZH (`宗族` · `族长`) while the shipped `i18n.ts` is **traditional** (`族長` · `成員`), so hardcoding the board's string would have put **simplified text inside a screen whose neighbours are traditional** — a mixed-script screen, worse than either consistent choice. The pill therefore returns the **existing** key (`ROLE_LABEL_KEY`) and writes **no new CJK copy**; `check:lib` asserts that role by role so a future edit cannot fork it. **The script question had no ticket at all** — it existed only as an `⚠️ TRADITIONAL` comment in `i18n.ts` and a line in the handover — so it was filed as **`SCRUM-95`** (🎯 Decide, in Sprint 1) with the three options and their consequences.
+
+**⚠️ One deliberate gap, labelled rather than hidden.** SCRUM-91 drew only the 1-clan and 2+-clan pills, so with **zero** clans Home has no designed clan control. The old scaffold entry therefore **stays, but only in that state**, because `AFTER_TUTORIAL_ROUTE` sends a new user to the fork while the fork's *Skip* can return them to Home — deleting it would strand a clan-less user with no route. It is commented as a gap, not dressed up as the pill.
+
+**Also corrected:** the four docs written earlier the same day said the device **gate was cleared**, which read as *available*. It is **purchased, awaiting delivery**, so `SCRUM-88` and `SCRUM-51` are still blocked in practice — the distinction the docs now carry.
+
+
 
 **The defect, re-derived rather than copied.** `#7b621f` on `#d4af37` = **2.77:1** — computed independently by the gate's own luminance function, which also reproduces the ticket's number. **`#7b621f` is `--gold-text`**, a token verified for **cream** backdrops (worst 4.52 on `--paper-deep`); `#d4af37` is **`--gold`**, a **decorative fill-only** token. So this is not a bad colour — it is a **role inversion**, exactly what `tokens.css` opens by warning about: *"A colour can be perfectly good as a border or a fill and still fail as text."*
 

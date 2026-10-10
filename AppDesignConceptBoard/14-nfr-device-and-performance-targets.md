@@ -29,6 +29,8 @@
 
 ### ✅ The named device (chosen 2026-10-10 · `SCRUM-52`) — **POCO C81 Pro**
 
+> ⚠️ **PURCHASED, NOT YET DELIVERED (checked 2026-10-10).** The device is bought and on order; **nothing has been run on it.** Until it arrives the hardware gate is satisfied **on paper only** — `SCRUM-88` (the device run) and `SCRUM-51` (the AR-fire spike) are **still blocked in practice**, and `SCRUM-53`'s four-band acceptance test cannot run either. ⚠️ **Do not read "named device" as "device in hand."** The correction is recorded because four docs written the same day said the gate was *cleared*, which read as *available*.
+
 | Field | Value | Tier F floor | Verdict |
 |---|---|---|---|
 | Model | **POCO C81 Pro** (released 2026-04-27) | — | ⚠️ **not one of the 3 shortlisted candidates** — the PM bought the cheapest available |

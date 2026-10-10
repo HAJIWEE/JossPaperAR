@@ -61,7 +61,7 @@
 | Gate | State | Blocks |
 |---|---|---|
 | **G1 · Repo + CI + dev environment** (SCRUM-15) | ✅ **cleared 2026-10-02** (PRs #1–#3, CI green) | — |
-| **G2 · Tier-F floor device** (SCRUM-52) — *a PM purchase, ~S$100–150* | ✅ **cleared 2026-10-10** — **POCO C81 Pro, S$157.73** (⚠️ not a shortlisted model · S$7.73 over budget; ✅ meets/exceeds Tier F, so the floor is unchanged — ⚠️ 4 GB is the band's top edge, so the strict 3 GB case is unproven) | — |
+| **G2 · Tier-F floor device** (SCRUM-52) — *a PM purchase, ~S$100–150* | 🟠 **purchased 2026-10-10, ⚠️ NOT yet delivered** — **POCO C81 Pro, S$157.73** (⚠️ not a shortlisted model · S$7.73 over budget; ✅ meets/exceeds Tier F, so the floor is unchanged — ⚠️ 4 GB is the band's top edge, so the strict 3 GB case is unproven) | ⚠️ **every device-measured step is still blocked in practice until it arrives** — the slice's device check, the AR-fire spike (SCRUM-51), all of N1–N12 |
 | **G3 · Backend of record** (Supabase project + the §5 schema subset + `cartoonize-orchestrator` / `award-service`) | 🔴 **open — no ticket existed until now** | E2 · E5 · E7 · E8 · E10 |
 | **G4 · ADR-006 burn-limit semantics** | 🟠 unwritten (spec is [[10-economy-spec]]) | final E8 rule + copy |
 | **G5 · ADR-008 ad posture** (*may ads ever enter the ritual flow?*) | 🟠 unwritten — **a product call** | the ad SDK, the rewarded photo, monetization planning — **not** the slice |
