@@ -565,7 +565,25 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
-### 12.24 · S38c–g — SCRUM-99: the decisions landed, the Credits page was never missing, and I had broken it (2026-10-10)
+### 12.25 · S38h–j — SCRUM-100: the Credits page was credits *in the copy* and offerings *in the artwork* (2026-10-10)
+
+**The PM, on the page I had just built:** *"9e should not have offerings at all. It should be just Credits and their cash value. Emphasize on the credits. You can show the relation to how much offerings they can buy, but offerings should not be the focus."*
+
+⚠️ **The leftover offerings were not in the copy. They were the ARTWORK and the layer names.** Five **visible art groups per board** — `art · Cash Bundle` · `art · House` · `art · Phone` · `art · Gold Bar` · `art · wealth bundle (ingots)` — i.e. **the cards were illustrated with the offerings they buy**, which is precisely "offerings are the focus". Plus **8 stale `(bg)` layer names per board** (`card · Cash Bundle cash (bg)`, `card · Gold Bar points (bg)`…) and a **full-card 165×150 `card · House owned (bg)` overlay** cloned from the store's House card.
+
+⚠️ **The `(bg)` rename was done by GEOMETRY, not by guesswork** — each price pair was matched to the card it sits with (every pairing landed within **41–49 px**, consistently across all four boards). Guessing the order would have mis-assigned three of four pairs.
+
+⚠️ **AND THE `House owned (bg)` RECT NEEDED A CHECK BEFORE HIDING IT.** At 165×150 it is **exactly card-sized**, so it could have been the *card's own background* rather than an "owned" badge — hiding the background would have broken the card. Measuring it against its siblings settled it: the card backgrounds **already existed under credit-numbered names** (`card · 500 (bg)` · `card · 3000 (bg)` · `card · 6000 (bg)` · `card · 10000 (bg)`), so the 165×150 duplicate is a **state overlay** ✅ safe to hide — and ⚠️ **those existing names are themselves evidence that the page was designed as a credits page all along**, which is why the `9c`/`9d` Credits tab pointed at it (§12.24).
+
+⚠️ **THE UNIT CHANGE, and it answers the open question from §12.24:** `about 6 photos` → **`about 6 offerings`** (ZH `约 6 次拍摄` → **`约 6 次供品`**), likewise `≈3 / ≈20 / ≈66`. ⚠️ **That was the "photo counts are wrong" report:** the relation was being counted in photos when the thing a credit buys is an **offering**.
+
+⚠️ **And the Store Points chip had to go.** Doc 10's invariant is *"credits ← money + deliberate grants ONLY"* — **credits cannot be bought with Store Points**, so a Store Points balance on a credits *purchase* page advertises a payment route that does not exist. It is now the **cash** chip: **Credits + Cash**, which is exactly "credits and their cash value".
+
+✅ **Verified on all four boards:** card titles are credit amounts only (`1,000 / 500 / 3,000 / 6,000 / 10,000`, and `点数` in ZH); **zero visible offering names and zero visible offering art**; the brief layer-name clash the rename created is fixed (`card · 6000 owned (bg, hidden)`); 24 layers hidden, 40 renamed, versions `S38h`–`S38j`.
+
+⚠️ **What this needs next, and it is not a naming job: the five hidden art slots are empty.** The cards now show credits + their cash value on their own, as asked — **but they need credit-token artwork** to replace the offering illustrations. ⚠️ **Also still open:** the non-featured bundles read **`price TBD`** — and the price shows **twice** per card (the `meta` line and the cash chip), both placeholder; doc 10 pins only `$1.55/1,000`, so the rest is not derivable and has not been invented.
+
+
 
 **The PM answered all three (`SCRUM-99`), and `SCRUM-100` did not revert.**
 
