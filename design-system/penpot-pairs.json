@@ -3,7 +3,7 @@
   "_why": "check:contrast reads tokens.css and the app stylesheet, so it structurally CANNOT see a Penpot board. That is how SCRUM-93 happened: the 0e3 role chip sat at 2.77:1 on a signed-off board (EN and ZH) while every gate stayed green — despite SCRUM-45 having cleared 132 AA failures in this same file. A signed-off board is not a checked board. This file is the bridge: the pairs are extracted from Penpot by penpot-sweeps/penpot-contrast-sweep.js and frozen here so CI can assert them without a Penpot connection.",
   "_limits": "⚠️ A snapshot is not a sweep. This asserts the pairs BELOW and nothing else — a NEW pair added to a board is invisible here until the sweep is re-run. Re-run the sweep after any Penpot colour change. The sweep also composites fillOpacity; this file stores the resolved backdrop, so a tint is recorded as the colour it actually renders as, never as its raw hex.",
   "_refresh": "node penpot-sweeps/penpot-contrast-sweep.js (via the Penpot MCP plugin) — it prints the pairs it measured and fails if any is below its minimum.",
-  "_source": "Penpot file `JossPaperAR`, page \"New-user tutorial · Core loop\". Named version `S37b · SCRUM-93 — role chip AA on 0e3 + 0e12 (all 4 boards)`; the document sat at revn 287 when this file was frozen (revn ticks on any change, and it ticked during the live fault test, which restored the same values).",
+  "_source": "Penpot file `JossPaperAR`, page \"New-user tutorial · Core loop\". The SCRUM-93 pairs were frozen from named version `S37b` at revn 287. The four SCRUM-94 pairs were measured live at revn 358 and saved as named version `S39 · SCRUM-94 — 0e8 disc + 7 Store Owned chip (revn 358)` via `penpot.currentFile.saveVersion()` — ⚠️ which EXISTS; the three-session-old claim that the plugin API had no version endpoint was itself the error (see follow-up-items.md), so do not repeat it. revn ticks on any change, including a live fault test that restores the same values.",
   "_rules": "`text` must be `normal` (>=4.5:1) or `large` (>=3:1, i.e. >=24px, or >=18.66px bold). `min` is DERIVED from `text` by the gate and asserted equal to it — so the requirement cannot be quietly lowered to make a failing pair pass.",
   "pairs": [
     {
@@ -68,6 +68,42 @@
       "bg": "#d4af37",
       "text": "normal",
       "why": "The PILL the build now SHIPS (SCRUM-92). Deliberately the same pair as the clan chips — ink on gold — so the control that ships and the boards SCRUM-93 fixed cannot drift apart. The sweep measured 0 failures across all 8 role-chip pairs."
+    },
+    {
+      "board": "EN · 0e8 Clan / join · success",
+      "layer": "card · glyph",
+      "on": "card · disc",
+      "fg": "#fff8e8",
+      "bg": "#887023",
+      "text": "large",
+      "why": "SCRUM-94 fix. The 🧧 glyph is 36px → large, so the bar is 3:1. The disc was --gold #d4af37 = 1.99:1, the worst pair in the file. ⚠️ PROVED the emoji's fill is NOT rendered: exporting this layer with its own #fff8e8 and with #ff0000 gives BYTE-IDENTICAL PNGs, while the SAME test changes a normal text layer's bytes — so the 1.99 is NOMINAL on screen; the emoji paints in its own colours. The disc is darkened to --disc-gold #887023 (= 4.52) regardless, because the DECLARED pair must be compliant for any renderer without a colour-emoji font, and #887023 is the value the file already uses for the four League avatar discs."
+    },
+    {
+      "board": "ZH · 0e8 宗族 / 加入 · 成功",
+      "layer": "card · glyph",
+      "on": "card · disc",
+      "fg": "#fff8e8",
+      "bg": "#887023",
+      "text": "large",
+      "why": "ZH half of the same disc — same emoji, same nominal-only verdict, same fix."
+    },
+    {
+      "board": "EN · 7 Store",
+      "layer": "card · House owned",
+      "on": "card · House owned (bg)",
+      "fg": "#0a7359",
+      "bg": "#dfece0",
+      "text": "normal",
+      "why": "SCRUM-94 fix. Was --malachite-deep #07795c = 4.42 — 0.08 short of AA. ⚠️ --malachite-deep is a DISC colour (it is in tokens.css DISCS_ALREADY_OK) and the file uses it correctly on four League avatar ellipses; painting TEXT with it is the same role inversion SCRUM-93 fixed. Swapped to --malachite-text #0a7359 = 4.77 — the value the file ALREADY uses for green-on-light text (the four League 'weekly move' labels). bg is the RESOLVED backdrop: #0e9b78 @ fillOpacity 0.12 over the card fill #fbf7ee = #dfece0 — ⚠️ NOT over --paper, which would give #d9e6db / 4.18 and is the wrong surface."
+    },
+    {
+      "board": "ZH · 7 Store / 商店",
+      "layer": "card · House owned",
+      "on": "card · House owned (bg)",
+      "fg": "#0a7359",
+      "bg": "#dfece0",
+      "text": "normal",
+      "why": "ZH half of the Owned chip — same composited backdrop, same fix."
     }
   ]
 }
