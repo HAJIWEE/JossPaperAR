@@ -257,6 +257,31 @@ export async function myClans(): Promise<ApiResult<ClanSummary[]>> {
 }
 
 /**
+ * The invite code, fetched EXPLICITLY (SCRUM-50 · doc 07 §4.6; **rewritten for
+ * SCRUM-86 on 2026-10-09**).
+ *
+ * ⚠️ AN RPC, NOT A TABLE READ. As of migration `0015`, `clans.code` is **no
+ * longer granted** to `authenticated`, so `select('code')` fails with
+ * `permission denied for column code`. `clan_invite_code` is the **only**
+ * client-readable path to it, and the server owns the rule:
+ * **elder and above** (SCRUM-86: *"limit link sharing to elder and above
+ * seniority"*).
+ *
+ * ⚠️ The client check below is a UI convenience, never the boundary. This
+ * function USED to be a table read that merely *withheld* the code from a
+ * non-head, over a column any member could select directly — the shortcut
+ * SCRUM-86 option C rejected as security theatre. The gate now lives in the
+ * database, which is why this call can simply be made and trusted.
+ */
+export async function fetchClanCode(clanId: string): Promise<ApiResult<string>> {
+  const { data, error } = await supabase().rpc('clan_invite_code', { p_clan_id: clanId });
+  if (error) return { ok: false, reason: reasonOf(error) };
+
+  const code = str(asRecord(data)?.code);
+  return code ? { ok: true, data: code } : { ok: false, reason: 'clan_code_unreadable' };
+}
+
+/**
  * The roster for the management surface (doc 15 §3). Reads `clan_members`,
  * which members can see — the same policy that makes the role ladder visible.
  */

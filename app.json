@@ -33,7 +33,8 @@
         {
           "cameraPermission": "Allow Joss Paper AR to photograph the offering you would like to burn.",
           "microphonePermission": false,
-          "recordAudioAndroid": false
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
         }
       ]
     ],

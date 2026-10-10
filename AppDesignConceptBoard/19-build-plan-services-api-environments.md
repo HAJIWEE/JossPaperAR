@@ -565,6 +565,112 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.16 · S36b — the PM's pill review: three defects, and the measurement error underneath them (2026-10-09)
+
+**The review found three things the `0 collisions` check could not see:** the clan-head chip looked misaligned, the streak panel was top-aligned, and the drop-down arrow was inconsistent. ⚠️ **The first two share one root cause, and it was mine: I checked the pill against LAYOUT boxes (`shape.width`/`height`) when a Penpot `Text` reports a box that is not its inked glyphs.** The house tooling already said so — [[penpot-sweeps/occlusion-contrast-audit-v3.js]]: *"a Text shape reports a LAYOUT box far wider than the inked glyphs... measure with `textBounds`"*. I had read that file and still built the pill on layout boxes. **A gate that measures the wrong box passes.**
+
+**What the ink said.** `EN · 1h`, name: box 80 wide, ink **51.9 × 39.2** → `lines: 2.2`. ⚠️ **"Tan Family" was WRAPPING to two lines** — and at `lineHeight 1.2` inside a 44 px pill that reads as *"misaligned"* even though every box was centred to 0.2 px. The chip was also cramped: ink 77.4 inside an 84 box = **3.3 px padding**. And the streak panel's content ink sat **1.8 px from its top vs 10.4 px from its bottom**.
+
+**Fixed the measure, not the symptom.** Name re-flowed to one line (**it needs 84.2 px, not 80**); chip re-padded to **8 px** and re-seated from the name's *ink* edge; the affordance unified to **ONE glyph family** — `›` (**U+203A**), with the open state that **same glyph rotated 90°**. The old pairing was `›` vs `▾` (**U+25BE**, a filled geometric triangle): different Unicode blocks, different weights (ink 3.9 vs 6.0 wide) — inconsistent *by construction*.
+
+⚠️ **The panel defect was on 35 boards, not one.** The streak and tribute panels are copies of a single component and every copy carried the identical error (streak −4.3, tribute +2.7). Fixed **136 shapes across 34 boards** (streak +4, tribute −3), so the fix did not ship on four boards and stay broken on thirty. Re-measured: **68 panels, max deviation 0.3 px, 0 still off.**
+
+⚠️ **Six Penpot traps, each of which silently produced a wrong result** (recorded in the sweep's header, because they will recur):
+1. **A `Text` keeps its OLD WRAP until its content is rewritten.** Widening the box does nothing on its own. This is why the name wrapped on three boards *after* I had "fixed" it.
+2. **`verticalAlign` is a NO-OP when set to its current value** — restoring a box's height does not re-centre the text. Toggle it, with a re-flow between.
+3. **`growType = 'auto-width'` COLLAPSES the height** (44 → 18) and leaves the text anchored where it was.
+4. **`rotate()` is INCREMENTAL, not absolute** — two calls of 90° gave **180°**. Use the `rotation` property, and rotate about the box's own centre or the glyph walks off-centre.
+5. **A freshly created `Text` reports `textBounds` as ALL ZEROS** until it has been laid out — reading it immediately placed a sibling at `x=0`, off the board. Re-measure in a *later* call, and guard with a measured constant.
+6. **`findShapes({type:"board"})` includes the "Root Frame" (which holds 157 boards)**, so a *subtree* walk double-counts every panel and would have shifted those 136 shapes **twice**. Walk **direct children** and de-duplicate by shape id. ⚠️ **The dry run caught this before the write** — which is the only reason it is a footnote and not a defect.
+7. ⚠️ **VERIFY IN THE PARENT'S FRAME, NEVER AGAINST ABSOLUTE LITERALS — and this one reached the PM.** Recreating the name on three boards set it to `x = 254`, the correct value *for board 1 only*. On the other three the pill sits **470 / 1020 / 1490 px** further right, so the name — and the chip, and the arrow — rendered **outside their board**, and the PM saw an **empty pill** while every check I ran still passed, because those checks compared siblings *to each other* and used hardcoded `254`/`444` literals. **Derive every position from the container's own x (`bg.x + pad`), and assert `child.x >= bg.x && child.x + child.w <= bg.x + bg.width` for every child.** ⚠️ **Note the shape of this failure: my gate was green and the design was broken.** The PM's eye found what the check could not — the second time this session (the first being the pill that passed `0 collisions` while the name wrapped). **Prefer a check that compares a shape to its CONTAINER over one that compares shapes to each other**; sibling-relative deltas are exactly what hid this.
+
+Fixed in **`S36c`** (revn 283): every position re-derived from the pill background, re-verified with an explicit `OUTSIDE_PILL` assertion — **0 offenders on all four boards**.
+
+✅ **AND THE PM APPROVED IT (2026-10-09: *"looks good"*)** — the Home clan pill is **signed off**, which **unblocks `SCRUM-92`** and completes the design half of `SCRUM-91`'s option A. ⚠️ **Build from `S36c`**; `S36` and `S36b` each carry defects. ⚠️ **Two rounds of review, and each round the PM found something my gates had blessed** — the pattern recorded above is the most useful thing this section holds, and it generalises: *a check that compares a shape to its sibling cannot see a fault the siblings share.*
+
+⚠️ **Corollary, and a correction to this session's own docs: the file has 161 real boards, not 162.** Every count taken this session ("158 → 162") includes the Root Frame; the honest figures are **157 → 161**. The **+4 delta is unaffected**, and the *conclusions* do not move — but this is now the **third** time a carried-forward number has needed re-deriving (§12.13's "12/12", §12.14's doc-15 misquote, and this).
+
+Checkpointed as named version **`S36b · Home alignment fixes (pill ink + panels + one chevron)`**. **Spend US$0.00** — Penpot only, no AI call.
+
+---
+
+
+### 12.15 · S36 — the Home "clan card" is a PILL: the layout was measured, and the answer changed (2026-10-09)
+
+**The task.** `SCRUM-91` asked whether a scaffold entry satisfies *"Home is clan-scoped (clan card / switcher)"*, or whether the card must be **designed + built** — the last item holding `SCRUM-46` open. The PM took the design pass first (option A).
+
+⚠️ **The pass changed the answer, because the premise — a clan *card* — had never been checked against the board.** Two earlier sessions *stated* "the signed-off Home layout has no free band" and [[next-ai-context]] carried it as fact. This session **measured** it: rasterise all **35** Home layers and solve for the largest empty rectangle. Exactly **one** region comes back — **`x 230–486, y 180–280`**, the **header row** between the app mark and `btn · settings`:
+
+| Band (board y) | Occupant |
+| --- | --- |
+| 229–282 | app mark · settings |
+| 280–328 | tribute panel · streak panel |
+| 332–350 | "altar state" caption |
+| 340–760 | altar halo (art) |
+| 856–922 | Make an Offering CTA |
+| 944–1024 | tab bar |
+
+⚠️ **My own first attempt got this wrong, and the check caught it.** I placed a full-width bar at **y 282–338** on the strength of a **truncated** layer dump that hid the tribute/streak panels — i.e. I contradicted a recorded fact on partial evidence, the same failure class as the "12/12" migration count (§12.13) and the doc-15 misquote (§12.14). The difference: a **collision check** was cheap enough to run, so it failed loudly in a work board instead of shipping. **When a layout claim can be tested in one call, test it before writing it down.**
+
+**The design.** A **header pill**, not a card — it occupies space that is *already* empty and moves **nothing** that was signed off. Four new boards (`EN · 1h` · `EN · 1h2` · `ZH · 1h` · `ZH · 1h2`), EN + ZH, each on a **clone** of its own Home board, so **no signed-off board was mutated**. Spec: `240,234` · **236×44** (≥44 px target) · r14 · `#eae2d2` + 2.5 px `#1a1a1a` inner stroke — the **`btn · settings` treatment**, so it reads as chrome, not content. Clan name `Noto Serif SC` 700/15, shown **plain** (§2.1) and deliberately **not localised** — matching the existing `0e3` pair, which already renders `Tan Family` on the ZH board. Role chip `#d4af37` r12 carrying the **locked** vocabulary (`Clan Head` · `族长`). Affordance `›` (one clan) → `▾` (2+), because ⚠️ **the switcher already exists** in `clan/manage.tsx` — the pill only has to *say* that it opens it, so no second switcher is built. Checkpointed in Penpot as named version **`S36 · Home clan pill (SCRUM-91 option A)`**.
+
+**Proved, not asserted.** Collision check — pill box against all 35 layers: **0 collisions on all four boards**, inner boxes strictly sequential (name 254–334 · chip 342–426 · affordance 426–462). Contrast **re-derived** from the fills: name **13.52** · affordance **7.28** · chip label **8.28** — all pass AA. (Penpot's plugin API *does* expose `file.saveVersion(label)`, so the "versions can only be saved in the UI" note that has sat in [[next-ai-context]] for several sessions is wrong — it was a claim about the API, not a call against it.)
+
+⚠️ **A defect found in a signed-off board — by having to pick a compliant colour.** The existing `0e3` role chip (`EN · 0e3` **and** `ZH · 0e3`, `👑 …` at 13 px / 700) is `#7b621f` on `#d4af37` = **2.77:1** — failing AA (4.5) *and* even the 3:1 large-text floor. The new pill uses `#1a1a1a` on gold (**8.28**), so the failure is **not** propagated. Filed **`SCRUM-93`** — and the durable half is not the chip but the gate: **`check:contrast` reads `tokens.css` and the app source, so it structurally cannot see a Penpot board.** A chip can fail AA there indefinitely while every gate stays green, *despite* S21 having cleared 132 AA failures in this same file. **A signed-off board is not a checked board.**
+
+**Filed, then DECIDED.** `SCRUM-92` (build the pill) and `SCRUM-93` (the contrast defect), both in Sprint 1. ⚠️ **Nothing was marked `Done` on the strength of the design pass alone** — and that restraint was right: on **2026-10-09 the PM made the call**: **`SCRUM-46` CLOSES, and the pill becomes `SCRUM-92`'s own work** — chosen explicitly *because the pill still needs the PM's review and that takes time*. ⚠️ **Nothing was cut:** `SCRUM-46`'s Scope item transfers to `SCRUM-92` **verbatim**. ⚠️ **And `SCRUM-92` was therefore not ready to build at that point — it waited on the review, not on engineering.** ✅ **That review happened, twice, and the verdict was *"looks good"* — see §12.16.** (This is the same discipline `SCRUM-50` closed under: *split out, not cut*, each residual carrying the original criterion's wording.)
+
+**Spend: US$0.00** — Penpot only; no AI call, no deploy ([[project-costs]]).
+
+---
+
+
+### 12.14 · S35b — SCRUM-86: the invite code is elder-and-above, and two traps that nearly produced a false green (2026-10-09)
+
+**The decision.** PM: *"limit link sharing to elder and above seniority."* ⚠️ **This CONFIRMED the spec rather than changing it** — doc 15 §3's matrix has always read `| Invite new members (link · code · QR) | ✅ | ✅ | ❌ |` (Head ✅ · **Elder ✅** · Member ❌). Two things had drifted *from* that row: `canInvite` returned `hasHeadPower` (justified by a comment that **misquoted doc 15** as saying "Elder ❌"), and the database never enforced it at all. ⚠️ **I repeated that misquote in my first SCRUM-86 comment before reading the document** — a claim about a doc is not the doc, and this is the second time in one day a carried-forward claim was wrong (the "12/12" migration count was the first).
+
+**Migration `0015`.** Three parts: the column becomes unreadable to clients · `clan_invite_code(p_clan_id)` (SECURITY DEFINER, gated to elder+) becomes the only path to it · and `reroll_clan_code` is **replaced**, because its `returning code, name` reads a column the role no longer has. ⚠️ That last one is the shape of breakage a column revoke causes: the migration applies cleanly and the feature dies only when a head taps Re-roll.
+
+⚠️ **TRAP A — a column revoke on top of a table-wide grant is a SILENT NO-OP.** Supabase grants `authenticated` **table-wide** SELECT, and **column ACLs are additive**: `revoke select (code)` leaves the table-wide grant standing, so `code` stays readable while the migration looks correct. The table-wide grant must be **dropped** and every *other* column re-granted by name. ⚠️ That re-grant list is now **fail-CLOSED** — a column added to `clans` later is unreadable until listed — and `invite_sharing.sql` **S9** asserts the list covers every column except `code`, so the failure is loud instead of a silent client regression.
+
+⚠️ **TRAP B — `supabase start` does NOT apply new migrations to an existing volume.** The Docker volume `supabase_db_JossPaperAR` **persisted from an earlier session**, so `supabase start` reused it: `START_EXIT=0`, no error, and the stack looked healthy — while `clan_invite_code` **did not exist** and `authenticated` still held SELECT on `code`. **The first "it applied cleanly" was a FALSE GREEN.** It was caught only by querying the database instead of trusting the exit code:
+
+```sql
+select version from supabase_migrations.schema_migrations order by version desc limit 3;
+```
+
+which read `20261008200000` — one migration short. **`npx supabase db reset` re-applies from the files** and fixed it. ⚠️ **The generalisation: a green exit code is evidence that a command finished, not that it did anything.** Verify the STATE, not the status.
+
+**Verified — local.** `clan_management.sql` **109 ✓** (not broken) · `invite_sharing.sql` **25 ✓** (new, self-contained fixtures) · `ai_budget.sql` **17 ✓** · `check:clanapi` **92/92** (was 81). ⚠️ **FAULT-TESTED**: replacing the table-wide revoke with the column-only form turns **S7 + S8 RED**, which proves both that the no-op is real and that the suite catches it.
+
+**Verified — live, by real calls.** `db push` (after a `--dry-run`, and after checking that nothing else reads the column — **no Edge Function references `clans`**, and the revoke is scoped to `authenticated`/`anon` so `service_role` is untouched). Remote is now **15/15, no drift**; the live PostgREST exposes `/rpc/clan_invite_code`; and `GET /rest/v1/clans?select=code` answers **401 `42501 permission denied`**.
+
+⚠️ **A deliberate side effect, recorded rather than hidden:** `anon` now loses SELECT on the **whole table**, not just the column — the unavoidable consequence of dropping a table-wide grant. It is the *tighter* posture, nothing in the client reads `clans` before a session exists, and **PR-3's R4 already tolerates it**: its loop treats a table `anon` cannot read at all as *"also 'reads nothing'"*. Pinned by **S13**.
+
+⚠️ **FOUND, NOT CAUSED — `pr3_verification.sql` is RED on the local stack, with or without this change** (proved by moving the migration aside and re-running). It uses **`set local role authenticated`**, which is a **no-op** under `run-sql-tests.sh` (psql autocommit; `SET LOCAL` outside a transaction warns and does nothing) — so its *"an authenticated INSERT into `ledger_events` is DENIED"* assertion actually runs as the owner. ⚠️ **`clan_management.sql` uses plain `set role`, which is exactly why that file passes** — the house guidance exists and was applied to one file but not the other. Note also that its failure **aborts before its teardown**, and the residue then broke a *later* file's C7 assertion until a `db reset` — the documented residue trap, demonstrated live rather than quoted.
+
+⚠️ **The PM ENDORSED option B on 2026-10-09** (*"B option is worth it"*) — the **more invasive** option, chosen deliberately over the cheap one. **A retrospective endorsement, not a new instruction** (B shipped the same day), but the reasoning is the durable part and worth keeping: **A** would have meant editing doc 15 §3 **to match a bug**, over a column any member could still `select`, and **C** would have been **security theatre** — so A and C both leave the rule enforceable **only by the client**, which is the opposite of this project's posture (*the server is the authority*, ADR-005). B is the only one of the three where a determined member **cannot** widen the family. **It cost one migration** — which is the honest measure of whether "worth it" held up.
+
+---
+
+### 12.13 · S35 — the hosted project was THREE MIGRATIONS BEHIND, and a fresh worktree is not linked (2026-10-09)
+
+**The finding, measured.** `npx supabase migration list` read **remote 11 / local 14**. Three migrations — `0012` (*clan_management_api*), `0013` (*clan_head_exit*) and `0014` (*clan_successor_rank*) — had **never been pushed**. So the **entire clan system that `main` had just merged was dead on the live backend**: `set_member_role` · `remove_member` · `leave_clan` · `rename_clan` · `delete_clan` · `clan_book` were all **404 by absence**, and SCRUM-82's fixed award path was running against a schema that predated its own guard.
+
+⚠️ **The S34 handover asserted "the hosted project was last verified at 12/12" — it was 11.** A remembered number is not a measurement. This is the second time this project has been bitten by a carried-forward total (see [[project-costs]]'s rule about re-deriving a figure from its inputs), and the honest generalisation is the one already in AGENTS.md: **re-derive, don't copy forward.**
+
+**The trap that made it invisible — a fresh worktree is NOT linked.** `supabase link` writes `supabase/.temp/` (project ref, pooler URL) and `.temp` is **gitignored**, so **local link state is per-worktree**. A session that notes "the CLI is linked" is describing *its own worktree*; the next session's fresh worktree is unlinked, and every `migration list` / `db push` fails with *"Cannot find project ref. Have you run supabase link?"* — which reads like a missing credential, not like "you are about to check the wrong thing". **Re-link and re-read the remote count before any push** (this is trap 8's rule, and it is now the first thing the S35 session did).
+
+**The fix.** `db push --dry-run` first (to print the exact pending set rather than trusting a count), then `db push --yes` — all three applied. `migration list` now reads **14/14, no drift**. ⚠️ Checked first that none of the three touches `app_config` (the kill switch): **they do not** — the ability to kill every user's session is not something to discover mid-push. No spend: a push is free.
+
+**Proved by a real call, not by a count.** With the service-role key, `GET /rest/v1/` (the PostgREST OpenAPI root) now lists the full clan surface — **14 clan/role RPCs**: `create_clan` · `join_clan` · `leave_clan` · `set_member_role` · `remove_member` · `rename_clan` · `delete_clan` · `clan_book` · `clan_role_of` · `is_clan_head` · `is_clan_member` · `preview_clan` · `new_clan_code` · `reroll_clan_code`. ⚠️ The `anon` key **cannot** read that root any more — it answers **401 `Invalid API key` / *"Only the `service_role` API key can be used for this endpoint"*** — so the introspection itself needs the service key (a read, not a mutation).
+
+**A posture finding, recorded rather than "fixed".** `clans_select_member` is `using (is_clan_member(id) or created_by = auth.uid())` — a **table-level** policy, so **any member can read `clans.code` by selecting it**. The client's gate on the invite surface is therefore a **UI** gate, not a security boundary. Tightening it is an **RLS / security-posture decision** (a PM call), not a client change — and a new `clan_invite_code` RPC gated to head-power would be **security theatre** while `clans` stays member-readable. Recorded on **SCRUM-50**.
+
+**Client defects this session's gate found** (full detail on [[follow-up-items]]): `invites.ts` **truncated a nine-character code** (`/join/ABCDEFGHJ` returned `ABCDEFGH` — the guess its own contract forbids) · the scan duplicate check compared **raw payloads**, so the same code as a link and then as a paste read as **two** scans · the join screen **collapsed "bad code" into "offline"**, so an unreachable shrine told a user their family's code was wrong and the invite was **never retried**. All three were found by writing the intended behaviour down as a **test** rather than as a comment.
+
+---
+
 ### 12.12 · SCRUM-46 — the clan management API (2026-10-08)
 
 **What was already there.** `clans` · `clan_members` · `create_clan` · `preview_clan` · `join_clan` · `reroll_clan_code` · `save_ancestor` · `is_clan_member` · `clan_role_of` · `is_clan_head` · `enforce_ancestor_cap` all shipped with PR-2/PR-3. What SCRUM-46 adds is the half doc 15 §3 *promises* and nothing implemented: **the role ladder, leaving and removal, rename, delete, and the Book of Tributes read path** — plus the anti-abuse limits §5.2 hands to this ticket.
@@ -820,3 +926,4 @@ One **real defect in the check itself** was found this way and fixed: the *"reco
 
 *Created 2026-10-03 (Session 27) — the stand-it-up plan for [[07-system-architecture]]: service build order · the complete API surface (3 Edge Fns · 11 RPCs · storage · realtime) · the 3-ring environment with the local toolchain audited · the exact SDK-57 package manifest + install traps · the build-vs-provision split (A–J ↔ #1–#10, filed as **SCRUM-57** / **SCRUM-56**) · and 4 doc-07 inconsistencies found while mapping the build against the architecture. Path C endpoints and prices verified live: **ADR-002's cost model still holds exactly.***
 *Updated 2026-10-05 (S29c) — **§12.7**: SCRUM-53 started; the slice's three client rules are now a typed state machine with a fault-tested gate (`npm run check:slice`), and the emulator interim target is filed as **SCRUM-64**.*
+*Updated 2026-10-09 (S36) — **§12.15**: the Home *"clan card"* is a **pill**, because the layout was finally **measured** instead of assumed — one empty rectangle on the whole board, the header row. Found and filed an **AA failure in a signed-off board** (`SCRUM-93`: `0e3`'s chip is 2.77:1, and `check:contrast` cannot see Penpot at all), and filed the build as **`SCRUM-92`**. **US$0.00.***

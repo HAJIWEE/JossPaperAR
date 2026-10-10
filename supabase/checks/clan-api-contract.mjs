@@ -121,6 +121,40 @@ section('3 · join_clan · { p_code }');
   check('joining twice is refused', again.error !== null);
 }
 
+// ═══ 3b · clan_invite_code — SCRUM-86 · the code is ELDER AND ABOVE ════════
+// ⚠️ This section exists because the repo has NO generated DB types: nothing
+// statically checks that `fetchClanCode`'s `p_clan_id` matches, nor that
+// `clans.code` is genuinely unreadable over the wire. B is a plain MEMBER here
+// (section 4 promotes them next), which is exactly the boundary to test.
+section('3b · clan_invite_code · { p_clan_id } — the SCRUM-86 boundary');
+{
+  // the head may read it, and gets the clan's real code
+  const asHead = await A.client.rpc('clan_invite_code', { p_clan_id: clanId });
+  check('clan_invite_code accepts { p_clan_id }', asHead.error === null, asHead.error?.message);
+  check('⚠️ the HEAD gets the invite code — SCRUM-86: elder and above',
+    asHead.data?.code === code, `got ${asHead.data?.code}`);
+  check('…and is told their own role, which clan-api parses', asHead.data?.role === 'head');
+
+  // ⚠️ a plain MEMBER is refused — the decision, enforced by the DATABASE
+  const asMember = await B.client.rpc('clan_invite_code', { p_clan_id: clanId });
+  check('⚠️ a plain MEMBER is REFUSED the invite code', asMember.error !== null,
+    'a member got the code — the column grant or the ladder has regressed');
+  check('…with 42501 (insufficient_privilege), not a generic error',
+    String(asMember.error?.code) === '42501' || /elder|permission/i.test(asMember.error?.message ?? ''),
+    asMember.error?.message);
+
+  // ⚠️ and the COLUMN is not a back door. The pair matters: on its own a failed
+  // read could just be an RLS row the member cannot see at all.
+  const rowRead = await B.client.from('clans').select('id, name').eq('id', clanId);
+  check('(control) a member CAN still read the ROW — id and name stay granted',
+    rowRead.error === null && (rowRead.data ?? []).length === 1, rowRead.error?.message);
+
+  const colRead = await B.client.from('clans').select('code').eq('id', clanId);
+  check('⚠️ …but selecting `code` over PostgREST is DENIED — no back door',
+    colRead.error !== null,
+    'a member read clans.code directly — the revoke in 0015 is not in force');
+}
+
 // ═══ 4 · set_member_role — the ladder, with the args the API sends ═════════
 section('4 · set_member_role · { p_clan_id, p_user_id, p_role }');
 {
@@ -138,6 +172,27 @@ section('4 · set_member_role · { p_clan_id, p_user_id, p_role }');
     p_clan_id: clanId, p_user_id: B.userId, p_role: 'head',
   });
   check('⚠️ head is refused by the server as well as the client', bad.error !== null);
+}
+
+// ═══ 4b · SCRUM-86 — an ELDER gains the code, and still cannot RE-ROLL ═════
+// B was promoted to `elder` immediately above, so this is the other half of the
+// boundary: the ladder changed the answer without a client flag being involved.
+section('4b · the elder side of the SCRUM-86 boundary');
+{
+  const asElder = await B.client.rpc('clan_invite_code', { p_clan_id: clanId });
+  check('⚠️ an ELDER now GETS the invite code — the promotion is what changed it',
+    asElder.error === null && asElder.data?.code === code, asElder.error?.message);
+  check('…and is told their own role', asElder.data?.role === 'elder');
+
+  const stillDenied = await B.client.from('clans').select('code').eq('id', clanId);
+  check('⚠️ …but an elder STILL cannot read the column — the RPC is the only path',
+    stillDenied.error !== null,
+    'an elder read clans.code directly — 0015 did not revoke the table-wide grant');
+
+  // ⚠️ sharing ≠ retiring: the elder gained the SHARE and must not gain the RE-ROLL
+  const reroll = await B.client.rpc('reroll_clan_code', { p_clan_id: clanId });
+  check('⚠️ an ELDER is still refused a RE-ROLL — retiring a link is head-only',
+    reroll.error !== null, 'an elder re-rolled the code — the asymmetry is broken');
 }
 
 // ═══ 5 · rename_clan · { p_clan_id, p_name } ═══════════════════════════════

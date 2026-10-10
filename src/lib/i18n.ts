@@ -64,8 +64,30 @@ export const MESSAGES = {
     'clan_welcome': 'Welcome to %{name}.',
     'clan.alreadyMember': 'You are already a member of this clan.',
     'clan.invalidCode': 'That invite code is not valid.',
+    // ⚠️ A SECOND message for a SECOND fact: an unreachable shrine is not a bad
+    // code, and telling a user their family's code is wrong when it is fine is
+    // how an invite never gets retried (SCRUM-50).
+    'clan.unreachableCode': 'We could not reach the shrine. Your code is fine — try again.',
     'clan.inviteFamily': 'Invite your family',
     'clan.shareCode': 'Share code · Show QR · Copy link',
+
+    // ── invites: the QR, the scanner and the held link (SCRUM-50 · doc 07 §4.6) ──
+    'invite.scan': 'Scan a QR code',
+    'invite.scanHint': 'Point the camera at your family’s invite code.',
+    'invite.typeCode': 'Type the code instead',
+    'invite.scanNeedsCamera': 'Scanning needs the camera',
+    'invite.scanNeedsCameraBody': 'Allow camera access to read a family invite, or type the code.',
+    'invite.grantCamera': 'Allow camera',
+    'invite.unreadableLink': 'That link does not contain an invite code.',
+    'invite.waiting': 'You have an invite waiting',
+    'invite.waitingHint': 'Tap to join.',
+    // ⚠️ `%{code}` is the whole payload — no clan name, no counts (doc 13 §4).
+    'invite.heldNoIdentity':
+      'Invite %{code} is saved. We will take you to the clan once your account is ready.',
+    'invite.heldOffline':
+      'Invite %{code} is saved. We could not reach the shrine — try again when you are back online.',
+    'invite.qrFailed': 'The QR could not be drawn — share the code instead.',
+    'invite.qrUnavailable': 'The QR is unavailable — share the code instead.',
     'role_head': 'Clan Head',
     'role_co_head': 'Co-Head',
     'role_elder': 'Elder',
@@ -175,8 +197,24 @@ export const MESSAGES = {
     'clan_welcome': '歡迎加入%{name}。',
     'clan.alreadyMember': '您已是此宗族的成員。',
     'clan.invalidCode': '邀請碼無效。',
+    'clan.unreachableCode': '無法連上神龕。邀請碼沒有錯——請再試一次。',
     'clan.inviteFamily': '邀請家人加入',
     'clan.shareCode': '分享邀請碼 · 顯示二維碼 · 複製連結',
+
+    // ── 邀請：二維碼 · 掃描 · 暫存的連結（SCRUM-50 · doc 07 §4.6）──
+    'invite.scan': '掃描二維碼',
+    'invite.scanHint': '將鏡頭對準家人的邀請碼。',
+    'invite.typeCode': '改為輸入邀請碼',
+    'invite.scanNeedsCamera': '掃描需要相機權限',
+    'invite.scanNeedsCameraBody': '允許使用相機以讀取家人的邀請，或改為輸入邀請碼。',
+    'invite.grantCamera': '允許使用相機',
+    'invite.unreadableLink': '此連結沒有邀請碼。',
+    'invite.waiting': '您有一個待加入的邀請',
+    'invite.waitingHint': '輕點即可加入。',
+    'invite.heldNoIdentity': '邀請碼 %{code} 已儲存。帳號就緒後將帶您加入宗族。',
+    'invite.heldOffline': '邀請碼 %{code} 已儲存。目前無法連上神龕——請於連線後再試。',
+    'invite.qrFailed': '無法繪製二維碼——請改為分享邀請碼。',
+    'invite.qrUnavailable': '二維碼暫不可用——請改為分享邀請碼。',
     'role_head': '族長',
     'role_co_head': '副族長',
     'role_elder': '長老',

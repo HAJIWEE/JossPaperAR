@@ -1,6 +1,6 @@
 # 🤝 Hand-over prompt — next AI session
 
-> **Written 2026-10-07 (S33 wrap) · rewritten 2026-10-08 (S34 wrap).** Paste everything below the rule into a fresh session's first message.
+> **Written 2026-10-07 (S33 wrap) · rewritten 2026-10-08 (S34 wrap) · rewritten 2026-10-09 (S35) · WRAPPED 2026-10-09 (S36).** ⚠️ **S36 was a DESIGN pass, not a build** — the Home clan control became a **PILL**, the PM reviewed it twice and **approved it**, and **`SCRUM-46` + `SCRUM-91` were closed out**. §1 carries it; §5 has the next steps. Paste everything below the rule into a fresh session's first message.
 > It is deliberately self-contained: goal · state · what to do first · traps · files.
 > The living versions are **[[next-ai-context]]** (state) · **[[follow-up-items]]** (open work) · **[[completed-work-archive]]** (history) · **[[AppDesignConceptBoard/19-build-plan-services-api-environments|doc 19]] §12** (what the backend found).
 
@@ -8,19 +8,26 @@
 
 ## 1 · Goal
 
-Continue building **JossPaperAR** — an Expo/React Native AR app that replaces physical joss-paper burning with a digital ritual. Repo: `github.com/HAJIWEE/JossPaperAR` — work on a **`cline/<id>` worktree**, then PR into `main` (S34 used `/home/gweejiahan/.cline/worktrees/c1292/JossPaperAR` on `cline/c1292`) · the vault worktree is `~/Documents/Obsidian Vault/Projects/JossPaperAR` · Jira `hajiwee9411.atlassian.net` (project **SCRUM**, the source of truth for decisions).
+Continue building **JossPaperAR** — an Expo/React Native AR app that replaces physical joss-paper burning with a digital ritual. Repo: `github.com/HAJIWEE/JossPaperAR` — work on a **`cline/<id>` worktree**, then PR into `main` (S35 used `/home/gweejiahan/.cline/worktrees/7421e/JossPaperAR` on **`cline/7421e`** — S34 used `cline/c1292`) · the vault worktree is `~/Documents/Obsidian Vault/Projects/JossPaperAR` · Jira `hajiwee9411.atlassian.net` (project **SCRUM**, the source of truth for decisions). ⚠️ **TOOLS CHANGED 2026-10-09: Jira and Supabase are now CONNECTORS, not MCP servers.** The working names are **`jira_*`** and **`supabase_*`** (single underscore); the old **`jira__*`** / **`supabase__*`** names **no longer exist** and are rejected before execution. *(S36 lost several calls to this, and reported the tools as "unauthorised" — they were simply renamed. If a tool call is rejected with `AI_NoSuchToolError`, read the available-tools list in the error rather than assuming a permissions problem.)*
 
 **Where the project is.** The backend of record is **live and exercised** (Supabase + Postgres + Edge Functions on hosted `yercgevebxvtzkgctfai`), the economy's **AI-cost ceiling is enforced**, the **Android emulator target is live**, and 🎉 **the vertical slice completes a FULL ritual on glass** — capture → cartoonize → burn → award → persist.
 
-**This session's work is on `cline/c1292` in PR #28 — OPEN, NOT MERGED.** `main` is still **`a076b88`**; the branch is **`940c85b`** (13 commits, CI green on every one). Nothing has been merged.
+**Last session = S36 (2026-10-09) — a DESIGN pass, wrapped.** The work is on `cline/7421e` in **PR #29**, which is open and green — ⚠️ **the PM said they will MERGE IT OFF-SESSION, so check `main` before assuming it landed.** `main` is still **`b81a86e`** (PR #28 merged 2026-10-09). ⚠️ **Do not carry a commit count forward — read it:** `git log --oneline origin/main..HEAD`, or the PR header. *(That line has now needed correcting twice in two sessions.)*
 
-What S34 added, all committed and gated:
+⚠️ **The vault is the `main` WORKTREE** — `~/Documents/Obsidian Vault/Projects/JossPaperAR`, and `git worktree list` shows it as `[main]`. S36 fast-forwarded it **`de18ee1 → b81a86e`**, so Obsidian now carries everything merged **except PR #29**. ✅ **After the merge, one command brings the S36 docs in:** `git -C "$HOME/Documents/Obsidian Vault/Projects/JossPaperAR" fetch origin && git -C "$HOME/Documents/Obsidian Vault/Projects/JossPaperAR" merge --ff-only origin/main`. ⚠️ **Never commit in the vault** — it *is* `main`, and work goes on a `cline/<id>` branch.
 
-- ✅ **`SCRUM-46` — the clan system, end to end.** Backend: migrations **`0012`** (the role ladder + the Book read path + RLS + anti-abuse), **`0013`** (the head-exit ramp), **`0014`** (the successor's rank). Frontend: `clan-api.ts` (11 RPC wrappers) · `clan-flow.ts` · `clan-ui.tsx` · five screens (`clan/index|create|join|manage|book`). New gate **`check:clanapi`**.
-- ✅ **`SCRUM-84` — ANSWERED and built.** The successor **inherits the departing rank** (`set role = v_role`): a departing `head` hands over to a new **`head`**, a departing **sole `co_head`** to a `co_head`, and a head leaving a co-head behind promotes **nobody**. ⚠️ This **reverses `0013`'s own rationale** that `head` was "the founder's immutable fact" — what survives is the **founding** fact (`clans.created_by` is never rewritten); headship now has a **line of succession**.
-- ✅ **`SCRUM-85` — BUILT** (the `SCRUM-83` answer, option E): the first burn is a **tutorial** — no clan, no points, **no AI spend** — then the fork.
+🎨 **What S36 delivered: the Home "clan card" is a PILL.** `SCRUM-91` asked whether a scaffold entry satisfies *"Home is clan-scoped (clan card / switcher)"* or whether the card must be designed + built; the PM took the **design pass** first. ⚠️ **The pass killed the *card***: rasterising all **35** Home layers and solving for the largest empty rectangle returns exactly **one** region — the **header row** `x 230–486, y 180–280` — so a card was never placeable without unzipping a signed-off layout. Four new boards (**EN + ZH** × one-clan / 2+-clan), each a **clone** of its own Home board, so **no signed-off board was mutated**; Penpot named version **`S36 · Home clan pill (SCRUM-91 option A)`**. Filed **`SCRUM-92`** (the build — `blocks` `SCRUM-46`) + **`SCRUM-93`** (⚠️ a **signed-off board fails AA**: `0e3`'s role chip is **2.77:1** on both locales — and the durable half is that **`check:contrast` cannot see Penpot at all**). **US$0.00** — Penpot only. ⚠️ **And the PM decided the sequencing on the spot (2026-10-09): `SCRUM-46` CLOSES, and the pill becomes `SCRUM-92`'s own work** — chosen explicitly *because the review takes time*. **Nothing was cut:** the Scope item transfers **verbatim**. ⚠️ **`SCRUM-92` was not ready to build at that point — it waited on the review, not on engineering.** ✅ **The PM then reviewed it twice and APPROVED it (2026-10-09: *"looks good"*) — `SCRUM-92` IS UNBLOCKED.** ⚠️ **Both rounds found defects my green gates had blessed, and the cause was the same both times: I compared shapes to their SIBLINGS instead of to their CONTAINER** — a sibling-relative check is structurally blind to a fault the siblings share. **Round 1:** the name was silently **wrapping** ("Tan Family" needs **84.2 px**, not the 80 it was given), the chip had 3.3 px padding, and the streak panel was top-aligned **on 35 boards** — fixed as a sweep, **136 shapes across 34 boards**. **Round 2:** three of the four boards came back with the name **outside its board**, so the pill looked **empty**. ⚠️ **Seven Penpot traps are recorded in `penpot-sweeps/home-alignment-audit.js`** — read them before touching this design. ⚠️ **Build from Penpot version `S36c`;** `S36` and `S36b` each carry defects.
 
-**Left for next session:** merge PR #28 · **the first device run** of the clan screens and the tutorial (nothing has been seen on glass) · **`SCRUM-50`** (the QR half — ⚠️ still in the **backlog**, so move it into the sprint *when you start it*) · the **Home clan card** (needs a Home design pass) · **`SCRUM-52`** (the device purchase) · **`SCRUM-83`'s ZH character-set mismatch** (the doc says simplified, the shipped i18n is traditional).
+⚠️ **THE FINDING THAT MATTERED WAS NOT THE TICKET.** `npx supabase migration list` read **remote 11 / local 14** — `0012`, `0013` and `0014` had **never been pushed**, so **the whole merged clan system was dead on the live backend**. The S34 handover's *"verified at 12/12"* was **wrong**. `db push` applied all three (**14/14, no drift**), proved by a real call: the live PostgREST OpenAPI now exposes the full clan RPC surface. ⚠️ **A fresh worktree is NOT linked** (`supabase/.temp` is gitignored, so link state is per-worktree) — **re-link and re-read the remote count before any push.** Full detail: doc 19 **§12.13**.
+
+What S35 delivered:
+
+- ✅ **`SCRUM-50` — the QR invite.** The pure half is new and gated (+50 assertions; `lib` **242 → 292**): `invite-flow.ts` (the **scan debounce** · the **resolve state** · **the HELD invite**). The surfaces: `invite-qr.tsx` (a RUNTIME QR, never the design's non-scannable placeholder) · `clan-join.tsx` (**one** join body, two entry points) · `clan/scan.tsx` (**`expo-camera` `CameraView` + `barcodeScannerSettings: ['qr']`** — no new native module) · `join/index.tsx` + `join/[code].tsx` (both link shapes) · `invite-entry.tsx` + `held-invite.ts` · `InviteCard` in create + manage.
+- ✅ **Deps verified BEFORE use** — `react-native-svg` (SDK 57 pins **15.15.4**) + `react-native-qrcode-svg`; the SDK docs list `react-native-svg` as **"Included in Expo Go"**, which matters because there is **no `expo-dev-client`**. `bundle:android` exports clean (**4.5 MB**) · **`expo-doctor` 21/21**.
+- ⚠️ **FOUR defects fixed** — **three found by writing the intent down as a test** (a nine-character code was **truncated** rather than refused · the scan duplicate check compared **raw payloads** · the join screen **collapsed offline into "bad code"**, so an invite was **never retried**), plus **the manage invite surface was dead** (it read `clan.code`, which `myClans()` nulls on purpose — a head could never see their own code).
+- ✅ **Both new gates fault-tested RED, then restored green.**
+
+**Left for next session:** ⚠️ **`SCRUM-92` — BUILD the Home clan pill** (the design is **approved** and the ticket is unblocked; build from Penpot **`S36c`**) · ⚠️ **the first DEVICE RUN — `SCRUM-88`** (the clan screens, the tutorial **and the new scanner** — **nothing has been seen on glass**) · **`SCRUM-52`** (the device purchase — the gate on `SCRUM-53`) · **`SCRUM-93`** (the Penpot AA defect **and** the contrast gate's blind spot) · **`SCRUM-87`** (the pre-existing SQL red) · **`SCRUM-89`** (⚠️ the universal link needs the domain, doc 19 §6.2 item 6 — the route and the QR payload are already correct, `josspaperar://` works today) · **`SCRUM-90`** (🎯 hold+resume vs an automatic join queue) · ⚠️ **`SCRUM-83`'s ZH character-set mismatch** (doc 15 specifies **simplified** and the shipped `i18n.ts` is **traditional** — ⚠️ **and the S36 ZH boards are simplified, so the *design* agrees with the doc, not with the code**).
 
 ## 2 · The PM's working rules (non-negotiable)
 
@@ -33,36 +40,37 @@ What S34 added, all committed and gated:
 
 ## 3 · Do this first, in order
 
-1. Read `next-ai-context.md` (*Quick Reference* → *Start Here*) → `follow-up-items.md` → doc 19 **§12.11 – §12.12e** (the ritual's first complete run, then the clan API, the head-exit ramp, the tutorial, and the successor's rank).
-2. **PR #28 is OPEN and awaiting the PM's merge.** Do not assume it is in. `main` = `a076b88`; `cline/c1292` = `940c85b`. ⚠️ A fresh worktree has **no `node_modules` and no `.env`** — run `npm install` and copy `.env.example` → `.env` before anything else, or the ritual dies at `preparing`. Verify a merge with `git merge-base --is-ancestor <branch> origin/main` — **not** `origin/<branch>`, which `git fetch --prune` deletes *after* a merge.
-3. **Green the local gates before touching anything**, so a red one is definitely yours: `npm run check` + `npx tsc --noEmit`. Expect **`lib` 242**, `check` reporting **14 migrations structurally sound**, and **0** TS errors.
-4. **Start the local stack for the DB gates** — `npx supabase start` (free, no account, applies the migrations **from the files**). Then `npm run check:clanapi` (**81/81**) and the SQL suite (⚠️ **needs `--network host`** — trap 20; without it every file reports `Connection refused` and it *reads* like a failing test).
-5. **Sprint audit** (rule 2). It was clean at the S34 wrap: `SCRUM-46` **In Progress** and `SCRUM-85` **In Review**, both in **Sprint 1 (id 1)**; `SCRUM-50` deliberately left in the backlog. ⚠️ `SCRUM-50` is **`To Do` with no sprint** — if you pick it up, move it in *first*.
+1. Read `next-ai-context.md` (*Quick Reference*) → `follow-up-items.md` → doc 19 **§12.11 – §12.14** (the ritual's first complete run · the clan API · the head-exit ramp · the tutorial · **the invite code made elder-and-above, and the two traps in §12.14**).
+2. ⚠️ **PR #29 is OPEN and awaiting the merge.** ⚠️ **Open PRs with the GitHub MCP server — never `gh`** (its PAT is read-only here and answers 403 even after a successful push; see trap 26). `main` = **`b81a86e`** (PR #28 merged 2026-10-09); `cline/7421e` = **`284124d`** (7 commits). A fresh worktree has **no `node_modules` and no `.env`** — `npm install` and copy `.env.example` → `.env` first, or the ritual dies at `preparing`. Verify a merge with `git merge-base --is-ancestor <branch> origin/main` — **not** `origin/<branch>`, which `git fetch --prune` deletes *after* a merge.
+3. **Green the local gates before touching anything**, so a red one is definitely yours: `npm run check` + `npx tsc --noEmit`. Expect **`lib` 293**, `check` reporting **15 migrations structurally sound**, and **0** TS errors.
+4. **Start the local stack for the DB gates** — `npx supabase start` (free, no account). ⚠️ **`start` does NOT apply new migrations to an existing volume** (doc 19 §12.14 **trap B**): the persisted `supabase_db_JossPaperAR` made a migration look applied while it was absent, and only **`npx supabase db reset`** fixed it. **Verify STATE, not the exit code** (`select version from supabase_migrations.schema_migrations order by version desc limit 3`). Then `npm run check:clanapi` (**92/92**) and the SQL suite — ⚠️ **needs `--network host`** (trap 20), and ⚠️ **`pr3_verification.sql` is RED and KNOWN — `SCRUM-87`**, not your change (`set local role` is a no-op under the runner). Reset before trusting a re-run: a failed file aborts before its teardown and poisons the next one.
+5. **Sprint audit** (rule 2). It must return **nothing** for `sprint is EMPTY AND statusCategory = "In Progress"`. **After the 2026-10-09 reconciliations** the in-flight set is: **In Progress** — `SCRUM-53` (⚠️ **correctly open: two acceptance criteria need `SCRUM-52`'s floor device**, which the emulator provably cannot settle) and `SCRUM-56` (PM provisioning); **In Review** — `SCRUM-46` (⚠️ **merged but NOT done: the design-led Home clan card is unbuilt**). ✅ **Closed Done in the same session:** `SCRUM-80` · `SCRUM-81` · `SCRUM-82` · `SCRUM-85` (each had been **merged for days while the board still said `In Review`**), **`SCRUM-86`**, **`SCRUM-64`**, and **`SCRUM-50`** — whose residual acceptance items were **split out, NOT cut**, into **`SCRUM-88`** (the device run + the ELDER sweep) · **`SCRUM-89`** (universal links + the store fallback) · **`SCRUM-90`** (🎯 hold+resume vs a real join queue). ⚠️ **The bar used was the ticket's OWN acceptance criteria — NOT merge state.** A merged PR is not a done ticket, and an unmerged PR is not an undone one.
 6. Then pick from §5.
 
 ## 4 · What exists (verified against the repo and the local stack — not asserted)
 
 | | |
 |---|---|
-| `main` | **`a076b88`** — every PR through **#27** merged, CI green |
-| this branch | **`cline/c1292` = `940c85b`** · 13 commits · **PR #28 OPEN** (not merged) |
-| local gates | `npm run check` **all green**: `tokens 36 · domain 45 · slice 36 · throw 33 · ads 51 · wire 52 · session 17 · pathc 38 · sql/migrations 14 · adrs 34 · contrast 22 · responsive 21 · lib 242` |
-| DB gates | `check:clanapi` **81/81** · `clan_management.sql` **109 assertions, exit 0** — both need `npx supabase start`; the SQL suite also needs **`--network host`** (trap 20) |
-| migrations | **14 files on disk.** The hosted project was last verified at **12/12**, so ⚠️ **`0013` and `0014` are almost certainly NOT applied there**, and this worktree is **not linked** (`Cannot find project ref`). `npx supabase link` + `migration list` **before** any `db push` — and expect to push **2** |
+| `main` | **`b81a86e`** — every PR through **#28** merged, CI green |
+| this branch | **`cline/7421e` = `284124d`** · **7 commits** · **PR #29 OPEN** (not merged) — carries `SCRUM-50` + `SCRUM-86` |
+| local gates | `npm run check` **all green**: `tokens 36 · domain 45 · slice 36 · throw 33 · ads 51 · wire 52 · session 17 · pathc 38 · sql/migrations 15 · adrs 34 · contrast 22 · responsive 21 · lib 293` |
+| DB gates | `check:clanapi` **92/92** · `clan_management.sql` **109** · `invite_sharing.sql` **25** · `ai_budget.sql` **17** — all need `npx supabase start` **+ `db reset`**; the SQL suite also needs **`--network host`** (trap 20). ⚠️ **`pr3_verification.sql` is RED and pre-existing — `SCRUM-87`**, not your change |
+| migrations | **15 files on disk, and all 15 ARE applied to the hosted project** — `migration list` reads **15/15, no drift** (S35 pushed `0012`–`0014`; S35b pushed `0015`). ⚠️ A fresh worktree is **not linked** (`supabase/.temp` is gitignored), so `npx supabase link` + `migration list` **before** any `db push` |
 | typecheck | `npx tsc --noEmit` → **0 errors** |
-| screen counts | **5** clan screens · the tutorial branch in `capture → preparing → burn → reward` |
-| spend | fal.ai **≈ US$5.16** of the approved **US$10–20** — **unchanged**: S34 spent **US$0.00** |
+| screen counts | **5** clan screens · the tutorial branch in `capture → preparing → burn → reward` · ⚠️ **new in PR #29:** the shared join body, the **scanner**, and **two `/join` deep-link routes** |
+| spend | fal.ai **≈ US$5.16** of the approved **US$10–20** — **unchanged**: **S34, S35, S35b and S36 all spent US$0.00** (S36 was Penpot-only) |
 
-**The two things S34 deliberately did NOT do:** no **device run** (nothing on glass), and no **`db push`** to the hosted project (migrations were proved on the local stack instead, which is free and equally real).
+**What the recent sessions deliberately did NOT do:** no **device run** (⚠️ **nothing on glass — still the top unknown**), and the Home clan control is **designed and APPROVED but unbuilt** — it is **`SCRUM-92`'s own work**, because the PM decided (2026-10-09) to **close `SCRUM-46`** rather than hold a finished ticket on a design review. ⚠️ **S36 changed its SHAPE, not its state** — it is a **pill**, not a card, because the layout was measured. See §1.
 
 ## 5 · What's next — the PM picks
 
-1. **⭐ Merge PR #28** *(PM action — everything in it is green)*. It carries `SCRUM-46`'s clan system, `SCRUM-84`'s succession rule and `SCRUM-85`'s tutorial. Until it merges, `main` does not have the clan system at all.
-2. **⭐ The first DEVICE RUN — the highest-value unknown in the project.** Nothing about the clan screens or the tutorial has ever been seen on glass. They are validated only by types, `check:lib` and the `check:clanapi` contract. Run the emulator (traps 1 · 14 · 15 · 16) and drive **tutorial → fork → create → join → manage → book**, then a **second** ritual as a real clan member. ⚠️ Expect this to find defects the gates *cannot* see — S32 found **three** in the write path that had never executed.
-3. **`SCRUM-50` — the QR half of `SCRUM-46`** (generation · scanner · invite deep links). ⚠️ It is **`To Do` with NO sprint** — move it into the active sprint *in the same action* that starts it (rule 2). `clans.code` already exists; the payload is the invite deep link (architecture: doc 07 §4.6).
-4. **The Home clan card** — `SCRUM-46`'s last surface. ⚠️ It needs a **Home design pass**: the signed-off layout has **no free band**, so this is a **design** task before it is a coding one.
-5. **`SCRUM-52` — buy the Tier F floor device** (the named CI phone, four-band acceptance test). A PM purchase, in Sprint 1.
+1. **⭐ Merge PR #29** — ⚠️ **the PM said they will do this OFF-SESSION, so verify `main` first**: if it is still `b81a86e`, the merge has not happened. It carries `SCRUM-50`'s QR invite **and** `SCRUM-86`'s invite-code rule (migration `0015`, **already pushed** to the hosted project). ✅ **Then pull the vault** — the S36 docs reach Obsidian only after the merge (`git -C "$HOME/Documents/Obsidian Vault/Projects/JossPaperAR" fetch origin && … merge --ff-only origin/main`). ⚠️ **PR #28 is already merged** (2026-10-09) — that was the S34 hand-off, and it is done.
+2. **⭐ The first DEVICE RUN — now `SCRUM-88`** (split out of `SCRUM-50` when it closed). It is the **highest-value unknown in the project, and its scope has GROWN**: nothing about the clan screens, the tutorial **or the scanner / QR** has been on glass. Drive **tutorial → fork → create → join → scan a QR → manage → book**, then a **second** ritual as a real clan member — **and a third as an ELDER**, because the `SCRUM-86` boundary has so far been *asserted* (92 contract checks, 25 SQL assertions) but never *seen*. ⚠️ Expect this to find defects the gates *cannot* — S32 found **three** in the write path that had never executed.
+3. ✅ **`SCRUM-50` is CLOSED Done** — the QR invite is built and its gate groups are green. ⚠️ Its residuals are their **own tickets now**: `SCRUM-88` (device run) · `SCRUM-89` (universal links — blocked on the domain, `SCRUM-56` #6) · `SCRUM-90` (🎯 the join queue).
+4. 🏮 **BUILD THE HOME CLAN PILL — ✅ the design is SIGNED OFF (PM, 2026-10-09: *"looks good"*), so this is the next build.** It is `SCRUM-92` (`blocks` `SCRUM-46`, which closed on the PM's split decision). ⚠️ **Build from Penpot version `S36c · pill re-seated per board frame`** — `S36` and `S36b` each carry defects. Four boards (**EN + ZH** × 1 / 2+ clans); the pill is `240,234` · **236×44** · r14, between the app mark and `btn · settings`. ⚠️ **The switcher half already exists** — in `clan/manage.tsx`, not on Home — so the pill **opens it**; do not build a second one. ⚠️ **Nothing here has been seen on glass** — it needs the `SCRUM-88` device run.
+5. **`SCRUM-52` — buy the Tier F floor device** (the named CI phone). ⚠️ **This is now the gate on `SCRUM-53`**: the slice's own acceptance criteria include a run **on the floor device** plus two timing budgets, and the emulator provably cannot settle either.
 6. **`SCRUM-83`'s ZH character-set mismatch** — doc 15 §8 specifies **simplified**, the shipped `i18n.ts` is **traditional**. Small, but it is a real product decision, not a typo.
+7. **`SCRUM-86`** — ✅ **CLOSED Done 2026-10-09** (elder-and-above, enforced in the DB; option B endorsed) · **`SCRUM-87`** — 🐛 the pre-existing SQL red (`bug`/`tests`/`database`), still open. ✅ **`SCRUM-64` also closed Done** the same day.
 
 **Recommended:** (1) then (2). The device run is where the next real bugs are, and it needs nothing but the emulator.
 
@@ -114,16 +122,19 @@ What S34 added, all committed and gated:
 npm install                       # node_modules may be absent in a fresh worktree
 cp .env.example .env              # the worktree needs its own (trap 19)
 npx expo start --android          # run the app on the emulator via Expo Go
-npm run check                     # full local gate suite — expect lib 242, 14 migrations sound
-npm run check:clanapi             # client↔server clan CONTRACT — needs `npx supabase start`
+npm run check                     # full local gate suite — expect lib 293, 15 migrations sound
+npm run check:clanapi             # client↔server clan CONTRACT — needs `npx supabase start` + `db reset` (92/92)
 npm run check:db                  # SQL tests (needs docker + supabase/.temp/pooler-url)
 npm run check:budget              # the live stop-rule proof — free by default
 npx tsc --noEmit                  # expect 0 errors
 
-npx supabase start                # local stack: applies the migrations FROM THE FILES (free, no account)
-npx supabase db reset             # re-apply the migration files; also clears residue (trap 9)
-npx supabase migration list       # ⚠️ verify the REMOTE count before any push (trap 8)
-npx supabase db push --yes        # ⚠️ only after `link` + `migration list` — expect to push 2
+npx supabase start                # local stack (free, no account)
+⚠️ it does NOT apply new migrations to an EXISTING volume — a persisted volume made a
+   migration look applied while it was absent (doc 19 §12.14 trap B). Verify STATE:
+   `select version from supabase_migrations.schema_migrations order by version desc limit 3;`
+npx supabase db reset             # ← the fix: re-applies from the files; also clears residue (trap 9)
+npx supabase migration list       # ⚠️ verify the REMOTE count before any push (trap 8) — expect 15/15, no drift
+npx supabase db push --yes        # ⚠️ only after `link` + `migration list` — expect to push 0
 
 # the SQL suite, run the way that actually works locally (trap 6):
 docker run --rm -i --network host postgres:17 psql \
@@ -139,7 +150,7 @@ fal.ai credit: **≈ US$5.16 spent** of the approved **US$10–20** (≈ **S$6.6
 
 **You may spend freely inside the budget — no need to ask.** ⚠️ Re-derive the total from `project-costs.md` rather than trusting this line; it goes stale silently.
 
-⚠️ **S34 spent US$0.00, and that is the pattern worth copying:** a migration can be proved against a **local Supabase stack on Docker** (real Postgres 17.11 + real PostgREST) for free, so **prefer the local stack to a hosted push** when the goal is verification rather than deployment. The only thing that costs money here is **fal.ai**, and the tutorial exists precisely so that new users never trigger it.
+⚠️ **S35 spent US$0.00 as well (branch `cline/7421e`, `/home/gweejiahan/.cline/worktrees/7421e/JossPaperAR`), and it went one better than S34:** the migrations were pushed to the **hosted** project (free) because the goal there was **deployment**, not verification — and the push was still made safe by a `--dry-run` first. ⚠️ **S34 spent US$0.00, and that is the pattern worth copying:** a migration can be proved against a **local Supabase stack on Docker** (real Postgres 17.11 + real PostgREST) for free, so **prefer the local stack to a hosted push** when the goal is verification rather than deployment. The only thing that costs money here is **fal.ai**, and the tutorial exists precisely so that new users never trigger it.
 
 
 

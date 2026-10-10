@@ -137,8 +137,15 @@ export function actionsFor(viewerRole: ClanRole | null | undefined): ClanAction[
 
 /**
  * A signed-in non-member holding a shared link: the Book, and only the Book.
- * ⚠️ Invite is **Head-only** (doc 15 §3), so an elder's list is narrower than a
- * head's — the difference is asserted in `check:lib`, not left to the screen.
+ * ⚠️ Invite is **elder and above** — ⚠️ **which is what doc 15 §3 has said all
+ * along** (`| Invite new members (link · code · QR) | ✅ | ✅ | ❌ |`). **SCRUM-86**
+ * (PM, 2026-10-09: *"limit link sharing to elder and above seniority"*) confirmed
+ * the spec and closed the two places that had drifted from it: `canInvite` said
+ * `hasHeadPower` (contradicting its own doc), and the database let any member read
+ * `clans.code`. An elder's list and a head's are now the SAME width on this row.
+ * The distinction that remains is that an elder may share a link but still may not
+ * **re-roll** it (`hasHeadPower`) — retiring a link is destructive, sharing is not,
+ * and doc 07 §4.6 already says the code is "re-rollable by a head".
  */
 export function actionsForOutsider(): ClanAction[] {
   return ['book'];

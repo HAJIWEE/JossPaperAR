@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Share, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import { router } from 'expo-router';
 
 import {
@@ -13,6 +13,7 @@ import {
   Screen,
   SectionTitle,
 } from '@/components/clan-ui';
+import { InviteCard } from '@/components/invite-qr';
 import { type ClanSummary, createClan } from '@/lib/clan-api';
 import {
   type CreateStep,
@@ -22,8 +23,7 @@ import {
   previousCreateStep,
   CREATE_STEPS,
 } from '@/lib/clan-flow';
-import { activeLocale, t } from '@/lib/i18n';
-import { INVITE_SHARE_COPY, inviteLink } from '@/lib/invites';
+import { t } from '@/lib/i18n';
 import { text } from '@/theme/tokens';
 
 /**
@@ -38,6 +38,11 @@ import { text } from '@/theme/tokens';
  *
  * ⚠️ Steps 3 and 4 are SKIPPABLE (§4.2: Skip and Continue both lead on). They are
  * not success states to be gated; the clan already exists by then.
+ *
+ * ⚠️ SCRUM-50 — the invite card is now the REAL `InviteCard` (QR + code + share),
+ * replacing a bare code string. The share sheet used to be mounted here and is
+ * now inside the card, so the QR, the code and the shared link can never drift:
+ * all three come from `invites.ts`.
  */
 export default function ClanCreateScreen() {
   const [step, setStep] = useState<CreateStep>('name');
@@ -77,13 +82,6 @@ export default function ClanCreateScreen() {
     const prev = previousCreateStep(step);
     if (prev) setStep(prev);
   }, [step]);
-
-  /** "Share code" — the share sheet, which is also how the link travels (§5.1). */
-  const onShare = useCallback(async () => {
-    if (!created?.code) return;
-    const copy = INVITE_SHARE_COPY[activeLocale()](created.name, created.code);
-    await Share.share({ message: `${copy}\n${inviteLink(created.code)}` });
-  }, [created]);
 
   const stepNumber = createStepIndex(step) + 1;
 
@@ -137,19 +135,12 @@ export default function ClanCreateScreen() {
       {step === 'invite' ? (
         <>
           <SectionTitle>{t('clan.inviteFamily')}</SectionTitle>
-          {created?.code ? (
-            <View style={styles.codeBox}>
-              <Label>{t('clan_code')}</Label>
-              <Text testID="clan-invite-code" selectable style={styles.code}>
-                {created.code}
-              </Text>
-            </View>
-          ) : null}
+          {created?.code ? <InviteCard clanName={created.name} code={created.code} /> : null}
           <PrimaryButton
-            testID="clan-invite-share"
-            label={t('clan.invite')}
+            testID="clan-invite-next"
+            label={t('clan.next')}
             onPress={() => {
-              void onShare();
+              void goNext();
             }}
           />
           <GhostButton label={t('clan.skip')} testID="clan-invite-skip" onPress={() => void goNext()} />
@@ -175,15 +166,5 @@ export default function ClanCreateScreen() {
 }
 
 const styles = StyleSheet.create({
-  codeBox: {
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  code: {
-    color: text.ink,
-    fontSize: 26,
-    fontWeight: '700',
-    letterSpacing: 4,
-  },
   problem: { color: text.cinnabar, fontSize: 14, marginTop: 8 },
 });

@@ -74,11 +74,14 @@ export function parseInviteUrl(input: unknown): string | null {
   if (bare) return bare;
 
   // …/join/{CODE}
-  const pathMatch = new RegExp(`/join/([A-Za-z0-9]{${CODE_LENGTH}})`).exec(trimmed);
+  // ⚠️ The lookahead is load-bearing: without it `/join/ABCDEFGHJ` (nine chars)
+  // matched the first eight and RETURNED A CODE — the very guess this function's
+  // contract forbids. Found by `check:lib` §13 in SCRUM-50.
+  const pathMatch = new RegExp(`/join/([A-Za-z0-9]{${CODE_LENGTH}})(?![A-Za-z0-9_-])`).exec(trimmed);
   if (pathMatch) return normaliseClanCode(pathMatch[1]);
 
   // ?code={CODE} or &code={CODE} or #code={CODE}
-  const queryMatch = new RegExp(`[?&#]code=([A-Za-z0-9]{${CODE_LENGTH}})`).exec(trimmed);
+  const queryMatch = new RegExp(`[?&#]code=([A-Za-z0-9]{${CODE_LENGTH}})(?![A-Za-z0-9_-])`).exec(trimmed);
   if (queryMatch) return normaliseClanCode(queryMatch[1]);
 
   // a JWT-free smart link that nests one, e.g. ?redirect=…%2Fjoin%2FCODE
