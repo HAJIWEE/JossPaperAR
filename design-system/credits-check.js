@@ -106,10 +106,32 @@ function main() {
     `no bundle is under the $${(floor / 100).toFixed(2)}/1,000 floor`,
     belowFloor.map((b) => `${b.credits} at $${(per1000(b) / 100).toFixed(2)}`).join(' · '));
 
-  const average = bundles.reduce((a, b) => a + per1000(b), 0) / bundles.length;
-  ok(average >= floor,
-    `the ladder averages $${(average / 100).toFixed(2)}/1,000, at or above the floor`,
-    `average $${(average / 100).toFixed(4)}`);
+  // 2b · ⚠️ TWO different averages, and the difference is NOT cosmetic. The credit-WEIGHTED
+  //      one is what the shelf actually collects per credit; the naive mean of the five rates
+  //      gives a 500-credit bundle the same say as a 10,000-credit one, which no real basket
+  //      resembles. ⚠️ My first version printed the NAIVE mean as "the ladder average" — $1.24
+  //      where the weighted truth is $1.22 — and I copied that figure into five docs without
+  //      re-deriving it. A check's own message is not evidence.
+  const totalCents = bundles.reduce((a, b) => a + b.priceCents, 0);
+  const totalCredits = bundles.reduce((a, b) => a + b.credits, 0);
+  const weighted = (totalCents / totalCredits) * 1000;
+  const naive = bundles.reduce((a, b) => a + per1000(b), 0) / bundles.length;
+  // ⚠️ DISCLOSURE, NOT INDEPENDENT EVIDENCE: every bundle is already asserted ≥ floor above,
+  //    and a weighted mean of values that are all ≥ floor cannot fall below it — so this line
+  //    can only go red if the check above did. It is here to be VISIBLE, not to add proof.
+  ok(weighted >= floor,
+    `the shelf's credit-weighted average is $${(weighted / 100).toFixed(2)}/1,000 — at or above the floor`,
+    `weighted $${(weighted / 100).toFixed(3)} · naive rate-mean $${(naive / 100).toFixed(3)} (both implied by the per-bundle floor)`);
+
+  // 2c · …and prove the two averages really are different formulas, on FIXED inputs. ⚠️ Testing
+  //      it on the live ladder would be a gate that cries wolf: a legal-but-nearly-flat shelf
+  //      can bring the two within a fraction of a cent, and that is not a defect.
+  const demo = [{ credits: 10000, priceCents: 1200 }, { credits: 500, priceCents: 64 }];
+  const demoWeighted = (demo.reduce((a, b) => a + b.priceCents, 0) / demo.reduce((a, b) => a + b.credits, 0)) * 1000;
+  const demoNaive = demo.reduce((a, b) => a + (b.priceCents / b.credits) * 1000, 0) / demo.length;
+  ok(demoWeighted !== demoNaive,
+    'control: the weighted and naive averages are different quantities',
+    `weighted ${demoWeighted.toFixed(2)}¢ vs naive ${demoNaive.toFixed(2)}¢ on the same pair`);
 
   // 3 · ⚠️ THE ONE THAT MATTERS: the badge is where the formula puts it
   const { bestRate, tied, winner } = bestValue(bundles, tieBreak);
