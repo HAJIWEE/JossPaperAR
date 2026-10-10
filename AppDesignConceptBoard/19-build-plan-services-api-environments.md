@@ -565,7 +565,27 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
-### 12.26 · S38k–o — SCRUM-100: the Credits page re-designed as a purse + price list (2026-10-10)
+### 12.27 · S38q — SCRUM-100: `BEST VALUE` is a formula now, and the formula is gated (2026-10-10)
+
+**The PM:** *"what is the real best value option now. The BEST VALUE Label should be truthful… should be formulaic even in future price adjustments and should truly reflect which IS the BEST VALUE."*
+
+⚠️ **THE HONEST ANSWER WAS THAT THERE IS NO UNIQUE BEST VALUE.** The ladder is linear at the locked rate, so **four bundles tie at exactly $1.55/1,000** (1,000 · 3,000 · 6,000 · 10,000) and **the 500 is the only bundle WORSE than the rate** — **$1.56/1,000, because 155¢ × 500 = 77.5¢ rounds UP**. So a lone `BEST VALUE` on the 1,000 row was **a tie-break's answer, not a fact** — ⚠️ **and a hand-placed label survives a price change by becoming a lie, silently.**
+
+**So the label became a formula:**
+```
+perCredit(b) = price(b) / credits(b)
+bestRate     = min(perCredit)                   ← "best value" = cheapest credit
+winner       = bestRate, then SMALLEST credits  ← the documented tie-break
+```
+The tie-break (best rate for the **least outlay**) is **one line to flip** (`bestValueTieBreak`) and **the formula does not change** — nothing in it hard-codes 1,000.
+
+**✅ New gate `check:credits` (7 checks) — the 16th gate.** `design-system/credits-ladder.json` freezes the shelf **as drawn**, the same pattern as `penpot-pairs.json`, because **CI cannot reach Penpot**. ⚠️ **Fault-tested four ways, and the third is the point:** baseline ✓7 · badge moved off the winner ✗ *("formula says 1000 … the file says 3000")* · ⚠️ **a LEGAL discount — 10,000 to $13.00 — with the badge left behind ✗ ("formula says 10000 … the file says 1000")** · a bundle below the $1.19 floor ✗2 · restored ✓7. ⚠️⚠️ **A permitted price change now MOVES the best value and the build FAILS until the label follows it.** The rule is also written into each board as **plugin data**, and `penpot-sweeps/credits-best-value.js` recomputes and prints the manifest after any price change. ✅ **Verified live: the drawn badge IS the formula's winner on all four boards, and the average holds the floor.**
+
+⚠️ **AND I FIXED A DEFECT IN MY OWN GATE BEFORE TRUSTING IT.** The first version asserted *"every bundle is priced AT the locked rate"* — which would have **blocked the very volume discount doc 10 explicitly permits**. It now asserts *"never above the rate, never below the floor"*, with a 1-cent rounding tolerance for the 500. ⚠️ **A gate that forbids a legal move is the same class of harm as a gate that permits an illegal one** — and this one would have been *fault-tested green*, because my fault tests only broke things toward failure.
+
+⚠️ **The decision this leaves:** a single *factual* winner needs a **volume discount**, which doc 10 permits **down to the $1.19 floor** (the 10,000 bundle at **$11.90** wins outright). That is a **pricing** decision, not a labelling one, and it has not been made — but when it is, the gate says which row to move and **nothing else needs editing**.
+
+
 
 **The PM:** *"after removing the offerings from the credits page now its too empty. can you re-design the whole thing, do not follow the decorations store or offering store design."*
 
