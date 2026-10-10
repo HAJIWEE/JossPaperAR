@@ -69,6 +69,9 @@
 
 | 2026-10-10 | **S43 — `SCRUM-87`: the local SQL suite can be GREEN — `pr3_verification.sql` now 87 checks, exit 0** | Fix the two defects the ticket named, ⚠️ **plus two it could not see** (the file was red and `assert_true` RAISES, so nothing past the first failure had ever run), and make the harness genuinely re-runnable | **US$0.00** — a **local Supabase stack on Docker**, local SQL runs and local gates. **No fal.ai call, no migration, nothing deployed** | — | **S$0.00** | ✅ **no spend** — logged so the zero is on the record rather than absent. fal.ai total unchanged at ≈ **US$5.16 / S$6.61** of the approved US$10–20. |
 | 2026-10-10 | **S44 — the PM's three visual confirmations: `SCRUM-94` · `SCRUM-104` · `SCRUM-105` all closed `Done`, and 104's deferred half became `SCRUM-106`** | Record the PM's rulings in Jira, verify each deliverable is genuinely in `main` before closing it, and file the deferred on-device re-check as its own Sprint 2 ticket | **US$0.00** — Jira comments/transitions, docs, and a **read-only** git verification (`git diff origin/main HEAD` + a pair count). **No fal.ai call, no migration, nothing deployed** | — | **S$0.00** | ✅ **no spend** — logged so the zero is on the record rather than absent. fal.ai total unchanged at ≈ **US$5.16 / S$6.61** of the approved US$10–20. |
+| 2026-10-10 | **S45 — WRAP-UP: `SCRUM-103.3` confirmed, so `SCRUM-103` and `SCRUM-96` both closed `Done`; the hand-over rewritten** | Record the PM's last ruling, close the two tickets it was blocking, and rewrite the hand-over prompt for the next session | **US$0.00** — Jira comments/transitions and docs. **No fal.ai call, no migration, nothing deployed** | — | **S$0.00** | ✅ **no spend** — logged so the zero is on the record rather than absent. ⚠️ **doc 10 was NOT moved** (a locked economy document); the PM's ruling ratified the shipped state instead. fal.ai total unchanged at ≈ **US$5.16 / S$6.61** of the approved US$10–20. |
+
+
 
 
 
