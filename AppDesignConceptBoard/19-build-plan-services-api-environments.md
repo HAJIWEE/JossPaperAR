@@ -606,9 +606,13 @@ The option said *"pass a per-capture attempt count into `submit_burn`"*. ⚠️ 
 
 ⚠️ **My first `R7` was wrong, and its failure was the finding:** I asserted another member burning my capture would be uncapped; the server **refused it outright** (*"is not a styled capture owned by the actor"*). So the per-actor scope is belt-and-braces and the **ownership** check is what holds.
 
-### ⚠️ Not yet live
+### ✅ Now LIVE — pushed, and verified in production
 
-**The cap is verified against a LOCAL stack and has NOT been pushed to the hosted project**, because a fresh worktree is not linked (`supabase/.temp` is gitignored — §12.13). ⚠️ **Until `db push` runs, a tampered client on the deployed backend can still farm bullseyes.** That is why the ticket is `In Review`, not `Done`.
+The PM deployed it, and it was verified **three ways via the Supabase connector**: the history row (`20261010100000`), **16 remote / 16 local — no drift**, ⚠️ **and `pg_proc.prosrc` for `submit_burn` actually CONTAINS the cap** — the comment at offset **9271**, `capture_id = v_capture_id` at **10283**, `v_band := 'devout'` at **10326**.
+
+⚠️ **That third check is the one that matters, and the one the CLI cannot do.** `supabase migration list` proves a **version string** is recorded; it does **not** prove the **function body** changed. **A history row can exist while the body is the old one** — exactly the false-green S35b hit when a persisted volume made a migration *look* applied while it was absent. Reading `prosrc` is the difference between *"the file was accepted"* and *"the enforcement is running"*.
+
+⚠️ **So the deployed backend no longer lets a tampered client farm Bullseyes**, and the promise to the cultural reviewer is kept by the **server**, not by the client's goodwill.
 
 ### Also this session
 
