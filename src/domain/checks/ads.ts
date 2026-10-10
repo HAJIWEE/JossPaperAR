@@ -179,7 +179,7 @@ const RITUAL_VOCABULARY: readonly string[] = [
   'Watch to prepare one more offering.',
   'The shrine is receiving many offerings — yours will be prepared shortly.',
   'The offering could not be prepared — your points have returned.',
-  'Tribute points earned · 正中 · 虔誠 · 擦邊',
+  'Tribute points earned · 正中 · 虔诚 · 擦边',
   'Ancestor altar · tablets · Book of Tributes',
   'Burn joss paper for your ancestors',
 ];

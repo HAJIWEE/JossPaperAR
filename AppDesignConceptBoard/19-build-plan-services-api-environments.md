@@ -565,7 +565,25 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
-### 12.18 · S37b — SCRUM-92: the Home clan pill is BUILT, and it reuses the design rather than re-deciding it (2026-10-10)
+### 12.19 · S37d — SCRUM-95: simplified Chinese, and the check that could not have caught its own mistake (2026-10-10)
+
+**The decision.** PM: *"Simplified Chinese. Has a significant larger market."* That closes option **B** of the three `SCRUM-95` offered. ⚠️ **It was a cultural call, not an engineering one** — the audience is Chinese-reading families in the 40–50s diaspora band, Singapore is officially simplified but has a real traditional-using segment, and `AGENTS.md` calls cultural sensitivity non-negotiable. It had sat **untracked** since S31, visible only as an `⚠️ TRADITIONAL` comment in `i18n.ts` and a line in the handover.
+
+**What moved.** The whole `zh` table **at once** — a partial flip was the thing `SCRUM-92` had refused to do, because a pill in simplified beside traditional neighbours is a **mixed-script screen**, worse than either consistent choice. The sweep then went wider than the ticket expected: the ZH copy also lives in `app/burn.tsx`, `domain/aim.ts` (the band labels), `domain/catalogue.ts` and `domain/quota.ts` — **11 files, 24 lines**, plus `i18n.ts`.
+
+**⚠️⚠️ The most transferable finding: my first conversion was done with a hand-typed list of ~80 traditional forms, and my check of it was worthless.** The list silently missed **`來 · 碼 · 設 · 誠 · 邊 · 輸 · 線 · 內 · 歡 · 錯 · 維 · 機 · 問`** — the output shipped `家人发來了连结` and `設为长老`. Worse, the verification I wrote **grepped only for the characters the list already contained**, so it was structurally incapable of finding a miss: it reported "✅ no traditional character remains" over a table containing thirteen. **This is the same failure as the "12/12" migration count and the `check:contrast` blind spot — a check that cannot fail the right way.**
+
+The fix was to stop authoring the mapping and **use an authoritative one**: **OpenCC's `TSCharacters.txt`** (Apache-2.0, ~5,000 entries), whose first pass immediately converted the 14 characters the hand list had missed. It is now vendored as two positionally-paired strings in **`src/lib/zh-script.ts`** (2,965 pairs, ~9 KB) with its source and licence in the header — so the **repo carries the means to redo the conversion**, and the guard is data, not opinion.
+
+**⚠️ Character-level is not word-level, and the spec caught what the tool could not.** A character pass produces `连结` and `身分`; the correct simplified is **`链接`** and **`身份`**. Both were caught **by cross-checking doc 15 §8's copy table (C2/C10) and the `ZH · 0e9` board** — the spec was right and the conversion was wrong. Two hand fixes, and the lesson: *a converter proves characters; the spec proves wording.*
+
+**The guard.** `check:lib` **section 15** asserts no shipping ZH string carries a traditional character — the `zh` messages, the four band labels, the quota copy, the catalogue names — plus the two word-level cases and a dictionary-size floor so a truncated data table fails loudly. **Fault-tested red twice, restored byte-identical:** `role_head → 族長` (2 failures) and `链接 → 连结` (1 failure, the word-level guard). `check:lib` **321 → 335**.
+
+✅ **And it closes `SCRUM-92` AC 5 without touching a line of it**: the pill returns `ROLE_LABEL_KEY.head` = `role_head`, so the moment the table says **`族长`** the pill matches its board — which is exactly why the key was used instead of a hardcoded string.
+
+⚠️ **Two corrections recorded rather than glossed.** First, my own `SCRUM-95` comment claimed *"all four S36 ZH design boards are simplified"* — they are **mostly**, and **7 strings are still traditional** (`虔誠 · 擦邊 · 對準 · 鍾馗像`), with the simplified forms sitting on *other* boards, so the file contradicts itself. Filed as **`SCRUM-96`**, and ⚠️ **its sweep is INCOMPLETE because the Penpot plugin tab was unreachable** — the ticket says so rather than implying a full pass. Second, the `zh-script.ts` data excludes **256** pairs whose characters are astral (2 UTF-16 units), because the helper pairs the two strings by index and an astral character would shift every later entry; that exclusion is documented in the file.
+
+
 
 **What landed.** `src/lib/clan-pill.ts` (the pure rules) · `src/components/clan-pill.tsx` (the render) · a header row in `src/app/index.tsx` · **34 new `check:lib` assertions** (`321`, was 287 at S36).
 

@@ -62,7 +62,7 @@ for (const band of AIM_BANDS) {
   );
 }
 /* ── the rethrow cap — SCRUM-23 ───────────────────────────────────────────── */
-section('② A rethrow caps at 虔誠 Devout — never 正中 Bullseye (SCRUM-23)');
+section('② A rethrow caps at 虔诚 Devout — never 正中 Bullseye (SCRUM-23)');
 
 check('throw 1 may be a bullseye', grade(0, 1).previewBand === 'bullseye');
 check('throw 2 bullseye attempt → capped to devout', grade(0, 2).previewBand === RETHROW_CAP);

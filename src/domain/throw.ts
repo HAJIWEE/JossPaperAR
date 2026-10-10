@@ -10,10 +10,10 @@
  *   1. turning a gesture into the px offset `deriveBand` expects, and
  *   2. **the rethrow cap** (SCRUM-23) — after a miss, the offering RETURNS to
  *      the hand (S9) and the player may throw again, but a rethrow
- *      **caps at 虔誠 Devout and can never be 正中 Bullseye**.
+ *      **caps at 虔诚 Devout and can never be 正中 Bullseye**.
  *
  * ⚠️ THE RETHROW CAP WAS SPEC'D BUT NEVER ENCODED. It appears in doc 16 §4's
- * Q4 ("Up to 3 throws per offering; a rethrow caps at 虔誠 — never 正中
+ * Q4 ("Up to 3 throws per offering; a rethrow caps at 虔诚 — never 正中
  * (SCRUM-23)") and nowhere in the code. Left unimplemented, a player who
  * misses twice can land a bullseye on the third throw and take 2.0× for what
  * is really a second bite at the same offering — the mechanic pays for a miss.

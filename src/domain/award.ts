@@ -6,8 +6,8 @@
  *
  * Which reproduces the locked numbers exactly (doc 05 §2 / doc 07 §6):
  *   正中 + new ground + streak = 400×2.0×2.0 + 50 = 1,650
- *   虔誠 + new ground + streak = 400×1.5×2.0 + 50 = 1,250
- *   擦邊 + new ground + streak = 400×1.0×2.0 + 50 =   850
+ *   虔诚 + new ground + streak = 400×1.5×2.0 + 50 = 1,250
+ *   擦边 + new ground + streak = 400×1.0×2.0 + 50 =   850
  *   偏失                        =                       0
  *
  * `MAX_AWARD` is the integrity cap (doc 11 §2): 1,650/burn. The clamp is not

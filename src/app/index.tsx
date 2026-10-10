@@ -159,7 +159,7 @@ export default function HomeScaffold() {
         }}
         style={({ pressed }) => [styles.begin, pressed && { opacity: 0.8 }]}
       >
-        <Text style={styles.beginLabel}>Begin an offering · 開始供奉</Text>
+        <Text style={styles.beginLabel}>Begin an offering · 开始供奉</Text>
       </Pressable>
 
       {/* ── the clan surface, for a user with NO clan (SCRUM-92) ─────────────

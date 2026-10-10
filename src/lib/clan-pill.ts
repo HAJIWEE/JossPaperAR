@@ -141,13 +141,14 @@ export interface PillView {
  * (`mine[0]`), so the two agree. A *persisted* active clan does not exist yet;
  * inventing one here would make the pill and the switcher disagree.
  *
- * ⚠️ **`roleLabelKey` deliberately returns an EXISTING key** (`role_head` …;
- * `ROLE_LABEL_KEY`, SCRUM-46). `SCRUM-92`'s AC 5 asks for the board's *simplified*
- * ZH while the shipped `i18n.ts` table is *traditional*, so hardcoding the board's
- * `族长` here would put simplified text inside a screen whose surrounding copy is
- * `族長`/`成員` — a **mixed-script screen**, which is worse than either consistent
- * choice. The script question is the PM's and is filed as **SCRUM-95**; until it is
- * answered the pill reuses the shipped vocabulary and writes NO new CJK copy.
+ * ⚠️ **`roleLabelKey` returns an EXISTING key** (`role_head` …; `ROLE_LABEL_KEY`,
+ * SCRUM-46) rather than a literal — that was the right call while the table was
+ * *traditional* and this AC asked for the board's *simplified* `族长`: hardcoding it
+ * would have put simplified text on a screen whose neighbours read traditional, a
+ * **mixed-script screen**. ✅ **SCRUM-95 has since settled it** (PM, 2026-10-10:
+ * *"Simplified Chinese. Has a significant larger market."*), the table is simplified
+ * throughout, and `role_head` now resolves to **族長 → 族长** — so the pill matches its
+ * board *without a single hardcoded string*, which is precisely why the key was used.
  */
 export function pillView(clans: readonly PillClan[]): PillView {
   const first = clans[0];

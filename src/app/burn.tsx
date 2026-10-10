@@ -163,9 +163,9 @@ export default function BurnScreen() {
         ]}
       >
         <Text style={styles.caption}>This offering lost its place — begin again.</Text>
-        <Text style={styles.caption}>供品已失去記錄，請重新開始。</Text>
+        <Text style={styles.caption}>供品已失去记录，请重新开始。</Text>
         <Pressable accessibilityRole="button" onPress={() => router.replace('/capture')} style={styles.button}>
-          <Text style={styles.buttonLabel}>開始 · Begin</Text>
+          <Text style={styles.buttonLabel}>开始 · Begin</Text>
         </Pressable>
       </View>
     );
@@ -184,7 +184,7 @@ export default function BurnScreen() {
       </View>
 
       <View style={[styles.hud, { paddingTop: insets.top + space.md }]} pointerEvents="none">
-        <Text style={styles.hint}>上滑對準火心拋入 · Swipe up &amp; aim for the heart</Text>
+        <Text style={styles.hint}>上滑对准火心抛入 · Swipe up &amp; aim for the heart</Text>
         <Text style={styles.throws}>
           {throwNumber} / {MAX_THROWS}
         </Text>
@@ -208,22 +208,22 @@ export default function BurnScreen() {
               <Text style={styles.caption}>
                 {/* SCRUM-23: a rethrow is capped at Devout — say so rather than
                     silently grading it lower than the player aimed. */}
-                {preview.capped ? 'A rethrow reaches at most 虔誠 Devout.' : ' '}
+                {preview.capped ? 'A rethrow reaches at most 虔诚 Devout.' : ' '}
               </Text>
             )}
 
             {exhausted ? (
-              <Text style={styles.caption}>The offering rests. 三次已盡。</Text>
+              <Text style={styles.caption}>The offering rests. 三次已尽。</Text>
             ) : (
               <View style={styles.row}>
                 {preview.returns && (
                   <Pressable accessibilityRole="button" onPress={rethrow} style={styles.button}>
-                    <Text style={styles.buttonLabel}>再試 · Try again</Text>
+                    <Text style={styles.buttonLabel}>再试 · Try again</Text>
                   </Pressable>
                 )}
                 {!preview.returns && (
                   <Pressable accessibilityRole="button" onPress={confirm} style={styles.button}>
-                    <Text style={styles.buttonLabel}>確認 · Confirm</Text>
+                    <Text style={styles.buttonLabel}>确认 · Confirm</Text>
                   </Pressable>
                 )}
               </View>

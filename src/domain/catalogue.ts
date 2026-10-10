@@ -141,7 +141,7 @@ export interface Decoration {
 
 export const DECORATIONS: readonly Decoration[] = [
   { code: 'spring_couplets', name: { en: 'Spring Couplets', zh: '春联' }, category: 'side', price: null },
-  { code: 'zhong_kui', name: { en: 'Zhong Kui Print', zh: '鍾馗像' }, category: 'background', price: null },
+  { code: 'zhong_kui', name: { en: 'Zhong Kui Print', zh: '钟馗像' }, category: 'background', price: null },
   { code: 'door_gods', name: { en: 'Door Gods', zh: '门神' }, category: 'side', price: null },
   { code: 'lanterns', name: { en: 'Lanterns', zh: '灯笼' }, category: 'top', price: null },
   { code: 'festive_set', name: { en: 'Festive Set', zh: '新春套装' }, category: 'side', price: null },
