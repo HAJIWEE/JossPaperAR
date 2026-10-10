@@ -41,6 +41,14 @@ jobs:
       - name: Token parity (src/theme/tokens.ts ↔ design-system/tokens.css)
         run: node src/theme/checks/parity.ts
 
+      # ⚠️ The credit shelf's pricing RULE, not the numbers: the largest bundle costs the
+      # base rate and each step DOWN adds a premium step per 1,000 — plus the ceiling, the
+      # floor, and the assertion that BEST VALUE is where the formula puts it. A price
+      # change must move the badge with it or this fails. Frozen manifest
+      # (`design-system/credits-ladder.json`) because CI cannot reach Penpot.
+      - name: Credits ladder (pricing rule · appreciating premium · BEST VALUE formula)
+        run: node design-system/credits-check.js
+
       # THE ACCEPTANCE TEST: the four aim bands + the award maths + the wallet
       # invariant. Zero dependencies (Node 22 strips the types). This is the
       # gate the vertical slice is graded on — not fps (doc 17 §2 A5).
