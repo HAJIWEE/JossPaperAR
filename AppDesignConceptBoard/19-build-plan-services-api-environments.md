@@ -565,7 +565,25 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
-### 12.20 · S37e — SCRUM-97: the copy gate that was blind, and the screenshot that caught what four gates could not (2026-10-10)
+### 12.21 · S37f/g — SCRUM-98: `ZH · 1g` was an untranslated CLONE, and "at least" was right — 24 boards (2026-10-10)
+
+**The report.** *"Zh-1g is still bilingual at least."* ⚠️ **`ZH · 1g 首页 / 离线` was not bilingual — it was an untranslated clone of its EN board.** Ten strings were pure English (`Shrine` · `League` · `Profile` · `Store` · `TRIBUTE POINTS` · `12-day streak` · `Your altar is empty — tap ＋ to add a tablet.` · `Offer something meaningful, once a day` · `Make an Offering` · `Everything here is customizable`), with only the offline banner in Chinese. And *"at least"* was correct: **24 ZH boards, 107 strings.**
+
+**The blind spot is the same one, again.** `check:copy` (SCRUM-97) reads the repo; **CI cannot reach Penpot**, so a design board is invisible to it — the identical conclusion `SCRUM-93` reached for contrast. ⚠️ **This is the third time in one session that a reviewer's eye found what a gate could not see**, which is the honest state of the design file rather than a gap in the code gates.
+
+**The method, and the trap it avoided.** Every English string was looked up against a **twin** — a same-named layer on a sibling ZH board carrying Chinese — and **95 of 107 had one**, so the fix was a **copy, not new copy**. ⚠️ **But a twin was accepted only when its own EN counterpart carries the identical English**, because **layer names alone are not enough**: the `1` and `1a` boards carry *different* Chinese under the same `hint · cta` name (`每日供奉一件有意义之物` vs `从这里开始 — 安放第一座牌位`), so a name-only match could have lifted the **first-run** string onto the **offline** board. Strings failing that test were **skipped and reported, never guessed.**
+
+**Done:** `ZH · 1g` (10 strings, version `S37f`) + **88 strings across 13 boards** (version `S37g`) = **98 strings, 14 boards**.
+
+**✅ Verified for `1g`, against its twin rather than a heuristic.** 17 layers compared with `ZH · 1 Home / 首页`: **all characters match, all ink matches (identical width×height), zero Latin text remains.** ⚠️ The first check I wrote flagged four layers as wrapping at a `inkH > 0.9 × boxH` threshold — **that was my metric being wrong** (one 12 px line inks ~16.5 in an 18 px box), not a defect, and it was replaced by the comparison that actually means something: **the clone must equal the good board.**
+
+⚠️ **NOT verified, and stated rather than implied:** the ink/wrap comparison was completed **for `1g` only**. The tab suspended before the other 88 substitutions were measured. The boards are the same layout family and the changes are character substitutions from a same-state sibling — but **"the box is wide enough for the Chinese" is an assumption I have not measured for those 13 boards.** ⚠️ That is the S36b failure mode exactly: *a Text keeps its old wrap until it is rewritten*, and a box sized for English need not suit Chinese.
+
+⚠️ **Residue — real defects with NO twin, so nothing was copied (~6 strings):** `switcher · Offerings` / `switcher · Decorations` on `ZH · 7e` and `ZH · 7d` (the words `供品`/`装饰` **do exist in the file**, but on differently-named layers, so the strict same-name test correctly refused them), and `chip · no object` = `No object? Choose one` on `ZH · 2f` and `ZH · 2g`. They need either a layer rename to match the file's vocabulary or genuinely new copy — and inventing copy is what this ticket refuses to do.
+
+**✅ Legitimate Latin, recorded so a future sweep does not mangle it:** the invite codes (`GX7K-2M4P` · `GX7K-9Z9Z`), `AR` in the app mark, **`Tan Family`** (the clan name, deliberately un-localised and already asserted as such on the `0e3`/`1h` boards), and `EN` in the language row. ⚠️ **`Xiao Chen`** (`ZH · 0e7`) is flagged, not changed — a *demo clan name*, so `陈氏` would read better on a 中文 board, but the file's convention is not to localise clan names.
+
+
 
 **Found by the reviewer, not by a gate.** *"Some Chinese panels which are marked zh still have English labels in the buttons and titles."* At that moment `tsc`, `check:lib` (382 checks) and `check:contrast` were **all green**. The lesson is the project's oldest one in a new costume: **the gates only see what they were built to see.**
 
