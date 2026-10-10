@@ -1,10 +1,14 @@
 name: CI
 
 # SCRUM-15 — repo + CI. Runs the machine-readable design-system gates on every
-# push and PR to main: WCAG contrast on tokens + decorative-token lint, and the
-# responsive-foundation invariants (type scale, safe areas, touch targets).
+# push and PR to main: WCAG contrast on tokens + decorative-token lint + the
+# frozen Penpot board pairs (SCRUM-93), and the responsive-foundation invariants
+# (type scale, safe areas, touch targets).
 # Both scripts report `skipped` — never a false green — for the build-stylesheet
 # scan until the real app stylesheet exists.
+# ⚠️ The Penpot part asserts `design-system/penpot-pairs.json`, a FROZEN snapshot
+# of board colours — CI cannot reach Penpot. Refresh it with the sweep in
+# `penpot-sweeps/penpot-contrast-sweep.js` after any design-file colour change.
 
 on:
   push:
