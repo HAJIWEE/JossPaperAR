@@ -110,6 +110,17 @@ jobs:
       - name: ADR register integrity (index ↔ files, status agreement)
         run: node AppDesignConceptBoard/ADRs/check-adrs.js
 
+      # SCRUM-89. The universal-link CONFIG — three files that must agree and
+      # that NOTHING in the type system connects: app.json's intentFilters and
+      # associatedDomains, .well-known/assetlinks.json and the AASA file. The
+      # ticket's own warning is why it is a gate rather than a code comment:
+      # "a universal link that is configured wrong fails silently and
+      # identically to not being configured at all". ⚠️ It proves the CONFIG,
+      # not the link — a real tap (or `pm get-app-links … verified`) needs a
+      # live domain AND a signed build, and it prints a RELEASE GUARD for both.
+      - name: App-links config (intentFilters · associatedDomains · .well-known agreement)
+        run: npm run check:links
+
   app-checks:
     name: App checks (typecheck · expo-doctor)
     runs-on: ubuntu-latest
