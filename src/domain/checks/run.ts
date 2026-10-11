@@ -166,8 +166,8 @@ check(
 // into valuable gems". Pinning the ENDS means a later edit cannot quietly drop
 // the bottom of the ladder the answer specified.
 check(
-  "the bottom rung is the PM's wood (木) and the top is a precious stone (鑽石)",
-  LEAGUE_TIERS[0].name_zh === '木' && LEAGUE_TIERS[TOP_TIER - 1].name_zh === '鑽石',
+  "the bottom rung is the PM's wood (木) and the top is a precious stone (钻石)",
+  LEAGUE_TIERS[0].name_zh === '木' && LEAGUE_TIERS[TOP_TIER - 1].name_zh === '钻石',
 );
 
 check(

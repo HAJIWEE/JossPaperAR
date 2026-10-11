@@ -191,6 +191,32 @@ export const MESSAGES = {
     'book_outside': 'A member made this offering.',
     'book_window': 'Showing the last month.',
 
+    // ── the LEAGUE BOARD (SCRUM-11 step 6 · doc 07 §4.7 · doc 18 E7) ───────
+    'league.title': 'League',
+    'league.week': '%{from} – %{to}',
+    'league.yourRank': 'Your rank',
+    'league.rankN': '#%{rank}',
+    'league.points': '%{points}',
+    'league.you': 'You',
+    'league.families': '%{count} families',
+    'league.zones': 'The top 3 rise · the bottom 3 fall',
+    'league.live': 'Live',
+    'league.unreachable': 'The board could not be reached.',
+    // ⚠️ The SERVER's `note` is EN prose and is deliberately NOT rendered — a ZH
+    //    screen cannot localise it. The two states it names are expressed here
+    //    instead, chosen from `cohortId === null` / week dates. See league-api.ts.
+    'league.noWeek': 'The league opens with the first weekly roll.',
+    'league.notPlaced': 'You are not in a cohort this week — the next roll places you.',
+    // ⚠️ THE MOMENT (SCRUM-111 answer C). ONLY the promoted pair animates — see
+    //    `promotionMoment()` in domain/league.ts for why a demotion must not, and
+    //    note that the demoted copy names no fault: no "you lost", no "don't slip".
+    'league.momentPromotedTitle': 'Risen to %{tier}',
+    'league.momentPromotedBody': 'Three families rise each week — yours is one of them.',
+    'league.momentDemotedTitle': 'Moved to %{tier}',
+    'league.momentDemotedBody': 'Three families move down each week. A new week begins today.',
+    'league.momentHeldTitle': 'Held at %{tier}',
+    'league.momentHeldBody': 'Your family stays in %{tier} this week.',
+
     // ── privacy (doc 13 §5/§8, ADR-007) ───────────────────────────────────
     'privacy.firstRun':
       "Your photos, your ancestors' names, and where you pay tribute stay in your account. We use them only to make your offering — never sold, never in ads.",
@@ -338,6 +364,26 @@ export const MESSAGES = {
     'book_header': '供奉簿',
     'book_outside': '由宗族成员供奉。',
     'book_window': '仅显示最近一个月。',
+
+    // ── 联赛榜（SCRUM-11 第 6 步 · doc 07 §4.7 · doc 18 E7）────────────────
+    'league.title': '联赛',
+    'league.week': '%{from} – %{to}',
+    'league.yourRank': '你的名次',
+    'league.rankN': '第 %{rank} 名',
+    'league.points': '%{points}',
+    'league.you': '你',
+    'league.families': '%{count} 个家族',
+    'league.zones': '前三名晋升 · 后三名下降',
+    'league.live': '实时',
+    'league.unreachable': '暂时无法取得榜单。',
+    'league.noWeek': '联赛将在第一次每周结算时开始。',
+    'league.notPlaced': '本周你尚未分组——下次结算将为你分组。',
+    'league.momentPromotedTitle': '晋升至%{tier}',
+    'league.momentPromotedBody': '每周有三个家族晋升——你是其中之一。',
+    'league.momentDemotedTitle': '降至%{tier}',
+    'league.momentDemotedBody': '每周有三个家族下降。新的一周从今天开始。',
+    'league.momentHeldTitle': '留在%{tier}',
+    'league.momentHeldBody': '本周你的家族留在%{tier}。',
 
     'privacy.firstRun':
       '您的照片、先人姓名与祭拜位置只属于您的账号，仅用于制作供品。我们绝不出售这些资料。',

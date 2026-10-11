@@ -52,6 +52,7 @@ import {
 } from '../queue.ts';
 import { QUOTA_SPENT_COPY } from '../../domain/quota.ts';
 import { AIM_BANDS } from '../../domain/aim.ts';
+import { LEAGUE_TIERS } from '../../domain/league.ts';
 import { OFFERINGS } from '../../domain/catalogue.ts';
 import { INITIAL_OFFERING, applyAll, isWaiting, nextAction } from '../../domain/slice.ts';
 import { eventsFromResponse } from '../ritual-map.ts';
@@ -1097,6 +1098,16 @@ function zhScriptChecks(): void {
   const tradOfferings = OFFERINGS.filter((o) => traditionalCharsIn(o.name.zh ?? '').length > 0);
   check(`${OFFERINGS.length} catalogue zh names are simplified`, tradOfferings.length === 0,
     tradOfferings.map((o) => o.name.zh).join(' · '));
+
+  // ⚠️ ADDED WITH SCRUM-11 STEP 6, and it closed a real hole rather than widening
+  //    coverage for its own sake: the league ladder shipped `銅` · `鐵` · `鑽石` and
+  //    nothing failed, because this section scanned the message table, the aim bands,
+  //    the quota copy and the catalogue — but never a constant living in `domain/`.
+  //    The PM's 2026-10-10 answer applies to every shipping ZH string, not only the
+  //    ones that happen to sit in `i18n.ts`.
+  const tradTiers = LEAGUE_TIERS.filter((t) => traditionalCharsIn(t.name_zh).length > 0);
+  check(`${LEAGUE_TIERS.length} league tier names are simplified`, tradTiers.length === 0,
+    tradTiers.map((t) => `${t.name_en}=${t.name_zh}`).join(' · '));
 
   // ⚠️ the two word-level cases a character pass gets wrong
   check('the link copy is 链接, not 连结 (doc 15 §8 C10)', zh['clan.shareCode'].includes('链接'));
