@@ -14,7 +14,11 @@ prove it — that bypasses the association check.
 
 ---
 
-## ⛔ These files are NOT ready to deploy — two values are placeholders
+## ⚠️ The files ARE deployed — but two values are still placeholders
+
+Deploying them as-is is **safe**: a fingerprint that matches nothing behaves
+exactly like no configuration at all. What it is **not** is *working* — the link
+stays **unverified** until the real values are filled.
 
 Both can only be known **after a signed build**, so they are **all-zero
 sentinels** that cannot be mistaken for real values:
@@ -66,10 +70,23 @@ The link must land somewhere useful when the app is **not** installed:
 
 ## The two prerequisites
 
-1. **The domain exists and serves these files** — 🟡 **half done.** `josspaperar.app`
-   was **registered 2026-10-10** (Cloudflare Registrar, renews **2027-10-10**) and
-   its zone is live and authoritative on Cloudflare — but it publishes **nothing
-   yet**: no records, no host. What remains is *hosting*, below.
+1. **The domain exists and serves these files** — ✅ **DONE, proven live 2026-10-11.**
+   `josspaperar.app` (registered 2026-10-10 via Cloudflare Registrar, renews
+   **2027-10-10**) serves both files with a valid certificate and **no redirects**.
+   Measured, not assumed:
+
+   | Check | Result |
+   |---|---|
+   | `/.well-known/assetlinks.json` | **200** · `application/json` · `redirects=0` |
+   | `/.well-known/apple-app-site-association` | **200** · `application/json` · `redirects=0` |
+   | `/join/{CODE}` | **302** → the Play listing for `app.josspaperar` |
+   | TLS | valid (`ssl_verify_result=0`) |
+
+   ⚠️ **`redirects=0` is the load-bearing number** — Apple requires the file be
+   hosted *"with no redirects"*, and a single `301` here breaks iOS silently.
+   ⚠️ The root `/` returns **404 with an empty body**. That is **correct, not a
+   fault**: this host exists to serve these two files and the store fallback, not
+   a website. (`curl https://josspaperar.app/` legitimately prints nothing.)
 2. **A signed build exists**, so the Android fingerprint is knowable.
 
 ## Deploying it — the hosting config
