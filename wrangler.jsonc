@@ -18,27 +18,41 @@
   // Per the Cloudflare docs: "Set this to today's date".
   "compatibility_date": "2026-10-11",
 
-  // Workers Logs. ⚠️ On THIS Worker this is a PRIVACY setting, not a config
-  // detail — please read the note below before changing `invocation_logs`.
+  // Workers Logs. ⚠️ MEASURED 2026-10-11 — on THIS Worker it captures NOTHING.
   //
-  // Why it earns its place: an invocation log is how you SEE Apple's CDN fetching
-  // the AASA and Android fetching assetlinks.json. That visibility is the one
-  // diagnostic this ticket otherwise lacks.
+  // The config below is correct and IS live (verified via the API: `enabled: true`,
+  // `redact_query_string: true`). But a telemetry query over the hour in which real
+  // traffic hit both `.well-known` paths AND `/join/{CODE}` returned **0 events**,
+  // on the events, invocations and traces views alike.
   //
-  // ⚠️ THE COST, stated rather than left implicit: each invocation log's message
-  // "describes the request method and THE REQUEST URL" — and this Worker also
-  // serves `/join/{CODE}`, an 8-char *capability* that doc 07 §4.6 says is
-  // "excluded from analytics/logs". So enabling invocation logs puts invite codes
-  // into Cloudflare log storage. Bounded: account-private, 3–7 day retention, and
-  // the code is re-rollable by a head — but it IS a departure from the stated rule.
+  // CAUSE — an upstream, long-standing Cloudflare bug: requests served by the
+  // **static-assets layer** do not reach Workers Logs or tail events.
+  // cloudflare/workers-sdk#8724, "Static Assets is not compatible with Workers
+  // Logs" — closed Apr 2025 as not-reproducible, then re-reported Oct 2025,
+  // Feb 2026 and Jul 2026. A reproduction comment pins it: "Console logs work
+  // UNTIL I add [assets] … directory", and "user workers with an assets binding
+  // stopped showing up in tail events ENTIRELY".
+  //
+  // ⚠️ Every request here is served by that layer — `/.well-known/*` as an asset
+  // and `/join/*` via `_redirects` — and this is an ASSETS-ONLY Worker
+  // (`has_modules: false`), so there is no script invocation for a log to describe.
+  //
+  // ⚠️ TWO CLAIMS WERE MADE THE OTHER WAY AND BOTH ARE NOW CORRECTED BY MEASUREMENT:
+  //  · PRIVACY. The invite-code exposure this file used to warn about does NOT
+  //    materialise: no code can be logged, because nothing is logged. Doc 07 §4.6's
+  //    "excluded from analytics/logs" holds here BY CONSTRUCTION, not by policy.
+  //  · DIAGNOSTIC. The benefit claimed on PR #35 does not materialise either — you
+  //    CANNOT watch Apple's CDN or Android fetch the association files from here.
+  //
+  // Left enabled on purpose: it costs nothing, captures nothing, and begins working
+  // by itself if Cloudflare fixes #8724 — or the day a Worker script is added.
   "observability": {
     "enabled": true,
 
-    // ⚠️ Does NOT protect the invite code. The code sits in the PATH
-    // (`/join/{CODE}`); this setting only strips the QUERY STRING — schema:
-    // "Whether query strings are removed from request URLs in logs and traces."
-    // Kept ON as hygiene: nothing here ever needs a query string logged, and the
-    // custom-scheme fallback (`josspaperar://join?code=…`) does use one.
+    // Kept as hygiene rather than as protection: nothing here ever needs a query
+    // string logged, and the custom-scheme fallback (`josspaperar://join?code=…`)
+    // uses one. It would not have covered a code in the PATH anyway — and on the
+    // evidence above, neither was ever needed.
     "redact_query_string": true,
 
     "logs": {
@@ -63,5 +77,27 @@
   //    be parsed by Workers and its rules will be applied."
   "assets": {
     "directory": "./public/"
-  }
+  },
+
+  // ⚠️ REQUIRED — without it EVERY PR's Cloudflare check FAILS.
+  //
+  // Cloudflare runs the Preview command (default `npx wrangler preview`) on every
+  // NON-production branch — i.e. every PR. It refuses to run without this block:
+  //
+  //   ✘ [ERROR] Your Wrangler configuration is missing a `previews` block to run
+  //     this command. Add the following to your configuration file:
+  //       { "previews": {} }
+  //
+  // It may be EMPTY. Docs, verbatim: "The `previews` block is required, but it
+  // can be empty if your Preview does not need separate settings." Assets,
+  // compatibility settings, migrations and placement stay at the TOP LEVEL and
+  // are deliberately not repeated here. Schema: `previews` → `PreviewsConfig`.
+  //
+  // ⚠️ THE TRAP THIS CLOSES: that failure surfaces ONLY as a GitHub check-run
+  // named "Workers Builds: josspaperar-links". It is INVISIBLE to `npm run check`
+  // and to `.github/workflows/ci.yml` — and an earlier pass on this repo duly
+  // reported "CI green" while it was RED on two merged PRs (#34 and #35).
+  // `check:links` now asserts this key, so the blind spot is closed rather than
+  // remembered.
+  "previews": {}
 }

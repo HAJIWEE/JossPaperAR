@@ -268,7 +268,7 @@ check(
 
 // Observability controls — the schema sets `additionalProperties: false`, so a
 // misspelled key is not ignored, it FAILS the deploy. These prove it is caught.
-const OBS_PREFIX = '{"name":"x","assets":{"directory":"./public/"},"observability":';
+const OBS_PREFIX = '{"name":"x","assets":{"directory":"./public/"},"previews":{},"observability":';
 check(
   'an INVALID observability key is reported (schema: additionalProperties:false)',
   validateWranglerConfig(`${OBS_PREFIX}{"logz":{"enabled":true}}}`).length > 0,
@@ -285,7 +285,11 @@ check(
 );
 check(
   'comment-stripping does not trip on "main" SPOKEN INSIDE a comment',
-  validateWranglerConfig('{\n  // no "main": assets-only, on purpose\n  "name":"x",\n  "assets":{"directory":"./public/"}\n}').length === 0,
+  validateWranglerConfig('{\n  // no "main": assets-only, on purpose\n  "name":"x",\n  "assets":{"directory":"./public/"},\n  "previews":{}\n}').length === 0,
+);
+check(
+  'a wrangler.jsonc MISSING the `previews` block is reported',
+  validateWranglerConfig('{"name":"x","assets":{"directory":"./public/"}}').length > 0,
 );
 check('an empty _headers is reported (no content type)', validateHeaders('').length > 0);
 

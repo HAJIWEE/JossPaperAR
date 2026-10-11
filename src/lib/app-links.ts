@@ -385,6 +385,16 @@ export function validateWranglerConfig(text: string): string[] {
   if ('main' in root) {
     problems.push('"main" must not be set — no Worker script exists in this repo, so this must be an ASSETS-ONLY Worker');
   }
+  // ⚠️ Not cosmetic: Cloudflare runs the Preview command (`npx wrangler preview`)
+  // on every NON-production branch, i.e. every PR, and it REFUSES to run without
+  // this block — failing only as a GitHub check-run ("Workers Builds: …") that
+  // `npm run check` and `ci.yml` cannot see. That is how it went unnoticed on two
+  // merged PRs. Docs: "The `previews` block is required, but it can be empty."
+  if (!('previews' in root)) {
+    problems.push(
+      '"previews" is missing — every PR\'s Cloudflare preview build FAILS without it, and only in a check-run `npm run check` cannot see (the block may be empty: `"previews": {}`)',
+    );
+  }
   const observability = root.observability as Record<string, unknown> | undefined;
   if (observability && typeof observability === 'object') {
     problems.push(...unknownConfigKeys(observability, OBSERVABILITY_KEYS, 'observability'));
