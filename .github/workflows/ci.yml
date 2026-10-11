@@ -119,7 +119,7 @@ jobs:
       # not the link — a real tap (or `pm get-app-links … verified`) needs a
       # live domain AND a signed build, and it prints a RELEASE GUARD for both.
       - name: App-links config (intentFilters · associatedDomains · .well-known agreement)
-        run: npm run check:links
+        run: node src/lib/checks/app-links.ts
 
   app-checks:
     name: App checks (typecheck · expo-doctor)
