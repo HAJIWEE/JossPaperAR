@@ -561,7 +561,17 @@ begin
   v_r := public.get_league_board();
   perform pg_temp.assert_true((v_r->>'my_weekly_points')::bigint = 49500,
     'get_league_board reads the caller''s weekly tribute from the ledger (INVOKER + RLS)');
-  perform pg_temp.assert_true(v_r ? 'note', 'the board is an honest stub — cohorts arrive with SCRUM-11');
+  -- ⚠️ SCRUM-11 STEP 3 changed this assertion DELIBERATELY. The board is no longer
+  -- a stub, so it now always returns the SAME key set whether the caller is
+  -- placed or not — `tier`/`my_rank` exist as KEYS even when their value is
+  -- null. Asserting the whole set is what stops a future edit from quietly
+  -- dropping a field a client renders.
+  perform pg_temp.assert_true(
+    v_r ? 'week_start' and v_r ? 'week_end' and v_r ? 'cohort_id'
+      and v_r ? 'cohort_no' and v_r ? 'tier' and v_r ? 'rows'
+      and v_r ? 'members' and v_r ? 'my_weekly_points' and v_r ? 'my_rank'
+      and v_r ? 'note',
+    'get_league_board returns the FULL SCRUM-11 key set, placed or not');
 
   -- ── delete_my_data: the one-tap delete verifies itself ────────────────
   perform set_config('request.jwt.claims',

@@ -1,5 +1,5 @@
 /**
- * THE CLIENT ↔ SERVER CONTRACT for the clan API — SCRUM-46.
+ * THE CLIENT ↔ SERVER CONTRACT for the CLAN and LEAGUE APIs — SCRUM-46.
  *
  *   npx supabase start
  *   SUPABASE_URL="http://127.0.0.1:54321" \
@@ -381,6 +381,54 @@ section('cleanup');
   check('…and so can the NAMED successor', d3.error === null, d3.error?.message);
   const d4 = await B.client.rpc('delete_clan', { p_clan_id: clanFour });
   check('…and the 9d clan is cleaned up too', d4.error === null, d4.error?.message);
+}
+
+// ═══ SCRUM-11 · THE LEAGUE BOARD ══════════════════════════════════════════════
+// `src/lib/league-api.ts` will have NO generated DB types either, so the same
+// argument holds as for the clan RPCs: a renamed parameter or a renamed response
+// field is invisible to `tsc` and to `check:lib`, and fails only on a device —
+// as a blank board rather than an error message.
+section('SCRUM-11 · get_league_board — the league contract');
+
+{
+  const { client } = await newDevice();
+  const { data, error } = await client.rpc('get_league_board');
+
+  check('get_league_board is callable with NO arguments', !error,
+    error ? error.message : undefined);
+  check('it returns an object', data !== null && typeof data === 'object');
+
+  // ⚠️ THE FULL KEY SET, asserted rather than sampled. The board returns the SAME
+  // keys whether or not the caller is placed, so a client renders ONE shape —
+  // and a dropped field shows up as a silently blank row, not as a failure.
+  for (const key of ['week_start', 'week_end', 'cohort_id', 'cohort_no', 'tier',
+                     'rows', 'members', 'my_weekly_points', 'my_rank', 'note']) {
+    check(`  … has the "${key}" field`, data !== null && typeof data === 'object' && key in data);
+  }
+
+  // A brand-new device has burned nothing and belongs to no cohort yet, so these
+  // are the documented UNPLACED answers — which is itself the assertion that a
+  // fresh user gets a renderable board instead of an error.
+  check('a fresh device has no cohort yet', data?.cohort_id === null || data?.cohort_id === undefined);
+  check('  … and is told WHY, in `note`', typeof data?.note === 'string' && data.note.length > 0);
+  check('  … and has zero weekly points', Number(data?.my_weekly_points) === 0);
+  check('  … and an empty board rather than an error', Array.isArray(data?.rows) && data.rows.length === 0);
+  check('  … and no rank', data?.my_rank === null || data?.my_rank === undefined);
+
+  // The roll's own RPCs must NOT be reachable from a client — `service_role`
+  // only, the `submit_burn` shape. This proves PostgREST agrees with the grant.
+  const asClient = await client.rpc('roll_league_week');
+  check('a signed-in client CANNOT trigger a roll', !!asClient.error,
+    'expected a permission error, but the call went through');
+
+  // And an UNSIGNED client reaches neither, because the EXECUTE grant was revoked
+  // from `anon` as well as from `public`.
+  const anon = createClient(URL, ANON, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+  const anonCall = await anon.rpc('get_league_board');
+  check('an UNSIGNED client cannot read the board', !!anonCall.error,
+    'expected a permission error, but the call went through');
 }
 
 // ═══ RESULT ════════════════════════════════════════════════════════════════
