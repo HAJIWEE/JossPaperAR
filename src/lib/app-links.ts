@@ -230,6 +230,47 @@ export function playListingUrl(packageName: string): string {
 }
 
 /**
+ * The ONLY keys Wrangler's schema allows under `observability` — transcribed from
+ * the published config schema (`unpkg.com/wrangler/config-schema.json` →
+ * `definitions.Observability`).
+ *
+ * ⚠️ Transcribed *because* that definition sets `"additionalProperties": false`:
+ * a guessed or misspelled key is **not** ignored, it **fails the deploy**. Since
+ * guessing is the failure mode, an allow-list is the guard.
+ */
+export const OBSERVABILITY_KEYS = [
+  'enabled',
+  'head_sampling_rate',
+  'redact_query_string',
+  'issues',
+  'logs',
+  'traces',
+] as const;
+
+/** The same, for `observability.logs` (schema: `definitions.Observability…logs`). */
+export const OBSERVABILITY_LOGS_KEYS = [
+  'enabled',
+  'head_sampling_rate',
+  'invocation_logs',
+  'persist',
+  'destinations',
+] as const;
+
+/** Keys present in `value` that the schema does not allow at `where`. */
+export function unknownConfigKeys(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+  where: string,
+): string[] {
+  return Object.keys(value)
+    .filter((key) => !allowed.includes(key))
+    .map(
+      (key) =>
+        `"${where}.${key}" is not a Wrangler config key — the schema sets additionalProperties:false, so it FAILS the deploy`,
+    );
+}
+
+/**
  * Strip `//` and block comments from JSONC, ignoring comment markers inside
  * strings — so a `wrangler.jsonc` that merely *mentions* `"main"` in a comment
  * cannot make this validator lie.
@@ -343,6 +384,14 @@ export function validateWranglerConfig(text: string): string[] {
   }
   if ('main' in root) {
     problems.push('"main" must not be set — no Worker script exists in this repo, so this must be an ASSETS-ONLY Worker');
+  }
+  const observability = root.observability as Record<string, unknown> | undefined;
+  if (observability && typeof observability === 'object') {
+    problems.push(...unknownConfigKeys(observability, OBSERVABILITY_KEYS, 'observability'));
+    const observabilityLogs = observability.logs as Record<string, unknown> | undefined;
+    if (observabilityLogs && typeof observabilityLogs === 'object') {
+      problems.push(...unknownConfigKeys(observabilityLogs, OBSERVABILITY_LOGS_KEYS, 'observability.logs'));
+    }
   }
   return problems;
 }
