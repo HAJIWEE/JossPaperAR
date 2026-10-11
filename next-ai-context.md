@@ -117,6 +117,7 @@
 ---
 
 ## 🕐 Recent sessions (one line each)
+- **S55 (2026-10-11)** — `SCRUM-11` **steps 1–6** (the league schema · the roll engine · `pg_cron` proven by a REAL firing · the real `get_league_board()` under a 111-check contract · the streak spec `doc 22` · the Penpot league pairs · the CLIENT board + its LIVE channel + answer C's moment) **plus the whole streak-timezone chain**: `SCRUM-112` answered (Done) and `SCRUM-113` answered **and DELIVERED** (Done) — the streak, the quota, the decay tick and the derived ceiling now key off the user's **LOCAL** day, forward-only and **≥23 h**. `SCRUM-114` raised (a **Penpot surface** for the moment — the one thing still owed). ⚠️ **PR #40 OPEN (13 commits); PR #39 was CLOSED unmerged, so its S53/S54 doc edits live only on `cline/9059b-eas-docs`.** `SCRUM-11` → **In Review**.
 
 | # | Date | What landed |
 |---|---|---|

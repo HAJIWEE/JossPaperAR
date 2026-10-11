@@ -7,6 +7,10 @@
 ## 🎯 Immediate Actions (Next 1–2 Weeks)
 
 ### 🔴 On the critical path
+- ⚠️ **REVIEW PR #40 (S55) — `SCRUM-11` steps 1–6 + the streak-timezone chain, and it is the ONLY open PR.** Branch `cline/9059b-league`, **13 commits**, base `main` = `6132851`. ⚠️ **PR #39 was CLOSED unmerged**, so the S53/S54 doc edits exist only on `cline/9059b-eas-docs` — re-land them deliberately if that content is wanted; do not assume. The same PR carries `get_league_board()` (contract-tested, 111 checks), the streak spec (doc 22), the Penpot league pairs, the client board + its LIVE channel, and `SCRUM-113`'s local-day adoption. **`SCRUM-11` is `In Review`.**
+- **`SCRUM-114` — a Penpot surface for answer C's promotion moment.** The moment is built, localised, contrast-checked and animated ONLY where it should be, so nothing is *broken* — it is **under-designed** relative to the PM's answer. `To Do` in the backlog, which is correct: it is not in flight.
+- ⚠️ **The board's server `note` is EN prose** and must NOT be rendered on a ZH screen — it arrives as *data*, so `check:copy` cannot see it. The screen picks its own localised copy from `cohortId`/`weekStart`; a server-side `note_code` is the clean fix. Recorded in `src/lib/league-api.ts`.
+
 
 > **Sequenced by [[AppDesignConceptBoard/18-mvp-scope-and-timeline|doc 18]] (S27).** The scope, dependency map, estimates, milestones, risks and testing plan are locked there — this file tracks only the *actions*.
 
