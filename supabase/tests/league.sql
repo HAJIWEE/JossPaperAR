@@ -79,9 +79,20 @@ begin
     format('insert into public.cohorts (week_id, tier) values (%L, 0)', v_week),
     'tier is a rung, and 0 is not a rung');
 
-  insert into public.cohorts (week_id, tier) values (v_week, 1) returning id into v_co2;
+  -- ⚠️ STEP 2 TIGHTENED THIS ASSERTION. A tier MAY hold several cohorts — a
+  -- tier that overflows 30 members opens `cohort_no` 2 — but they must be
+  -- DISTINGUISHABLE, so the unique key is (week_id, tier, cohort_no). This test
+  -- originally asserted only "not unique on (week_id, tier)", which step 2's new
+  -- "column made insufficient: the set-based fill has to address ONE cohort, and
+  -- without the discriminator it could not.
+  insert into public.cohorts (week_id, tier, cohort_no) values (v_week, 1, 2)
+    returning id into v_co2;
   perform pg_temp.assert_true(v_co <> v_co2,
-    'a tier MAY hold several cohorts — (week_id, tier) is not unique');
+    'a tier MAY hold several cohorts — distinguished by cohort_no');
+
+  v_err := pg_temp.expect_error(
+    format('insert into public.cohorts (week_id, tier, cohort_no) values (%L, 1, 2)', v_week),
+    'but the SAME (week, tier, cohort_no) twice IS rejected');
 
   raise notice '── cohort_members: the tombstone rule ──────────────────────';
 
