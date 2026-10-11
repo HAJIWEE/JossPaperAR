@@ -14,19 +14,25 @@ prove it — that bypasses the association check.
 
 ---
 
-## ⚠️ The files ARE deployed — but two values are still placeholders
+## ✅ The Android fingerprint is REAL — one placeholder remains
 
-Deploying them as-is is **safe**: a fingerprint that matches nothing behaves
-exactly like no configuration at all. What it is **not** is *working* — the link
-stays **unverified** until the real values are filled.
+| Value | State |
+|---|---|
+| `sha256_cert_fingerprints` in `assetlinks.json` | ✅ **REAL** — filled from the first EAS build (below) |
+| `appID` in `apple-app-site-association` | ⚠️ **still the all-zero sentinel** — needs the **Apple Developer Team ID**, and iOS is deferred (`ADR-001`/`ADR-003`) |
 
-Both can only be known **after a signed build**, so they are **all-zero
-sentinels** that cannot be mistaken for real values:
+**How the fingerprint was derived — from the actual signed artifact, not a dashboard readout.**
 
-| Placeholder | File | Where the real value comes from |
-|---|---|---|
-| `sha256_cert_fingerprints` — `00:00:…:00` | `assetlinks.json` | the app's **signing certificate**: from an **EAS build** (`eas credentials`), or the local debug keystore's SHA-256 |
-| `appID` — `0000000000.app.josspaperar` | `apple-app-site-association` | the **Apple Developer Team ID** + the bundle id (iOS is deferred — ADR-001/ADR-003) |
+EAS build `bc92bdce-0504-4115-9bd6-47fd0568ddf7` (`--profile preview`, Android, `versionCode 1`) produced an APK; `apksigner` read its v2 signer:
+
+```
+V2 Signer: certificate SHA-256 digest: 4bd8b24e606a14824a430f2e9bdd7cfc3b704027fda46e88c6fdf12405abffa2
+  →  4B:D8:B2:4E:60:6A:14:82:4A:43:0F:2E:9B:DD:7C:FC:3B:70:40:27:FD:A4:6E:88:C6:FD:F1:24:05:AB:FF:A2
+```
+
+⚠️ **`keytool -printcert -jarfile` CANNOT read this APK.** It is **v2-only signed** (`v1: false`), so there is no `META-INF/*.RSA` and `keytool` prints nothing — a silent-looking failure. Use **`apksigner`**, which lives in the Android SDK's **`build-tools`** (`/opt/android-sdk/build-tools/*/`), *not* `platform-tools`.
+
+⚠️ **If the app is ever published via Play with Play App Signing, Google re-signs it.** The *installed* certificate then becomes Google's, and a **second** fingerprint must be added here. Not true today — nothing is on Play — but it will be the moment item #10 (#Play Console) lands.
 
 `npm run check:links` **checks the structure and the cross-file agreement** and
 prints a **RELEASE GUARD** while a sentinel is still in place. It cannot fill

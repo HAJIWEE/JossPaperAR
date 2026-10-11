@@ -224,6 +224,82 @@ export const HEADERS_FILE = '_headers';
 /** Where the fallback must send a browser with no app installed. */
 export const PLAY_LISTING_PREFIX = 'https://play.google.com/store/apps/details?id=';
 
+/**
+ * The EAS build config — `SCRUM-56` #4.
+ *
+ * ⚠️ Why this is GATED and not merely filed: without a **signed** build the cert
+ * SHA-256 is unknowable, so `assetlinks.json` keeps its all-zero sentinel and the
+ * link can never be verified. `eas.json` is the first link in that chain:
+ *
+ *   `eas login` → `eas build --profile preview` → an installable APK
+ *     → the RELEASE cert SHA-256 → fills the sentinel
+ *       → `adb shell pm get-app-links app.josspaperar` can finally report `verified`
+ *
+ * A missing `eas.json` fails as silently as everything else here: nothing in the
+ * type system notices, `expo-doctor` does not care, and the only symptom is a link
+ * that opens the browser instead of the app.
+ *
+ * ⚠️ `eas.json` is parsed as **strict JSON** by EAS CLI, so it CANNOT carry
+ * comments — which is why this explanation lives here instead of in the file.
+ */
+export const EAS_CONFIG_FILE = 'eas.json';
+
+/** `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` — the EAS project id format. */
+export const EAS_PROJECT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * Validate `expo.extra.eas.projectId` — the id `eas build:configure` writes.
+ *
+ * ⚠️ Without it `eas build` cannot tell WHICH EAS project to build (it prompts,
+ * or fails), so there is no signed build, no cert SHA-256, and the sentinel in
+ * `assetlinks.json` can never be replaced. That is the whole chain.
+ */
+export function validateEasProjectId(expoConfig: Record<string, unknown>): string[] {
+  const extra = expoConfig.extra as Record<string, unknown> | undefined;
+  const eas = extra?.eas as Record<string, unknown> | undefined;
+  const projectId = eas?.projectId;
+  if (projectId === undefined) {
+    return ['expo.extra.eas.projectId is missing — `eas build` cannot resolve the EAS project, so no signed build (and no fingerprint) is possible'];
+  }
+  if (!EAS_PROJECT_ID_PATTERN.test(String(projectId))) {
+    return [`expo.extra.eas.projectId is not a UUID: ${JSON.stringify(projectId)}`];
+  }
+  return [];
+}
+/** The three profiles EAS CLI's own default generates (Expo docs: "the default configuration for eas.json generated in a new project"). */
+export const EAS_REQUIRED_PROFILES = ['development', 'preview', 'production'] as const;
+
+/**
+ * Validate `eas.json`. Returns PROBLEMS (empty = good).
+ *
+ * Deliberately SHALLOW: it asserts only what Expo's documentation states — that
+ * the file parses as strict JSON and carries a `build` object with the three
+ * default profiles. It does not police profile contents, because inventing rules
+ * the vendor does not have would be a gate that fails for the wrong reason.
+ */
+export function validateEasConfig(text: string): string[] {
+  const problems: string[] = [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    return [
+      `${EAS_CONFIG_FILE} is not valid JSON — EAS CLI parses it strictly, so comments are NOT allowed: ${(error as Error).message}`,
+    ];
+  }
+  const build = (parsed as { build?: unknown } | null)?.build;
+  if (!build || typeof build !== 'object') {
+    problems.push('the "build" key is missing — EAS CLI would have no profiles to build');
+    return problems;
+  }
+  for (const profile of EAS_REQUIRED_PROFILES) {
+    if (!(profile in (build as Record<string, unknown>))) {
+      problems.push(`the "${profile}" build profile is missing`);
+    }
+  }
+  return problems;
+}
+
 /** The Play listing for a given package id — derived, never re-typed. */
 export function playListingUrl(packageName: string): string {
   return `${PLAY_LISTING_PREFIX}${packageName}`;

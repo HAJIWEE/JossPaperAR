@@ -26,6 +26,8 @@ import {
   AASA_FILE,
   APP_LINKS_PATH_PREFIX,
   ASSET_LINKS_FILE,
+  EAS_CONFIG_FILE,
+  EAS_REQUIRED_PROFILES,
   HEADERS_FILE,
   PUBLIC_DIR,
   REDIRECTS_FILE,
@@ -40,6 +42,8 @@ import {
   playListingUrl,
   validateAasa,
   validateAssetLinks,
+  validateEasConfig,
+  validateEasProjectId,
   validateHeaders,
   validateRedirects,
   validateWranglerConfig,
@@ -188,6 +192,31 @@ check(
   headerProblems.join(' · '),
 );
 
+// ⚠️ The BUILD half of the deploy: without a signed build the fingerprint stays a
+// sentinel and the link can never be verified. `eas.json` is the first link there.
+const eas = readText(EAS_CONFIG_FILE);
+check(
+  `${EAS_CONFIG_FILE} exists — without a signed build the fingerprint stays a SENTINEL`,
+  eas.ok,
+  eas.problem ?? '',
+);
+const easProblems = eas.ok ? validateEasConfig(eas.value) : [];
+check(
+  `${EAS_CONFIG_FILE} declares the ${EAS_REQUIRED_PROFILES.join(' · ')} profiles`,
+  eas.ok && easProblems.length === 0,
+  easProblems.join(' · '),
+);
+
+// ⚠️ The id `eas build:configure` writes. Without it EAS cannot resolve WHICH
+// project to build, so there is no signed build and no fingerprint — the chain
+// this whole gate exists to protect.
+const projectIdProblems = validateEasProjectId(expo);
+check(
+  `app.json carries expo.extra.eas.projectId — \`eas build\` cannot resolve the project without it`,
+  projectIdProblems.length === 0,
+  projectIdProblems.join(' · '),
+);
+
 // ─── 4 · the code ↔ config tie ─────────────────────────────────────────────
 section('4 · the tie — what the APP produces vs what the CONFIG claims');
 
@@ -292,6 +321,30 @@ check(
   validateWranglerConfig('{"name":"x","assets":{"directory":"./public/"}}').length > 0,
 );
 check('an empty _headers is reported (no content type)', validateHeaders('').length > 0);
+
+// EAS controls — the last one encodes the trap: eas.json is STRICT JSON.
+check('an eas.json with NO build key is reported', validateEasConfig('{}').length > 0);
+check(
+  'an eas.json missing a profile is reported',
+  validateEasConfig('{"build":{"development":{},"production":{}}}').length > 0,
+);
+check(
+  'an eas.json containing COMMENTS is reported (EAS CLI parses it strictly)',
+  validateEasConfig('{\n  // EAS CLI would reject this\n  "build":{"development":{},"preview":{},"production":{}}\n}').length > 0,
+);
+check(
+  'the REAL eas.json shape is valid',
+  validateEasConfig(
+    '{"build":{"development":{"developmentClient":true,"distribution":"internal"},"preview":{"distribution":"internal"},"production":{}}}',
+  ).length === 0,
+);
+check('a MISSING eas projectId is reported', validateEasProjectId({ extra: { eas: {} } }).length > 0);
+check('a MISSING extra.eas entirely is reported', validateEasProjectId({}).length > 0);
+check('a MALFORMED eas projectId is reported', validateEasProjectId({ extra: { eas: { projectId: 'not-a-uuid' } } }).length > 0);
+check(
+  'the REAL projectId shape is valid',
+  validateEasProjectId({ extra: { eas: { projectId: 'b4b28ad0-f302-438a-9c46-e784b488c1c5' } } }).length === 0,
+);
 
 // ─── release guard — the two prerequisites, stated plainly ─────────────────
 const firstTarget = ((assetLinks.value as unknown[] | undefined)?.[0] ?? {}) as {
