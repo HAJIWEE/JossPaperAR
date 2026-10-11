@@ -80,8 +80,8 @@ begin
       v_prev := public.streak_period_end(z, b);
       perform pg_temp.assert_true(v_prev > b,
         'doc 22 §4.2 · ' || z || ' @ ' || b || ': forward-only (strictly after the previous end)');
-      perform pg_temp.assert_true(extract(epoch from (v_prev - b)) >= 24 * 3600,
-        'doc 22 §4.2 · ' || z || ' @ ' || b || ': the window is NEVER below 24h');
+      perform pg_temp.assert_true(extract(epoch from (v_prev - b)) >= 23 * 3600,
+        'doc 22 §4.2 · ' || z || ' @ ' || b || ': the window is NEVER below 23h (a real local day)');
       perform pg_temp.assert_true((v_prev at time zone z)::time = time '00:00:00',
         'doc 22 §4.2 · ' || z || ' @ ' || b || ': and it IS a local midnight');
     end loop;
@@ -93,10 +93,37 @@ begin
   perform pg_temp.assert_true(v_hours = 25,
     'doc 22 §4.2 · across the US DST end the window is 25h, not 23h (got ' || v_hours || 'h)');
 
+  -- ── 6b · ⚠️ AND THE SHORTER DAY MUST SURVIVE TOO ────────────────────────
+  --    DST spring-forward is a REAL 23h local day. A 24h floor rejected that
+  --    midnight, skipped to the next one and handed the user ~47h — this
+  --    assertion is the reason the floor is 23h and not 24h. Do not widen it.
+  v_dst := public.streak_period_end('America/New_York', '2026-03-08 05:00:00+00'::timestamptz);
+  v_hours := extract(epoch from (v_dst - '2026-03-08 05:00:00+00'::timestamptz)) / 3600;
+  perform pg_temp.assert_true(v_hours = 23,
+    '⚠️ doc 22 §4.2 · the 23h DST spring-forward day SURVIVES at 23h — not padded to ~47h (got ' || v_hours || 'h)');
+  perform pg_temp.assert_true(
+    v_dst = '2026-03-09 04:00:00+00'::timestamptz,
+    'doc 22 §4.2 · and that boundary is 00:00 EDT on 2026-03-09 (got ' || v_dst || ')');
+
+  -- ── 10 · EVERY INSTANT IS RECORDED IN UTC ───────────────────────────────
+  --    The PM: "recording of any time should always be UTC on the db, meaning
+  --    we should record when the period of day STARTS in UTC, which will be
+  --    different for people in different timezones."
+  perform pg_temp.assert_true(
+    (select count(*) from information_schema.columns
+      where table_schema = 'public' and table_name = 'streaks'
+        and column_name in ('period_start', 'period_end')
+        and data_type = 'timestamp with time zone') = 2,
+    'doc 22 §4.5 · period_start AND period_end are timestamptz — recorded in UTC, zone-independent');
+  perform pg_temp.assert_true(
+    public.next_local_midnight('Asia/Singapore', v_base)
+      is distinct from public.next_local_midnight('America/New_York', v_base),
+    'doc 22 §4.5 · the same LOCAL midnight is a DIFFERENT UTC instant per zone — which is why the zone must be stored and the instant kept in UTC');
+
   -- ── 7 · A NEW USER'S FIRST WINDOW IS NOT SHORT EITHER ───────────────────
   v_prev := public.first_streak_period_end('America/New_York', v_base);
-  perform pg_temp.assert_true(extract(epoch from (v_prev - v_base)) >= 24 * 3600,
-    'doc 22 §4.2 · a first-ever burn also gets >= 24h (got ' || v_prev || ')');
+  perform pg_temp.assert_true(extract(epoch from (v_prev - v_base)) >= 23 * 3600,
+    'doc 22 §4.2 · a first-ever burn also gets >= 23h (got ' || v_prev || ')');
 
   -- ── 8 · AN INVALID ZONE MUST FAIL LOUDLY, NOT SILENTLY GUESS ────────────
   v_raised := false;

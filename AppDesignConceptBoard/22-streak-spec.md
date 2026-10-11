@@ -73,29 +73,31 @@ To meet *"we don't shorten or lengthen the time allowed to extend the streak"*, 
 
 > *"The streak tracking will be as such. If the user is in SGT the streak will start and end at midnight SGT. If the user flies 12hr away the streak will end still at midnight SGT but the next streak extension period will start only from the next midnight of the new timezone. Always move the start forward never backwards, which is what Duolingo does sometimes."*
 
-**The boundary is the user's own local midnight** — option **B**, not the global UTC day (A) and not a rolling 24 h window (C). Choosing B also accepts the consequence the ticket listed for it: the quota and the daily AI ceiling move to the same per-user key. ⚠️ Doc 10's *values* are untouched — what changes is the **key** they are counted against, and the cost implication is that two users' AI-ceiling windows no longer coincide.
+**The boundary is the user's own local midnight** — option **B**, not the global UTC day (A) and not a rolling 24 h window (C). ✅ **CONFIRMED 2026-10-11:** *"Yes it should be on the user's local day too"* — so the **quota** and the **daily AI ceiling** move to the same per-user key as well. ⚠️ Doc 10's *values* are untouched; what changes is the **key** they are counted against, so two users' AI-ceiling windows no longer coincide. That is a **cost-model** change, so it lands as its own reviewed change rather than being folded into the streak.
 
-**The rule, derived — and this document's FIRST version of it was wrong.** The wording asks for two things at once, and a single "next local midnight" satisfies only the first:
+**The rule, derived — and this document has now had TWO versions of it, the first wrong outright and the second too strict.** The wording asks for two things at once, and a single "next local midnight" satisfies only the first:
 
 1. each period **ends at a local midnight**; and
-2. the boundary is **forward-only** — never earlier than the previous one. ⚠️ But monotonicity *alone* is not enough: as the arithmetic below shows, it still permitted a **12 h** window. The window must also never fall **below 24 h**.
+2. the boundary is **forward-only** — never *earlier* than the previous one. ⚠️ But monotonicity alone is not enough: as the arithmetic below shows, it still permitted a **12 h** window, so a floor is needed too.
 
 ```
 period_end(n+1) = the earliest local midnight, in the user's CURRENT zone,
-                  that is >= period_end(n) + 24 hours
+                  that is >= period_end(n) + interval '23 hours'
 ```
 
-⚠️ **Both halves are load-bearing, and the second was found by arithmetic rather than read off the prose.** Take the example above — in SGT the current boundary is 24:00 SGT = **16:00 UTC** — and fly **west to UTC−4**:
+⚠️ **Why 23 h and not 24 h — and this is the third correction.** A first floor of 24 h was wrong in the other direction: it **destroys the shorter day**. The PM's decision explicitly accepts that days vary — *"some days will be longer and shorter"* — and the natural source is **DST**: a local day is **23 h** across the spring-forward shift and **25 h** across the fall-back. A 24 h floor rejects the 23 h midnight, so the loop skips to the *next* one and hands the user a ~47 h window: neither the day they live in nor a floor, just a distortion.
 
-- **local midnights only** (the first, WRONG version): 16:00 UTC is 12:00 local, so the earliest local midnight strictly after it is 00:00 local = **04:00 UTC** — a window of **12 h** ❌. ⚠️ A "gap" the user is *required to burn inside* is not a gap; it is the deadline. This is precisely the shortening the decision forbids.
-- **with the ≥ 24 h half**: 16:00 UTC + 24 h = 12:00 local next day, so the earliest local midnight at or after that is 00:00 local = **04:00 UTC on D+2** — a window of **36 h** ✅.
+⚠️ **23 h is the right threshold because it is the shortest a REAL local day can be** — the largest DST shift in the tz database is 1 h (Lord Howe's is 30 min) — so anything under 23 h cannot be a calendar day at all. It can only be a **travel truncation**, which is the thing the floor exists to refuse. So one number does both jobs: **23 h preserves every genuine local day (23/24/25 h) and still refuses the 12 h travel stub.**
 
-| Flight | v1 (wrong) | **the rule** | Window |
-|---|---|---|---|
-| **West** — SGT → UTC−4 (the "12 h away" case) | 04:00 UTC D+1 | **04:00 UTC D+2** | **36 h** ✅ |
-| **East** — SGT → UTC+12 | 12:00 UTC D+1 | **12:00 UTC D+2** | **44 h** ✅ |
+| Case | Local day | v1 (no floor) | v2 (24 h floor) | **v3 = the rule (23 h)** |
+|---|---|---|---|---|
+| No travel | 24 h | 24 h ✅ | 24 h ✅ | **24 h** ✅ |
+| **DST spring-forward** | **23 h** | 23 h ✅ | ~47 h ❌ **over-corrected** | **23 h** ✅ |
+| DST fall-back | 25 h | 25 h ✅ | 25 h ✅ | **25 h** ✅ |
+| **West** — SGT → UTC−4 (the "12 h away" case) | truncated | **12 h** ❌ **under-corrected** | 36 h ✅ | **36 h** ✅ |
+| **East** — SGT → UTC+12 | truncated | 20 h ❌ | 44 h ✅ | **44 h** ✅ |
 
-✅ **Neither direction can shorten a window, and the boundary can only ever move later.** The old SGT deadline is still honoured — the user keeps the remainder of the day they were in — and everything beyond it is grace, never a penalty.
+✅ **Both failure modes are now closed, and they pull in opposite directions** — which is why neither the floorless rule nor a 24 h floor is right. The boundary only ever moves later, every genuine local day survives at its true length, and a travel stub is refused.
 
 ### 4.3 · ✅ DECIDED — the travel gap belongs to the NEXT period: **option (ii)**, PM, 2026-10-11
 
@@ -109,6 +111,20 @@ The wording settled the boundaries but not what a burn *inside* the travel gap c
 
 1. **A per-user timezone.** **No column anywhere stores one** — `profiles` has none and `streaks` has none — so nothing today can answer *"what is this user's local midnight?"*. **Decision (engineering, not the PM's):** the client sends its **IANA zone** with the burn and the server stores the last-seen zone — one-way, the same direction as §4.1, so the server never guesses a zone.
 2. **A remembered previous boundary.** `streaks` is `(user_id, current_days, last_burn_date date)`. The rule compares against an **instant**, so it needs a `timestamptz` column. From a bare `date` it cannot be re-derived.
+
+### 4.5 · ✅ DECIDED — everything is RECORDED in UTC, even though the *day* is local
+
+> *"Recording of any time should always be UTC on the db, meaning we should record when the period of day starts in UTC, which will be different for people in different timezones."*
+
+⚠️ **The storage form and the rule's boundary are two different things, and they are easy to conflate:**
+
+| | |
+|---|---|
+| **Stored** | Every instant is a `timestamptz`, so Postgres records **UTC**. ⚠️ `streaks.period_start` **and** `streaks.period_end` are both `timestamptz` — the period start is the previous period's end, expressed in UTC. |
+| **Zone-dependent** | *Which* UTC instant that is depends entirely on the user's zone: **00:00 SGT = 16:00 UTC**, but **00:00 UTC−4 = 04:00 UTC**. ⚠️ That difference is precisely why the zone must be stored (`profiles.iana_tz`) and why a `date` column could never hold the boundary — a local date divorced from its zone is not recoverable. |
+| **The client** | Renders those UTC instants in the device's zone (§4.1). One-way: nothing local is ever written back. |
+
+✅ **Asserted:** both columns are `timestamp with time zone`, and the same *local* midnight is a **different** UTC instant in two zones.
 
 ## 5 · Reminders
 
@@ -175,10 +191,12 @@ Under the **current UTC boundary** the expiry is the end of the server UTC day, 
 
 ⚠️ **Both real gates were fault-tested and both go RED:** creating `public.streak_freezes`, and pointing `burn_day()` at a local zone (the latter fails on the *definition* check — the always-distinguishing half).
 
-⚠️ **NOT yet covered — §4.2's forward-only boundary rule.** It is **decided but not implemented** (§4.3), so there is nothing to assert, and `streak_spec.sql` still asserts the **UTC** boundary — which is what the code genuinely does *today*. When §4.2 lands, those two UTC assertions are the ones that must be **changed rather than deleted**: they are the evidence that the rewrite moved the boundary deliberately.
+⚠️ **§4.2's rule now has its own suite** — `streak_window.sql`, **117 assertions**: the 23 h DST day, the 25 h fall-back day, 36 h west, 44 h east, the naive 12 h rule asserted *as a trap*, 8 zones × 4 bases swept for forward-only / ≥ 23 h / lands-on-a-local-midnight, an invalid zone **raising**, and both boundary columns being `timestamptz`.
+⚠️ **Both floors were fault-tested, and they fail in opposite directions:** no floor → the west-bound travel truncation goes **RED**; a 24 h floor → the 23 h DST day goes **RED at 47 h**. That is why the rule is 23 h and the assertions exist to keep it there.
+⚠️ **`streak_spec.sql` still asserts the UTC boundary** — because `submit_burn` still uses it. When the RPC adopts §4.2, those two UTC assertions must be **changed rather than deleted**: they are the evidence the rewrite moved the boundary deliberately.
 
 ---
 
 *Created 2026-10-11 (S55) — SCRUM-11 step 4. Written FROM the implementation, not ahead of it: every rule cites its line, and the only prescriptions are the three questions in §6.*
 *Updated 2026-10-11 (S55) — **the three questions in §6 are ANSWERED** (`SCRUM-112`, PM). §4.1 records that the display half of the timezone answer does **not** by itself meet the "no shortened or lengthened window" requirement (→ `🎯 SCRUM-113`), and §5.2 shows the decided reminder hours depend on that same boundary.*
-*Updated 2026-10-11 (S55) — **`SCRUM-113` is answered too**: §4.2 records the decision (the user's **local** midnight, **forward-only**), derives the exact rule, and computes both travel cases; §4.3 names the one edge the wording leaves open and the two schema pieces the rule still needs. **Not implemented until §4.3 is settled — deliberately.***
+*Updated 2026-10-11 (S55) — **`SCRUM-113` is ANSWERED and BUILT**: §4.2 the rule (local midnight, forward-only, **23 h** floor — three versions, the two floors failing in opposite directions), §4.3 the travel gap (option **(ii)**), §4.4 what it needs, §4.5 the UTC recording rule. **`streak_window.sql` asserts all of it (117 checks).** ⚠️ `submit_burn` has not yet adopted the rule, and the quota / AI-ceiling re-key is its own reviewed change — so `SCRUM-113` stays **In Review**.*

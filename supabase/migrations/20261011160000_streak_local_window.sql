@@ -9,25 +9,40 @@
 --
 -- THE RULE (doc 22 §4.2, PM 2026-10-11)
 --   period_end(n+1) = the earliest LOCAL midnight, in the user's CURRENT zone,
---                     that is >= period_end(n) + interval '24 hours'
+--                     that is >= period_end(n) + interval '23 hours'
 --
---   ⚠️ TWO clauses, and the second was found by ARITHMETIC, not read off the
---   prose. "The next local midnight after the previous end" is monotonic but
---   NOT >= 24h: SGT->UTC-4 turns a 24h window into a 12h one, because 16:00Z is
---   already 12:00 local. A window a user is REQUIRED to burn inside is not a
---   "grace gap" — it is the deadline, i.e. exactly the shortening the decision
---   forbids. The >= 24h floor is what makes it safe; see supabase/tests/
---   streak_window.sql, which asserts both travel cases (36h west, 44h east).
+--   ⚠️ THREE versions of this rule were needed, and the two floors failed in
+--   OPPOSITE directions — which is why the number is 23 and not nothing or 24.
+--
+--   v1 — no floor ("the next local midnight after the previous end"): monotonic
+--        but it TRUNCATES on travel. SGT->UTC-4 gives a 12h window, because
+--        16:00Z is already 12:00 local. A window a user is REQUIRED to burn
+--        inside is not a "grace gap" — it is the deadline, i.e. exactly the
+--        shortening the decision forbids.
+--   v2 — a 24h floor: fixed the truncation but DESTROYED THE SHORTER DAY. A
+--        local day is 23h across DST spring-forward, so the 24h floor rejects
+--        that midnight and skips to the next one, handing the user ~47h. The
+--        PM's decision accepts that days are "longer and shorter".
+--   v3 — a 23h floor (this file): the shortest a REAL local day can be, since
+--        the largest DST shift in tzdata is 1h. Anything under 23h cannot be a
+--        calendar day — it can only be a travel stub. So one number preserves
+--        every genuine day (23/24/25h) AND refuses the 12h truncation.
+--
+--   supabase/tests/streak_window.sql asserts all of it: the 23h DST day, the
+--   25h fall-back day, 36h west, 44h east, and the naive 12h rule as a trap.
 --
 -- ⚠️ AND THE GAP IS NOT DEAD TIME (doc 22 §4.3, option (ii)): a burn inside the
 --   travel gap counts for the NEXT period and advances immediately. That is
 --   what absorbs the gap into the window and makes the >= 24h floor the honest
 --   reading rather than a refinement.
 --
--- ⚠️ THE QUOTA AND THE DAILY AI CEILING ARE **NOT** TOUCHED HERE. `burn_day()`
---   is unchanged and still drives them; only the STREAK moves to the local day.
---   Moving the two cost keys is the other half of SCRUM-113's option B and is
---   deliberately a separate change — see the ticket.
+-- ⚠️ THE QUOTA AND THE DAILY AI CEILING ARE **NOT TOUCHED HERE** — but they are
+--   DECIDED. PM, 2026-10-11: *"Yes it should be on the user's local day too."*
+--   So `burn_day()` (UTC) must eventually stop keying them and the cost windows
+--   become per-user, per zone. It is a separate change not because it is
+--   undecided but because it RE-SHAPES AI-SPEND ACCOUNTING (doc 10) — two users'
+--   ceilings stop coinciding — and that must not ride inside a streak commit
+--   without review. Tracked on SCRUM-113.
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- ── 1 · the two things the rule needs and the schema did not have ──────────
@@ -43,6 +58,13 @@ alter table public.profiles add column if not exists iana_tz text;
 -- forward-only anchor: every later boundary is derived from it, never from the
 -- current clock.
 alter table public.streaks add column if not exists period_end timestamptz;
+
+-- ⚠️ RECORDED IN UTC, as the PM requires — and recording it is the point.
+-- Every instant in this schema is a `timestamptz`, so the PERIOD START is stored
+-- in UTC and merely *differs per zone* (00:00 SGT is 16:00Z, 00:00 UTC-4 is
+-- 04:00Z). Storing a local date, or a wall-clock time without the zone, would
+-- throw away the only thing that makes the boundary recoverable.
+alter table public.streaks add column if not exists period_start timestamptz;
 
 -- Backfill existing rows from the UTC day the old rule used, so no row is left
 -- without an anchor. Not NOT NULL: a row may legitimately have no burn yet.
@@ -91,7 +113,7 @@ language plpgsql stable
 as $$
 declare
   v_end   timestamptz := public.next_local_midnight(p_tz, p_prev_end);
-  v_floor timestamptz := p_prev_end + interval '24 hours';
+  v_floor timestamptz := p_prev_end + interval '23 hours';
 begin
   while v_end < v_floor loop
     v_end := public.next_local_midnight(p_tz, v_end);
@@ -101,7 +123,7 @@ end;
 $$;
 
 comment on function public.streak_period_end(text, timestamptz) is
-  'The forward-only, >= 24h streak boundary. period_end(n+1) = earliest local midnight >= period_end(n) + 24h. SCRUM-113 / doc 22 §4.2.';
+  'The forward-only streak boundary: the earliest local midnight >= period_end(n) + 23h. 23h (not 24h) so a DST 23h day survives while a travel truncation is refused. SCRUM-113 / doc 22 §4.2.';
 
 -- ── 4 · the first boundary for a user with no history ─────────────────────
 -- A brand-new streak: for a first-ever burn the "previous end" is effectively
@@ -117,7 +139,7 @@ language plpgsql stable
 as $$
 declare
   v_end   timestamptz := public.next_local_midnight(p_tz, p_at);
-  v_floor timestamptz := p_at + interval '24 hours';
+  v_floor timestamptz := p_at + interval '23 hours';
 begin
   while v_end < v_floor loop
     v_end := public.next_local_midnight(p_tz, v_end);
