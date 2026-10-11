@@ -75,37 +75,40 @@ To meet *"we don't shorten or lengthen the time allowed to extend the streak"*, 
 
 **The boundary is the user's own local midnight** — option **B**, not the global UTC day (A) and not a rolling 24 h window (C). Choosing B also accepts the consequence the ticket listed for it: the quota and the daily AI ceiling move to the same per-user key. ⚠️ Doc 10's *values* are untouched — what changes is the **key** they are counted against, and the cost implication is that two users' AI-ceiling windows no longer coincide.
 
-**The rule, derived.** One clause does all the work — *the next period starts at the next local midnight **after** the previous period ended*:
+**The rule, derived — and this document's FIRST version of it was wrong.** The wording asks for two things at once, and a single "next local midnight" satisfies only the first:
+
+1. each period **ends at a local midnight**; and
+2. the boundary is **forward-only** — never earlier than the previous one. ⚠️ But monotonicity *alone* is not enough: as the arithmetic below shows, it still permitted a **12 h** window. The window must also never fall **below 24 h**.
 
 ```
-period_end(n+1) = the earliest local midnight, in the user's CURRENT zone, strictly after period_end(n)
+period_end(n+1) = the earliest local midnight, in the user's CURRENT zone,
+                  that is >= period_end(n) + 24 hours
 ```
 
-⚠️ **"Strictly after the previous end" is the whole protection, and it is the part a naive build gets wrong.** A natural implementation — *"the next local midnight from now"* — moves the boundary **earlier** when a user flies east and so **shortens** the window. That is the Duolingo bug the PM names; making the boundary relative to the *previous end* instead of to *now* makes it **monotonic**: it can only move later, so a window can only ever be ≥ 24 h.
+⚠️ **Both halves are load-bearing, and the second was found by arithmetic rather than read off the prose.** Take the example above — in SGT the current boundary is 24:00 SGT = **16:00 UTC** — and fly **west to UTC−4**:
 
-**Both travel cases, computed.** User in SGT (UTC+8); the current period ends at 24:00 SGT = **16:00 UTC**.
+- **local midnights only** (the first, WRONG version): 16:00 UTC is 12:00 local, so the earliest local midnight strictly after it is 00:00 local = **04:00 UTC** — a window of **12 h** ❌. ⚠️ A "gap" the user is *required to burn inside* is not a gap; it is the deadline. This is precisely the shortening the decision forbids.
+- **with the ≥ 24 h half**: 16:00 UTC + 24 h = 12:00 local next day, so the earliest local midnight at or after that is 00:00 local = **04:00 UTC on D+2** — a window of **36 h** ✅.
 
-| Flight | New zone's midnight is at | Next midnight **after** 16:00 UTC | Gap | Window the user gets |
-|---|---|---|---|---|
-| **West** — SGT → UTC−4 (the "12 h away" case) | 04:00 UTC | **04:00 UTC D+1** | **12 h** | ✅ unchanged old day + 12 h grace + a fresh 24 h — never shortened |
-| **East** — SGT → UTC+12 | 12:00 UTC | **12:00 UTC D+1** | **20 h** | ✅ same shape, never shortened |
+| Flight | v1 (wrong) | **the rule** | Window |
+|---|---|---|---|
+| **West** — SGT → UTC−4 (the "12 h away" case) | 04:00 UTC D+1 | **04:00 UTC D+2** | **36 h** ✅ |
+| **East** — SGT → UTC+12 | 12:00 UTC D+1 | **12:00 UTC D+2** | **44 h** ✅ |
 
-⚠️ **What the gap is, and is not.** During it no period is open. The wording settles the **boundaries**; it does **not** settle what a burn *inside* the gap counts as — and that is a fairness question, not an implementation detail.
+✅ **Neither direction can shorten a window, and the boundary can only ever move later.** The old SGT deadline is still honoured — the user keeps the remainder of the day they were in — and everything beyond it is grace, never a penalty.
 
-### 4.3 · ⚠️ ONE EDGE THE WORDING LEAVES OPEN — a burn inside the travel gap
+### 4.3 · ✅ DECIDED — the travel gap belongs to the NEXT period: **option (ii)**, PM, 2026-10-11
 
-| | What a burn in the gap does | Cost |
-|---|---|---|
-| **(i)** belongs to the **previous** period | does not advance the streak — that day is spent | safest, but the user flies, burns, and sees nothing move |
-| **(ii)** belongs to the **next** period — **recommended** | advances immediately; they are already "in" the new day when it opens | matches *"never punish travel"*; a small gaming vector (a burn just before the gap ends lands on the new day) |
-| **(iii)** neutral | neither advances nor resets | the streak neither grows nor breaks — what §2.3 already does for a miss |
+The wording settled the boundaries but not what a burn *inside* the travel gap counts as. The PM chose **(ii)**: **a burn in the gap counts for the NEXT period — it advances immediately, and the user is "already in" the new day when it opens.**
 
-⚠️ **And two mechanics the rule needs, neither of which exists** (checked 2026-10-11):
+**Why (ii) is the only option consistent with the rest of the decision: it leaves no dead time.** Under **(i)** a burn in the gap does nothing, which a user cannot tell apart from a penalty for flying; under **(iii)** the streak silently stalls. (ii) is the only one in which the deadline moves **only later** — the same forward-only principle as the boundary itself. ⚠️ It is also what makes §4.2's **≥ 24 h half** the honest reading rather than a refinement: with the gap absorbed into the next period, the window ends at the next *usable* midnight, not at a nominal one 12 h away.
 
-1. **A per-user timezone.** **No column anywhere stores one** — `profiles` has none and `streaks` has none — so nothing today can answer "what is this user's local midnight?". *Recommended engineering choice (not a PM decision):* the client sends its IANA zone with the burn and the server stores the last-seen zone. Same one-way direction as §4.1, so the server never has to guess a zone.
-2. **A remembered previous boundary.** `streaks` is `(user_id, current_days, last_burn_date date)`. The forward-only rule compares against the **previous period's end instant**, so it needs a `timestamptz` column (e.g. `streaks.period_end`). Re-derived from a `date` alone it cannot work.
+⚠️ **Accepted cost, recorded:** a burn just before the gap ends lands on the new day, so it cannot also count for the old one. It favours the user, which is the intended direction.
 
-⚠️ **Until §4.3's edge is answered the rule is deliberately NOT implemented.** A half-applied boundary rule is worse than none: the streak's entire value is that it is predictable, and the one thing worse than the Duolingo bug is a *different* unfairness shipped while fixing it.
+### 4.4 · What the rule needs to be built (checked, not assumed)
+
+1. **A per-user timezone.** **No column anywhere stores one** — `profiles` has none and `streaks` has none — so nothing today can answer *"what is this user's local midnight?"*. **Decision (engineering, not the PM's):** the client sends its **IANA zone** with the burn and the server stores the last-seen zone — one-way, the same direction as §4.1, so the server never guesses a zone.
+2. **A remembered previous boundary.** `streaks` is `(user_id, current_days, last_burn_date date)`. The rule compares against an **instant**, so it needs a `timestamptz` column. From a bare `date` it cannot be re-derived.
 
 ## 5 · Reminders
 
