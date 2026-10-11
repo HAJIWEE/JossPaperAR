@@ -18,12 +18,18 @@
   // Per the Cloudflare docs: "Set this to today's date".
   "compatibility_date": "2026-10-11",
 
-  // Workers Logs. ⚠️ MEASURED 2026-10-11 — on THIS Worker it captures NOTHING.
+  // Workers Logs. ⚠️ MEASURED 2026-10-11 — capture is PARTIAL and unreliable.
   //
-  // The config below is correct and IS live (verified via the API: `enabled: true`,
-  // `redact_query_string: true`). But a telemetry query over the hour in which real
-  // traffic hit both `.well-known` paths AND `/join/{CODE}` returned **0 events**,
-  // on the events, invocations and traces views alike.
+  // The config below is correct and IS live (API-verified: `enabled: true`,
+  // `redact_query_string: true`). What it CAPTURES is the problem.
+  //
+  // Over 6 hours of probing with known traffic — curl AND browser-like headers,
+  // across the custom domain, the workers.dev host and a preview alias:
+  //   · exactly 4 events captured, ALL from ONE browser visit to a PREVIEW
+  //     hostname (`4c70b1d7…`) at 07:19Z;
+  //   · NOTHING from the production deployment has been captured;
+  //   · 0 `/join/*` requests captured, across three distinct probes;
+  //   · 0 `.well-known/*` requests captured.
   //
   // CAUSE — an upstream, long-standing Cloudflare bug: requests served by the
   // **static-assets layer** do not reach Workers Logs or tail events.
@@ -37,12 +43,21 @@
   // and `/join/*` via `_redirects` — and this is an ASSETS-ONLY Worker
   // (`has_modules: false`), so there is no script invocation for a log to describe.
   //
-  // ⚠️ TWO CLAIMS WERE MADE THE OTHER WAY AND BOTH ARE NOW CORRECTED BY MEASUREMENT:
-  //  · PRIVACY. The invite-code exposure this file used to warn about does NOT
-  //    materialise: no code can be logged, because nothing is logged. Doc 07 §4.6's
-  //    "excluded from analytics/logs" holds here BY CONSTRUCTION, not by policy.
-  //  · DIAGNOSTIC. The benefit claimed on PR #35 does not materialise either — you
-  //    CANNOT watch Apple's CDN or Android fetch the association files from here.
+  // ⚠️ WHAT THIS MEANS FOR THE INVITE CODE — after TWO overclaiming corrections:
+  //  · THE MECHANISM IS REAL. A captured event's message is literally
+  //    "GET https://<host><path>" — the FULL URL. So a captured `/join/{CODE}`
+  //    WOULD put the code into log storage, against doc 07 §4.6.
+  //  · WHETHER `/join/*` IS EVER SAMPLED IS UNKNOWN. None has been observed — but
+  //    the sampler demonstrably drops almost everything, so that absence is WEAK
+  //    evidence, not proof.
+  //  ⚠️ THIS FILE WAS WRONG TWICE. It first warned that codes WOULD leak, then
+  //  retracted that by saying nothing is logged at all. Both were overclaims, each
+  //  built on a single measurement. The honest state is: REAL mechanism,
+  //  UNQUANTIFIED exposure. Treat §4.6 as at odds with `invocation_logs: true`
+  //  until the sampling behaviour is understood — the mitigation, if wanted, is
+  //  `invocation_logs: false` (which costs all logs, there being no script here).
+  //  · DIAGNOSTIC. Still unusable: you CANNOT reliably watch Apple's CDN or
+  //    Android fetch the association files from here.
   //
   // Left enabled on purpose: it costs nothing, captures nothing, and begins working
   // by itself if Cloudflare fixes #8724 — or the day a Worker script is added.
