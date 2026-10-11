@@ -17,9 +17,10 @@
 -- would only restate arithmetic. §5.2's hours are REPORTED by a notice instead.
 -- See the block above the teardown for why that distinction was measured.
 --
--- ⚠️ The day boundary is the SERVER's UTC day and a test cannot move it, so each
--- continuation case SEEDS `streaks.last_burn_date` relative to that day — which
--- is exactly how the code reads it.
+-- ⚠️ SCRUM-113 MOVED THE BOUNDARY. The day is now the USER'S LOCAL day and the
+-- streak is a forward-only PERIOD window (doc 22 §4.2), so each continuation case
+-- seeds `streaks.period_start` / `period_end` — a DATE seed means nothing to the RPC.
+-- The INSTANTS are still recorded in UTC, which §4.1/§4.5 below assert separately.
 -- ⚠️ FAULT-TEST IT: change an expected award and confirm the run goes RED.
 -- ═══════════════════════════════════════════════════════════════════════════
 
@@ -34,7 +35,12 @@ $$;
 do $t$
 declare
   v_u     uuid := '00000000-0000-4000-8000-000000000901';
-  v_day   date := (now() at time zone 'utc')::date;
+  -- ⚠️ SCRUM-113: the day is the USER'S LOCAL day. The fixture user has no
+  -- `iana_tz`, so this is the Asia/Singapore default — the same zone the
+  -- functions fall back to, which is what makes the two comparable.
+  v_day   date := (now() at time zone 'Asia/Singapore')::date;
+  v_ps    timestamptz;
+  v_pe    timestamptz;
   v_clan  uuid;
   v_cap   uuid;
   v_r     jsonb;
@@ -94,8 +100,18 @@ begin
   perform pg_temp.assert_true((v_r->>'award')::int = 1600,
     'doc 22 §2.1 · and it does not reset it either (still no +50)');
 
-  -- ── 3 · YESTERDAY → TODAY CONTINUES, and the bonus turns on ─────────────
-  update public.streaks set current_days = 1, last_burn_date = v_day - 1
+  -- ── 3 · THE NEXT PERIOD CONTINUES THE CHAIN, and the bonus turns on ─────
+  --    ⚠️ SCRUM-113 CHANGED THIS CASE. It used to seed `last_burn_date = v_day - 1`
+  --    ("yesterday"). The rule is now a forward-only PERIOD window (doc 22 §4.2),
+  --    so a DATE seed means nothing to the RPC — the WINDOW must be seeded.
+  --    `period_end` an hour in the PAST does it: the following boundary is
+  --    `period_end + >= 23h`, still in the future, so the next burn lands in the
+  --    window AFTER the last one (⇒ +1) rather than after a gap.
+  update public.streaks
+     set current_days = 1,
+         last_burn_date = v_day,
+         period_start   = now() - interval '24 hours',
+         period_end     = now() - interval '1 hour'
    where user_id = v_u;
   select id into v_cap from public.captures
    where user_id = v_u and id not in (select capture_id from public.burns
@@ -105,18 +121,31 @@ begin
            'capture_id', v_cap, 'clan_id', v_clan, 'accuracy', 0,
            'cell_hash', 'streakC', 'client_time', now()), 'streak-key-3');
   perform pg_temp.assert_true((v_r->>'streak_day')::int = 2,
-    'doc 22 §2 · yesterday -> today gives current_days + 1 = 2');
+    'doc 22 §2/§4.2 · the NEXT window gives current_days + 1 = 2');
   perform pg_temp.assert_true((v_r->>'award')::int = 1650,
     'doc 22 §2 · day 2 IS active, so the +50 lands: 1,600 + 50 (got ' || (v_r->>'award') || ')');
-  --  ⚠️ The WRITE path follows the UTC day too, not just the read helper. Placed
-  --     here, after a REWARDED burn, because §2.3 deliberately leaves the column
-  --     untouched on a miss and a seeded value would prove nothing.
-  select last_burn_date into v_last from public.streaks where user_id = v_u;
-  perform pg_temp.assert_true(v_last = public.burn_day(),
-    '⚠️ doc 22 §4.1 · a REWARDED burn writes last_burn_date = burn_day(), i.e. the UTC day (PM 112.1)');
+  --  ⚠️ §4.1 CHANGED BY SCRUM-113 — and this is exactly the assertion doc 22 §7.1
+  --     said must be CHANGED RATHER THAN DELETED when the boundary moved, because it
+  --     is the evidence the rewrite was deliberate. `last_burn_date` is no longer the
+  --     UTC day: it is the LOCAL calendar key, while the WINDOW is recorded as two UTC
+  --     instants. All three are asserted, so none of them can drift alone.
+  select last_burn_date, period_start, period_end into v_last, v_ps, v_pe
+    from public.streaks where user_id = v_u;
+  perform pg_temp.assert_true(v_last = (now() at time zone public.streak_tz(v_u))::date,
+    'doc 22 §4.1 · a REWARDED burn writes the LOCAL date to last_burn_date (SCRUM-113)');
+  perform pg_temp.assert_true(v_ps < now() and now() < v_pe,
+    'doc 22 §4.5 · and the WINDOW is two UTC instants that bracket now — the period is live');
+  perform pg_temp.assert_true(v_pe = public.streak_period_end(public.streak_tz(v_u), v_ps),
+    'doc 22 §4.2 · the stored window end IS the forward-only rule applied to its own start');
 
   -- ── 4 · A GAP RESETS TO 1 — never to 0 ─────────────────────────────────
-  update public.streaks set current_days = 5, last_burn_date = v_day - 2
+  --    ⚠️ Seeded as a window that ended THREE DAYS ago: the boundary advance loop
+  --    has to walk forward more than once, which is what makes this a gap.
+  update public.streaks
+     set current_days = 5,
+         last_burn_date = v_day,
+         period_start   = now() - interval '96 hours',
+         period_end     = now() - interval '72 hours'
    where user_id = v_u;
   select id into v_cap from public.captures
    where user_id = v_u and id not in (select capture_id from public.burns
@@ -132,7 +161,11 @@ begin
 
   -- ── 5 · A MISS LEAVES `streaks` COMPLETELY UNTOUCHED ────────────────────
   --    ⚠️ The property that was NOWHERE WRITTEN DOWN before doc 22 §2.3.
-  update public.streaks set current_days = 9, last_burn_date = v_day - 1
+  update public.streaks
+     set current_days = 9,
+         last_burn_date = v_day,
+         period_start   = now() - interval '2 hours',
+         period_end     = now() + interval '22 hours'
    where user_id = v_u;
   select id into v_cap from public.captures
    where user_id = v_u and id not in (select capture_id from public.burns
@@ -152,12 +185,15 @@ begin
   perform pg_temp.assert_true(v_bs is null,
     'doc 22 §1 · the burn row stores NULL, which is how a miss is recorded');
 
-  select current_days, last_burn_date into v_days, v_last
+  select current_days, last_burn_date, period_start, period_end
+    into v_days, v_last, v_ps, v_pe
     from public.streaks where user_id = v_u;
   perform pg_temp.assert_true(v_days = 9,
     '⚠️ doc 22 §2.3 · a miss does NOT advance the streak (still 9, got ' || v_days || ')');
-  perform pg_temp.assert_true(v_last = v_day - 1,
+  perform pg_temp.assert_true(v_last = v_day,
     '⚠️ doc 22 §2.3 · and does NOT break it either — last_burn_date is untouched');
+  perform pg_temp.assert_true(now() < v_pe,
+    '⚠️ doc 22 §2.3/§4.2 · nor does it move the WINDOW: the period is still open (SCRUM-113)');
 
   -- ═══ §4.1 · STORAGE IS UTC — the PM's SCRUM-112.1 decision ═══════════════
   --    The decision's FIRST half ("UTC recording in our backend") is already
@@ -199,18 +235,22 @@ begin
   --    consequence 2) and nothing schedules them yet, so an assertion here could
   --    only restate a constant — a check that cannot fail. What IS derivable is
   --    the consequence of the boundary the server actually uses.
-  v_expiry := ((public.burn_day() + 1)::timestamp at time zone 'utc');   -- end of the SERVER's own day
+  -- ⚠️ SCRUM-113 MOVED THE BOUNDARY, AND THE HOURS WITH IT. The expiry is no longer
+  -- 24:00 UTC — the user's own LOCAL midnight is — so the same three offsets now land
+  -- at sane local hours. Derived from the RULE rather than from a stored row, so it
+  -- holds whatever the cases above left behind.
+  v_expiry := public.next_local_midnight(public.streak_tz(v_u), now());
   --    ⚠️ DERIVED AND *REPORTED* — DELIBERATELY NOT ASSERTED, and that is the point.
   --    The expiry instant is never materialised in the schema, and the three
   --    reminders are CLIENT-side local notifications that nothing schedules yet, so
   --    any assertion here could only restate fixed timezone arithmetic: it would
   --    hold for every value the code could take.
-  --    ⚠️ MEASURED, not assumed: fault-testing `burn_day()` to Asia/Singapore left
-  --    the arithmetic GREEN (the UTC and SGT dates coincide 16h a day, and the
-  --    conversion above pins the date to UTC midnight regardless). That is how the
-  --    decorative first version of this block was caught — it was deleted.
-  --    The notice below is a NUMBER TO READ, not a gate: it changes the day
-  --    SCRUM-113 moves the boundary, and its job is to make the 4am reminder visible.
+  --    ⚠️ MEASURED, not assumed: fault-testing an earlier version of this block against
+  --    a boundary swap left it GREEN, which is how a decorative assertion was caught
+  --    and deleted. The notice below is a NUMBER TO READ, not a gate.
+  --    ✅ AND IT NOW SHOWS THE SCRUM-113 FIX: with the boundary at the user's own
+  --    midnight the three decided reminders land at 12:00 / 20:00 / 23:00 SGT, instead
+  --    of the 20:00 / 04:00 / 07:00 that the UTC day produced (doc 22 §5.2).
   raise notice '  ⓘ doc 22 §5.2 · the three decided reminders land at % / % / % SGT',
     to_char((v_expiry - interval '12 hours') at time zone 'Asia/Singapore', 'HH24:MI'),
     to_char((v_expiry - interval '4 hours')  at time zone 'Asia/Singapore', 'HH24:MI'),

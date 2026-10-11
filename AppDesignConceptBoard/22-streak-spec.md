@@ -152,24 +152,26 @@ True regardless of the decision: because a miss does not touch `streaks` (§2.3)
 2. ⚠️ **Delivery must be client-local scheduling, not server push.** A server cron would have to know every device's instants and fan out pushes; `expo-notifications`' local scheduling computes them **on-device from the last burn** and stays correct **in the user's own timezone** — the same stance §4.1 takes. This is the natural pairing of 112.1 and 112.2, and it is why the reminder copy must survive being scheduled days in advance.
 3. ⚠️ **The instants depend on a boundary that is not settled.** "Before the streak expiry" is unambiguous only once the expiry *is*. See §5.2.
 
-### 5.2 · ⚠️ The hours only work if the boundary moves — the argument for `SCRUM-113`
+### 5.2 · ✅ RESOLVED — the boundary moved, so the reminder hours are sane
 
-Under the **current UTC boundary** the expiry is the end of the server UTC day, **24:00 UTC**, so the three decided offsets land at:
+⚠️ **This section used to be an argument for `SCRUM-113`; it is now the evidence that the fix landed.** Under the **old UTC boundary** the expiry was 24:00 UTC, and the three decided offsets landed like this:
 
-| Reminder | Instant (UTC) | = Singapore time | |
+| Reminder | Old (expiry 24:00 UTC) | **Now (expiry = the user's LOCAL midnight)** | |
 |---|---|---|---|
-| 12h | 12:00 UTC | **20:00 SGT** | ✅ a reasonable evening |
-| 4h | 20:00 UTC | **04:00 SGT** | ⚠️ **the middle of the night** |
-| 1h | 23:00 UTC | **07:00 SGT** | ✅ reasonable — arguably the morning ritual |
+| 12h | 20:00 SGT | **12:00 local** | ✅ midday |
+| 4h | ⚠️ **04:00 SGT** | **20:00 local** | ✅ evening, and previously **the middle of the night** |
+| 1h | 07:00 SGT | **23:00 local** | ✅ just before the deadline |
 
-⚠️ The 4h reminder lands at **04:00 SGT**, and doc 04 names *"engagement-baiting at unsocial hours"* as exactly the pattern to avoid. So the reminder decision **is itself an argument for the local-day boundary** (`SCRUM-113` option **B**) or the rolling window (option **C**): under either, the expiry is the user's own end-of-day and the same three offsets become **12:00 / 20:00 / 23:00 local** — all sane. Recorded because this is invisible until the notification fires at 4am.
+⚠️ **The 4h reminder used to land at 04:00 SGT** — and doc 04 names *"engagement-baiting at unsocial hours"* as exactly the pattern to avoid. It was never a copy problem; it was the boundary. With the expiry at the user's own midnight the same three offsets become **12:00 / 20:00 / 23:00 local — all sane**, and this is now *derived* rather than hoped for.
+
+✅ **The test prints it on every run**, so the number is visible rather than assumed — and it is a number to READ, not a gate, because the reminders are client-side and nothing schedules them yet (§5.1).
 
 ## 6 · The three questions, ANSWERED — `SCRUM-112`, PM, 2026-10-11
 
 | # | Question | Answer |
 |---|---|---|
 | 1 | Is the UTC day boundary acceptable for a Singapore-first audience? | **Storage stays UTC** ✅; the **client converts for display** using the device timezone. ⚠️ The requirement — *"we don't shorten or lengthen the time allowed to extend the streak"* — is **not met by a display change**; the *rule's* boundary is the open part → **`🎯 SCRUM-113`** |
-| 2 | Do reminders ship in the MVP, and with what copy? | ✅ **Ship in the MVP**: exactly **three** (12h / 4h / 1h before expiry), **no aggression**. ⚠️ Needs `expo-notifications` + a dev build, and the hours assume `SCRUM-113` |
+| 2 | Do reminders ship in the MVP, and with what copy? | ✅ **Ship in the MVP**: exactly **three** (12h / 4h / 1h before expiry), **no aggression**. ⚠️ Needs `expo-notifications` + a dev build. ✅ **The hours are now sane** — the 4h one used to land at 04:00 SGT and now lands at 20:00 local, because `SCRUM-113` moved the expiry to the user's own midnight (§5.2) |
 | 3 | Is the festival freeze a post-MVP item? | ❌ **No freeze in the MVP and no freeze in the final product** as a mechanic. It may return in a later iteration **only as an explicitly granted gift/reward** — *"we do not want to use all the cards up at the start"*. doc 04's suggestion is therefore **declined**, not deferred |
 
 **Two follow-ups the answers create — neither is a question for the PM:**
@@ -179,13 +181,14 @@ Under the **current UTC boundary** the expiry is the end of the server UTC day, 
 
 ## 7 · What is asserted, rather than believed
 
-`supabase/tests/streak_spec.sql` drives **every row of §2's table**, plus §2.3's miss rule and §3's reset-to-1, through the real `submit_burn` against a real database. **This document and that file are two statements of the same thing**, and a run fails if they part. **22 assertions**, all green.
+`supabase/tests/streak_spec.sql` drives **every row of §2's table**, plus §2.3's miss rule and §3's reset-to-1, through the real `submit_burn` against a real database. **This document and that file are two statements of the same thing**, and a run fails if they part. **23 assertions**, all green.
 
 ### 7.1 · What the test asserts for `SCRUM-112` — and one thing it refuses to
 
 | | |
 |---|---|
 | ✅ **§4.1 storage is UTC** | `public.burn_day()` returns the UTC date **and** its *definition* names `utc` — asserted twice on purpose: the behavioural check alone cannot tell UTC from SGT during the 00:00–08:00 SGT overlap, so it could only ever fail one third of the time, and a gate that passes the rest is not a gate. Plus: a **rewarded** burn writes `last_burn_date = burn_day()`. |
+| ✅ **§4.2's rule, adopted** | `submit_burn` keys the quota, the decay tick, the derived ceiling and the streak off the **user's local day** (migration `20261011170000`). ⚠️ The **global** AI budget deliberately does **not** move: `ai_spend_today()` sums every user against one `app_config` budget, and a global window cannot belong to one user's zone. |
 | ✅ **§3 no freeze** | asserted across the **catalog** — no table, no column and no function in `public` may carry a freeze. A decision that lives only in prose can be undone by a migration nobody reviews. |
 | ⚠️ **§5's reminder schedule — NOT asserted** | **deliberately.** The reminders are client-side local notifications and nothing schedules them yet, so an assertion here could only restate fixed timezone arithmetic — it would hold for every value the code could take. ⚠️ **This was measured, not assumed:** fault-testing `burn_day()` to `Asia/Singapore` left that arithmetic green, so the decorative assertion was **deleted** rather than kept for the look of coverage. §5.2's three hours are printed by a `raise notice` — a number to read, not a gate. |
 
@@ -193,10 +196,10 @@ Under the **current UTC boundary** the expiry is the end of the server UTC day, 
 
 ⚠️ **§4.2's rule now has its own suite** — `streak_window.sql`, **117 assertions**: the 23 h DST day, the 25 h fall-back day, 36 h west, 44 h east, the naive 12 h rule asserted *as a trap*, 8 zones × 4 bases swept for forward-only / ≥ 23 h / lands-on-a-local-midnight, an invalid zone **raising**, and both boundary columns being `timestamptz`.
 ⚠️ **Both floors were fault-tested, and they fail in opposite directions:** no floor → the west-bound travel truncation goes **RED**; a 24 h floor → the 23 h DST day goes **RED at 47 h**. That is why the rule is 23 h and the assertions exist to keep it there.
-⚠️ **`streak_spec.sql` still asserts the UTC boundary** — because `submit_burn` still uses it. When the RPC adopts §4.2, those two UTC assertions must be **changed rather than deleted**: they are the evidence the rewrite moved the boundary deliberately.
+⚠️ **`streak_spec.sql` asserts the UTC boundary** — because it is still the boundary of *something*: `burn_day()` remains the GLOBAL AI budget's clock. The two assertions that USED to guard the streak's UTC day were **CHANGED rather than deleted**, exactly as this section required. ✅ **And `submit_burn` now uses the new rule** (migration `20261011170000`): it writes the **local date** to `last_burn_date` and the **window** as two UTC instants, and `streak_spec.sql` asserts all three — so none of them can drift alone. **23 assertions**, green.
 
 ---
 
 *Created 2026-10-11 (S55) — SCRUM-11 step 4. Written FROM the implementation, not ahead of it: every rule cites its line, and the only prescriptions are the three questions in §6.*
 *Updated 2026-10-11 (S55) — **the three questions in §6 are ANSWERED** (`SCRUM-112`, PM). §4.1 records that the display half of the timezone answer does **not** by itself meet the "no shortened or lengthened window" requirement (→ `🎯 SCRUM-113`), and §5.2 shows the decided reminder hours depend on that same boundary.*
-*Updated 2026-10-11 (S55) — **`SCRUM-113` is ANSWERED and BUILT**: §4.2 the rule (local midnight, forward-only, **23 h** floor — three versions, the two floors failing in opposite directions), §4.3 the travel gap (option **(ii)**), §4.4 what it needs, §4.5 the UTC recording rule. **`streak_window.sql` asserts all of it (117 checks).** ⚠️ `submit_burn` has not yet adopted the rule, and the quota / AI-ceiling re-key is its own reviewed change — so `SCRUM-113` stays **In Review**.*
+*Updated 2026-10-11 (S55) — **`SCRUM-113` is ANSWERED, BUILT AND ADOPTED**: §4.2 the rule (local midnight, forward-only, **23 h** floor — three versions, the two floors failing in opposite directions), §4.3 the travel gap (option **(ii)**), §4.4 what it needed, §4.5 the UTC recording rule, and §5.2 **RESOLVED** — the 4h reminder moved off 04:00 because the expiry moved to the user's own midnight. Migrations `20261011160000` (the rule) and `20261011170000` (`submit_burn` adopts it: quota, decay tick and derived ceiling follow the local day; the **global** AI budget stays UTC by design). **422 SQL assertions across 9 suites**, including 117 for the window and 23 for the spec — and the two UTC assertions were **changed, not deleted** (§7.1).*
