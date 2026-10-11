@@ -298,14 +298,14 @@ The CI habit is **plain Node scripts with no `npm install`** (`.github/workflows
 | ~~**3**~~ ✅ | **Supabase CLI login** — **done 2026-10-03**: CLI **v2.119.0** at `/usr/local/bin/supabase`, logged in (verified: `supabase projects list` sees the project) | Ring 1 — `supabase start` / `db reset` / `functions serve` | free | ~~the local backend loop~~ **unblocked** |
 | **4** | **EAS login** — `npx eas-cli login`, same interactive reason | cloud Android builds; the iOS-later path | free | dev builds |
 | **5** | **Android SDK + emulator (KVM)** *or* the **Tier-F device** (SCRUM-52) | Ring 2 — emulator for speed, **device for truth** (N1) | free / ~S$100–150 | the M1 device run |
-| **6** | **A domain for invite deep links** (e.g. `josspaperar.app` — doc 07 §4.6 assumes it) | App/Universal Links, so a QR invite survives the app not being installed | ~S$15/yr | **SCRUM-50 only — not the slice** |
+| ~~**6**~~ ✅ | **A domain for invite deep links** — **registered 2026-10-10**: `josspaperar.app` via **Cloudflare Registrar**, renews **2027-10-10**, zone live and authoritative on Cloudflare. ⚠️ **Registered ≠ serving** — it carries **zero records** and publishes nothing yet. The serving config now ships in the repo (`wrangler.jsonc` · `public/_redirects` · `public/_headers`, asserted by `check:links`); what remains is the **PM's Cloudflare click**. | App/Universal Links, so a QR invite survives the app not being installed | ~S$15/yr | **`SCRUM-89`** — see `public/.well-known/README.md` |
 | ~~**7**~~ ✅ | **Android package id** — **decided 2026-10-03: `app.josspaperar`** → set in `app.json` (`android.package`; `ios.bundleIdentifier` carries the same reverse-DNS as the natural pairing — trivially changeable while iOS is deferred) | baked into `app.json` + EAS; **painful to change after the first Play upload** | free | EAS build config — **resolved before any build** |
 | ~~**8**~~ ✅ | **Supabase region** — **decided 2026-10-03: `ap-southeast-1` (Singapore)**, and the live project is already there | SEA latency; awkward to change later | free | project creation — **resolved** |
 | **9** | **GitHub repo secrets** *(optional)* | lets CI run DB lint against a throwaway project | free | nice-to-have |
 | **10** | **Google Play Console** — **defer** | submission only | $25 | M4 — not now |
 | ~~**11**~~ ✅ | **Anonymous sign-ins on the hosted project** — Dashboard → Authentication → Providers. **Set 2026-10-03 (S27c) and VERIFIED by a real sign-in.** | **ADR-004** locks anonymous device identity first, so a user burns *before* any signup wall. Locally this is `enable_anonymous_sign_ins = true` in `config.toml` (the `supabase init` default is `false` and contradicts the ADR) — on the hosted project it is a Dashboard toggle with **no** migration/SQL equivalent. **Verified:** `POST /auth/v1/signup` → **HTTP 200**, `is_anonymous: true`, `role: authenticated`, a full session issued | free | - |
 
-> **Three of these are one-time decisions that are expensive to reverse — #7 package id · #8 region · #6 domain. Five minutes each, now, saves a migration later.** The rest are logins.
+> **All three one-time decisions that are expensive to reverse are now made — #7 package id · #8 region · #6 domain (registered 2026-10-10).** ✅ The rest are logins.
 
 ### 6.3 What unblocks what
 
@@ -315,9 +315,9 @@ The CI habit is **plain Node scripts with no `npm install`** (`.github/workflows
    │ ✅ #1 Supabase project ──────▶ Ring 3 persist ─────────────┼──▶ PR-3 · PR-4 · M1 device run
    │ ⬜ #2 fal.ai key ────────────▶ live Path C call ───────────┼──▶ the slice's cartoonize step
    │ ⬜ #5 device / emulator ─────▶ Ring 2 ─────────────────────┼──▶ N1 device verification
-   │ ✅ #7/#8 decided ──⬜ #6 ────▶ config ─────────────────────┼──▶ SCRUM-50 · EAS
+   │ ✅ #7/#8/#6 decided ─────────▶ config ─────────────────────┼──▶ SCRUM-89 · EAS
    └────────────────────────────────────────────────────────────┘
-        ✅ = provisioned 2026-10-03.   Still open: #2 fal.ai · #5 device · #6 domain.
+        ✅ = provisioned (2026-10-03; #6 re-dated 2026-10-10).   Still open: #2 fal.ai · #5 device.
 
    ┌── ME — no dependencies at all ─────────────────────────────┐
    │ A · B · C · D · E(migrations) · F · G · H · I · J ─────────┼──▶ PR-1 ✅ shipped

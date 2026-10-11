@@ -204,7 +204,7 @@ The clause text below is kept as the **reference wording** — it is what ADR-00
 
 | # | Open | Why it is left open | Close it by |
 |---|---|---|---|
-| 1 | **Unity / Meta publisher controls** | The doc pages 404'd; recorded as **unverified rather than guessed** | reading the LevelPlay/Unity and Audience Network publisher docs before SDK selection |
+| 1 | **Unity / Meta publisher controls** | The doc pages 404'd; recorded as **unverified rather than guessed** | ✅ **NOW `SCRUM-107`** — split out when `SCRUM-63` closed (**2026-10-11**), filed in the **backlog** and ⏸ **gated on SDK selection**, which ADR-008 defers |
 | 2 | **The live AdMob category list for the SG account** | Google's list is **per-country and mutable** — hard-coding it would be wrong | reading *Blocking controls → Sensitive categories* **in the console** at integration and mapping our five classes onto whatever is actually offered |
 | 3 | **Alcohol's default state in AdMob** | Google describes a country-gated **opt-in**; the console is the source of truth | confirming the setting at integration and setting it **OFF** — SG *is* a permitted country |
 | 4 | **AdMob's `Consumer Loans` removal (2026-10-23)** | A **dated** change to a category we would have relied on | diarising it, and treating the `loans` class as ours regardless |
@@ -266,3 +266,5 @@ The clause text below is kept as the **reference wording** — it is what ADR-00
 ---
 
 *Last updated: **2026-10-06** — after `main` was synced (17 commits; PRs #16–#21 arrived): **ADR-008 clause D was applied directly** (§7.1), the §5.2 correction was rewritten once `check:adrs` turned out to exist after all, and the change set now records the **union of gates** (`slice` · `throw` · `ads` · `adrs`). Still true: SCRUM-63's five questions are answered, the deliverable list is satisfied **except the Unity/Meta SDK read** (§4.3, §8 item 1), no ad SDK is integrated, and this gate is **policy, not a runtime filter**.*
+
+*Updated **2026-10-11 (S46)** — ✅ **`SCRUM-63` was closed `Done`, six days after this doc landed on `main`**: the ticket had stayed `To Do` while the deliverable shipped **and** `check:ads` ran in CI (`.github/workflows/ci.yml`). ⚠️ **Only reading the tree found it — nothing in Jira said so.** Its **one unsatisfied deliverable** is now **split out, not cut**: **§8 item 1 → `SCRUM-107`**, in the backlog, ⏸ gated on SDK selection (which ADR-008 defers). **Nothing else in §8 is this doc's to close** — #2/#3 are console reads **at integration**, #4 is **diarised** (2026-10-23), #5 is **moot**, #6 is a **per-release** pass, #7 belongs to **`SCRUM-49`**. Still true: no ad SDK is integrated, and this gate is **policy, not a runtime filter**.*

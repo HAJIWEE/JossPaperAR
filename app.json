@@ -8,10 +8,25 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "app.josspaperar",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "associatedDomains": ["applinks:josspaperar.app"]
     },
     "android": {
       "package": "app.josspaperar",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "josspaperar.app",
+              "pathPrefix": "/join"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",

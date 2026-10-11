@@ -1,0 +1,37 @@
+{
+  // SCRUM-89 — the DEPLOY config for the website half of the universal link.
+  //
+  // Why this file exists: Cloudflare's current "Connect to Git" flow for this
+  // project is **Workers Builds**, whose deploy step runs `npx wrangler deploy`.
+  // That command reads THIS file to learn what to publish. Without it there is
+  // no Worker and no assets directory, so the deploy has nothing to ship and
+  // `https://josspaperar.app/.well-known/assetlinks.json` never appears.
+  //
+  // Docs: developers.cloudflare.com/workers/static-assets/binding/
+  "$schema": "./node_modules/wrangler/config-schema.json",
+
+  // ⚠️ MUST MATCH the Worker/project name you created in the Cloudflare
+  // dashboard. If they differ you end up with TWO Workers and the domain points
+  // at the empty one. Rename this line to match, or ask and it will be changed.
+  "name": "josspaperar-links",
+
+  // Per the Cloudflare docs: "Set this to today's date".
+  "compatibility_date": "2026-10-11",
+
+  // No `main` — this is an ASSETS-ONLY Worker (no script to run). Static files
+  // are served directly, which is all the association files need.
+  //
+  // ⚠️ `./public/` is the docs' own example value: "The folder of static assets
+  // to be served. For many frameworks, this is the ./public/, ./dist/, or
+  // ./build/ folder."
+  //
+  // ⚠️ Do NOT add an `.assetsignore` listing `_redirects` / `_headers`. The
+  // Cloudflare docs show that example for people who do NOT want those files
+  // processed — the opposite of what we want. Workers parses them; they are
+  // never served as static assets:
+  //   "This file will not itself be served as a static asset, but will instead
+  //    be parsed by Workers and its rules will be applied."
+  "assets": {
+    "directory": "./public/"
+  }
+}

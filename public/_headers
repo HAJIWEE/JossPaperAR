@@ -1,0 +1,20 @@
+# SCRUM-89 — response headers for the two association files.
+#
+# Format (same as Pages): a path line, then indented "Name: value" lines.
+# Parsed by Workers; this file is never served as a static asset.
+#
+# Why it exists: Apple requires the file be named `apple-app-site-association`
+# **without an extension**, so — unlike `assetlinks.json` — its content type
+# cannot be inferred from the filename. Pinning it removes the doubt.
+#
+# Apple's currently documented hosting requirements for this file are:
+#   "You must host the file using https:// with a valid certificate and with no
+#    redirects."                                                (developer.apple.com)
+# ⚠️ That "no redirects" is why public/_redirects must never touch /.well-known/.
+/.well-known/apple-app-site-association
+  Content-Type: application/json
+
+# `.json` would be inferred correctly from the extension; pinned anyway, so the
+# header does not depend on the host's behaviour.
+/.well-known/assetlinks.json
+  Content-Type: application/json
