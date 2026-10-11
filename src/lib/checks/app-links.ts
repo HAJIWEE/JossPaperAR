@@ -160,7 +160,7 @@ check(
 );
 const wranglerProblems = wrangler.ok ? validateWranglerConfig(wrangler.value) : [];
 check(
-  `${WRANGLER_FILE} serves ${PUBLIC_DIR}/ and stays assets-only`,
+  `${WRANGLER_FILE} serves ${PUBLIC_DIR}/ · stays assets-only · uses only schema-valid keys`,
   wrangler.ok && wranglerProblems.length === 0,
   wranglerProblems.join(' · '),
 );
@@ -264,6 +264,24 @@ check(
 check(
   'a wrangler.jsonc publishing the WRONG directory is reported',
   validateWranglerConfig('{"name":"x","assets":{"directory":"./dist/"}}').length > 0,
+);
+
+// Observability controls — the schema sets `additionalProperties: false`, so a
+// misspelled key is not ignored, it FAILS the deploy. These prove it is caught.
+const OBS_PREFIX = '{"name":"x","assets":{"directory":"./public/"},"observability":';
+check(
+  'an INVALID observability key is reported (schema: additionalProperties:false)',
+  validateWranglerConfig(`${OBS_PREFIX}{"logz":{"enabled":true}}}`).length > 0,
+);
+check(
+  'an invalid observability.logs key is reported',
+  validateWranglerConfig(`${OBS_PREFIX}{"logs":{"invokation_logs":true}}}`).length > 0,
+);
+check(
+  'the REAL observability block is schema-valid',
+  validateWranglerConfig(
+    `${OBS_PREFIX}{"enabled":true,"redact_query_string":true,"logs":{"enabled":true,"invocation_logs":true,"persist":true}}}`,
+  ).length === 0,
 );
 check(
   'comment-stripping does not trip on "main" SPOKEN INSIDE a comment',
