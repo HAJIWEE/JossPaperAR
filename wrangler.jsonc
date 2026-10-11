@@ -77,5 +77,27 @@
   //    be parsed by Workers and its rules will be applied."
   "assets": {
     "directory": "./public/"
-  }
+  },
+
+  // ⚠️ REQUIRED — without it EVERY PR's Cloudflare check FAILS.
+  //
+  // Cloudflare runs the Preview command (default `npx wrangler preview`) on every
+  // NON-production branch — i.e. every PR. It refuses to run without this block:
+  //
+  //   ✘ [ERROR] Your Wrangler configuration is missing a `previews` block to run
+  //     this command. Add the following to your configuration file:
+  //       { "previews": {} }
+  //
+  // It may be EMPTY. Docs, verbatim: "The `previews` block is required, but it
+  // can be empty if your Preview does not need separate settings." Assets,
+  // compatibility settings, migrations and placement stay at the TOP LEVEL and
+  // are deliberately not repeated here. Schema: `previews` → `PreviewsConfig`.
+  //
+  // ⚠️ THE TRAP THIS CLOSES: that failure surfaces ONLY as a GitHub check-run
+  // named "Workers Builds: josspaperar-links". It is INVISIBLE to `npm run check`
+  // and to `.github/workflows/ci.yml` — and an earlier pass on this repo duly
+  // reported "CI green" while it was RED on two merged PRs (#34 and #35).
+  // `check:links` now asserts this key, so the blind spot is closed rather than
+  // remembered.
+  "previews": {}
 }
