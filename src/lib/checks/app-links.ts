@@ -43,6 +43,7 @@ import {
   validateAasa,
   validateAssetLinks,
   validateEasConfig,
+  validateEasProjectId,
   validateHeaders,
   validateRedirects,
   validateWranglerConfig,
@@ -206,6 +207,16 @@ check(
   easProblems.join(' · '),
 );
 
+// ⚠️ The id `eas build:configure` writes. Without it EAS cannot resolve WHICH
+// project to build, so there is no signed build and no fingerprint — the chain
+// this whole gate exists to protect.
+const projectIdProblems = validateEasProjectId(expo);
+check(
+  `app.json carries expo.extra.eas.projectId — \`eas build\` cannot resolve the project without it`,
+  projectIdProblems.length === 0,
+  projectIdProblems.join(' · '),
+);
+
 // ─── 4 · the code ↔ config tie ─────────────────────────────────────────────
 section('4 · the tie — what the APP produces vs what the CONFIG claims');
 
@@ -326,6 +337,13 @@ check(
   validateEasConfig(
     '{"build":{"development":{"developmentClient":true,"distribution":"internal"},"preview":{"distribution":"internal"},"production":{}}}',
   ).length === 0,
+);
+check('a MISSING eas projectId is reported', validateEasProjectId({ extra: { eas: {} } }).length > 0);
+check('a MISSING extra.eas entirely is reported', validateEasProjectId({}).length > 0);
+check('a MALFORMED eas projectId is reported', validateEasProjectId({ extra: { eas: { projectId: 'not-a-uuid' } } }).length > 0);
+check(
+  'the REAL projectId shape is valid',
+  validateEasProjectId({ extra: { eas: { projectId: 'b4b28ad0-f302-438a-9c46-e784b488c1c5' } } }).length === 0,
 );
 
 // ─── release guard — the two prerequisites, stated plainly ─────────────────

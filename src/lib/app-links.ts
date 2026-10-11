@@ -244,6 +244,28 @@ export const PLAY_LISTING_PREFIX = 'https://play.google.com/store/apps/details?i
  */
 export const EAS_CONFIG_FILE = 'eas.json';
 
+/** `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` — the EAS project id format. */
+export const EAS_PROJECT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * Validate `expo.extra.eas.projectId` — the id `eas build:configure` writes.
+ *
+ * ⚠️ Without it `eas build` cannot tell WHICH EAS project to build (it prompts,
+ * or fails), so there is no signed build, no cert SHA-256, and the sentinel in
+ * `assetlinks.json` can never be replaced. That is the whole chain.
+ */
+export function validateEasProjectId(expoConfig: Record<string, unknown>): string[] {
+  const extra = expoConfig.extra as Record<string, unknown> | undefined;
+  const eas = extra?.eas as Record<string, unknown> | undefined;
+  const projectId = eas?.projectId;
+  if (projectId === undefined) {
+    return ['expo.extra.eas.projectId is missing — `eas build` cannot resolve the EAS project, so no signed build (and no fingerprint) is possible'];
+  }
+  if (!EAS_PROJECT_ID_PATTERN.test(String(projectId))) {
+    return [`expo.extra.eas.projectId is not a UUID: ${JSON.stringify(projectId)}`];
+  }
+  return [];
+}
 /** The three profiles EAS CLI's own default generates (Expo docs: "the default configuration for eas.json generated in a new project"). */
 export const EAS_REQUIRED_PROFILES = ['development', 'preview', 'production'] as const;
 
