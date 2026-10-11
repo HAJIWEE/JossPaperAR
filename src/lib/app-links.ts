@@ -196,3 +196,213 @@ export function validateAasa(value: unknown, bundleId: string): string[] {
   return problems;
 }
 
+// ─── the DEPLOY contract — what SERVES the two files above ──────────────────
+//
+// An association file nobody serves is not a universal link. Serving it needs a
+// hosting config — three MORE files that nothing type-checks:
+//
+//   `wrangler.jsonc`     → which folder is published, and how
+//   `public/_redirects`  → the store fallback when the app is not installed
+//   `public/_headers`    → the response headers Google/Apple expect
+//
+// ⚠️ **LIVE FINDING, 2026-10-11.** This repo had NO Wrangler config, while the
+// current Cloudflare "Connect to Git" flow is **Workers Builds**, whose deploy
+// step runs `npx wrangler deploy`. With no config that command has no Worker and
+// no assets directory, so it publishes nothing and every `.well-known` URL 404s.
+// **A missing deploy config fails exactly as silently as a wrong one** — which
+// is why it is asserted here rather than left to a checklist.
+
+/** The Wrangler config, read by `npx wrangler deploy` (Workers Builds). */
+export const WRANGLER_FILE = 'wrangler.jsonc';
+/** The static root that gets published. */
+export const PUBLIC_DIR = 'public';
+/** The URL path both association files are served from. */
+export const WELL_KNOWN_URL_PATH = '/.well-known';
+/** Cloudflare's two directives files — parsed by Workers, never served. */
+export const REDIRECTS_FILE = '_redirects';
+export const HEADERS_FILE = '_headers';
+/** Where the fallback must send a browser with no app installed. */
+export const PLAY_LISTING_PREFIX = 'https://play.google.com/store/apps/details?id=';
+
+/** The Play listing for a given package id — derived, never re-typed. */
+export function playListingUrl(packageName: string): string {
+  return `${PLAY_LISTING_PREFIX}${packageName}`;
+}
+
+/**
+ * Strip `//` and block comments from JSONC, ignoring comment markers inside
+ * strings — so a `wrangler.jsonc` that merely *mentions* `"main"` in a comment
+ * cannot make this validator lie.
+ */
+export function stripJsonComments(text: string): string {
+  let out = '';
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (inString) {
+      out += ch;
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      out += ch;
+      continue;
+    }
+    if (ch === '/' && next === '/') {
+      while (i < text.length && text[i] !== '\n') i += 1;
+      out += '\n';
+      continue;
+    }
+    if (ch === '/' && next === '*') {
+      i += 2;
+      while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) i += 1;
+      i += 1;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+/** One `_redirects` line: `[source] [destination] [code?]`. */
+export type RedirectRule = { readonly source: string; readonly destination: string; readonly code: number };
+
+/** Parse `_redirects`. Blank lines and `#` comments are skipped. */
+export function parseRedirects(text: string): RedirectRule[] {
+  const rules: RedirectRule[] = [];
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (line.length === 0 || line.startsWith('#')) continue;
+    const [source, destination, code] = line.split(/\s+/);
+    if (!source || !destination) continue;
+    rules.push({ source, destination, code: code ? Number(code) : 302 });
+  }
+  return rules;
+}
+
+/** One `_headers` block: a path line, then indented `Name: value` lines. */
+export type HeaderRule = {
+  readonly path: string;
+  readonly headers: readonly { readonly name: string; readonly value: string }[];
+};
+
+/** Parse `_headers`. Indentation is what separates a header from the next path. */
+export function parseHeaders(text: string): HeaderRule[] {
+  const rules: { path: string; headers: { name: string; value: string }[] }[] = [];
+  let current: { path: string; headers: { name: string; value: string }[] } | null = null;
+  for (const raw of text.split('\n')) {
+    const trimmed = raw.trim();
+    if (trimmed.length === 0 || trimmed.startsWith('#')) continue;
+    if (!/^\s/.test(raw)) {
+      current = { path: trimmed, headers: [] };
+      rules.push(current);
+      continue;
+    }
+    if (!current) continue;
+    const colon = raw.indexOf(':');
+    if (colon === -1) continue;
+    current.headers.push({ name: raw.slice(0, colon).trim(), value: raw.slice(colon + 1).trim() });
+  }
+  return rules;
+}
+
+/**
+ * Validate `wrangler.jsonc` — must publish `public/` and stay ASSETS-ONLY.
+ *
+ * ⚠️ `"main"` is a problem, not a nicety: pointing at a Worker script that does
+ * not exist fails the deploy outright. And no script is needed here — the
+ * `/join` fallback is a `_redirects` rule, so it needs no code at all.
+ */
+export function validateWranglerConfig(text: string): string[] {
+  const problems: string[] = [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stripJsonComments(text));
+  } catch (error) {
+    return [`${WRANGLER_FILE} is not valid JSONC once comments are stripped: ${(error as Error).message}`];
+  }
+  const root = (parsed ?? {}) as Record<string, unknown>;
+  if (typeof root.name !== 'string' || root.name.length === 0) {
+    problems.push('"name" is missing — `npx wrangler deploy` needs a Worker name');
+  }
+  const assets = root.assets as Record<string, unknown> | undefined;
+  if (!assets || typeof assets !== 'object') {
+    problems.push('the "assets" key is missing — the deploy would publish nothing');
+    return problems;
+  }
+  const declared = String(assets.directory ?? '')
+    .replace(/^\.\//, '')
+    .replace(/\/+$/, '');
+  if (declared !== PUBLIC_DIR) {
+    problems.push(`assets.directory must serve ${PUBLIC_DIR}/ (it is ${JSON.stringify(assets.directory)})`);
+  }
+  if ('main' in root) {
+    problems.push('"main" must not be set — no Worker script exists in this repo, so this must be an ASSETS-ONLY Worker');
+  }
+  return problems;
+}
+
+/**
+ * Validate `_redirects` — the STORE FALLBACK, plus the "no redirects" rule.
+ *
+ * ⚠️ Apple, verbatim: *"You must host the file using `https://` with a valid
+ * certificate and with **no redirects**."* So a rule touching `/.well-known/` is
+ * not a style problem — it silently breaks the iOS association.
+ */
+export function validateRedirects(text: string, packageName: string): string[] {
+  const problems: string[] = [];
+  const rules = parseRedirects(text);
+  const joinPath = `${APP_LINKS_PATH_PREFIX}/*`;
+  const joinRule = rules.find((rule) => rule.source === joinPath || rule.source === APP_LINKS_PATH_PREFIX);
+  if (!joinRule) {
+    problems.push(`no rule redirects ${joinPath} — opened in a browser, the link would dead-end`);
+  } else {
+    const expected = playListingUrl(packageName);
+    if (joinRule.destination !== expected) {
+      problems.push(`${joinPath} must point at ${expected} (it is ${JSON.stringify(joinRule.destination)})`);
+    }
+    if (!(joinRule.code >= 300 && joinRule.code < 400)) {
+      problems.push(`${joinPath} must use a redirect status (3xx) — it is ${joinRule.code}`);
+    }
+  }
+  for (const rule of rules) {
+    if (rule.source.includes('.well-known')) {
+      problems.push(
+        `"${rule.source}" must NOT be redirected — Apple requires the association file be hosted "with no redirects"`,
+      );
+    }
+  }
+  return problems;
+}
+
+/**
+ * Validate `_headers` — both association files must be `application/json`.
+ *
+ * The AASA file has **no extension** (Apple: *"create a file named
+ * `apple-app-site-association` (without an extension)"*), so unlike
+ * `assetlinks.json` its content type cannot be inferred from the filename.
+ */
+export function validateHeaders(text: string): string[] {
+  const problems: string[] = [];
+  const rules = parseHeaders(text);
+  for (const file of [AASA_FILE, ASSET_LINKS_FILE]) {
+    const path = `${WELL_KNOWN_URL_PATH}/${file}`;
+    const rule = rules.find((candidate) => candidate.path === path);
+    if (!rule) {
+      problems.push(`no rule pins the response headers for ${path}`);
+      continue;
+    }
+    const contentType = rule.headers.find((header) => header.name.toLowerCase() === 'content-type');
+    if (!contentType || !contentType.value.toLowerCase().startsWith('application/json')) {
+      problems.push(`${path} must be served as application/json (it is ${JSON.stringify(contentType?.value)})`);
+    }
+  }
+  return problems;
+}
+
+

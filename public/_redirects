@@ -1,0 +1,22 @@
+# SCRUM-89 — the STORE FALLBACK (doc 07 §4.6: "routes to the store when the app
+# is not installed").
+#
+# Why a plain redirect is the correct fallback, and not a compromise:
+# the OS intercepts an App Link BEFORE any HTTP request leaves the device. So a
+# verified install NEVER reaches this file — reaching it already MEANS the app
+# did not take the link (not installed, or the association is not yet verified).
+# That is exactly the case where the store is the right answer.
+#
+# Format: [source] [destination] [code?]  ·  parsed by Workers, never served.
+# 302 is the default status code. An external destination is explicitly allowed:
+#   destination — "A file path or external link."
+#
+# package id = app.josspaperar (app.json → android.package; doc 19 §6.2 #7).
+# ⚠️ Not yet published to Play — this 404s on Google's side until it is, which is
+# expected until SCRUM-56 #10 (Play Console) is done.
+#
+# ⚠️ DEFERRED DEEP-LINKING IS DELIBERATELY NOT DONE HERE. Carrying {CODE}
+# through the install needs the code passed as a Play `referrer` AND read back
+# in-app via the Play Install Referrer API — a native capability this app does
+# not have yet. Faking it here would look like it worked and silently would not.
+/join/* https://play.google.com/store/apps/details?id=app.josspaperar 302

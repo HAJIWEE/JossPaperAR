@@ -26,13 +26,23 @@ import {
   AASA_FILE,
   APP_LINKS_PATH_PREFIX,
   ASSET_LINKS_FILE,
+  HEADERS_FILE,
+  PUBLIC_DIR,
+  REDIRECTS_FILE,
   WELL_KNOWN_DIR,
+  WELL_KNOWN_URL_PATH,
+  WRANGLER_FILE,
   aasaPathCoversJoin,
   expectedAssociatedDomain,
   isPlaceholderFingerprint,
   isPlaceholderTeamId,
+  parseRedirects,
+  playListingUrl,
   validateAasa,
   validateAssetLinks,
+  validateHeaders,
+  validateRedirects,
+  validateWranglerConfig,
 } from '../app-links.ts';
 import { INVITE_HOST, INVITE_SCHEME, inviteLink } from '../invites.ts';
 
@@ -61,6 +71,15 @@ function readJson(rel: string): { readonly ok: boolean; readonly value?: unknown
     return { ok: true, value: JSON.parse(readFileSync(join(ROOT, rel), 'utf8')) };
   } catch (error) {
     return { ok: false, problem: `${rel} — ${(error as Error).message}` };
+  }
+}
+
+/** Read a text file that is NOT JSON (`_redirects` · `_headers` · `wrangler.jsonc`). */
+function readText(rel: string): { readonly ok: boolean; readonly value: string; readonly problem?: string } {
+  try {
+    return { ok: true, value: readFileSync(join(ROOT, rel), 'utf8') };
+  } catch (error) {
+    return { ok: false, value: '', problem: `${rel} — ${(error as Error).message}` };
   }
 }
 
@@ -130,8 +149,47 @@ check(
   aasaProblems.join(' · '),
 );
 
-// ─── 3 · the code ↔ config tie ─────────────────────────────────────────────
-section('3 · the tie — what the APP produces vs what the CONFIG claims');
+// ─── 3 · the deploy — what SERVES the two files above ──────────────────────
+section('3 · the deploy — the hosting config that serves them');
+
+const wrangler = readText(WRANGLER_FILE);
+check(
+  `${WRANGLER_FILE} exists — \`npx wrangler deploy\` publishes NOTHING without it`,
+  wrangler.ok,
+  wrangler.problem ?? '',
+);
+const wranglerProblems = wrangler.ok ? validateWranglerConfig(wrangler.value) : [];
+check(
+  `${WRANGLER_FILE} serves ${PUBLIC_DIR}/ and stays assets-only`,
+  wrangler.ok && wranglerProblems.length === 0,
+  wranglerProblems.join(' · '),
+);
+
+const redirects = readText(join(PUBLIC_DIR, REDIRECTS_FILE));
+check(`${PUBLIC_DIR}/${REDIRECTS_FILE} exists — the store fallback`, redirects.ok, redirects.problem ?? '');
+const redirectProblems = redirects.ok ? validateRedirects(redirects.value, packageName) : [];
+check(
+  `${REDIRECTS_FILE} sends ${APP_LINKS_PATH_PREFIX}/* to the Play listing for ${packageName}`,
+  redirects.ok && redirectProblems.length === 0,
+  redirectProblems.join(' · '),
+);
+check(
+  `nothing redirects ${WELL_KNOWN_URL_PATH}/ — Apple: host the file "with no redirects"`,
+  redirects.ok &&
+    !parseRedirects(redirects.value).some((rule) => rule.source.includes(WELL_KNOWN_URL_PATH)),
+);
+
+const headers = readText(join(PUBLIC_DIR, HEADERS_FILE));
+check(`${PUBLIC_DIR}/${HEADERS_FILE} exists — the response headers`, headers.ok, headers.problem ?? '');
+const headerProblems = headers.ok ? validateHeaders(headers.value) : [];
+check(
+  `${HEADERS_FILE} serves both association files as application/json`,
+  headers.ok && headerProblems.length === 0,
+  headerProblems.join(' · '),
+);
+
+// ─── 4 · the code ↔ config tie ─────────────────────────────────────────────
+section('4 · the tie — what the APP produces vs what the CONFIG claims');
 
 const produced = new URL(inviteLink('ABCDEFGH'));
 check('inviteLink() lands on the host the intentFilter claims', produced.host === data.host, produced.host);
@@ -141,8 +199,8 @@ check(
   produced.pathname,
 );
 
-// ─── 4 · positive controls — the gate must be able to FAIL ─────────────────
-section('4 · controls — a wrong config must be CAUGHT, not merely "not green"');
+// ─── 5 · positive controls — the gate must be able to FAIL ─────────────────
+section('5 · controls — a wrong config must be CAUGHT, not merely "not green"');
 
 check('a wrong package name is reported', validateAssetLinks(assetLinks.value, 'app.wrong').length > 0);
 check(
@@ -178,6 +236,40 @@ check(
   ).length > 0,
 );
 check('aasaPathCoversJoin rejects an unrelated prefix', !aasaPathCoversJoin('/clans/*') && aasaPathCoversJoin('/join/*') && aasaPathCoversJoin('*'));
+
+// Hosting controls — each one is a way the LIVE link breaks silently.
+check(
+  'a redirect of /.well-known is reported (Apple: "no redirects")',
+  validateRedirects(
+    `/.well-known/${AASA_FILE} /oops 302\n${APP_LINKS_PATH_PREFIX}/* ${playListingUrl(packageName)} 302`,
+    packageName,
+  ).length > 0,
+);
+check(
+  'a fallback pointing at SOMEONE ELSE\'S app is reported',
+  validateRedirects(`${APP_LINKS_PATH_PREFIX}/* ${playListingUrl('app.someoneelse')} 302`, packageName).length > 0,
+);
+check(
+  'a MISSING fallback is reported (the browser would dead-end)',
+  validateRedirects(`# nothing but a comment`, packageName).length > 0,
+);
+check(
+  'a fallback that is not a redirect is reported',
+  validateRedirects(`${APP_LINKS_PATH_PREFIX}/* ${playListingUrl(packageName)} 200`, packageName).length > 0,
+);
+check(
+  'a "main" in wrangler.jsonc is reported (no Worker script exists)',
+  validateWranglerConfig('{"name":"x","main":"src/index.ts","assets":{"directory":"./public/"}}').length > 0,
+);
+check(
+  'a wrangler.jsonc publishing the WRONG directory is reported',
+  validateWranglerConfig('{"name":"x","assets":{"directory":"./dist/"}}').length > 0,
+);
+check(
+  'comment-stripping does not trip on "main" SPOKEN INSIDE a comment',
+  validateWranglerConfig('{\n  // no "main": assets-only, on purpose\n  "name":"x",\n  "assets":{"directory":"./public/"}\n}').length === 0,
+);
+check('an empty _headers is reported (no content type)', validateHeaders('').length > 0);
 
 // ─── release guard — the two prerequisites, stated plainly ─────────────────
 const firstTarget = ((assetLinks.value as unknown[] | undefined)?.[0] ?? {}) as {
