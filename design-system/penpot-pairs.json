@@ -1,9 +1,9 @@
 {
   "_what": "The Penpot colour pairs that check:contrast asserts. A FROZEN SNAPSHOT of board colours — the gate reads this file, not Penpot.",
   "_why": "check:contrast reads tokens.css and the app stylesheet, so it structurally CANNOT see a Penpot board. That is how SCRUM-93 happened: the 0e3 role chip sat at 2.77:1 on a signed-off board (EN and ZH) while every gate stayed green — despite SCRUM-45 having cleared 132 AA failures in this same file. A signed-off board is not a checked board. This file is the bridge: the pairs are extracted from Penpot by penpot-sweeps/penpot-contrast-sweep.js and frozen here so CI can assert them without a Penpot connection.",
-  "_limits": "⚠️ A snapshot is not a sweep. This asserts the pairs BELOW and nothing else — a NEW pair added to a board is invisible here until the sweep is re-run. Re-run the sweep after any Penpot colour change. The sweep also composites fillOpacity; this file stores the resolved backdrop, so a tint is recorded as the colour it actually renders as, never as its raw hex. ⚠️ AND — found the hard way on 2026-10-11 — that sweep asserted ONLY chip pairs (`role chip (label)` / `chip · `) until SCRUM-11 added a second branch for the League boards. The league parts are named `row 1 · Chen Family (bg)`, `row 1 · rank`, `divider · promotion line`, `art · tier badge label` — matching NEITHER pattern — so the whole League board would have stayed invisible to the file's only refresh mechanism, on the same shape of hole that let SCRUM-93 ship.",
-  "_refresh": "node penpot-sweeps/penpot-contrast-sweep.js (via the Penpot MCP plugin) — it prints the pairs it measured and fails if any is below its minimum. ⚠️ SCRUM-11 extended it with the League branch (part 1b) and the top-level-board fix (trap 7). The thirteen League pairs below were measured from the LIVE board at revn 365 by exactly those rules, but the EXTENDED SCRIPT had not been run end-to-end when they were frozen (the Penpot plugin tab kept suspending). Before the next board colour change: run the sweep and diff its `league` array against these pairs.",
-  "_source": "Penpot file `JossPaperAR`, page \"New-user tutorial · Core loop\". The SCRUM-93 pairs were frozen from named version `S37b` at revn 287. The four SCRUM-94 pairs were measured live at revn 358 and saved as named version `S39 · SCRUM-94 — 0e8 disc + 7 Store Owned chip (revn 358)`; the six SCRUM-104 pairs (the confirm dialogs' cancel/no-thanks labels) were added at revn 364 under named version `S40 · SCRUM-104 — the 6 confirm dialogs grew 54px so Cancel sits ON the card`. All were saved via `penpot.currentFile.saveVersion()` — ⚠️ which EXISTS; the three-session-old claim that the plugin API had no version endpoint was itself the error (see follow-up-items.md), so do not repeat it. revn ticks on any change, including a live fault test that restores the same values. The thirteen SCRUM-11 pairs (the 6 / 6b League boards) were measured live at revn 365 — READ-ONLY, no board was touched, so there is no new named version and the file stayed at revn 365 throughout.",
+  "_limits": "⚠️ A snapshot is not a sweep. This asserts the pairs BELOW and nothing else — a NEW pair added to a board is invisible here until the sweep is re-run. Re-run the sweep after any Penpot colour change. The sweep also composites fillOpacity; this file stores the resolved backdrop, so a tint is recorded as the colour it actually renders as, never as its raw hex. ⚠️ AND — found the hard way on 2026-10-11 — that sweep asserted ONLY chip pairs (`role chip (label)` / `chip · `) until SCRUM-11 added a second branch for the League boards. The league parts are named `row 1 · Chen Family (bg)`, `row 1 · rank`, `divider · promotion line`, `art · tier badge label` — matching NEITHER pattern — so the whole League board would have stayed invisible to the file's only refresh mechanism, on the same shape of hole that let SCRUM-93 ship. AND FOUND 2026-10-12 (S56, SCRUM-114): the sweep filters BOARDS by name (/League/i), which is ASCII-only — so `ZH · 6b 联赛 / 第一周` has been invisible to the sweep entirely: the same shape of hole as the layer-pattern gap below, one level up. The 6c / 6d moment boards were named with `League` deliberately so they do not join it.",
+  "_refresh": "node penpot-sweeps/penpot-contrast-sweep.js (via the Penpot MCP plugin) — it prints the pairs it measured and fails if any is below its minimum. ⚠️ SCRUM-11 extended it with the League branch (part 1b) and the top-level-board fix (trap 7). The thirteen League pairs below were measured from the LIVE board at revn 365 by exactly those rules, but the EXTENDED SCRIPT had not been run end-to-end when they were frozen (the Penpot plugin tab kept suspending). Before the next board colour change: run the sweep and diff its `league` array against these pairs. The SCRUM-114 pairs were measured by reading the new boards' shapes and recomputing the ratios with the sweep's own formula — the extended sweep itself has still not been run end-to-end (the plugin tab suspends). Run it and diff the `league` array before the next board colour change.",
+  "_source": "Penpot file `JossPaperAR`, page \"New-user tutorial · Core loop\". The SCRUM-93 pairs were frozen from named version `S37b` at revn 287. The four SCRUM-94 pairs were measured live at revn 358 and saved as named version `S39 · SCRUM-94 — 0e8 disc + 7 Store Owned chip (revn 358)`; the six SCRUM-104 pairs (the confirm dialogs' cancel/no-thanks labels) were added at revn 364 under named version `S40 · SCRUM-104 — the 6 confirm dialogs grew 54px so Cancel sits ON the card`. All were saved via `penpot.currentFile.saveVersion()` — ⚠️ which EXISTS; the three-session-old claim that the plugin API had no version endpoint was itself the error (see follow-up-items.md), so do not repeat it. revn ticks on any change, including a live fault test that restores the same values. The thirteen SCRUM-11 pairs (the 6 / 6b League boards) were measured live at revn 365 — READ-ONLY, no board was touched, so there is no new named version and the file stayed at revn 365 throughout. The twenty-two SCRUM-114 pairs (the 6c / 6d moment boards, EN + ZH) were measured at **revn 367**, where those boards were CREATED — they are new surfaces drawn in the existing League language: the header, the tier badge and three rows are CLONES from the live league board, so the artwork is the board's own rather than a redraw. The new boards sit at x=5400.",
   "_rules": "`text` must be `normal` (>=4.5:1) or `large` (>=3:1, i.e. >=24px, or >=18.66px bold). `min` is DERIVED from `text` by the gate and asserted equal to it — so the requirement cannot be quietly lowered to make a failing pair pass.",
   "pairs": [
     {
@@ -105,7 +105,6 @@
       "text": "normal",
       "why": "ZH half of the Owned chip — same composited backdrop, same fix."
     },
-
     {
       "board": "EN · 9f Credits · confirm",
       "layer": "btn · cancel",
@@ -160,7 +159,6 @@
       "text": "normal",
       "why": "ZH half. Card 340 → 394."
     },
-
     {
       "board": "EN · 6 League",
       "layer": "art · tier badge label",
@@ -267,7 +265,205 @@
       "fg": "#fff8e8",
       "bg": "#0c8265",
       "text": "normal",
-      "why": "SCRUM-11 step 5. The FIRST-WEEK EMPTY STATE carries the same tier badge as the populated board, so it carries the same 0.01 margin — 4.51. ⚠️ There is NO ZH · 6b board in the file: the populated league has ZH parity (ZH · 6 League / 联赛) but the empty state is EN-only. Frozen from the EN board because it is the only one that exists; the ZH gap is recorded on SCRUM-11."
+      "why": "SCRUM-11 step 5. The FIRST-WEEK EMPTY STATE carries the same tier badge as the populated board, so it carries the same 0.01 margin — 4.51. CORRECTED 2026-10-12 (S56): this entry claimed there is NO ZH · 6b board. There IS — `ZH · 6b 联赛 / 第一周`. And it is INVISIBLE to the sweep, whose league branch filters BOARD NAMES with /League/i (ASCII): that name carries 联赛 and not `League`, so its pairs have never been measured. Recorded on SCRUM-114 — the board filter needs the same treatment the layer patterns already got."
+    },
+    {
+      "board": "EN · 6c League / promotion moment",
+      "layer": "moment · title",
+      "on": "the moment card (--surface-row-zone #f8f1dc)",
+      "fg": "#1a1a1a",
+      "bg": "#f8f1dc",
+      "text": "large",
+      "why": "SCRUM-114. the promoted moment's title. 26 px / 700, so the LARGE bar (3:1) applies and it measures 15.42 — the same pair as the board's own `meta · tier name`. Answer C asked for a fuller moment; the title being the largest type on the sheet is what makes it read as news rather than a delta."
+    },
+    {
+      "board": "EN · 6c League / promotion moment",
+      "layer": "moment · eyebrow",
+      "on": "the moment card (--surface-row-zone #f8f1dc)",
+      "fg": "#7b621f",
+      "bg": "#f8f1dc",
+      "text": "normal",
+      "why": "SCRUM-114. the eyebrow that NAMES the moment, 11 px / 700 → normal text. 5.16 — the same gold-on-zone pair the in-zone rank freezes, so the moment and the zone agree on one gold instead of inventing a second."
+    },
+    {
+      "board": "EN · 6c League / promotion moment",
+      "layer": "moment · tier delta",
+      "on": "the moment card (--surface-row-zone #f8f1dc)",
+      "fg": "#7b621f",
+      "bg": "#f8f1dc",
+      "text": "normal",
+      "why": "SCRUM-114. the \"IRON → JADE\" delta — 13 px / 700, still normal text. 5.16. This is the rung named a SECOND time: the design answers SCRUM-114's \"whether the rung is named twice\" by naming it three ways (badge label, title, delta), none of them in a colour the others do not use."
+    },
+    {
+      "board": "EN · 6c League / promotion moment",
+      "layer": "moment · body",
+      "on": "the moment card (--surface-row-zone #f8f1dc)",
+      "fg": "#4a463f",
+      "bg": "#f8f1dc",
+      "text": "normal",
+      "why": "SCRUM-114. the body copy on the zone surface, 8.31 — `--ink-soft`, the token every other secondary line on the board already uses."
+    },
+    {
+      "board": "EN · 6c League / promotion moment",
+      "layer": "art · tier badge label (large)",
+      "on": "the tier badge art (#0c8265 under the label)",
+      "fg": "#fff8e8",
+      "bg": "#0c8265",
+      "text": "normal",
+      "why": "SCRUM-114. the ENLARGED tier badge (70 → 110 px). ⚠️ The badge is CLONED from the board and resized, so this pair keeps the same 0.01 margin as the 6b empty state — 4.51. The label does NOT scale with the art: 17 px is still normal text, NOT large, so the 4.5 bar holds. If a later pass scales the label past 18.66 px, the requirement must be re-derived rather than assumed."
+    },
+    {
+      "board": "EN · 6d League / demoted · held",
+      "layer": "state · label (demoted)",
+      "on": "the board (--paper #f5f0e8)",
+      "fg": "#7b621f",
+      "bg": "#f5f0e8",
+      "text": "normal",
+      "why": "SCRUM-114. the sheet label that names the state, 5.13. ⚠️ Recorded here because the OBVIOUS move is a mistake: gold on the DEEP paper measures only **4.52** — a 0.02 margin — which is exactly why the demoted treatment carries no gold at all."
+    },
+    {
+      "board": "EN · 6d League / demoted · held",
+      "layer": "moment · title (demoted)",
+      "on": "the demoted card (--surface-paper-deep #eae2d2)",
+      "fg": "#1a1a1a",
+      "bg": "#eae2d2",
+      "text": "normal",
+      "why": "SCRUM-114. the demoted title, 13.52. 17 px / 700 is still NORMAL text (the large bar needs ≥18.66 px BOLD), so it holds the 4.5 requirement. ⚠️ The demoted moment is deliberately a SMALLER title than the promoted one (17 vs 26) and takes the deep paper, so a demotion is told in the board's ordinary voice — stated, never played (doc 04)."
+    },
+    {
+      "board": "EN · 6d League / demoted · held",
+      "layer": "moment · body (demoted)",
+      "on": "the demoted card (--surface-paper-deep #eae2d2)",
+      "fg": "#4a463f",
+      "bg": "#eae2d2",
+      "text": "normal",
+      "why": "SCRUM-114. the demoted body, 7.28 — `--ink-soft` on the surface the client uses for the non-promoted variant."
+    },
+    {
+      "board": "EN · 6d League / demoted · held",
+      "layer": "moment · title (held)",
+      "on": "the board (--paper #f5f0e8, no card of its own)",
+      "fg": "#1a1a1a",
+      "bg": "#f5f0e8",
+      "text": "normal",
+      "why": "SCRUM-114. the held title, 15.34. A HOLD sits on plain paper with no card: the quietest of the three treatments, by construction rather than by taste."
+    },
+    {
+      "board": "EN · 6d League / demoted · held",
+      "layer": "moment · body (held)",
+      "on": "the board (--paper #f5f0e8, no card of its own)",
+      "fg": "#4a463f",
+      "bg": "#f5f0e8",
+      "text": "normal",
+      "why": "SCRUM-114. the one line a hold gets, 8.27."
+    },
+    {
+      "board": "EN · 6d League / demoted · held",
+      "layer": "spec · motion (the sheet note)",
+      "on": "the board (--paper #f5f0e8)",
+      "fg": "#4a463f",
+      "bg": "#f5f0e8",
+      "text": "normal",
+      "why": "SCRUM-114. the motion is DESIGNED on the board rather than left to the implementer — 0.92 → 1.0 scale + a 420 ms fade on the UI thread, PROMOTED ONLY. 8.27."
+    },
+    {
+      "board": "ZH · 6c League / 联赛 · 晋升时刻",
+      "layer": "moment · title",
+      "on": "the moment card (--surface-row-zone #f8f1dc)",
+      "fg": "#1a1a1a",
+      "bg": "#f8f1dc",
+      "text": "large",
+      "why": "ZH half of the promoted moment's title. 26 px / 700, so the LARGE bar (3:1) applies and it measures 15.42 — the same pair as the board's own `meta · tier name`. Answer C asked for a fuller moment; the title being the largest type on the sheet is what makes it read as news rather than a delta."
+    },
+    {
+      "board": "ZH · 6c League / 联赛 · 晋升时刻",
+      "layer": "moment · eyebrow",
+      "on": "the moment card (--surface-row-zone #f8f1dc)",
+      "fg": "#7b621f",
+      "bg": "#f8f1dc",
+      "text": "normal",
+      "why": "ZH half of the eyebrow that NAMES the moment, 11 px / 700 → normal text. 5.16 — the same gold-on-zone pair the in-zone rank freezes, so the moment and the zone agree on one gold instead of inventing a second."
+    },
+    {
+      "board": "ZH · 6c League / 联赛 · 晋升时刻",
+      "layer": "moment · tier delta",
+      "on": "the moment card (--surface-row-zone #f8f1dc)",
+      "fg": "#7b621f",
+      "bg": "#f8f1dc",
+      "text": "normal",
+      "why": "ZH half of the \"IRON → JADE\" delta — 13 px / 700, still normal text. 5.16. This is the rung named a SECOND time: the design answers SCRUM-114's \"whether the rung is named twice\" by naming it three ways (badge label, title, delta), none of them in a colour the others do not use."
+    },
+    {
+      "board": "ZH · 6c League / 联赛 · 晋升时刻",
+      "layer": "moment · body",
+      "on": "the moment card (--surface-row-zone #f8f1dc)",
+      "fg": "#4a463f",
+      "bg": "#f8f1dc",
+      "text": "normal",
+      "why": "ZH half of the body copy on the zone surface, 8.31 — `--ink-soft`, the token every other secondary line on the board already uses."
+    },
+    {
+      "board": "ZH · 6c League / 联赛 · 晋升时刻",
+      "layer": "art · tier badge label (large)",
+      "on": "the tier badge art (#0c8265 under the label)",
+      "fg": "#fff8e8",
+      "bg": "#0c8265",
+      "text": "normal",
+      "why": "ZH half of the ENLARGED tier badge (70 → 110 px). ⚠️ The badge is CLONED from the board and resized, so this pair keeps the same 0.01 margin as the 6b empty state — 4.51. The label does NOT scale with the art: 17 px is still normal text, NOT large, so the 4.5 bar holds. If a later pass scales the label past 18.66 px, the requirement must be re-derived rather than assumed."
+    },
+    {
+      "board": "ZH · 6d League / 联赛 · 降级与留级",
+      "layer": "state · label (demoted)",
+      "on": "the board (--paper #f5f0e8)",
+      "fg": "#7b621f",
+      "bg": "#f5f0e8",
+      "text": "normal",
+      "why": "ZH half of the sheet label that names the state, 5.13. ⚠️ Recorded here because the OBVIOUS move is a mistake: gold on the DEEP paper measures only **4.52** — a 0.02 margin — which is exactly why the demoted treatment carries no gold at all."
+    },
+    {
+      "board": "ZH · 6d League / 联赛 · 降级与留级",
+      "layer": "moment · title (demoted)",
+      "on": "the demoted card (--surface-paper-deep #eae2d2)",
+      "fg": "#1a1a1a",
+      "bg": "#eae2d2",
+      "text": "normal",
+      "why": "ZH half of the demoted title, 13.52. 17 px / 700 is still NORMAL text (the large bar needs ≥18.66 px BOLD), so it holds the 4.5 requirement. ⚠️ The demoted moment is deliberately a SMALLER title than the promoted one (17 vs 26) and takes the deep paper, so a demotion is told in the board's ordinary voice — stated, never played (doc 04)."
+    },
+    {
+      "board": "ZH · 6d League / 联赛 · 降级与留级",
+      "layer": "moment · body (demoted)",
+      "on": "the demoted card (--surface-paper-deep #eae2d2)",
+      "fg": "#4a463f",
+      "bg": "#eae2d2",
+      "text": "normal",
+      "why": "ZH half of the demoted body, 7.28 — `--ink-soft` on the surface the client uses for the non-promoted variant."
+    },
+    {
+      "board": "ZH · 6d League / 联赛 · 降级与留级",
+      "layer": "moment · title (held)",
+      "on": "the board (--paper #f5f0e8, no card of its own)",
+      "fg": "#1a1a1a",
+      "bg": "#f5f0e8",
+      "text": "normal",
+      "why": "ZH half of the held title, 15.34. A HOLD sits on plain paper with no card: the quietest of the three treatments, by construction rather than by taste."
+    },
+    {
+      "board": "ZH · 6d League / 联赛 · 降级与留级",
+      "layer": "moment · body (held)",
+      "on": "the board (--paper #f5f0e8, no card of its own)",
+      "fg": "#4a463f",
+      "bg": "#f5f0e8",
+      "text": "normal",
+      "why": "ZH half of the one line a hold gets, 8.27."
+    },
+    {
+      "board": "ZH · 6d League / 联赛 · 降级与留级",
+      "layer": "spec · motion (the sheet note)",
+      "on": "the board (--paper #f5f0e8)",
+      "fg": "#4a463f",
+      "bg": "#f5f0e8",
+      "text": "normal",
+      "why": "ZH half of the motion is DESIGNED on the board rather than left to the implementer — 0.92 → 1.0 scale + a 420 ms fade on the UI thread, PROMOTED ONLY. 8.27."
     }
   ]
 }

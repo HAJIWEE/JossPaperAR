@@ -753,6 +753,31 @@ The PM's rule: a clan is named in **whatever script the user types**, and the ap
 
 **Outcome:** `npm run check` **exit 0** · `tsc` **0 errors** · **US$0.00**.
 
+### 12.33 · S56 — SCRUM-114: answer C's moment gets a surface — and the Penpot sweep had two holes (2026-10-12)
+
+**What was missing.** `SCRUM-11` step 6 built the moment (`promotionMoment()` + `LeagueMoment`), `SCRUM-111`'s answer C asked for *"a fuller animated moment"* — and there was **no design surface for it**: the animation drew from tokens (`surface.rowZone` promoted, `surface.paperDeep` otherwise) with a `0.92 → 1` scale and a 420 ms fade. Correct, localised, contrast-checked — and **under-designed relative to the answer**.
+
+**Four new boards, drawn in the board's own language.** `EN · 6c League / promotion moment` · `EN · 6d League / demoted · held` · `ZH · 6c League / 联赛 · 晋升时刻` · `ZH · 6d League / 联赛 · 降级与留级` (x=5400). ⚠️ **The header, the tier badge and three league rows are CLONES of the live board — the badge scaled 70 → 110 px — so the moment cannot drift from the artwork it grew out of.** A clone-based surface is a surface the reviewer already recognises.
+
+**The design decisions, written on the boards rather than left to the implementer:**
+
+| Question `SCRUM-114` asked | Answer |
+|---|---|
+| what fills the surface | a **296 px card of 844** on `--surface-row-zone` — the token the client already uses for the promoted variant — badge large, eyebrow, title, body; **the list stays visible below**, which is what keeps it part of the board rather than a modal |
+| is the badge shown large | **yes** — cloned and scaled 70 → 110 px, label re-set at 17 px ⚠️ (still *normal* text, so the 4.5 bar holds; scaling it past 18.66 px would change the requirement) |
+| is the rung named twice | **three times, deliberately**: badge label · title · a `IRON → JADE` delta — and none of the three uses a colour the others do not |
+| how much of the screen | **296 / 844 px**, stated on the sheet (`spec · screen share`) so the proportion is a decision, not a layout accident |
+
+⚠️ **Three states, three treatments — one surface reused three ways would flatten three different messages.** PROMOTED takes the zone surface at 26 px/700 · DEMOTED takes `--surface-paper-deep` at a deliberately **smaller 17 px/700 with no badge, no tier art, no gold and no animation** · HELD is **one line on plain paper with no card of its own**. The motion is designed too: **0.92 → 1.0 + a 420 ms fade on the UI thread, PROMOTED ONLY** — a demotion is *stated, never played* (doc 04's guilt pattern).
+
+**Gated, and fault-tested.** `design-system/penpot-pairs.json` **29 → 51 pairs** (22 new, EN + ZH twins); `check:contrast` **52 checks green**. ⚠️ **Forcing the promoted title's backdrop to `#1a1a1a` turns the gate RED at 1.00:1 and green on restore** — the new entries are assertions, not decoration.
+
+⚠️ **TWO HOLES IN THE PENPOT TOOLING, found by doing the work rather than reading it:**
+1. **The sweep's league branch filtered BOARDS with `/League/i` — ASCII-only.** `ZH · 6b 联赛 / 第一周` carries 联赛 and no ASCII `League`, so **that board's pairs had never been measured** — while `penpot-pairs.json` simultaneously claimed *"there is NO ZH · 6b board in the file"*. It does exist. Now `/League|联赛/i`. ⚠️ **That is the same shape of hole as the layer-pattern gap noted in the same file, one level up: a filter is a scope decision, and scope by accident is the defect.** (And writing the fix wrong-once is how the class stays visible: the first attempt used 联**赐** U+8D50 instead of 联**赛** U+8D5B — **caught by comparing codepoints against the real board name, not by eye.**)
+2. **Gold on `--surface-paper-deep` measures 4.52** — a **0.02** margin. The obvious move, golding a demoted label, is therefore the one that must not be made; the frozen pair records it so a future pass does not rediscover it.
+
+⚠️ **Honest limits.** The extended sweep has **not** been run end-to-end (the plugin tab suspends mid-run), so the 22 pairs were measured by **reading the new boards' shape fills and recomputing the ratios with the sweep's own formula**; run the sweep and diff its `league` array before the next board colour change. And the **中文 copy** — the moment strings as they now appear on the boards, plus five new annotation notes — is **unreviewed by a 中文 speaker**, filed as **`SCRUM-116`**.
+
 ### 12.32 · S56 — SCRUM-115: the roll BOOTSTRAPS itself, so the league can start from a COLD database (2026-10-12)
 
 **The defect — found while verifying that PR #40's push was really live.** `open_league_week()` is the only thing that creates a `league_weeks` row, and **nothing called it**: `pg_cron` schedules `roll_league_week()`, which returned `{"status":"no_week"}` when no week existed. The Monday tick would have no-opped **forever** — and `get_league_board()`'s note told the client the exact opposite: *"no league week is open yet — the first roll opens one."* A shipped feature that cannot start, with copy asserting that it starts itself.

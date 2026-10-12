@@ -156,7 +156,12 @@ for (const b of boards) {
    ever appear in part 2's uncapped-by-nothing-but-15 "lead" list, which nothing asserts.
    That is the same shape of hole SCRUM-93 fell through, one level down.
    Rows resolve to their own `(bg)` sibling; the named singletons resolve by compositing. */
-const leagueBoards = topBoards.filter(b => /League/i.test(b.name));
+/* ⚠️ THE FILTER WAS ASCII-ONLY (found 2026-10-12, S56 · SCRUM-114). `/League/i` cannot match
+   `ZH · 6b 联赛 / 第一周`, so that board's pairs were NEVER measured while the file claimed the board
+   did not exist. Same shape of hole as the layer-pattern gap above, one level up: a filter is a
+   scope decision, and scope by accident is the defect. Match BOTH scripts, and keep new league
+   boards named with a token this actually matches. */
+const leagueBoards = topBoards.filter(b => /League|联赛/i.test(b.name));
 for (const b of leagueBoards) {
   const list = ordered(b);
   const boardFill = boardFillOf(b);
