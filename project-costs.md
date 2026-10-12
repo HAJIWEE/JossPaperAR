@@ -82,6 +82,8 @@
 
 
 
+| 2026-10-12 | **S56 — the Sprint 1 close-out: PR #40's migrations verified LIVE, the `weekly-roll` Edge Function deployed, and the league's bootstrap gap found and filed** | Confirm the PM's off-session `db push` is really online (23/23, no drift — schema, function bodies, RLS, grants, trigger, cron), deploy the half `db push` cannot (`weekly-roll` v2 → v3, proved by a real 403), and reconcile the living docs to `feb2cab` | **US$0.00** — Supabase Management-API reads via the connector, one `supabase functions deploy`, the local gate suite, Jira writes and docs. **No fal.ai call, no migration authored, nothing that bills** | — | **S$0.00** | ✅ **no spend** — logged so the zero is on the record rather than absent. ⚠️ **The finding that made the check worth running: `db push` is only half the deliverable** — the hosted `weekly-roll` was still the **2026-10-04 stub** (`db push` does not deploy functions). ⚠️ **And `SCRUM-115`, filed not narrated:** `open_league_week()` is called by nothing, so the league cannot start itself while the board's note claims it will. fal.ai total unchanged at ≈ **US$5.16 / S$6.61** of the approved US$10–20. |
+
 <!-- APPEND-NEW-ONEOFF-COSTS-ABOVE -->
 
 ---
