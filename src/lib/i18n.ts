@@ -210,12 +210,18 @@ export const MESSAGES = {
     // ⚠️ THE MOMENT (SCRUM-111 answer C). ONLY the promoted pair animates — see
     //    `promotionMoment()` in domain/league.ts for why a demotion must not, and
     //    note that the demoted copy names no fault: no "you lost", no "don't slip".
+    // ⚠️ THE BODIES USED TO RESTATE THE MECHANISM ("three families rise each week",
+    //    "your family stays in %{tier}"), which the TITLE and the tier delta already
+    //    say — the PM's review, 2026-10-12. Each body now carries only what the
+    //    title cannot: where the new week STARTS (promoted), that it starts at all
+    //    (demoted), and that points reset weekly (held). ⚠️ Held no longer takes
+    //    `%{tier}` for the same reason — the title names the rung.
     'league.momentPromotedTitle': 'Risen to %{tier}',
-    'league.momentPromotedBody': 'Three families rise each week — yours is one of them.',
+    'league.momentPromotedBody': 'A new week begins a rung higher.',
     'league.momentDemotedTitle': 'Moved to %{tier}',
-    'league.momentDemotedBody': 'Three families move down each week. A new week begins today.',
+    'league.momentDemotedBody': 'A new week begins today.',
     'league.momentHeldTitle': 'Held at %{tier}',
-    'league.momentHeldBody': 'Your family stays in %{tier} this week.',
+    'league.momentHeldBody': 'Points reset every week.',
 
     // ── privacy (doc 13 §5/§8, ADR-007) ───────────────────────────────────
     'privacy.firstRun':
@@ -379,11 +385,14 @@ export const MESSAGES = {
     'league.noWeek': '联赛将在第一次每周结算时开始。',
     'league.notPlaced': '本周你尚未分组——下次结算将为你分组。',
     'league.momentPromotedTitle': '晋升至%{tier}',
-    'league.momentPromotedBody': '每周有三个家族晋升——你是其中之一。',
+    // ⚠️ 正文不再复述机制——标题与段位变化已经说明。每行只补充标题没有说的：
+    //    新的一周从哪里开始（晋升）· 新的一周会开始（下降）· 功德点每周重置（留级）。
+    //    ⚠️ 留级不再使用 %{tier}，理由相同：标题已经点名段位。
+    'league.momentPromotedBody': '新的一周从更高段位开始。',
     'league.momentDemotedTitle': '降至%{tier}',
-    'league.momentDemotedBody': '每周有三个家族下降。新的一周从今天开始。',
+    'league.momentDemotedBody': '新的一周从今天开始。',
     'league.momentHeldTitle': '留在%{tier}',
-    'league.momentHeldBody': '本周你的家族留在%{tier}。',
+    'league.momentHeldBody': '功德点每周重置。',
 
     'privacy.firstRun':
       '您的照片、先人姓名与祭拜位置只属于您的账号，仅用于制作供品。我们绝不出售这些资料。',
