@@ -56,7 +56,7 @@ Pokémon GO uses **AR+ (ARKit/ARCore)** for full 3D AR, but also has **non-AR AR
 - Nearby-value weighting: users in same region see each other (4-block radius privacy rule)
 
 ### Streak System
-- Daily streak with **freeze** mechanic (don't punish holidays/festivals!)
+- Daily streak with **freeze** mechanic (don't punish holidays/festivals!) — ⚠️ **DECLINED, not deferred** (`SCRUM-112.3`, PM 2026-10-11): *"no freeze in MVP no freeze in final product, we can consider gifting freezes as rewards later iterations — we do not want to use all the cards up at the start."* If a freeze ever ships it arrives as a **GIFT**, never as a mechanic the user buys or spends. The cultural point below still stands — protect festivals by **designing around** them, not by suspending the streak. See doc 22 §3, and `streak_spec.sql`, which asserts the absence.
 - **Important cultural note**: The "Hungry Ghost Festival" and Qingming are *peak* engagement moments - design special events around them, not around fake holidays!
 
 ---

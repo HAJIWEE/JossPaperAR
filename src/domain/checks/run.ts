@@ -20,6 +20,9 @@ import { computeAward, MAX_AWARD } from '../award.ts';
 import { OFFERINGS, BASE_VALUE_RATIO, baseValueOf } from '../catalogue.ts';
 import { isLegalCreditMovement, accrualFor, PHOTO_FEE_CREDITS } from '../currency.ts';
 import { hasQuota, remaining, dailyLimit, EMPTY_QUOTA, DAILY_PHOTO_BURNS } from '../quota.ts';
+import {
+  LEAGUE_TIERS, COHORT_SIZE, PROMOTE_COUNT, DEMOTE_COUNT, BOTTOM_TIER, TOP_TIER, tierOf,
+} from '../league.ts';
 
 let passed = 0;
 let failed = 0;
@@ -136,9 +139,65 @@ check(
   hasQuota({ ...EMPTY_QUOTA(TODAY), photoBurnsUsed: 10 }, 'store', TODAY),
 );
 
-// ── 6 · FAULT-TEST THE HARNESS ITSELF ────────────────────────────────────────
+// ── 6 · THE LEAGUE LADDER (SCRUM-111 · doc 07 §7 Q6) ─────────────────────────
+// ⚠️ THE ORDER OF `LEAGUE_TIERS` IS LOAD-BEARING. The roll promotes by
+// incrementing `tier`, so a reordered array would silently INVERT promotion and
+// demotion — a user would be demoted for winning, and nothing else would look
+// wrong. These assertions exist because that failure is invisible until a human
+// notices they were punished for coming first.
+section('6 · The league ladder — the tier vocabulary (SCRUM-111)');
+
+check(
+  "every rung's tier equals its index + 1 (lowest first, no gaps)",
+  LEAGUE_TIERS.every((t, i) => t.tier === i + 1),
+);
+
+check(
+  'the rungs ascend strictly',
+  LEAGUE_TIERS.every((t, i) => i === 0 || t.tier > LEAGUE_TIERS[i - 1].tier),
+);
+
+check(
+  `${LEAGUE_TIERS.length} rungs, and TOP_TIER/BOTTOM_TIER agree with them`,
+  TOP_TIER === LEAGUE_TIERS.length && BOTTOM_TIER === 1,
+);
+
+// The PM's own words on SCRUM-111: "start with wood - bronze - iron - and go up
+// into valuable gems". Pinning the ENDS means a later edit cannot quietly drop
+// the bottom of the ladder the answer specified.
+check(
+  "the bottom rung is the PM's wood (木) and the top is a precious stone (钻石)",
+  LEAGUE_TIERS[0].name_zh === '木' && LEAGUE_TIERS[TOP_TIER - 1].name_zh === '钻石',
+);
+
+check(
+  'every rung carries BOTH languages — these words are the product’s voice',
+  LEAGUE_TIERS.every((t) => t.name_en.length > 0 && t.name_zh.length > 0),
+);
+
+check(
+  'no two rungs share a name in either language (a duplicate rung is not a rung)',
+  new Set(LEAGUE_TIERS.map((t) => t.name_en)).size === LEAGUE_TIERS.length &&
+    new Set(LEAGUE_TIERS.map((t) => t.name_zh)).size === LEAGUE_TIERS.length,
+);
+
+// ⚠️ A promotion at the top must HOLD, and a demotion at the bottom must HOLD.
+// If a rung existed beyond either end, the roll would write a tier with no name
+// and the board would render a blank band.
+check(
+  'there is NO rung above the top or below the bottom',
+  tierOf(TOP_TIER + 1) === undefined && tierOf(BOTTOM_TIER - 1) === undefined,
+);
+
+// SCRUM-111 answer A, and doc 07 §4.4's promote/demote counts.
+check(
+  'SCRUM-111 answer A is pinned: cohort ≈ 30, top 3 up / bottom 3 down',
+  COHORT_SIZE === 30 && PROMOTE_COUNT === 3 && DEMOTE_COUNT === 3,
+);
+
+// ── 7 · FAULT-TEST THE HARNESS ITSELF ────────────────────────────────────────
 // The prototype's guard square: if the harness is dead, this MUST fail.
-section('6 · Guard — the harness is alive');
+section('7 · Guard — the harness is alive');
 
 const GUARD_MUST_BE_FALSE = deriveBand(1000) === 'bullseye';
 check(

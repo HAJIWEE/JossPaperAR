@@ -1,9 +1,9 @@
 {
   "_what": "The Penpot colour pairs that check:contrast asserts. A FROZEN SNAPSHOT of board colours — the gate reads this file, not Penpot.",
   "_why": "check:contrast reads tokens.css and the app stylesheet, so it structurally CANNOT see a Penpot board. That is how SCRUM-93 happened: the 0e3 role chip sat at 2.77:1 on a signed-off board (EN and ZH) while every gate stayed green — despite SCRUM-45 having cleared 132 AA failures in this same file. A signed-off board is not a checked board. This file is the bridge: the pairs are extracted from Penpot by penpot-sweeps/penpot-contrast-sweep.js and frozen here so CI can assert them without a Penpot connection.",
-  "_limits": "⚠️ A snapshot is not a sweep. This asserts the pairs BELOW and nothing else — a NEW pair added to a board is invisible here until the sweep is re-run. Re-run the sweep after any Penpot colour change. The sweep also composites fillOpacity; this file stores the resolved backdrop, so a tint is recorded as the colour it actually renders as, never as its raw hex.",
-  "_refresh": "node penpot-sweeps/penpot-contrast-sweep.js (via the Penpot MCP plugin) — it prints the pairs it measured and fails if any is below its minimum.",
-  "_source": "Penpot file `JossPaperAR`, page \"New-user tutorial · Core loop\". The SCRUM-93 pairs were frozen from named version `S37b` at revn 287. The four SCRUM-94 pairs were measured live at revn 358 and saved as named version `S39 · SCRUM-94 — 0e8 disc + 7 Store Owned chip (revn 358)`; the six SCRUM-104 pairs (the confirm dialogs' cancel/no-thanks labels) were added at revn 364 under named version `S40 · SCRUM-104 — the 6 confirm dialogs grew 54px so Cancel sits ON the card`. All were saved via `penpot.currentFile.saveVersion()` — ⚠️ which EXISTS; the three-session-old claim that the plugin API had no version endpoint was itself the error (see follow-up-items.md), so do not repeat it. revn ticks on any change, including a live fault test that restores the same values.",
+  "_limits": "⚠️ A snapshot is not a sweep. This asserts the pairs BELOW and nothing else — a NEW pair added to a board is invisible here until the sweep is re-run. Re-run the sweep after any Penpot colour change. The sweep also composites fillOpacity; this file stores the resolved backdrop, so a tint is recorded as the colour it actually renders as, never as its raw hex. ⚠️ AND — found the hard way on 2026-10-11 — that sweep asserted ONLY chip pairs (`role chip (label)` / `chip · `) until SCRUM-11 added a second branch for the League boards. The league parts are named `row 1 · Chen Family (bg)`, `row 1 · rank`, `divider · promotion line`, `art · tier badge label` — matching NEITHER pattern — so the whole League board would have stayed invisible to the file's only refresh mechanism, on the same shape of hole that let SCRUM-93 ship.",
+  "_refresh": "node penpot-sweeps/penpot-contrast-sweep.js (via the Penpot MCP plugin) — it prints the pairs it measured and fails if any is below its minimum. ⚠️ SCRUM-11 extended it with the League branch (part 1b) and the top-level-board fix (trap 7). The thirteen League pairs below were measured from the LIVE board at revn 365 by exactly those rules, but the EXTENDED SCRIPT had not been run end-to-end when they were frozen (the Penpot plugin tab kept suspending). Before the next board colour change: run the sweep and diff its `league` array against these pairs.",
+  "_source": "Penpot file `JossPaperAR`, page \"New-user tutorial · Core loop\". The SCRUM-93 pairs were frozen from named version `S37b` at revn 287. The four SCRUM-94 pairs were measured live at revn 358 and saved as named version `S39 · SCRUM-94 — 0e8 disc + 7 Store Owned chip (revn 358)`; the six SCRUM-104 pairs (the confirm dialogs' cancel/no-thanks labels) were added at revn 364 under named version `S40 · SCRUM-104 — the 6 confirm dialogs grew 54px so Cancel sits ON the card`. All were saved via `penpot.currentFile.saveVersion()` — ⚠️ which EXISTS; the three-session-old claim that the plugin API had no version endpoint was itself the error (see follow-up-items.md), so do not repeat it. revn ticks on any change, including a live fault test that restores the same values. The thirteen SCRUM-11 pairs (the 6 / 6b League boards) were measured live at revn 365 — READ-ONLY, no board was touched, so there is no new named version and the file stayed at revn 365 throughout.",
   "_rules": "`text` must be `normal` (>=4.5:1) or `large` (>=3:1, i.e. >=24px, or >=18.66px bold). `min` is DERIVED from `text` by the gate and asserted equal to it — so the requirement cannot be quietly lowered to make a failing pair pass.",
   "pairs": [
     {
@@ -159,6 +159,115 @@
       "bg": "#f5f0e8",
       "text": "normal",
       "why": "ZH half. Card 340 → 394."
+    },
+
+    {
+      "board": "EN · 6 League",
+      "layer": "art · tier badge label",
+      "on": "composited surface (tier badge, #0c8265 under the label)",
+      "fg": "#fff8e8",
+      "bg": "#0c8265",
+      "text": "normal",
+      "why": "SCRUM-11 step 5. THE TIGHTEST PAIR ON THE LEAGUE BOARD — 4.51 against a 4.5 bar, a margin of 0.01. 11px, so it takes the BODY bar, not large. A one-step nudge to either the badge green or the cream label drops it below AA — which is why the board is frozen rather than trusted."
+    },
+    {
+      "board": "ZH · 6 League / 联赛",
+      "layer": "art · tier badge label",
+      "on": "composited surface (tier badge, #0c8265 under the label)",
+      "fg": "#fff8e8",
+      "bg": "#0c8265",
+      "text": "normal",
+      "why": "ZH half. At revn 365 the ZH board's 13 distinct layer/size/weight combinations are IDENTICAL to EN's, so this pair carries the same 0.01 margin."
+    },
+    {
+      "board": "EN · 6 League",
+      "layer": "row · avatar glyph",
+      "on": "composited surface (row 1 avatar ellipse, --disc #887023)",
+      "fg": "#fff8e8",
+      "bg": "#887023",
+      "text": "normal",
+      "why": "SCRUM-11 step 5, 4.52 — second-tightest. 16px/700 is NOT large text (the bar is 18.66px bold), so it needs 4.5:1 despite the weight. Same cream-on-gold DISC family as the SCRUM-94 0e8 pair; #887023 is the disc gold that fix introduced."
+    },
+    {
+      "board": "EN · 6 League",
+      "layer": "row · avatar glyph",
+      "on": "composited surface (row 5 avatar ellipse, #8b6f23)",
+      "fg": "#fff8e8",
+      "bg": "#8b6f23",
+      "text": "normal",
+      "why": "SCRUM-11 step 5 — a FINDING, not a formality: the board carries TWO near-identical gold avatar discs, #887023 (rows 1, 2, 4 …) and #8b6f23 (row 5), differing only in low bits, and BOTH sit at 4.51–4.52, 0.01–0.02 above AA. Frozen separately because a designer nudging 'the gold disc' will not know there are two."
+    },
+    {
+      "board": "ZH · 6 League / 联赛",
+      "layer": "row · avatar glyph",
+      "on": "composited surface (row avatar ellipse, #887023 / #8b6f23)",
+      "fg": "#fff8e8",
+      "bg": "#887023",
+      "text": "normal",
+      "why": "ZH half of the avatar glyph. The ZH board uses the same disc palette; the #8b6f23 twin is covered by the EN entry above, because a shared component must not be able to regress in one language only."
+    },
+    {
+      "board": "EN · 6 League",
+      "layer": "row · rank  (the in-zone row)",
+      "on": "composited surface (row 1 · Chen Family (bg), --surface-row-zone #f8f1dc)",
+      "fg": "#7b621f",
+      "bg": "#f8f1dc",
+      "text": "normal",
+      "why": "SCRUM-11 step 5 — the CONTROL that stops this file being misread. #7b621f is the EXACT token SCRUM-93 was about, and here it is CORRECT at 5.16:1. SCRUM-93 was a role inversion (--gold-text on a gold FILL = 2.77), not a bad colour. Freezing this records that the token is fine on the cream row it was designed for, so nobody 'fixes' #7b621f twice."
+    },
+    {
+      "board": "ZH · 6 League / 联赛",
+      "layer": "row · rank  (the in-zone row)",
+      "on": "composited surface (in-zone row (bg), --surface-row-zone #f8f1dc)",
+      "fg": "#7b621f",
+      "bg": "#f8f1dc",
+      "text": "normal",
+      "why": "ZH half of the in-zone rank — the same control pair in the other language."
+    },
+    {
+      "board": "EN · 6 League",
+      "layer": "divider · promotion line",
+      "on": "the board (--paper #f5f0e8)",
+      "fg": "#7b621f",
+      "bg": "#f5f0e8",
+      "text": "normal",
+      "why": "SCRUM-11 step 5, 5.13. ⚠️ The backdrop is the BOARD's --paper, not the white this sweep first computed: the promotion divider sits in the list viewport board, which is NESTED and has no fill of its own, so a resolver reading only the nearest board's fill sees #ffffff (5.82) — a surface that does not exist. Scanning top-level boards and walking DOWN is what makes this 5.13."
+    },
+    {
+      "board": "ZH · 6 League / 联赛",
+      "layer": "divider · promotion line",
+      "on": "the board (--paper #f5f0e8)",
+      "fg": "#7b621f",
+      "bg": "#f5f0e8",
+      "text": "normal",
+      "why": "ZH half of the promotion divider — same --paper backdrop, same nested-board trap."
+    },
+    {
+      "board": "EN · 6 League",
+      "layer": "row · weekly move",
+      "on": "composited surface (is-you row (bg), --surface-row-you #fdf8e7)",
+      "fg": "#0a7359",
+      "bg": "#fdf8e7",
+      "text": "normal",
+      "why": "SCRUM-11 step 5, 5.47. This is the pair SCRUM-94 CITED when it fixed the Store 'Owned' chip: --malachite-text #0a7359 is the value the four League weekly-move labels already used for green-on-light. Freezing it makes that citation checkable instead of remembered."
+    },
+    {
+      "board": "ZH · 6 League / 联赛",
+      "layer": "row · weekly move",
+      "on": "composited surface (is-you row (bg), --surface-row-you #fdf8e7)",
+      "fg": "#0a7359",
+      "bg": "#fdf8e7",
+      "text": "normal",
+      "why": "ZH half of the weekly-move label — the green-on-light control in the other language."
+    },
+    {
+      "board": "EN · 6b League / first week",
+      "layer": "art · tier badge label",
+      "on": "composited surface (tier badge, #0c8265 under the label)",
+      "fg": "#fff8e8",
+      "bg": "#0c8265",
+      "text": "normal",
+      "why": "SCRUM-11 step 5. The FIRST-WEEK EMPTY STATE carries the same tier badge as the populated board, so it carries the same 0.01 margin — 4.51. ⚠️ There is NO ZH · 6b board in the file: the populated league has ZH parity (ZH · 6 League / 联赛) but the empty state is EN-only. Frozen from the EN board because it is the only one that exists; the ZH gap is recorded on SCRUM-11."
     }
   ]
 }

@@ -15,6 +15,12 @@
  *      (`X (label)` + `X (bg)`, or `chip · Y` + `chip · Y (bg)`) — NOT by a hard-coded board
  *      list. That is how the 0e12 copy of the 0e3 defect was found: the ticket listed two
  *      boards, the component was on four.
+ *  1b. Discovers the LEAGUE board's pairs as well (SCRUM-11). Its parts are named
+ *      `row 1 · Chen Family (bg)`, `row 1 · rank`, `divider · promotion line`,
+ *      `art · tier badge label` — NONE of which match the chip convention above. So before
+ *      this branch the entire 6 / 6b League board was invisible to the ASSERTED half of the
+ *      sweep and could only ever surface in part 2's report-only "lead" list. Rows resolve to
+ *      their own `(bg)` sibling; the named singletons resolve by compositing.
  *   2. Resolves the surface each label actually sits on, COMPOSITING fillOpacity.
  *   3. Applies the SIZE-AWARE threshold: normal text 4.5:1, large text (>=24px, or >=18.66px
  *      bold) 3:1.
@@ -42,6 +48,21 @@
  *  6. ⚠️ **A discovery sweep is not a proof of scope.** It finds chips matching the naming
  *     convention. A chip named something else is invisible here, which is why the manifest is
  *     frozen and reviewed rather than generated straight into the gate.
+ *  7. ⚠️ **A NESTED BOARD HAS NO FILL OF ITS OWN — DO NOT SCAN IT STANDALONE.** The
+ *     `6 · League · list viewport (scroll)` board sits INSIDE `EN · 6 League` and has no fill,
+ *     so `boardFillOf()` fell back to WHITE and reported a phantom
+ *     `#7b621f on #ffffff = 5.82` for its promotion divider, whose real backdrop is the parent
+ *     board's --paper (#f5f0e8, 5.13) — a 0.69 error on a pair whose whole margin is 0.63.
+ *     Parts 1/1b/2 now scan TOP-LEVEL boards only; `ordered()` walks down into nested
+ *     children, so no shape is lost and no phantom surface is invented.
+ *  8. ⚠️ **A NAMED `(bg)` SIBLING IS NOT AUTOMATICALLY THE SURFACE** (trap 2, one level up).
+ *     A league row's `row 1 · Chen Family (bg)` rectangle is the backdrop for its rank / name
+ *     / points but NOT for the avatar glyph, which sits on its own ELLIPSE — and that ellipse
+ *     is painted AFTER the row rect and covers the ink centre. The first version of part 1b
+ *     preferred the named sibling unconditionally and so reported the avatar glyph as cream
+ *     on the ROW (`#f8f1dc` / `#fdf8e7` / `#fbf7ee`) = 1.00–1.07: SIX failures on pairs that
+ *     actually measure 4.51–7.91. The sibling is the honest pair only when nothing OPAQUE
+ *     painted after it also covers the ink centre; otherwise the composite wins.
  */
 
 const AA_BODY = 4.5, AA_LARGE = 3.0;
@@ -59,6 +80,19 @@ const solidFill = s => s.fills && s.fills.length && typeof s.fills[0].fillColor 
 const contains = (o, x, y) => x >= o.x && x <= o.x + o.width && y >= o.y && y <= o.y + o.height;
 const inkCentre = t => { const b = t.textBounds; return b ? { x: b.x + b.width / 2, y: b.y + b.height / 2 } : { x: t.x + t.width / 2, y: t.y + t.height / 2 }; };
 const boardFillOf = b => solidFill(b) ? String(b.fills[0].fillColor).toLowerCase() : '#ffffff';
+
+/* trap 7 (SCRUM-11 step 5): a board NESTED inside another board usually has NO fill of its
+   own, so boardFillOf() falls back to WHITE and any pair measured on it is measured against
+   a surface that does not exist. Scanning the nested copy of the 6 League list viewport
+   standalone produced a phantom `#7b621f on #ffffff = 5.82` for its promotion divider, whose
+   real backdrop is the parent board's --paper (#f5f0e8, 5.13). ordered() walks DOWN into
+   nested children, so scanning top-level boards loses nothing and gains the real backdrop. */
+const nestedBoardIds = new Set();
+for (const b of boards) for (const s of ordered(b)) if (s.type === 'board') nestedBoardIds.add(s.id);
+const topBoards = boards.filter(b => !nestedBoardIds.has(b.id));
+
+/* every text shape already ASSERTED in part 1 or 1b — part 2 must not re-report it as a lead */
+const assertedIds = new Set();
 
 /* size-aware requirement — trap 3 */
 function needFor(fs, fw) {
@@ -110,17 +144,86 @@ for (const b of boards) {
       bgOpacity: bg && bg.fills[0] ? (bg.fills[0].fillOpacity == null ? 1 : bg.fills[0].fillOpacity) : null,
       compositedSurface: resolved.surface, compositedLayers: resolved.layers,
     });
+    assertedIds.add(s.id);
+  }
+}
+
+/* 1b) the LEAGUE surfaces — a SECOND naming convention (SCRUM-11 step 5).
+   WHY THIS DID NOT EXIST BEFORE: part 1 matches `/role chip \(label\)/` or `/^chip · /`.
+   The 6 / 6b League boards name their parts `row 1 · Chen Family (bg)`, `row 1 · rank`,
+   `divider · promotion line`, `art · tier badge label` — NONE of which match either pattern.
+   So the whole league board was invisible to the ASSERTED half of this sweep: it could only
+   ever appear in part 2's uncapped-by-nothing-but-15 "lead" list, which nothing asserts.
+   That is the same shape of hole SCRUM-93 fell through, one level down.
+   Rows resolve to their own `(bg)` sibling; the named singletons resolve by compositing. */
+const leagueBoards = topBoards.filter(b => /League/i.test(b.name));
+for (const b of leagueBoards) {
+  const list = ordered(b);
+  const boardFill = boardFillOf(b);
+  const seen = new Map();
+  for (const s of list) {
+    if (s.type !== 'text' || !hexes(s).length) continue;
+    if (/role chip \(label\)|^chip · /.test(s.name)) continue;          /* part 1 owns these */
+    const rowM = s.name.match(/^(row \d+) · /);
+    let bgShape = null;
+    if (rowM) {
+      const p = rowM[1] + ' · ';
+      bgShape = list.find(q => q.name.indexOf(p) === 0 && /\(bg\)$/.test(q.name)) || null;
+    }
+    const i = list.indexOf(s);
+    const resolved = surfaceUnder(list, i, s, boardFill);
+    const fg = hexes(s)[0];
+    const siblingSolid = !!(bgShape && solidFill(bgShape) &&
+      (bgShape.fills[0].fillOpacity == null || bgShape.fills[0].fillOpacity >= 0.999));
+    /* trap 8 (SCRUM-11 step 5): a row's `(bg)` rectangle is the backdrop for rank / name /
+       points but NOT for the avatar glyph, which sits on its own ELLIPSE — and the ellipse is
+       painted after the row rect and covers the glyph's ink centre. Preferring the named
+       sibling unconditionally reported the avatar glyph as cream on the ROW
+       (#f8f1dc / #fdf8e7 / #fbf7ee) = 1.00–1.07: SIX false failures on pairs that really
+       measure 4.51–7.91. The sibling is the honest pair only when nothing OPAQUE painted
+       after it also covers the ink centre; otherwise the composite — which already walks in
+       paint order — is right. Same lesson as trap 2, one level up: a named surface is not
+       automatically the surface. */
+    const c = inkCentre(s);
+    const idxBg = bgShape ? list.indexOf(bgShape) : -1;
+    let covered = false;
+    if (idxBg >= 0) {
+      for (let j = idxBg + 1; j < i; j++) {
+        const q = list[j];
+        if (q.type === 'text' || q.type === 'board' || !solidFill(q)) continue;
+        const a = q.fills[0].fillOpacity == null ? 1 : q.fills[0].fillOpacity;
+        if (a >= 0.999 && contains(q, c.x, c.y)) { covered = true; break; }
+      }
+    }
+    const useSibling = siblingSolid && !covered;
+    const bgHex = useSibling ? String(bgShape.fills[0].fillColor).toLowerCase() : resolved.surface;
+    const need = needFor(s.fontSize, s.fontWeight);
+    const layer = s.name.replace(/^row \d+ · /, 'row · ');             /* rows 1..8 collapse */
+    const key = layer + '|' + fg + '|' + bgHex + '|' + need;
+    const hit = seen.get(key);
+    if (hit) { hit.rows++; continue; }
+    const r = ratio(fg, bgHex);
+    const rec = {
+      board: b.name, layer, on: useSibling ? bgShape.name : 'composited surface',
+      fg, bg: bgHex, text: need === AA_BODY ? 'normal' : 'large', ratio: r, need,
+      pass: r >= need, siblingSolid: useSibling, convention: 'league', rows: 1,
+      fs: s.fontSize, fw: s.fontWeight,
+    };
+    seen.set(key, rec);
+    pairs.push(rec);
+    assertedIds.add(s.id);
   }
 }
 
 /* 2) a whole-page pass for pairs the naming convention misses — REPORTED, not asserted,
       because the resolver is an approximation (trap 4) and this list is a lead, not a verdict */
 const otherFindings = [];
-for (const b of boards) {
+for (const b of topBoards) {
   const list = ordered(b);
   const boardFill = boardFillOf(b);
   list.forEach((s, i) => {
     if (s.type !== 'text' || !hexes(s).length || /role chip \(label\)|^chip · /.test(s.name)) return;
+    if (assertedIds.has(s.id)) return;                 /* part 1 / 1b already asserts it — no duplicate lead */
     const fg = hexes(s)[0];
     const { surface, layers } = surfaceUnder(list, i, s, boardFill);
     const need = needFor(s.fontSize, s.fontWeight);
@@ -133,12 +236,18 @@ for (const b of boards) {
 }
 
 const failures = pairs.filter(p => !p.pass);
+const chipPairs = pairs.filter(p => p.convention !== 'league');
+const leaguePairs = pairs.filter(p => p.convention === 'league');
 return {
   revn: penpot.currentFile.revn,
-  boards: boards.length,
-  chipPairs: pairs.length,
-  chipFailures: failures.length,
+  boardsOnPage: boards.length,
+  boardsScanned: topBoards.length,          /* trap 7 — nested boards are reached, not scanned twice */
+  chipPairs: chipPairs.length,
+  chipFailures: chipPairs.filter(p => !p.pass).length,
+  leaguePairs: leaguePairs.length,
+  leagueFailures: leaguePairs.filter(p => !p.pass).length,
   failures,
+  league: leaguePairs,                      /* the SCRUM-11 step 5 manifest fragment */
   passing: pairs.filter(p => p.pass),
   /* the fragment to freeze into design-system/penpot-pairs.json */
   manifestPairs: pairs.map(p => ({ board: p.board, layer: p.layer, on: p.on, fg: p.fg, bg: p.bg, text: p.text })),

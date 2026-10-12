@@ -32,7 +32,7 @@
 | E4 | **Four-band throw + award** — 正中 ×2.0 · 虔誠 ×1.5 · 擦邊 ×1.0 · 偏失 ×0; 400 × band × ground + streak | 05 §2 (art-derived) | client measure → **server** award | **the four bands grade true** — the acceptance test (A5) |
 | E5 | **Persisted ledger** — append-only, idempotent, server-only writer | [[ADRs/ADR-005-honest-client-caps-append-only-ledger\|ADR-005]] · 07 §5 | Postgres + RLS + `award-service` | same `idempotency_key` replayed → one award (N6) |
 | E6 | **Clan + ancestors** — no non-clan altar; create/join, up to 10 tablets | [[15-clan-model-and-book-of-tributes]] | SCRUM-46 (+ SCRUM-50 QR) | a user cannot reach Home without a clan (15 §6) |
-| E7 | **Tribute points, league & streaks** — cohorts, weekly roll, live board | SCRUM-11 · 07 §4.7 | `weekly-roll` + Realtime channel | board re-ranks live; promotion line follows the top 3 |
+| E7 | **Tribute points, league & streaks** — cohorts, weekly roll, live board ⚠️ **+ streak reminders** (`SCRUM-112.2`, PM 2026-10-11 — a scope ADDITION: exactly three, 12h/4h/1h before expiry, no aggression) | SCRUM-11 · 07 §4.7 | `weekly-roll` + Realtime channel ⚠️ **+ `expo-notifications`** (native module → needs a development build; client-local scheduling, not server push) | board re-ranks live; promotion line follows the top 3 |
 | E8 | **Burn limits** — 10 photo / 20 store burns per day, per **user** | [[10-economy-spec]] §1 | `quotas` + orchestrator gate | the quota copy shows; caps enforced server-side |
 | E9 | **Alternative (store) items** — fixed-value burns with no photo (Track-B, $0.01) | 10 §2/§3 | catalogue (code-owned) + `item_code` burn | a store burn awards without a capture |
 | E10 | **Location-based value** — new-ground ×2.0, decay on repeat, ~4-block cells, **no location trail** | [[13-privacy-and-retention]] · 07 §5 | cell hash → server flag | repeat burn in the same cell decays; no raw coordinates stored |
@@ -137,7 +137,7 @@ Two honest caveats before reading the table:
 | W3 | AR-fire spike | SCRUM-51 | **2–3** | doc 17 is already the test script; this is execution + numbers |
 | W4 | AR fire mechanic (production) | SCRUM-13 | **3–5** | the spike's code, productised |
 | W5 | Clan build (+ QR/links) | SCRUM-46 · 50 | **5–8** | doc 15 §9 schema is written; boards are built |
-| W6 | Points · league · streaks · weekly roll | SCRUM-11 | **4–6** | spec needs writing first (it is *design* **+** build) |
+| W6 | Points · league · streaks · weekly roll ⚠️ **+ streak reminders** (`SCRUM-112.2` — this 4–6 estimate PREDATES them; it was sized before the reminders were in scope) | SCRUM-11 | **4–6** | spec needs writing first (it is *design* **+** build) |
 | W7 | Location value + decay | SCRUM-12 | **3–4** | never prototyped — new ground ([[05-concept-to-mvp-gap-analysis]] §5) |
 | W8 | Economy & wallets wiring (credits/points/store · quota UX) | part of 53/54 | **3–4** | catalogue is 4 items; shop UI deferred |
 | W9 | **App screens from Penpot** (Home · altar · capture · burn · reward · collection · profile · privacy hub) | folded into the above | **6–10** | 153 boards include states/EN+ZH; ~30 unique screens. **The hidden cost** — the design is signed off, but it is a *design*, not code |
