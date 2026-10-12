@@ -753,6 +753,20 @@ The PM's rule: a clan is named in **whatever script the user types**, and the ap
 
 **Outcome:** `npm run check` **exit 0** · `tsc` **0 errors** · **US$0.00**.
 
+### 12.32 · S56 — SCRUM-115: the roll BOOTSTRAPS itself, so the league can start from a COLD database (2026-10-12)
+
+**The defect — found while verifying that PR #40's push was really live.** `open_league_week()` is the only thing that creates a `league_weeks` row, and **nothing called it**: `pg_cron` schedules `roll_league_week()`, which returned `{"status":"no_week"}` when no week existed. The Monday tick would have no-opped **forever** — and `get_league_board()`'s note told the client the exact opposite: *"no league week is open yet — the first roll opens one."* A shipped feature that cannot start, with copy asserting that it starts itself.
+
+**The fix — migration `20261012040000` (a NEW version; an applied migration is never edited).** When the caller did **not** name a week **and** no active week exists, the roll opens the week containing **its own clock** (`p_now` — in the signature and **never read** before this) and fills it, returning `status: "bootstrapped"`. It **ranks nothing**: a week that has just opened has no points, so ranking and closing it would promote nobody and consume the week. An **explicit** `p_week_start` is **never** bootstrapped — an operator who names a week must not be handed a different one.
+
+**Why here, not a second cron entry.** A bootstrap cron would have to run **before** the Monday roll to be useful, and that ordering is a promise nothing enforces. The roll already owns the question *"which week is current"*.
+
+**Proof.** `supabase/tests/league_bootstrap.sql` — **26 assertions, green** — covers the bootstrap itself, the tier-1 fill, *"nothing ranked"*, the explicit-week refusal, that the **next** roll rolls rather than re-bootstrapping, idempotence, and **the ACLs surviving the re-emit** (`anon`/`authenticated` still denied, `service_role` allowed — the default-PUBLIC-grant trap asserted from *outside*). **Fault-tested by restoring the OLD body**: the run goes **RED** at *"the roll BOOTSTRAPS when no week exists"*, then green on restore. The whole suite (**9 files**) is green, and the migration is structurally sound (**24/24**).
+
+⚠️ **The 8 KB body was re-emitted VERBATIM** from `20261011130000` with one branch inserted — extracted mechanically and the patch anchor **asserted to match exactly once**, because a hand-copied function is how indentation drift starts. ⚠️ **The first attempt proved the point in reverse**: it silently dropped the original `no_week` early return (falling through with a NULL `v_week`), and **the diff — not the eye — caught it**.
+
+⚠️ **Verified locally only.** The hosted push needs a linked checkout, which this worktree is not, so `SCRUM-115` is `In Review` until `db push` runs and the deployed `prosrc` is read back.
+
 ### 12.31 · S39 — SCRUM-94: two board colours fixed, and the emoji's fill was DISPROVED (2026-10-10)
 
 `SCRUM-93`'s sweep left two findings behind, filed as **`SCRUM-94`**. ⚠️ **The session started BLOCKED:** both Penpot MCP tools answered *"No Penpot instance connected for user token"*, and since both findings are **artwork** changes — and AC 1 requires re-deriving the pairs from the **live** fills — nothing was touched until Penpot was connected. The block was recorded in Jira, not worked around.
