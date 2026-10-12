@@ -795,3 +795,15 @@ The PM merged **PR #40** (`cline/9059b-league`, 14 commits) **off-session at 202
 
 **Cost of both:** **US$0.00** (no fal.ai call; local Docker + local gates).
 
+
+### ✅ `SCRUM-114` + `SCRUM-116` — the promotion moment's designed surface → `Done` (2026-10-12)
+**Four Penpot boards** (`EN/ZH · 6c League / promotion moment` · `EN/ZH · 6d League / demoted · held`), cloned from the live board so the moment cannot drift from the artwork it grew out of — and then **three PM review rounds changed the design**:
+1. **The copy tightened** — the three bodies restated the mechanism the title already carries; `held` no longer takes `%{tier}`.
+2. **The states got an image** — ⚠️ **a correction to how doc 04 was read:** *stated, never played* bans the **animation**, not the **art**. Stripping both left a demoted card that was not dignified but **empty**. Colour is the celebration; grey is the fact.
+3. **The ladder was aligned (EN/ZH now one story, IRON ⇄ JADE / 铁 ⇄ 玉) and the direction reversed** — the demotion reads **left → right on a level line**, because *a descent drawn as a fall enacts the loss; the same fact read sideways is only a fact*.
+
+⚠️ **Two defects the pass caught by MEASURING, not looking:** `BRONZE` at 11 px was **48 px wide inside a 44 px badge (109%)** — it overflowed its own art, so the tier captions moved to a 10 px legend column; and a **stray badge label of mine** sat parked off EN 6c (x 5000 against a board starting at 5400), which I had first **mis-reported as a ZH omission** — deleting it left the twins **identical shape for shape (38 each, inventory diff empty)**.
+
+⚠️ **The lesson that cost the most:** a heavy plugin call **outlives the tab heartbeat** — `findShapes()` in a loop (16 scans of an 11,751-shape file) timed out and the removal **silently never applied**; only a re-read caught it. **Verify Penpot with a single snapshot.**
+
+✅ Merged in **PR #42** (07:16:57Z, verified with `git merge-base --is-ancestor`); named versions `S56c` → `S56h` (revn 381); `npm run check` **16/16** (contrast 85 · lib 388). **Cost US$0.00.**
