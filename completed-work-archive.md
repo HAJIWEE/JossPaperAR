@@ -762,3 +762,36 @@ Migration `0011`: `app_config.daily_ai_budget_micros` (alpha **$5/day**, server-
 
 PR-3 (**#13**) and SCRUM-59 (**#14**) were both **clean, green and awaiting the PM's merge**; the worktree was left clean, the hosted project at **11/11 migrations with no drift**, and the project with **zero residue** (no rows, no Storage objects, no `auth.users`). Cost: **≈ US$0.09** — one mis-fired live run, logged honestly in [[project-costs]].
 
+---
+
+## 6 · Completed follow-ups — 2026-10-12 (S56)
+
+> ⚠️ **Note on the gap.** Sections 4–5 end at **2026-10-04 (S28b)**, and the sessions between then and S56 closed **many** tickets (`SCRUM-87` · `93` · `94` · `96` · `98` · `99` · `100` · `101` · `103` · `104` · `105` · `53` · `56` · `89` · `11` …) without moving them here — the rule in this file's own header was not kept. **This section records S56 only**; the intervening closures live in the living docs, doc 19 §12 and Jira. A future session may want to sweep them in.
+
+### ✅ `SCRUM-11` — League & progression → `Done` (closed on PR #40's merge)
+
+The PM merged **PR #40** (`cline/9059b-league`, 14 commits) **off-session at 2026-10-12 10:31 SGT**; `main` moved `6132851 → feb2cab`. The ticket closed on the merge **the same way `SCRUM-87` closed on PR #32** — the work was complete, proven and on `main`.
+
+**What landed:** the league schema (`league_weeks` · `cohorts` · `cohort_members` · `weekly_rolls`, RLS **SELECT-only**) · the roll engine (rank from the **ledger**, top-3/bottom-3, the `weekly_rolls` audit row, the **346,500** impossible-score line flagged and never paid) · **`pg_cron`** · the real **`get_league_board()`** under a 111-check client↔server contract · the streak spec (**doc 22**) with its local-day, forward-only, ≥23 h window · the Penpot league pairs · the client board with its **LIVE broadcast** channel and answer C's promotion moment.
+
+### ✅ The PR #40 / PR #39 reconciliation — two false claims corrected
+
+1. ⚠️ **The S55 docs recorded *"PR #39 is CLOSED, unmerged"* — PR #39 WAS MERGED** (`33d1137` is on `main`, its branch deleted). Its S53/S54 doc edits were already on `main`, so the standing *"re-land them deliberately"* instruction was moot.
+2. ⚠️ **`db push` was only HALF of PR #40's delivery.** The PR also rewrote the **`weekly-roll` Edge Function**, and `db push` **does not deploy functions**: the hosted copy was still **version 2 from 2026-10-04 (the old stub)**. Deployed **v3** and proved it with a **real call** — a `POST` **without** the secret key returns **`403 forbidden`**, so the gate holds.
+
+**The push itself was verified rather than trusted** (hosted `yercgevebxvtzkgctfai`): `schema_migrations` **23/23 matching the local filenames exactly** · the 11 new functions with **real bodies** · the **23 h floor inside the live bodies** (`pg_proc.prosrc`) · **RLS on the four league tables** · the **`league_broadcast_award` trigger on `ledger_events`** · the **`pg_cron` job `weekly-roll` active** · and the **grant matrix exactly as specified** (`anon` denied on all eleven; `authenticated` on `get_league_board` only). ✅ **Sprint 1 closed 100 % `Done`** (the PM completed it at 11:55 SGT on 2026-10-12).
+
+### ✅ `SCRUM-115` — the roll now BOOTSTRAPS ITSELF → `Done` (built, pushed and verified live, same day)
+
+**The defect, found by asking "is the league actually usable?" after the push:** `open_league_week()` is the **only** thing that creates a `league_weeks` row and **nothing called it** — while `pg_cron` schedules `roll_league_week()`, which returns `no_week` when no week exists. The Monday tick would have no-opped **forever**, and `get_league_board()`'s note told the client the opposite (*"the first roll opens one"*).
+
+**The fix — migration `20261012040000`** (a **new** version; an applied migration is never edited): when the caller names **no** week (`p_week_start is null`, the cron's shape) **and** no active week exists, the roll opens the week containing **its own clock** and fills it, returning `status: "bootstrapped"`. It **ranks nothing** — a just-opened week has no points, so ranking and closing it would promote nobody and consume the week. An **explicit** `p_week_start` is **never** bootstrapped: an operator who names a week must not be handed a different one. ⚠️ **`p_now` was in the signature and never read** by the old body; the bootstrap derives the week from it, which is what makes the boundary testable.
+
+**Proven:** `supabase/tests/league_bootstrap.sql` — **26 assertions** covering the bootstrap, the tier-1 fill, *"nothing ranked"*, the explicit-week refusal, that the **next** roll rolls rather than re-bootstrapping, idempotence, and **the ACLs surviving the re-emit** — ⚠️ **fault-tested RED by restoring the OLD function body**; the whole **9-file** SQL suite green; `check:sql` **24/24**; `npm run check` **exit 0**. ⚠️ **The near-miss the method caught: the first re-emit silently dropped the original `no_week` early return** (fall-through with a NULL `v_week`) — **the diff caught it, not the eye**, which is why the 8 KB body is extracted mechanically and its patch anchor asserted to match **exactly once**.
+
+**Verified live** (`db push` → *"Remote database is up to date"*; the recorded version was read back **and** the body): `roll_league_week` is **9,738 B** (was 8,066) · `bootstrapped` present · the bootstrap branch present · ⚠️ **the OLD note text is GONE (`position` 0) and the renamed note is present** — the two-way check that a version string alone cannot give · **24 local / 24 remote, no drift** · and the function is still **`service_role`-only**.
+
+⚠️ **Not exercised on the hosted runtime, deliberately:** a real bootstrap call would write the first `league_weeks` row and cohorts, so the first firing is the cron's — **Monday 2026-10-19 00:00 UTC**.
+
+**Cost of both:** **US$0.00** (no fal.ai call; local Docker + local gates).
+

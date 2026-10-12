@@ -765,7 +765,7 @@ The PM's rule: a clan is named in **whatever script the user types**, and the ap
 
 ⚠️ **The 8 KB body was re-emitted VERBATIM** from `20261011130000` with one branch inserted — extracted mechanically and the patch anchor **asserted to match exactly once**, because a hand-copied function is how indentation drift starts. ⚠️ **The first attempt proved the point in reverse**: it silently dropped the original `no_week` early return (falling through with a NULL `v_week`), and **the diff — not the eye — caught it**.
 
-⚠️ **Verified locally only.** The hosted push needs a linked checkout, which this worktree is not, so `SCRUM-115` is `In Review` until `db push` runs and the deployed `prosrc` is read back.
+✅ **VERIFIED LIVE — the same day.** `db push` → *"Remote database is up to date"*, and the deployed body was read back rather than trusted: `roll_league_week` is **9,738 B** (was 8,066) · `bootstrapped` **and** the bootstrap branch present · ⚠️ **the OLD note text is GONE (`position` 0) while the renamed note is present** — the two-way check a version string alone cannot give · **24 local / 24 remote, no drift** · still **`service_role`-only**. ⚠️ **No bootstrap call was made on production:** it would write the first `league_weeks` row and its cohorts, so the first firing is the cron's — **Mon 2026-10-19 00:00 UTC**.
 
 ### 12.31 · S39 — SCRUM-94: two board colours fixed, and the emoji's fill was DISPROVED (2026-10-10)
 
