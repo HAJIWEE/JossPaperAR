@@ -791,7 +791,7 @@ The PM merged **PR #40** (`cline/9059b-league`, 14 commits) **off-session at 202
 
 **Verified live** (`db push` → *"Remote database is up to date"*; the recorded version was read back **and** the body): `roll_league_week` is **9,738 B** (was 8,066) · `bootstrapped` present · the bootstrap branch present · ⚠️ **the OLD note text is GONE (`position` 0) and the renamed note is present** — the two-way check that a version string alone cannot give · **24 local / 24 remote, no drift** · and the function is still **`service_role`-only**.
 
-⚠️ **Not exercised on the hosted runtime, deliberately:** a real bootstrap call would write the first `league_weeks` row and cohorts, so the first firing is the cron's — **Monday 2026-10-19 00:00 UTC**.
+✅ **Then exercised on the hosted runtime, on the PM's approval:** `select public.roll_league_week()` → `{status: "bootstrapped", rolled: false, week_start: "2026-10-12", members_placed: 2}`, verified afterwards as **1 active week (2026-10-12 → 2026-10-18) · 1 cohort at tier 1 · 2 members · ranked 0 · with_rank 0 · audit_rows 0**. The league therefore starts **a week earlier** than the cron alone would have managed; **Mon 2026-10-19 00:00 UTC is the first REAL roll.**
 
 **Cost of both:** **US$0.00** (no fal.ai call; local Docker + local gates).
 
