@@ -121,6 +121,16 @@ jobs:
       - name: App-links config (intentFilters · associatedDomains · .well-known agreement)
         run: node src/lib/checks/app-links.ts
 
+      # The PUBLIC SITE — the URL Play verifies, the privacy-policy URL the Data
+      # Safety form needs, and the published demo. ⚠️ The demo is scanned HERE
+      # and not by contrast-check.js: that lint cannot express "this text sits on
+      # a dark surface", and the demo's fire screen legitimately paints brand
+      # gold on #121418. The allowance is enumerated in the check and asserted
+      # BOTH ways, so a stale entry fails too. Dependency-free, so it belongs in
+      # this job.
+      - name: Site contract (Play contacts · privacy URL · demo surface policy)
+        run: node src/lib/checks/site.ts
+
   app-checks:
     name: App checks (typecheck · expo-doctor)
     runs-on: ubuntu-latest

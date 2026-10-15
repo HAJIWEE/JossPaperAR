@@ -51,6 +51,11 @@ check('index.html carries the contact email', index.includes(EMAIL));
 check('index.html carries the contact phone', index.includes(PHONE_TEL));
 check('index.html links the privacy policy', index.includes('/privacy.html'));
 check('index.html names the Play package', index.includes('app.josspaperar'));
+/* ⚠️ The demo and the landing page are two halves of one journey: a Play
+   reviewer lands on `/`, and the only way they reach the demo is this link.
+   Publishing /demo without it leaves the demo reachable only by typing the
+   URL — which is how this was missed the first time. Asserted BOTH ways. */
+check('index.html links the demo', index.includes('href="/demo/"'));
 
 const privacy = read('public/privacy.html');
 check('privacy.html exists and is standalone', privacy.length > 1000);
@@ -68,6 +73,106 @@ check(
     return src.startsWith('/join');
   }),
   lines.filter((l) => !(l.split(/\s+/)[0] ?? '').startsWith('/join')).join('; '),
+);
+
+// ─── the DEMO (public/demo) ────────────────────────────────────────────────
+// The published interactive prototype. Two contracts:
+//
+//  1. FRAMING — it must read as a public demo, not internal scaffolding, and
+//     it must carry the CC BY-SA attribution the car photograph requires.
+//     (CREDITS.md: "swap both files … before this mockup is shared or
+//     published" — kept, so credit is mandatory, not optional.)
+//  2. SURFACE POLICY — a decorative brand token may only be used as text where
+//     the surface is DARK. The app-wide lint cannot express "on dark", and the
+//     demo is deliberately NOT in its scan list, so the allowance is
+//     enumerated HERE and asserted both ways: an unlisted usage fails, and a
+//     listed-but-unused entry ALSO fails (so the list cannot rot into
+//     permission for something that no longer exists).
+//
+// ⚠️ WHY NOT JUST SWAP THEM ALL TO -text: measured, not assumed. 11 of these
+// sit on the camera/burn screens (#121418) and one on the tablet face
+// (#7A2412). The -text counterparts (#77632F, #7B621F) are DARK BY DESIGN —
+// verified against cream — so on a near-black surface they invert the defect
+// instead of fixing it, and the aim sight, throw guide, swipe chevron and
+// score pop would vanish into the fire.
+const DEMO_DIR = 'public/demo';
+const ON_DARK_DEMO_SELECTORS = [
+  // the page chrome — the page surrounds the phone on #171412
+  '.proto-head h1 .zh',
+  '.style-chip',
+  '.jump button:hover',
+  '.jump button.is-current',
+  // the tablet face is dark red (#7A2412 / #8F2A0E)
+  '.tablet-txt',
+  // the capture + burn screens (#121418)
+  '.detect-chip',
+  '.aim-sight .sight-line',
+  '.aim-sight .sight-tick',
+  '.aim-sight .sight-tick.is-heart',
+  '.burn-ladder b',
+  '.aim-live',
+  '.throw-guide .guide-path',
+  '.throw-guide .guide-tip',
+  '.swipe-hint .chev',
+  '.score-pop',
+  '.aim-badge',
+];
+
+const DEMO_DECORATIVE = [
+  '--cinnabar', '--cinnabar-soft', '--cinnabar-deep',
+  '--gold', '--gold-bright', '--gold-deep',
+  '--azurite', '--azurite-light', '--azurite-deep',
+  '--malachite', '--malachite-deep', '--jade-facet',
+  '--muted',
+];
+/* ⚠️ The leading boundary group is load-bearing — see the same fix in
+   design-system/contrast-check.js. Without it `border-top-color:` is read as
+   `color:` and every decorative BORDER reports as a text defect. */
+const DEMO_COLOR_PROPS = /(?:^|[\s;{])(color|fill|stroke)\s*:\s*var\((--[a-z0-9-]+)\)/g;
+
+const demo = read(`${DEMO_DIR}/index.html`);
+const demoCss = read(`${DEMO_DIR}/styles.css`);
+
+// 1 · framing
+check('demo exists', demo.length > 10000 && demoCss.length > 10000);
+check('demo no longer shows the internal fidelity test', !demo.includes('fidelity-test'));
+check('demo does not describe itself as non-production scaffolding', !/exploratory, not production code/.test(demo));
+check('demo links back to the site root', demo.includes('href="/"'));
+check('demo links the privacy policy', demo.includes('/privacy.html'));
+check('demo carries the contact email', demo.includes(EMAIL));
+check('demo states it is a prototype', /not the released app/i.test(demo));
+check(
+  'demo carries the CC BY-SA attribution the photograph requires',
+  /CC BY-SA/.test(demo) && /Wikimedia Commons/.test(demo),
+);
+
+// 2 · surface policy
+const usedOnDark = new Set<string>();
+const offenders: string[] = [];
+{
+  let selector = '';
+  const cssLines = demoCss.split('\n');
+  cssLines.forEach((line) => {
+    const s = line.match(/^([^{]+)\{/);
+    if (s) selector = s[1].trim();
+    if (/^\s*--/.test(line)) return; // a token definition is not a usage
+    for (const m of line.matchAll(DEMO_COLOR_PROPS)) {
+      if (!DEMO_DECORATIVE.includes(m[2])) continue;
+      if (ON_DARK_DEMO_SELECTORS.includes(selector)) usedOnDark.add(selector);
+      else offenders.push(`${selector} → ${m[1]}:var(${m[2]})`);
+    }
+  });
+}
+check(
+  'demo: no decorative token used as text on a CREAM surface',
+  offenders.length === 0,
+  offenders.slice(0, 4).join(' · '),
+);
+const stale = ON_DARK_DEMO_SELECTORS.filter((s) => !usedOnDark.has(s));
+check(
+  'demo: every on-dark allowance is still actually used (the list cannot rot)',
+  stale.length === 0,
+  stale.join(' · '),
 );
 
 console.log('\n────────────────────────────────────────────────────────────────');
