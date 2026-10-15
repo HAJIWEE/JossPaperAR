@@ -161,7 +161,19 @@ const DECORATIVE = [
   '--malachite', '--malachite-deep', '--jade-facet',
   '--muted',
 ];
-const COLOR_PROPS = /\b(color|fill|stroke)\s*:\s*var\((--[a-z0-9-]+)\)/g;
+/* ⚠️ THE PREFIX IS NOT DECORATION — it is the fix for a false-positive class.
+   The pattern was `\b(color|fill|stroke):…`, and `\b` matches INSIDE a
+   hyphenated property: `border-top-color` contains `color`, so every
+   `border-*-color: var(--brand)` was reported as "text painted with a
+   decorative token" — the exact opposite of this lint's own stated intent,
+   which is that decorative tokens ARE qualified for **borders and fills**.
+   MEASURED on prototype/styles.css (2026-10-15): 32 hits, of which 6 were
+   this false positive (`.jump button:hover`, `.jump button.is-current`,
+   `.chip.is-on`, `.brush-ring` ×2, `.league-row.is-you`).
+   Requiring a real declaration boundary (`^` · whitespace · `;` · `{`) before
+   the property name excludes every `*-color` suffix while keeping
+   `color:` / `fill:` / `stroke:` themselves. `background:` was never matched. */
+const COLOR_PROPS = /(?:^|[\s;{])(color|fill|stroke)\s*:\s*var\((--[a-z0-9-]+)\)/g;
 
 function resolveLintTargets() {
   const explicit = (process.argv.find(a => a.startsWith('--css=')) || '').split('=')[1];
@@ -183,8 +195,10 @@ function lintStylesheet() {
     console.log('      point it there with --css=path/to/styles.css once the real build lands —');
     console.log('      until then the design-system foundation below is the scanned target.');
     console.log('      prototype/styles.css is deliberately NOT scanned: the prototype is retired');
-    console.log('      and Penpot is the design source of truth, so its 32 decorative-token');
+    console.log('      and Penpot is the design source of truth, so its 26 decorative-token');
     console.log('      usages are a historical record, not a live build defect.');
+    console.log('      (Was 32 until 2026-10-15 — 6 were the border-*-color false positive');
+    console.log('      this lint used to report; see COLOR_PROPS above.)');
   }
   const targets = [...build, ...foundation];
   if (!targets.length) { console.log('  – skipped: nothing to scan'); return; }
