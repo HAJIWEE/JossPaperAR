@@ -51,6 +51,11 @@ check('index.html carries the contact email', index.includes(EMAIL));
 check('index.html carries the contact phone', index.includes(PHONE_TEL));
 check('index.html links the privacy policy', index.includes('/privacy.html'));
 check('index.html names the Play package', index.includes('app.josspaperar'));
+/* ⚠️ The demo and the landing page are two halves of one journey: a Play
+   reviewer lands on `/`, and the only way they reach the demo is this link.
+   Publishing /demo without it leaves the demo reachable only by typing the
+   URL — which is how this was missed the first time. Asserted BOTH ways. */
+check('index.html links the demo', index.includes('href="/demo/"'));
 
 const privacy = read('public/privacy.html');
 check('privacy.html exists and is standalone', privacy.length > 1000);
