@@ -49,6 +49,7 @@
     "check:sql": "node supabase/checks/sql-structure.js",
     "check:adrs": "node AppDesignConceptBoard/ADRs/check-adrs.js",
     "check:links": "node src/lib/checks/app-links.ts",
+    "check:site": "node src/lib/checks/site.ts",
     "check:db": "bash supabase/checks/run-sql-tests.sh",
     "check:clanapi": "bash supabase/checks/run-clan-api-contract.sh",
     "check:budget": "bash supabase/checks/exercise-budget.sh",
