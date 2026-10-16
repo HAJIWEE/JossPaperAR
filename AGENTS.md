@@ -42,7 +42,7 @@ Steps:
 1. **Create a `Task`** in project `SCRUM` (issue type id `10003`).
 2. **Prefix the summary with `🎯 Decide:`** (house convention for decision tickets — see SCRUM-59/60/61/62). Name the decision, not the work.
 3. **Explain the context in the description** — enough that the PM can decide *without reading the repo*: what is already settled, what is genuinely open, why it needs a human (vs an engineering trade-off), the options with their consequences, what it blocks, and what happens if it is deferred.
-4. **Add it to the active sprint.** Sprint field is `customfield_10020`; the current sprint is **id 1 = `SCRUM Sprint 1`** (2026-10-02 → 2026-10-16). Verify the sprint id via `jql: project = SCRUM AND sprint IN openSprints()` with field `customfield_10020` — **do not assume it stays 1**, and **do not assume a newly created issue is in the sprint** (it is not; set it explicitly and confirm with a read-back).
+4. **Add it to the active sprint.** Sprint field is `customfield_10020`. ⚠️ **Read the id every time — never carry it forward.** For reference only, as of **2026-10-16** the active sprint is **id 34 = `SCRUM Sprint 2`** (2026-10-12 → 2026-10-29). ⚠️ **This line used to read *"id 1 = SCRUM Sprint 1 (2026-10-02 → 2026-10-16)"* and was still being believed a sprint later — an id that pointed at a CLOSED sprint.** Read it via `jql: project = SCRUM AND sprint IN openSprints()` with field `customfield_10020`, and **do not assume a newly created issue is in the sprint** (it is not; set it explicitly and confirm with a read-back).
 5. Label it `decision` (plus `pm-action`, and a domain label such as `adr-008` / `economy` / `cultural`).
 
 **Why:** a decision that lives only in a PR description is invisible to the PM's workflow and will not be answered. An ADR stuck at 🟡 Proposed is a decision recorded as unmade — the ticket is what converts it.
@@ -56,7 +56,7 @@ Steps:
 This is **not** only for tickets you create. **When you RESUME a backlog ticket, move it into the sprint in the same action that starts the work** — resuming is what puts it in flight, and in-flight means in the sprint.
 
 ```bash
-# 1. read the CURRENT sprint id — never hard-code 1, it changes every sprint
+# 1. read the CURRENT sprint id — never hard-code it, it changes every sprint
 jql: project = SCRUM AND sprint IN openSprints()   → field customfield_10020
 
 # 2. put the ticket in it — BEFORE you start working
