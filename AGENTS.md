@@ -110,6 +110,7 @@ npm run check:adrs       # ADR register ↔ files (status agreement)
 npm run check:db         # SQL tests (needs docker + supabase/.temp/pooler-url)
 npm run check:clanapi    # the clan client↔server CONTRACT (needs `npx supabase start`)
 npm run check:budget     # live AI-budget stop-rule proof — free by default
+npm run check:doctor     # expo-doctor (21 checks) — ⚠️ NEEDS THE NETWORK, so it is NOT part of `npm run check`
 npx supabase start                                            # local stack — applies the migrations FROM THE FILES, no account/link needed
 bash supabase/checks/run-sql-tests.sh \
   "postgresql://postgres:postgres@127.0.0.1:54322/postgres"   # the whole supabase/tests/ suite against that local Postgres
@@ -119,6 +120,12 @@ npx tsc --noEmit
 ```
 
 **Known traps:** no local `psql` and no `supabase query` subcommand — to run SQL, add a migration file, `db push`, then delete it and `migration repair --status reverted <version>` or remote history drifts. `app_config` is a kill switch — any script that writes it must restore it from an `EXIT` trap. The Storage bulk-delete `{"prefixes":[…]}` answers `200` and deletes nothing; delete objects **by path**. A Path C generation is ≈ **US$0.09** — check the budget before spending.
+
+⚠️ **`npm run check` structurally cannot see the CI failure you are most likely to hit.** `expo-doctor` compares the installed packages against the **latest patch for the SDK — a target Expo keeps moving** — so an **untouched repo goes red**. Symptom: *"Check that packages match versions required by installed Expo SDK — expected `~57.0.x`, found an older patch"*, with **no dependency change to explain it**. Measured 2026-10-16: PR #48's `App checks` failed while `package.json` · `package-lock.json` · `app.json` were **byte-identical to `main`**, and the same check had **passed the day before**.
+
+✅ **Remedy — two commands, no investigation:** `npx expo install --fix`, commit the lockfile, confirm with `npm run check:doctor` (expect *21/21*). ⚠️ **Run `npm run check:doctor` BEFORE pushing** — it is deliberately **not** in `npm run check`, because it needs the **network** and the suite must stay usable offline (same reason `check:db` needs docker and `check:clanapi` needs `supabase start`).
+
+⚠️ **And never read its exit code through a pipe.** `npx expo-doctor | tail -40` reports **`tail`'s** status, so a genuine failure reads as `EXIT: 0` — measured, and it is exactly how a broken gate would ship unnoticed. This is the **second** occurrence of the class (`48f0865`, *"refresh package-lock so installed patches match SDK 57"*); pinning one version is a treadmill. See **SCRUM-120**.
 
 ⚠️ **`run-sql-tests.sh` calls `docker run` WITHOUT `--network host`**, so pointing it at a local URL makes **every** file report `Connection refused` while the stack is perfectly healthy — a failure that reads exactly like a red suite. Locally, run the SQL suite with `--network host` (`docker run --rm -i --network host postgres:17 psql "<url>" -v ON_ERROR_STOP=1 -q -f - < supabase/tests/<file>.sql`). Measured 2026-10-08 (S34).
 
