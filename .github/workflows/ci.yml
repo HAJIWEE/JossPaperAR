@@ -164,3 +164,19 @@ jobs:
 
       - name: Expo doctor
         run: npx expo-doctor
+
+      # ⚠️ SCRUM-120 — a red check has to say what to DO about it.
+      #
+      # expo-doctor's own output is detailed, but it lives in the log. The
+      # check-run ANNOTATION the PM actually sees on the PR said only
+      # "Process completed with exit code 1" — which is the whole trap: a red
+      # check, no change to explain it, and nothing naming the cause.
+      #
+      # The most common failure here is NOT a code change: Expo publishes an SDK
+      # patch, expo-doctor's *expected* version moves, and an untouched repo goes
+      # red. So the annotation names that case and its remedy.
+      # ⚠️ Check it BEFORE pushing: npm run check:doctor
+      - name: Expo doctor — what to do about it
+        if: failure()
+        run: |
+          echo "::error title=expo-doctor failed::If it reports 'packages match versions required by installed Expo SDK' with an OLDER patch than expected, nothing you wrote is at fault - Expo published a patch. Run 'npx expo install --fix', commit the lockfile, confirm 21/21 with 'npm run check:doctor', then push. See AGENTS.md -> Known traps (SCRUM-120)."
