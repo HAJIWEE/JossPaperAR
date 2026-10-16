@@ -16,7 +16,7 @@
 | 1 | ⚠️ **Decide the account type** — personal vs organization | Play Console, once | **5 min to decide · up to 3 weeks to *wait*** | everything in Part A |
 | 2 | Create the account (**US$25**) + identity verification | Play Console | ~30 min + Google's review | the listing |
 | 3 | Create the app with package **`app.josspaperar`** | Play Console | 5 min | the store URL |
-| 4 | Fill the listing + the policy declarations — ⚠️ **the privacy-policy URL does not exist yet** (§A.2 step 4) | Play Console + repo | 1–2 h, plus a small build | submission |
+| 4 | Fill the listing + the policy declarations — ✅ **the privacy policy is already live** at `https://josspaperar.app/privacy` (§A.2 step 4) | Play Console + repo | 1–2 h | submission |
 | 5 | Upload a signed **AAB** (`production` profile) | EAS → Play Console | ~30 min | the closed test |
 | 6 | ⚠️ Closed test: **12 testers × 14 continuous days** *(personal accounts only)* | Play Console | **≥ 14 days of calendar** | production access |
 | 7 | ⚠️ **Add Play App Signing's fingerprint** to `assetlinks.json`, redeploy, re-verify | repo → Cloudflare | 15 min | the App Link on **Play-signed** builds |
@@ -65,7 +65,15 @@ Fetched from **Google Play Console Help** on **2026-10-12**, verbatim:
 
 **Step 4 — the policy declarations — ⚠️ this is the part that actually blocks submission**
 
-**4a. ⚠️ The privacy-policy URL DOES NOT EXIST YET.** Verified 2026-10-12: `public/` contains only `_headers`, `_redirects` and the hidden `.well-known/`. Play requires a **publicly reachable page**, reachable **without** the app and without a login. The natural home is the **Cloudflare Worker already built from this repo** (`wrangler.jsonc`), at e.g. `https://josspaperar.app/privacy`. ✅ **Its content is already decided** — [[13-privacy-and-retention]] plus [[20-business-registration-and-compliance]] §7 (the DPO duty) — so this is **writing a page, not inventing a policy**. ⚠️ It must cover what the app really does: **anonymous sign-in**, **photos sent for cartoonization**, **clan membership**, and the **retention window** (see 4b).
+**4a. ✅ The privacy-policy URL is LIVE — this step is done** (corrected 2026-10-16).
+
+`https://josspaperar.app/privacy` → **HTTP 200**, a standalone page reachable **without** the app and without a login. ⚠️ Fault-tested rather than assumed: `/definitely-not-real-xyz123` → **404**, so the 200 is a real page and not a wildcard. Source is `public/privacy.html` (+ `public/index.html`), landed in `04913bd` (*"Site: Play Console one-pager + privacy policy on josspaperar.app"*) and `8f4e430`; ✅ **`npm run check:site` now asserts those files' values.**
+
+⚠️ **Why this paragraph used to say the opposite — and why that is kept here.** On **2026-10-12** this was a *measured* claim: `public/` genuinely held only `_headers`, `_redirects` and the hidden `.well-known/`, so the page really did not exist. The deployment landed afterwards. A claim that was **checked** and later became stale is the easiest kind to keep trusting, which is why the correction is dated rather than silent.
+
+✅ It covers what the app really does — **anonymous sign-in**, **photos sent for cartoonization**, **clan membership**, and the **retention window** (see 4b) — from [[13-privacy-and-retention]] plus [[20-business-registration-and-compliance]] §7 (the DPO duty).
+
+⚠️ **What this does NOT settle:** `check:site` proves the **files** are correct — its own header states it does **not** prove the domain *serves* them. That half is the deploy + `curl`, also confirmed on 2026-10-16 (200, no redirect).
 
 **4b. ⚠️ The Data Safety form — the one answer that needs care.** Play asks whether data is **collected** and **shared**. The honest answer turns on **retention**, not on transport: photos do leave the device and reach the server and the AI provider for cartoonization, so the real question is whether they are **stored, and for how long**. ✅ **Answer it from [[13-privacy-and-retention]] and [[ADRs/ADR-007-privacy-minimal-windowed-one-tap|ADR-007]] (minimal, windowed), never from memory** — a wrong declaration here is the classic cause of a post-launch strike. ⚠️ Declare **only what the app actually does**, and treat `package.json` as the source of truth for that: at the time of writing there is **no analytics or crash-reporting SDK** installed.
 
@@ -155,7 +163,7 @@ adb shell dumpsys package app.josspaperar | grep -i targetSdk
 | ☐ | Account created + identity verified | **PM** | Console shows the account as verified |
 | ☐ | **Device verification** completed | **PM** | Google's device-verification step clears — ⚠️ needs a real Android device |
 | ☐ | App created, package **`app.josspaperar`** | **PM** | the package matches `app.json` exactly |
-| ☐ | ⚠️ **Privacy policy live at a public URL** | **code** | `curl -I https://josspaperar.app/privacy` → **200**, no login |
+| ✅ | **Privacy policy live at a public URL** | **code** | `curl -I https://josspaperar.app/privacy` → **200**, no login — ✅ **verified 2026-10-16** |
 | ☐ | Data Safety + content rating + ads declared | **PM** | answered from doc 13 / ADR-007, not memory |
 | ☐ | Test instructions + a live invite code in *App access* | **PM** | a reviewer could complete a join |
 | ☐ | **Target API ≥ 36** (**§A.3**) | **code** | `aapt2 dump badging … \| grep targetSdkVersion` |
@@ -284,4 +292,4 @@ TRACK 1 — Play (Part A)                        TRACK 2 — the phone (Part B)
 
 ---
 
-**⚠️ Provenance.** Every claim above is sourced either to a file in this repo (section named), to a Jira ticket, or to a primary web source fetched **2026-10-12** (**Google Play Console Help**: *App testing requirements for new personal developer accounts* · *Target API level requirements for Google Play apps*). ⚠️ **The items marked as measured — the missing `expo-dev-client`, the single fingerprint, the absent privacy page, the two env variables, `versionCode: None` — were run against this working tree on 2026-10-12**, not recalled.
+**⚠️ Provenance.** Every claim above is sourced either to a file in this repo (section named), to a Jira ticket, or to a primary web source fetched **2026-10-12** (**Google Play Console Help**: *App testing requirements for new personal developer accounts* · *Target API level requirements for Google Play apps*). ⚠️ **The items marked as measured — the missing `expo-dev-client`, the single fingerprint, the absent privacy page, the two env variables, `versionCode: None` — were run against this working tree on 2026-10-12**, not recalled. ⚠️ **One of those has since changed: the privacy page now EXISTS** — ✅ corrected in **§A.2 step 4a** on **2026-10-16**. The list records what was measured *on that date*, **not** the current state.
