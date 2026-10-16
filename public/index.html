@@ -45,6 +45,19 @@ a{color:var(--azurite-text)}
 .support-figure{margin:0;display:flex;justify-content:center}
 .support-figure img{display:block;width:13rem;max-width:100%;height:auto;background:#fff;
   border:1px solid var(--paper-edge);border-radius:.75rem;padding:.5rem}
+.support-qr{display:block;padding:0;margin:0;border:0;background:none;cursor:zoom-in;border-radius:.75rem}
+.support-qr:focus-visible{outline:2px solid var(--gold-deep);outline-offset:3px}
+/* The enlarged view shows the SAME verified file at its native 400px, so there is
+   no upscaling to blur the modules. min(…,50vh) keeps it inside a short viewport. */
+.qr-zoom{max-width:min(94vw,30rem);border:1px solid var(--paper-edge);border-radius:.9rem;
+  background:#FBF7EE;color:var(--ink);padding:1rem;text-align:center}
+.qr-zoom img{display:block;width:min(88vw,50vh,25rem);height:auto;margin:0 auto;background:#fff;
+  border:1px solid var(--paper-edge);border-radius:.5rem}
+.qr-zoom::backdrop{background:rgba(26,26,26,.62)}
+.qr-zoom p{margin:.6rem 0 0}
+.qr-zoom-close{margin-top:.9rem;background:var(--cinnabar-text);color:#FFF8E8;border:0;
+  border-radius:999px;padding:.5rem 1.1rem;font:inherit;font-weight:600;cursor:pointer}
+.qr-zoom-close:focus-visible{outline:2px solid var(--gold-deep);outline-offset:2px}
 footer{margin-top:3rem;padding-top:1rem;border-top:1px solid var(--paper-edge);font-size:.85rem;color:var(--muted-text)}
 footer .gold{color:var(--gold-deep)}
 </style>
@@ -77,12 +90,21 @@ footer .gold{color:var(--gold-deep)}
   <p>Joss Paper AR is an independent project, built by one developer in Singapore. If you would like to help cover its development costs, you can send a contribution by PayNow — thank you.</p>
   <div class="card">
     <figure class="support-figure">
-      <img src="/paynow-qr.png" width="400" height="551" loading="lazy" decoding="async"
-        alt="PayNow QR code for JOSSPAPERAR, UEN 53533816C. Scan it with a Singapore banking app to make a contribution.">
+      <button type="button" class="support-qr" data-qr-open>
+        <img src="/paynow-qr.png" width="400" height="551" loading="lazy" decoding="async"
+          alt="PayNow QR code for JOSSPAPERAR, UEN 53533816C. Activate to enlarge it for scanning.">
+      </button>
     </figure>
-    <p class="small">Scan with any Singapore banking app that supports PayNow. The amount is for you to choose.</p>
+    <p class="small">Tap or click the code to enlarge it. Scan it with any Singapore banking app that supports PayNow — the amount is for you to choose.</p>
     <p class="small">Payee <strong>JOSSPAPERAR</strong> · UEN <code>53533816C</code> — please check that the UEN shown in your banking app matches before you confirm. PayNow works with Singapore bank accounts only.</p>
   </div>
+
+  <dialog id="qr-enlarge" class="qr-zoom" aria-label="PayNow QR code, enlarged">
+    <img src="/paynow-qr.png" width="400" height="551"
+      alt="PayNow QR code for JOSSPAPERAR, UEN 53533816C, enlarged for scanning.">
+    <p class="small">Payee <strong>JOSSPAPERAR</strong> · UEN <code>53533816C</code></p>
+    <button type="button" class="qr-zoom-close" data-qr-close>Close</button>
+  </dialog>
 
   <h2>Developer contact</h2>
   <p>For store-listing enquiries, support, privacy, or deletion requests:</p>
@@ -101,5 +123,27 @@ footer .gold{color:var(--gold-deep)}
     © 2026 JOSSPAPERAR · Singapore · <span class="gold">Burn bright, remember well.</span>
   </div>
 </footer>
+<script>
+/* Progressive enhancement only — the QR is fully usable without this: the
+   thumbnail stays visible and scannable, so a donor is never blocked.
+   <dialog> is used rather than a hand-rolled div because it brings focus
+   trapping and Escape-to-close with it. */
+(function () {
+  var dlg = document.getElementById('qr-enlarge');
+  var openBtn = document.querySelector('[data-qr-open]');
+  if (!dlg || !openBtn || typeof dlg.showModal !== 'function') return;
+  openBtn.addEventListener('click', function () { dlg.showModal(); });
+  dlg.querySelector('[data-qr-close]').addEventListener('click', function () { dlg.close(); });
+  /* Only a click on the BACKDROP dismisses it — checked against the dialog's own
+     box, so clicking its padding does not close it by surprise. */
+  dlg.addEventListener('click', function (e) {
+    if (e.target !== dlg) return;
+    var r = dlg.getBoundingClientRect();
+    var inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    if (!inside) dlg.close();
+  });
+  dlg.addEventListener('close', function () { openBtn.focus(); });
+})();
+</script>
 </body>
 </html>
