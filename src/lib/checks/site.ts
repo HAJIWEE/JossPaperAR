@@ -81,6 +81,18 @@ check(
   /PayNow/.test(index) && /Singapore banking app/.test(index),
 );
 check('index.html gives the QR a descriptive alt text', /alt="PayNow QR code/.test(index));
+/* ⚠️ The enlarged view must reuse the SAME frozen file. A second, "high-res" QR
+   would be an asset the hash freeze does not cover — exactly the silent-swap
+   hole the freeze exists to close. Asserted as a count, so adding a third QR
+   file or pointing one elsewhere fails rather than passing quietly. */
+check(
+  'the enlarged QR reuses the same frozen asset (no second QR file)',
+  (index.match(/src="\/paynow-qr\.png"/g) ?? []).length === 2,
+);
+check(
+  'index.html can enlarge the QR (a native <dialog> carries it)',
+  index.includes('<dialog') && index.includes('data-qr-open'),
+);
 
 const qrBytes = readFileSync(join(ROOT, QR_FILE));
 check('the PayNow QR asset exists and is non-trivial', qrBytes.length > 1000, `${qrBytes.length} bytes`);
