@@ -15,6 +15,7 @@
  * Dependency-free (Node 22 strips the types), same as check:links.
  */
 
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -56,6 +57,43 @@ check('index.html names the Play package', index.includes('app.josspaperar'));
    Publishing /demo without it leaves the demo reachable only by typing the
    URL — which is how this was missed the first time. Asserted BOTH ways. */
 check('index.html links the demo', index.includes('href="/demo/"'));
+
+/* ⚠️ SCRUM-119 — the DONATION surface (PayNow).
+   A payment QR is the one asset on this site where a silent swap is
+   indistinguishable from working: the page still renders, the alt text still
+   reads correctly, and the money goes to a different account. So the asset is
+   FROZEN BY HASH — and the hash failing is the point. It forces whoever changed
+   the QR to re-verify it, then update the hash AND the UEN stated on the page.
+   ⚠️ What is NOT asserted here: that the PNG encodes the UEN. This check is
+   deliberately dependency-free (Node strips the types) and a real QR decoder is
+   not available to it. The verified pair is therefore: the page STATES the UEN,
+   and the asset is byte-for-byte the file that was decoded and CRC-checked.
+   The decode for `2eec7dc5…` gave SG.PAYNOW · proxy type 2 (UEN) · 53533816C ·
+   amount editable · EMVCo CRC 4278 — validated, not assumed. */
+const QR_FILE = 'public/paynow-qr.png';
+const QR_SHA256 = '2eec7dc517c5601b674bbcbcf6e6ba262768523c7ef8ab2ad9e642c55453ce91';
+const QR_UEN = '53533816C';
+
+check('index.html links the PayNow QR', index.includes('src="/paynow-qr.png"'));
+check('index.html states the UEN the QR encodes', index.includes(QR_UEN));
+check(
+  'index.html names PayNow and scopes it to Singapore',
+  /PayNow/.test(index) && /Singapore banking app/.test(index),
+);
+check('index.html gives the QR a descriptive alt text', /alt="PayNow QR code/.test(index));
+
+const qrBytes = readFileSync(join(ROOT, QR_FILE));
+check('the PayNow QR asset exists and is non-trivial', qrBytes.length > 1000, `${qrBytes.length} bytes`);
+{
+  const digest = createHash('sha256').update(qrBytes).digest('hex');
+  check(
+    'the PayNow QR is byte-for-byte the artefact that was VERIFIED (frozen)',
+    digest === QR_SHA256,
+    digest === QR_SHA256
+      ? ''
+      : `hash changed (${digest.slice(0, 16)}…) → re-decode the new QR, confirm its UEN, then update QR_SHA256 AND the UEN shown on the page`,
+  );
+}
 
 const privacy = read('public/privacy.html');
 check('privacy.html exists and is standalone', privacy.length > 1000);
