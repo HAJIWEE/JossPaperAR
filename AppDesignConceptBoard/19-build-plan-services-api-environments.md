@@ -565,6 +565,62 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.38 · S59b — THE DEVICE RUN: the whole capture path ran on glass, and it found a THIRD upload defect (2026-10-17)
+
+**Device:** Xiaomi `25128PC17G` (`arctic`) · **Android 16 / API 36** · arm64-v8a · **3.6 GB RAM** · **720×1600** — floor-class, which is the target this project names (doc 14 §1). ⚠️ Not the Tier-F handset (`SCRUM-109` is still undelivered); this is the PM's own phone.
+**Environment:** the **local Supabase stack** (`127.0.0.1:54321`, migrations applied from the files) + **Expo Go 57.0.9**, port-reversed over USB. ⚠️ **No dev build was needed** — `expo-blob` ships *inside* Expo Go for SDK 57, which is why this run could happen the moment the PM said the phone was connected (the standing advice to build a dev client is for a *standalone* build, not for this).
+
+**✅ PROVEN ON GLASS**
+
+- **The upload path works end-to-end, with a real sensor photo.** `captures` row → **`storage.objects` row**, `image/jpeg`, **101,873 bytes** (and 102,315 on the first attempt) against the bucket's **307,200-byte** limit. ⚠️ **The raw photo off this sensor is 874,762 B** — so the resize is doing exactly what SCRUM-124's AC 1 asked, and it was previously a `413`. **This is SCRUM-124's original defect, verified fixed on the hardware that exposed it.**
+- **`expo-blob` loads and is not the slow path.** No `requireNativeModule('ExpoBlob')` failure, and **no *"copies the response into the native blob store…"* warning** — so `Response.blob()` took the fast branch (§12.37 ①). It is on this path twice (the `.blob()` read and the `FormData` part `storage-js` builds).
+- **The anti-hang works — and it is now QUANTITATIVE, not just "it didn't stick".** The screen never stuck: it resolved to the retry affordance. Before §12.37 ② this state was an unbounded spinner. ⚠️ **Measured directly, by forcing a `cartoonize_jobs` row to `status = 'running'` (the exact state that caused the hang) and watching the Edge runtime's own log:** **20 consecutive requests, ~3.08 s apart** (`11:45:26.1` → `11:46:24.8`), then **nothing**. That is `MAX_PROBES = 20` at `PROBE_DELAY_MS = 3000` — a ~61 s window that **stops at the bound** rather than running on. ⚠️ **The count matching the constant exactly is the part that proves it: 20 probes, no 21st** — a loop that merely "didn't hang" could still have been unbounded. (The probe is free: the orchestrator answers `already_requested` from the job row without reaching the provider.)
+- **The whole pipeline reached the orchestrator.** The Edge runtime logged *`serving the request with supabase/functions/cartoonize-orchestrator`* and a **`cartoonize_jobs` row was created** — i.e. `registerCapture` → upload → `requestCartoonize` all executed.
+
+**⭐ FOUND ON GLASS — and it is the reason the retry could never succeed.** Every previous device attempt had died in a way that masked this: the offering was marked `spent` and the **retry button could not retry**, because the upload sent **`upsert: true`**. An upsert is `INSERT … ON CONFLICT DO UPDATE`, which needs **UPDATE** permission on `storage.objects` — and the `captures` bucket has **only INSERT and SELECT** policies. So the *second* upload of the same path answered:
+
+```
+{"statusCode":"403","error":"Unauthorized","code":"AccessDenied",
+ "message":"new row violates row-level security policy"}
+```
+
+The measured matrix (one real call each, against the local stack — these are the bodies, not guesses):
+
+| case | result |
+|---|---|
+| object **absent**, upsert omitted | **200** `{"Key":"captures/…","Id":"…"}` |
+| object **exists**, upsert omitted | `{"statusCode":"409","code":"KeyAlreadyExists","message":"The resource already exists"}` |
+| object **exists**, `x-upsert: true` | `{"statusCode":"403","code":"AccessDenied", …RLS…}` |
+
+**The fix is to send NO upsert and treat the 409 as the SUCCESS it is** — the object is present with the same bytes, which is precisely what a retry wants. ⚠️ It deliberately does **not** widen storage permissions to make `upsert` legal: a client that can rewrite its own raw capture is a much larger change than an upload that declines to rewrite identical bytes. This is **the same idempotency lesson as `registerCapture`'s `23505`, on the other half of the step** (§12.37 ②) — and the two had to be fixed **together** for a retry to work at all.
+
+⚠️ **AND FIXING IT EXPOSED A DEAD CHECK IN MY OWN §12.37 CODE.** The measured too-large refusal is **HTTP 400 with `statusCode: "413"`**, *not* an HTTP 413 — so `uploadFailureVerdict`'s `status === 413` arm was near-dead, and the reason the classifier still worked was the **message patterns** catching it. `statusCode === '413'` is now checked too, asserted as the measured shape.
+
+**⚠️ ENVIRONMENTAL, NOT A DEFECT (stated so it is not mis-read as one):** `FAL_KEY` is unset locally, so the orchestrator failed *after* creating its job row with *"FAL_KEY is not set"*. That is the function behaving correctly (it never reached the provider, so nothing was spent), and the client classified the 502 as **retriable** — the player gets *Check again*, not *Offer a new photo*. ✅ **The alternates were exhausted first and at US$0.00** (absence from the Git worktrees, `.env.example`'s real URL with an empty key, and a key/URL search) — and bringing the pipeline up was verified against the **local** stack rather than the hosted project.
+
+**⑤ ALSO FOUND ON GLASS — the copy still conflates the two causes, even after ④ separated them.** The screen renders three lines that contradict each other:
+
+> **The offering is being prepared…** · This offering cannot be prepared. · **[ Check again ]**
+
+Because `ritual_preparing` is a **permanent title**, and the `offline` branch shares the **`spent` body string**: both render `ritual.cannotPrepare`, and only the *button* differs (`common.retry` vs `common.recapture`). ⚠️ **So the branching now distinguishes the two causes but the copy does not** — and the offering in that very screenshot was perfectly **recoverable** (the only fault was an unset `FAL_KEY`). ⚠️ Filed as **`SCRUM-127`** rather than fixed: the fix is a new key in **both locales**, and the i18n table holds **signed-off product copy**, so inventing bilingual player-facing copy is a PM/brand call — the same reason SCRUM-97's strings went out for review. It also raises whether the *title* should be phase-aware.
+
+**⑥ THEN THE SAME RUN WAS REPEATED AGAINST THE HOSTED PROJECT, AND IT COMPLETED EVERY STAGE.** ⚠️ **The local stack structurally CANNOT finish Path C**, and that is a finding in its own right: `createSignedUrl` returns the orchestrator's own base URL, which inside `supabase start` is **`http://kong:8000/...`** — a Docker-internal hostname that **the public internet cannot resolve**. fal.ai therefore answered `422 file_download_error` and the job failed **with `cost_micros` NULL — nothing was charged**. ⚠️ **This trap is documented NOWHERE in the repo** (the only signpost is `doc 19:164`'s passing mention of `EXPO_PUBLIC_API_BASE_URL`), and it means **a Path C device run must target the hosted project** — the local stack is for schema, RLS and storage work, not generation. With the app switched to the hosted URL (`https://yercgevebxvtzkgctfai.supabase.co`, the PM's own `.env`) and the phone on the same wifi, the ritual ran **end to end**:
+
+| stage | evidence |
+|---|---|
+| capture → resize → upload | the object landed under 300 KB from an **874,762-byte** raw photo |
+| orchestrator | **`cartoonize_jobs` `728e1904…` → `status = styled`** |
+| generation | **`cost_micros = 90000`** (exactly the documented **US$0.09**) · **`latency_ms = 13065`** (the documented p50 ≈13 s) · `retries = 0` |
+| the sprite | **`styled/…/a12eb2a5….webp` — 44,680 bytes, `image/webp`**, under the 150 KB budget |
+| the burn | the graded swipe recorded **`Graze` · ±41.45 px** |
+| the award | the reward screen read **Graze · 400 · tribute · Balance 400** — `award-service` persisted it server-side (ADR-005) |
+
+✅ **That is the slice's own definition — `capture → cartoonize → burn → award → persist` — completed on a real sensor**, and it is the first time the whole path has run with **all four upload defects fixed**. ⚠️ **The one earlier failure in the same hosted history** (`4ce8e87b`, `09:56`) is a `422 image_load_error` — *"ensure the image file is not corrupted"* — i.e. the **14-byte 404 body** `native-path.ts` documents being uploaded as the offering. That is the defect **SCRUM-124 already fixed**, and the 10:09 and 11:59 rows succeeding are the proof.
+
+⚠️ **CORRECTED SPEND: this run cost ≈US$0.09 / ≈S$0.12 — ONE real generation.** The earlier drafts of this section said *"US$0.00 — no AI call"*, which was true of the **local** run and became false the moment the hosted run succeeded. Logged in `project-costs.md`.
+
+✅ `tsc` 0 · `npm run check` exit 0 · `check:wire` **76 → 85**, §8 fault-tested **both ways** (`uploadAlreadyPresent` pinned false → 4 RED; pinned true → 3 RED) · **CI 3/3 green on PR #56**.
+
 ### 12.37 · S59 — SCRUM-124's CLIENT half: the upload's Blob was the slow path, and `/preparing` could hang forever (2026-10-17)
 
 ⚠️ **Neither finding is SCRUM-124's 413.** That root cause — the real photo exceeds the `captures` bucket's 300 KB, so Storage answers `413 EntityTooLarge` — was **fixed and merged the same day** (`expo-image-manipulator` + `src/lib/capture-size.ts` + `src/lib/native-path.ts`, PR #54). These are the two defects that were standing *next to* it, found while chasing the session's own dev-warning.

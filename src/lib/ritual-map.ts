@@ -289,8 +289,12 @@ const UNUSABLE_UPLOAD_PATTERNS = [
 ];
 
 export function uploadFailureVerdict(failure: UploadFailureSignal): UploadVerdict {
-  // The status is the strongest signal and needs no string matching.
-  if (failure.status === 413) return 'unusable';
+  // ⚠️ MEASURED (2026-10-17, local storage API): the too-large refusal arrives as
+  // **HTTP 400 with `statusCode: "413"`** — NOT as an HTTP 413. So the numeric
+  // status is only the fallback; `statusCode` is the field that actually carries
+  // it. Checking `status` alone was near-dead code that the message patterns
+  // happened to rescue.
+  if (failure.status === 413 || failure.statusCode === '413') return 'unusable';
 
   if (failure.code && UNUSABLE_UPLOAD_CODES.has(failure.code)) return 'unusable';
   if (failure.statusCode && UNUSABLE_UPLOAD_CODES.has(failure.statusCode)) return 'unusable';
@@ -301,4 +305,45 @@ export function uploadFailureVerdict(failure: UploadFailureSignal): UploadVerdic
   // Everything else — offline, DNS, TLS, a 5xx, an expired session — leaves the
   // photo intact. Re-running the step is free and is the honest next action.
   return 'retry';
+}
+
+/**
+ * ── IS THE OBJECT ALREADY THERE? (the upload's idempotency test) ────────────
+ *
+ * ⚠️ FOUND ON GLASS (2026-10-17, SCRUM-124 device run) — and it is the reason
+ * **the retry could never actually succeed.**
+ *
+ * The upload used `upsert: true` with a comment promising that "re-uploading the
+ * same bytes must not 409 and strand an offering whose row is already
+ * committed". ⚠️ **But an upsert is `INSERT … ON CONFLICT DO UPDATE`, and the
+ * `captures` bucket has only INSERT and SELECT policies — no UPDATE.** So on the
+ * SECOND attempt, against an object that already exists, Storage answers:
+ *
+ *     {"statusCode":"403","error":"Unauthorized","code":"AccessDenied",
+ *      "message":"new row violates row-level security policy"}
+ *
+ * …and the retry died at the upload step, every time, for ever. The measured
+ * matrix (a real call each, against the local stack):
+ *
+ *     object ABSENT, upsert omitted  → 200  {"Key":"captures/…","Id":"…"}
+ *     object EXISTS, upsert omitted   → 409  {"code":"KeyAlreadyExists",
+ *                                             "message":"The resource already exists"}
+ *     object EXISTS, x-upsert: true   → 403  {"code":"AccessDenied", …RLS…}
+ *
+ * So the fix is to send NO upsert and treat the 409 as the SUCCESS it is: the
+ * object is present and holds the same bytes (same source photo, deterministic
+ * resize), which is exactly the state the caller wanted. ⚠️ **This is the same
+ * idempotency lesson as `registerCapture`'s `23505`, on the other half of the
+ * step** — and it deliberately does NOT widen storage permissions to make
+ * `upsert` legal, because a client that can rewrite its own raw capture is a
+ * bigger change than an upload that declines to rewrite identical bytes.
+ */
+const ALREADY_PRESENT_CODES = new Set(['KeyAlreadyExists', 'Duplicate', 'ResourceAlreadyExists']);
+
+export function uploadAlreadyPresent(failure: UploadFailureSignal): boolean {
+  // ⚠️ `statusCode`, NOT `status` — the measured duplicate is HTTP **400** with
+  // `statusCode: "409"`, so keying on the numeric status would miss it entirely.
+  if (failure.statusCode === '409') return true;
+  if (failure.code && ALREADY_PRESENT_CODES.has(failure.code)) return true;
+  return (failure.message ?? '').toLowerCase().includes('already exists');
 }
