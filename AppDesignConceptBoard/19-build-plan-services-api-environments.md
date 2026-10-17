@@ -604,7 +604,22 @@ The measured matrix (one real call each, against the local stack — these are t
 
 Because `ritual_preparing` is a **permanent title**, and the `offline` branch shares the **`spent` body string**: both render `ritual.cannotPrepare`, and only the *button* differs (`common.retry` vs `common.recapture`). ⚠️ **So the branching now distinguishes the two causes but the copy does not** — and the offering in that very screenshot was perfectly **recoverable** (the only fault was an unset `FAL_KEY`). ⚠️ Filed as **`SCRUM-127`** rather than fixed: the fix is a new key in **both locales**, and the i18n table holds **signed-off product copy**, so inventing bilingual player-facing copy is a PM/brand call — the same reason SCRUM-97's strings went out for review. It also raises whether the *title* should be phase-aware.
 
-✅ `tsc` 0 · `npm run check` exit 0 · `check:wire` **76 → 85**, §8 fault-tested **both ways** (`uploadAlreadyPresent` pinned false → 4 RED; pinned true → 3 RED) · **CI 3/3 green on PR #56** · **US$0.00** — no AI call, no deploy.
+**⑥ THEN THE SAME RUN WAS REPEATED AGAINST THE HOSTED PROJECT, AND IT COMPLETED EVERY STAGE.** ⚠️ **The local stack structurally CANNOT finish Path C**, and that is a finding in its own right: `createSignedUrl` returns the orchestrator's own base URL, which inside `supabase start` is **`http://kong:8000/...`** — a Docker-internal hostname that **the public internet cannot resolve**. fal.ai therefore answered `422 file_download_error` and the job failed **with `cost_micros` NULL — nothing was charged**. ⚠️ **This trap is documented NOWHERE in the repo** (the only signpost is `doc 19:164`'s passing mention of `EXPO_PUBLIC_API_BASE_URL`), and it means **a Path C device run must target the hosted project** — the local stack is for schema, RLS and storage work, not generation. With the app switched to the hosted URL (`https://yercgevebxvtzkgctfai.supabase.co`, the PM's own `.env`) and the phone on the same wifi, the ritual ran **end to end**:
+
+| stage | evidence |
+|---|---|
+| capture → resize → upload | the object landed under 300 KB from an **874,762-byte** raw photo |
+| orchestrator | **`cartoonize_jobs` `728e1904…` → `status = styled`** |
+| generation | **`cost_micros = 90000`** (exactly the documented **US$0.09**) · **`latency_ms = 13065`** (the documented p50 ≈13 s) · `retries = 0` |
+| the sprite | **`styled/…/a12eb2a5….webp` — 44,680 bytes, `image/webp`**, under the 150 KB budget |
+| the burn | the graded swipe recorded **`Graze` · ±41.45 px** |
+| the award | the reward screen read **Graze · 400 · tribute · Balance 400** — `award-service` persisted it server-side (ADR-005) |
+
+✅ **That is the slice's own definition — `capture → cartoonize → burn → award → persist` — completed on a real sensor**, and it is the first time the whole path has run with **all four upload defects fixed**. ⚠️ **The one earlier failure in the same hosted history** (`4ce8e87b`, `09:56`) is a `422 image_load_error` — *"ensure the image file is not corrupted"* — i.e. the **14-byte 404 body** `native-path.ts` documents being uploaded as the offering. That is the defect **SCRUM-124 already fixed**, and the 10:09 and 11:59 rows succeeding are the proof.
+
+⚠️ **CORRECTED SPEND: this run cost ≈US$0.09 / ≈S$0.12 — ONE real generation.** The earlier drafts of this section said *"US$0.00 — no AI call"*, which was true of the **local** run and became false the moment the hosted run succeeded. Logged in `project-costs.md`.
+
+✅ `tsc` 0 · `npm run check` exit 0 · `check:wire` **76 → 85**, §8 fault-tested **both ways** (`uploadAlreadyPresent` pinned false → 4 RED; pinned true → 3 RED) · **CI 3/3 green on PR #56**.
 
 ### 12.37 · S59 — SCRUM-124's CLIENT half: the upload's Blob was the slow path, and `/preparing` could hang forever (2026-10-17)
 
