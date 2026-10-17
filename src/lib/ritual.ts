@@ -20,7 +20,7 @@ import { eventsFromResponse, outcomeFromHttpFailure, type Outcome, type Orchestr
 import { captureStoragePath } from './storage-path.ts';
 import { supabase, supabaseConfig } from './supabase.ts';
 
-export { eventsFromResponse, httpFailureReason, isTransportCode, outcomeFromHttpFailure, type Outcome, type OrchestratorResponse } from './ritual-map.ts';
+export { eventsFromResponse, httpFailureReason, isTransportCode, outcomeFromHttpFailure, probeVerdict, MAX_PROBES, type Outcome, type OrchestratorResponse, type ProbeVerdict } from './ritual-map.ts';
 
 /**
  * Ask the orchestrator to prepare the offering under the client-minted id.
@@ -114,7 +114,24 @@ export async function registerCapture(captureId: string): Promise<{ userId: stri
     storage_path: captureStoragePath(userId, captureId),
     status: 'pending',
   });
-  if (error) throw new Error(`capture_insert_failed: ${error.message}`);
+  if (error && error.code !== '23505') {
+    throw new Error(`capture_insert_failed: ${error.message}`);
+  }
+  /**
+   * ⚠️ A DUPLICATE IS SUCCESS, NOT A FAILURE (found 2026-10-17 while fixing the
+   * preparing screen's retry). Rule ① mints the id BEFORE the photo, so the id
+   * names THIS offering and nothing else — a `23505` can only mean "this same
+   * offering was already registered by an earlier attempt", which is exactly the
+   * state the caller wanted to reach. Treating it as an error made every retry
+   * after a transient failure fail forever: the row already existed, so the second
+   * insert was refused, the screen fell back to the retry affordance, and pressing
+   * it re-ran the very insert that had just been refused.
+   *
+   * ⚠️ `upsert: true` is NOT the fix: `captures` deliberately has NO client UPDATE
+   * policy (status/moderation belong to the orchestrator), so
+   * `INSERT … ON CONFLICT DO UPDATE` is refused by RLS. Tolerating the unique
+   * violation is the only idempotent form available.
+   */
   return { userId };
 }
 

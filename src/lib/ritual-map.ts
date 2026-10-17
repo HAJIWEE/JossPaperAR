@@ -148,3 +148,77 @@ export function httpFailureReason(status: number, body: unknown): string {
 export function outcomeFromHttpFailure(status: number, body: unknown): Outcome {
   return { kind: 'transient', reason: httpFailureReason(status, body) };
 }
+
+/**
+ * ── THE PREPARING SCREEN'S VERDICT: the anti-hang decision ──────────────────
+ *
+ * `requestCartoonize` answers immediately, but the job it reports may still be in
+ * flight. The orchestrator returns the EXISTING row (`already_requested: true`)
+ * when the job for this capture is no longer `queued` — and that row can be
+ * `processing`/`running`. `eventsFromResponse` reports that correctly as
+ * `CART_DRAFT`: *"a job exists and is legitimately in flight. The offering waits;
+ * the UI polls."*
+ *
+ * ⚠️ THE SCREEN DID NEITHER. `preparing.tsx` had no branch for `CART_DRAFT` at
+ * all, so `phase` stayed `{ kind: 'working' }` and the spinner span FOREVER — no
+ * poll, no timeout, no error, and no way out but killing the app. It is reachable
+ * whenever the first request's answer is lost (a timeout, a killed app) and the
+ * offering is retried: the retry then lands on a job that is already running.
+ *
+ * This function exists so the decision is PURE and therefore assertable — the same
+ * reason `eventsFromResponse` lives here rather than inside the screen. Its
+ * contract is the fix:
+ *
+ *   · every outcome resolves to something the UI can RENDER, and
+ *   · `'again'` is only ever returned while a bound remains — so the poll loop
+ *     terminates by construction, whatever the server says.
+ *
+ * The bound lives here (it is the decision); the poll interval lives in the screen
+ * (it is presentation). Re-asking is FREE and cannot double-charge:
+ * `request_cartoonize` is idempotent per capture (`unique(capture_id)`), and the
+ * orchestrator short-circuits any job that is no longer `queued`, so a repeat call
+ * returns the existing row without ever reaching the provider.
+ */
+
+/** How many times the preparing screen may re-ask before it stops waiting. */
+export const MAX_PROBES = 20;
+
+export type ProbeVerdict =
+  /** A sprite exists — go on to the fire. */
+  | 'done'
+  /** Rule ③: parked by the budget stop-rule. Free, and worth retrying. */
+  | 'parked'
+  /** Rule ②: the capture is spent — only a NEW capture can continue. */
+  | 'spent'
+  /** Nothing to wait for: show the retry affordance. */
+  | 'retriable'
+  /** Legitimately in flight and the bound has not been reached: poll again. */
+  | 'again';
+
+export function probeVerdict(
+  outcome: Outcome,
+  probesMade: number,
+  maxProbes: number = MAX_PROBES,
+): ProbeVerdict {
+  // The request never got an answer (or was refused): nothing is in flight on
+  // this client's behalf, so waiting would be waiting for nothing.
+  if (outcome.kind === 'transient') return 'retriable';
+
+  const event = outcome.events[0];
+  switch (event?.type) {
+    case 'BUDGET_PARKED':
+      return 'parked';
+    case 'GENERATION_FAILED':
+      return 'spent';
+    case 'STYLED':
+      return 'done';
+    case 'CART_DRAFT':
+      return probesMade < maxProbes ? 'again' : 'retriable';
+    default:
+      // ⚠️ An explicit `default`, NOT a fall-through to 'again'. An empty event
+      // list, or an event type this build does not know, must RESOLVE. Falling
+      // through would hang the spinner on exactly the response nobody
+      // anticipated — which is how the original defect survived review.
+      return 'retriable';
+  }
+}

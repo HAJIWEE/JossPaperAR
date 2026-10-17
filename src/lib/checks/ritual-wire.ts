@@ -22,8 +22,17 @@
  *      to photograph a *new* offering. `isTransportCode` existed for this and was
  *      never called.
  *
+ *   ③ **The preparing screen could spin FOREVER** (found 2026-10-17). It handled
+ *      STYLED / BUDGET_PARKED / GENERATION_FAILED and nothing else, so a
+ *      `CART_DRAFT` answer — a job that already exists and is still running —
+ *      left `phase` at `{ kind: 'working' }` with no poll, no timeout and no
+ *      error. `probeVerdict` replaced that branch; §6 pins its contract, which is
+ *      that every outcome RESOLVES and that `'again'` is only ever returned while
+ *      a bound remains.
+ *
  * ⚠️ FAULT-TEST IT: delete the `captureId` from a `toRewardParams` call, or make
- * `outcomeFromHttpFailure` return GENERATION_FAILED, and confirm it goes RED.
+ * `outcomeFromHttpFailure` return GENERATION_FAILED, or make `probeVerdict`'s
+ * CART_DRAFT arm return `'again'` unconditionally — and confirm it goes RED.
  */
 
 import { readBurnParams, readRewardParams, toBurnParams, toRewardParams } from '../route-params.ts';
@@ -33,7 +42,10 @@ import {
   eventsFromResponse,
   httpFailureReason,
   isTransportCode,
+  MAX_PROBES,
   outcomeFromHttpFailure,
+  probeVerdict,
+  type Outcome,
 } from '../ritual-map.ts';
 
 let passed = 0;
@@ -230,6 +242,72 @@ const { demo: _omitted, ...droppedTurn } = toBurnParams('c1', 'file://x.jpg', tr
 const droppedRead = readBurnParams(droppedTurn);
 check('⚠️ a DROPPED flag reads as a real turn — the failure this pins',
   droppedRead.ok && droppedRead.demo === false);
+
+// ── 6 · PREPARING can never spin forever (defect ③, fixed 2026-10-17) ──────
+// ⚠️ THE DEFECT THIS PINS. `preparing.tsx` handled STYLED / BUDGET_PARKED /
+// GENERATION_FAILED and NOTHING ELSE, so a `CART_DRAFT` answer — a job that
+// already exists and is still running (`already_requested`) — left `phase` at
+// `{ kind: 'working' }`: no poll, no timeout, no error, no way out but killing
+// the app. `probeVerdict` is the pure decision that replaced it. Its contract is
+// the fix, and it is two claims: EVERY outcome resolves, and `'again'` is only
+// ever returned while a bound remains.
+//
+// ⚠️ FAULT-TEST IT: make probeVerdict's CART_DRAFT arm return 'again'
+// unconditionally and this section goes RED.
+section('6 · Preparing always resolves — no outcome can leave the UI spinning');
+
+const draftOutcome: Outcome = { kind: 'ok', jobId: 'j1', events: [{ type: 'CART_DRAFT' }] };
+check('an in-flight job polls again while the bound remains', probeVerdict(draftOutcome, 1) === 'again');
+check(
+  '⚠️ …but at the bound it STOPS and becomes retriable — the anti-hang itself',
+  probeVerdict(draftOutcome, MAX_PROBES) === 'retriable',
+);
+check(
+  '…and past the bound too, so an off-by-one cannot re-open the hang',
+  probeVerdict(draftOutcome, MAX_PROBES + 1) === 'retriable',
+);
+
+/**
+ * Table-driven: the verdict AT THE BOUND is asserted per event type the mapper
+ * can emit. Written this way so a NEW event type — one nobody thought about — is
+ * caught by this section rather than hung on by the screen, which is exactly how
+ * defect ③ survived review.
+ */
+const atBound: ReadonlyArray<[string, Outcome, string]> = [
+  ['BUDGET_PARKED', { kind: 'ok', jobId: 'j', events: [{ type: 'BUDGET_PARKED' }] }, 'parked'],
+  ['GENERATION_FAILED', { kind: 'ok', jobId: 'j', events: [{ type: 'GENERATION_FAILED' }] }, 'spent'],
+  ['STYLED', { kind: 'ok', jobId: 'j', events: [{ type: 'STYLED', spritePath: 'styled/x' }] }, 'done'],
+  ['CART_DRAFT', draftOutcome, 'retriable'],
+];
+for (const [eventName, outcome, expected] of atBound) {
+  check(`at the bound, ${eventName} resolves to '${expected}'`, probeVerdict(outcome, MAX_PROBES) === expected);
+}
+
+// The two shapes nobody plans for. Both must RESOLVE, because "the response we
+// did not anticipate" is precisely how the original hang got through.
+check(
+  'a transport failure is retriable at once, never a spin',
+  probeVerdict({ kind: 'transient', reason: 'network_error' }, 1) === 'retriable',
+);
+const emptyEvents: Outcome = { kind: 'ok', jobId: 'j', events: [] };
+check('an empty event list resolves rather than spinning', probeVerdict(emptyEvents, 1) === 'retriable');
+const unknownEvent = {
+  kind: 'ok',
+  jobId: 'j',
+  events: [{ type: 'SOMETHING_THIS_BUILD_NEVER_HEARD_OF' }],
+} as unknown as Outcome;
+check(
+  'an UNKNOWN event type resolves rather than spinning',
+  probeVerdict(unknownEvent, 1) === 'retriable',
+);
+
+// ⚠️ The inverse, so the section cannot pass vacuously: the bound must be doing
+// real work. A bound of zero must NOT permit a poll — if this ever reads 'again',
+// the bound has stopped bounding and §6's other assertions mean nothing.
+check(
+  '⚠️ a bound of zero refuses the first poll — so the bound is load-bearing, not decoration',
+  probeVerdict(draftOutcome, 0, 0) === 'retriable',
+);
 
 // ── verdict ─────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(64)}`);
