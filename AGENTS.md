@@ -83,6 +83,53 @@ Three real cases the audit caught on 2026-10-05: **SCRUM-53** (moved to `In Prog
 - Worktrees share one `main` checkout, so `git checkout main` fails in a sibling worktree. Verify the merged state with `git merge-base --is-ancestor <local-branch> origin/main` — **not** `origin/<branch>`, because `git fetch --prune` deletes those refs *after* a merge and `--is-ancestor` then reports a misleading "not merged".
 - Every applied migration is permanent: **never edit an applied migration** — add a new version number.
 
+### ⚠️ A worktree has NO gitignored files — borrow the environment before testing on glass
+
+**A worktree inherits the *commit*, not the *environment*.** Both secrets files are gitignored
+(`.gitignore:8`), so a fresh `cline/<id>` worktree has **neither** — and ⚠️ **`git status` stays
+perfectly clean**, which is exactly why this is easy to miss for a whole session:
+
+| file | holds | needed by |
+|---|---|---|
+| `.env` | `EXPO_PUBLIC_SUPABASE_URL` · `…_ANON_KEY` | the app — Metro inlines them **at bundle time** |
+| `supabase/functions/.env` | **`FAL_KEY`** | the orchestrator's Path C call |
+
+**Before ANY device or emulator run, copy both from `main`.** The main checkout is the **Obsidian
+vault**, and the worktree itself says where: `cat .git` → `gitdir: …/Projects/JossPaperAR/.git/worktrees/<name>`.
+
+```bash
+V="/home/gweejiahan/Documents/Obsidian Vault/Projects/JossPaperAR"
+cp "$V/.env" .env
+cp "$V/supabase/functions/.env" supabase/functions/.env
+# ⚠️ verify by SIZE, not by presence — see the trap below
+wc -c .env supabase/functions/.env        # ≈935 and ≈2260; a ~19-byte file is a STUB
+awk -F= '/^FAL_KEY=/{print "FAL_KEY value length: " length($2)}' supabase/functions/.env  # ≈72
+```
+
+⚠️ **THE TRAP THAT MAKES THIS EXPENSIVE: a stub is worse than an absence.** Measured 2026-10-17
+(S59): the worktree's `supabase/functions/.env` was **19 bytes with a 10-character `FAL_KEY` value**,
+while the vault's is **2,260 bytes with a 72-character key**. `ls` succeeds, the variable *looks*
+set, and the orchestrator fails at **step 4** — *"FAL_KEY is not set"*, from `falKey()` in
+`supabase/functions/_shared/env.ts` — which reads as a missing secret rather than a stubbed one. It
+took a byte-size comparison against `main` to see it. ⚠️ **So: check sizes.**
+
+⚠️ **Never commit either file** — `git check-ignore -v .env supabase/functions/.env` proves they are
+ignored, and it is also the only evidence that matters: ⚠️ **a clean `git status` is NOT evidence
+they exist.**
+
+⚠️ **Companion trap, same run — the LOCAL STACK CANNOT FINISH PATH C.** `createSignedUrl` returns
+the orchestrator's own base URL, which inside `supabase start` is **`http://kong:8000/...`** — a
+Docker-internal hostname the public internet cannot resolve, so **fal.ai answers
+`422 file_download_error`**. (That failure is the one consolation: it stops *before* the provider, so
+`cost_micros` stays NULL and **nothing is charged**.) **A generation run must target the HOSTED
+project**; the local stack is for schema · RLS · storage work. Point the app at hosted by putting the
+hosted URL in `.env`, then ⚠️ **restart Metro** — `EXPO_PUBLIC_*` is inlined at bundle time, so a
+running dev server keeps serving the old value.
+
+⚠️ **And revert `tsconfig.json` after any Metro run.** Expo's dev server **rewrites it on boot**
+(drops `.expo/types/**` and `expo-env.d.ts` from `include`). It is not a change you made; do not
+commit it.
+
 ### Spend within the approved budget without asking
 
 **You do not need to ask before spending fal.ai credit, as long as the spend stays inside the approved budget.**
@@ -114,7 +161,7 @@ npm run check:doctor     # expo-doctor (21 checks) — ⚠️ NEEDS THE NETWORK,
 npx supabase start                                            # local stack — applies the migrations FROM THE FILES, no account/link needed
 bash supabase/checks/run-sql-tests.sh \
   "postgresql://postgres:postgres@127.0.0.1:54322/postgres"   # the whole supabase/tests/ suite against that local Postgres
-npx supabase migration list   # expect 12/12, no drift
+npx supabase migration list   # expect 24/24, no drift (⚠️ local NOW has 24 files — the "12/12" this line long claimed went stale)
 npx supabase db push --yes
 npx tsc --noEmit
 ```
