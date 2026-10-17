@@ -9,6 +9,7 @@
     "expo-camera": "~57.0.6",
     "expo-constants": "~57.0.20",
     "expo-crypto": "~57.0.3",
+    "expo-image-manipulator": "~57.0.21",
     "expo-linking": "~57.0.12",
     "expo-localization": "~57.0.2",
     "expo-router": "~57.0.28",
@@ -43,6 +44,7 @@
     "check:wire": "node src/lib/checks/ritual-wire.ts",
     "check:session": "node src/lib/checks/session.ts",
     "check:lib": "node src/lib/checks/run.ts",
+    "check:capturesize": "node src/lib/checks/capture-size.ts",
     "check:credits": "node design-system/credits-check.js",
     "check:copy": "node src/lib/checks/copy.ts",
     "check:pathc": "node supabase/checks/pathc-check.ts",
@@ -54,7 +56,7 @@
     "check:clanapi": "bash supabase/checks/run-clan-api-contract.sh",
     "check:budget": "bash supabase/checks/exercise-budget.sh",
     "check:doctor": "npx expo-doctor",
-    "check": "npm run typecheck && npm run check:tokens && npm run check:domain && npm run check:slice && npm run check:throw && npm run check:ads && npm run check:wire && npm run check:session && npm run check:pathc && npm run check:sql && npm run check:adrs && npm run check:links && npm run check:site && node design-system/contrast-check.js && node design-system/credits-check.js && node design-system/responsive-check.js && npm run check:lib && npm run check:copy",
+    "check": "npm run typecheck && npm run check:tokens && npm run check:domain && npm run check:slice && npm run check:throw && npm run check:ads && npm run check:wire && npm run check:session && npm run check:pathc && npm run check:sql && npm run check:adrs && npm run check:links && npm run check:site && node design-system/contrast-check.js && node design-system/credits-check.js && node design-system/responsive-check.js && npm run check:lib && npm run check:capturesize && npm run check:copy",
     "bundle:android": "expo export --platform android --output-dir .expo/bundle-check"
   },
   "private": true

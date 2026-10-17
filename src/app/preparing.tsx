@@ -109,7 +109,15 @@ export default function Preparing(): React.JSX.Element {
     // ── 2 · the bytes, to exactly the path the row records ─────────────────
     try {
       await uploadCapture(userId, captureId, uri);
-    } catch {
+    } catch (error) {
+      // ⚠️ FOUND ON GLASS (SCRUM-124): a bare `catch` here hid a Storage 413 for
+      // a whole session — the offering was marked spent and NOTHING reached the
+      // console, so the cause took a database dig and a synthetic upload to find.
+      // Log the MESSAGE only; the photo's bytes must never be logged.
+      console.warn(
+        'capture_upload_failed:',
+        error instanceof Error ? error.message : String(error),
+      );
       // ⚠️ The row exists but the object does not, so the offering can never be
       // generated. Treated as spent rather than "try again": retrying would
       // insert the same primary key again and fail on the constraint.
