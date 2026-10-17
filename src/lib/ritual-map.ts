@@ -148,3 +148,157 @@ export function httpFailureReason(status: number, body: unknown): string {
 export function outcomeFromHttpFailure(status: number, body: unknown): Outcome {
   return { kind: 'transient', reason: httpFailureReason(status, body) };
 }
+
+/**
+ * ── THE PREPARING SCREEN'S VERDICT: the anti-hang decision ──────────────────
+ *
+ * `requestCartoonize` answers immediately, but the job it reports may still be in
+ * flight. The orchestrator returns the EXISTING row (`already_requested: true`)
+ * when the job for this capture is no longer `queued` — and that row can be
+ * `processing`/`running`. `eventsFromResponse` reports that correctly as
+ * `CART_DRAFT`: *"a job exists and is legitimately in flight. The offering waits;
+ * the UI polls."*
+ *
+ * ⚠️ THE SCREEN DID NEITHER. `preparing.tsx` had no branch for `CART_DRAFT` at
+ * all, so `phase` stayed `{ kind: 'working' }` and the spinner span FOREVER — no
+ * poll, no timeout, no error, and no way out but killing the app. It is reachable
+ * whenever the first request's answer is lost (a timeout, a killed app) and the
+ * offering is retried: the retry then lands on a job that is already running.
+ *
+ * This function exists so the decision is PURE and therefore assertable — the same
+ * reason `eventsFromResponse` lives here rather than inside the screen. Its
+ * contract is the fix:
+ *
+ *   · every outcome resolves to something the UI can RENDER, and
+ *   · `'again'` is only ever returned while a bound remains — so the poll loop
+ *     terminates by construction, whatever the server says.
+ *
+ * The bound lives here (it is the decision); the poll interval lives in the screen
+ * (it is presentation). Re-asking is FREE and cannot double-charge:
+ * `request_cartoonize` is idempotent per capture (`unique(capture_id)`), and the
+ * orchestrator short-circuits any job that is no longer `queued`, so a repeat call
+ * returns the existing row without ever reaching the provider.
+ */
+
+/** How many times the preparing screen may re-ask before it stops waiting. */
+export const MAX_PROBES = 20;
+
+export type ProbeVerdict =
+  /** A sprite exists — go on to the fire. */
+  | 'done'
+  /** Rule ③: parked by the budget stop-rule. Free, and worth retrying. */
+  | 'parked'
+  /** Rule ②: the capture is spent — only a NEW capture can continue. */
+  | 'spent'
+  /** Nothing to wait for: show the retry affordance. */
+  | 'retriable'
+  /** Legitimately in flight and the bound has not been reached: poll again. */
+  | 'again';
+
+export function probeVerdict(
+  outcome: Outcome,
+  probesMade: number,
+  maxProbes: number = MAX_PROBES,
+): ProbeVerdict {
+  // The request never got an answer (or was refused): nothing is in flight on
+  // this client's behalf, so waiting would be waiting for nothing.
+  if (outcome.kind === 'transient') return 'retriable';
+
+  const event = outcome.events[0];
+  switch (event?.type) {
+    case 'BUDGET_PARKED':
+      return 'parked';
+    case 'GENERATION_FAILED':
+      return 'spent';
+    case 'STYLED':
+      return 'done';
+    case 'CART_DRAFT':
+      return probesMade < maxProbes ? 'again' : 'retriable';
+    default:
+      // ⚠️ An explicit `default`, NOT a fall-through to 'again'. An empty event
+      // list, or an event type this build does not know, must RESOLVE. Falling
+      // through would hang the spinner on exactly the response nobody
+      // anticipated — which is how the original defect survived review.
+      return 'retriable';
+  }
+}
+
+/**
+ * ── THE UPLOAD'S VERDICT: did the PHOTO fail, or did the NETWORK? ───────────
+ *
+ * ⚠️ SCRUM-124 AC 3, and it is not cosmetic. `/preparing` used to mark EVERY
+ * upload failure `spent` — the branch whose own comment says *"the capture is
+ * spent, offering a retry would be a lie"* — and show *"This offering cannot be
+ * prepared · Offer a new photo"* for both. So a momentary network blip during the
+ * upload threw away a perfectly good offering and told the player to photograph
+ * the object again. The two causes are not the same event and must not share copy:
+ *
+ *   unusable → the SAME photo cannot succeed. Storage refused the bytes on a
+ *              ground that does not change between attempts (too large, wrong
+ *              MIME), or the client's own shrink loop gave up. A new capture is
+ *              genuinely the only way on — which is what `spent` MEANS.
+ *   retry    → nothing about the photo is wrong: a dropped connection, a 5xx, or
+ *              a session that needs re-adopting. `registerCapture` now tolerates
+ *              a duplicate key, so re-running the whole step is safe and free.
+ *
+ * ⚠️ THE DEFAULT IS `retry`, deliberately. An unrecognised failure must never be
+ * allowed to DESTROY an offering: waiting one more round costs nothing, while
+ * telling a player their photo is unusable when it is not is unrecoverable (the
+ * object has usually been put away by then).
+ */
+
+export type UploadVerdict = 'unusable' | 'retry';
+
+/**
+ * The parts of a failure that decide the verdict — a message and a status, never
+ * the bytes. Shaped to accept Supabase's `StorageError` (`status` · `statusCode`)
+ * and `StorageApiError` (`code`) without this module importing either: keeping it
+ * structurally typed is what keeps this file loadable under plain Node.
+ */
+export interface UploadFailureSignal {
+  readonly status?: number;
+  readonly statusCode?: string;
+  readonly code?: string;
+  readonly message?: string;
+}
+
+/**
+ * The service's own error codes for "these bytes can never be accepted"
+ * (supabase.com/docs/guides/storage/debugging/error-codes). `capture_unusable` is
+ * OURS — it is what the client's shrink loop reports when it gives up.
+ */
+const UNUSABLE_UPLOAD_CODES = new Set([
+  'EntityTooLarge',
+  'PayloadTooLarge',
+  'InvalidMimeType',
+  'invalid_mime_type',
+  'capture_unusable',
+]);
+
+/**
+ * Message fallbacks, lower-cased. ⚠️ These duplicate the codes ON PURPOSE: the
+ * 413 the PM hit on glass arrived as *"The object exceeded the maximum allowed
+ * size"* with the code absent, so keying only on codes would have classified the
+ * one failure we have actually seen as retryable.
+ */
+const UNUSABLE_UPLOAD_PATTERNS = [
+  'payload too large',
+  'exceeded the maximum allowed size',
+  'entity too large',
+  'mime type',
+];
+
+export function uploadFailureVerdict(failure: UploadFailureSignal): UploadVerdict {
+  // The status is the strongest signal and needs no string matching.
+  if (failure.status === 413) return 'unusable';
+
+  if (failure.code && UNUSABLE_UPLOAD_CODES.has(failure.code)) return 'unusable';
+  if (failure.statusCode && UNUSABLE_UPLOAD_CODES.has(failure.statusCode)) return 'unusable';
+
+  const message = (failure.message ?? '').toLowerCase();
+  if (UNUSABLE_UPLOAD_PATTERNS.some((pattern) => message.includes(pattern))) return 'unusable';
+
+  // Everything else — offline, DNS, TLS, a 5xx, an expired session — leaves the
+  // photo intact. Re-running the step is free and is the honest next action.
+  return 'retry';
+}

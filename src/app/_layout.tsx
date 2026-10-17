@@ -1,3 +1,14 @@
+/**
+ * ⚠️ FIRST IMPORT, ON PURPOSE — it must not be reordered.
+ *
+ * It installs `expo-blob`'s Blob as `globalThis.Blob` (module side effect). That
+ * is what switches `expo/fetch`'s `Response.blob()` off React Native's Blob
+ * (native blob store + base64) and onto a native byte read. `isReactNativeBlobGlobal()`
+ * is evaluated per `.blob()` call, so this only has to land before the first one —
+ * and this file is the earliest app code there is. See `src/lib/blob-polyfill.ts`.
+ */
+import '@/lib/blob-polyfill';
+
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';

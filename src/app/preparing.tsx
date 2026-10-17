@@ -12,12 +12,18 @@
  * by `nextAction(...)`. This screen has no policy of its own to get wrong —
  * which is the reason the three rules can be asserted without a device.
  *
- * ── THE THREE OUTCOMES, AND WHY THEY LOOK DIFFERENT ON SCREEN ─────────────
+ * ── THE OUTCOMES, AND WHY THEY LOOK DIFFERENT ON SCREEN ───────────────────
  *   styled  → straight on to the burn. Nothing to say.
  *   parked  → `ritual_busy`, and a RETRY that costs nothing. The AI budget for
  *             the day is spent; the job keeps its row. ⚠️ This arrives as an
  *             HTTP **200**, so any code that branches on `res.ok` first will
  *             call it a success and lose the park (ADR-006 / SCRUM-59).
+ *   in flight → the job already exists and is still running (`CART_DRAFT`). The
+ *             screen waits on a BOUNDED timer, re-asking the orchestrator, and
+ *             falls back to the retry affordance when the bound runs out.
+ *             ⚠️ **This screen used to do NOTHING here** — `phase` stayed
+ *             `working` and the spinner never stopped, which is the bug this
+ *             loop exists to kill. See `probeVerdict` in ritual-map.ts.
  *   failed  → the capture is SPENT (`unique(capture_id)`), so the only way on is
  *             a NEW capture. A "retry" button here would either double-charge
  *             or silently do nothing.
@@ -33,9 +39,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { t } from '@/lib/i18n';
 import { toBurnParams } from '@/lib/route-params';
 import {
+  probeVerdict,
   registerCapture,
   requestCartoonize,
   uploadCapture,
+  type UploadResult,
 } from '@/lib/ritual';
 import { ensureAnonymousSession } from '@/lib/session';
 import { TUTORIAL_WAIT_MS, isDemo } from '@/lib/tutorial';
@@ -50,6 +58,17 @@ type Phase =
   /** The request never reached the server — nothing was spent, so retry is free. */
   | { readonly kind: 'offline'; readonly reason: string }
   | { readonly kind: 'done' };
+
+/**
+ * How long to wait before re-asking while a job is still in flight.
+ *
+ * Presentation, so it lives here rather than in `ritual-map.ts` (which owns the
+ * DECISION, and the bound: `MAX_PROBES`). The pipeline's p50 is ≈13s, and this
+ * branch is only reached when a *previous* request's answer was lost, so a few
+ * seconds of patience is ample: `MAX_PROBES × PROBE_DELAY_MS` ≈ 60s worst case,
+ * after which the player gets an ordinary retry instead of a dead spinner.
+ */
+const PROBE_DELAY_MS = 3000;
 
 export default function Preparing(): React.JSX.Element {
   const router = useRouter();
@@ -107,47 +126,114 @@ export default function Preparing(): React.JSX.Element {
     }
 
     // ── 2 · the bytes, to exactly the path the row records ─────────────────
+    // ⚠️ FOUND ON GLASS (SCRUM-124): this used to be a bare `catch` that marked
+    // the offering `spent` for EVERY failure, so a momentary network blip during
+    // the upload told the player to photograph the object again — throwing away a
+    // perfectly good offering. The two causes are not the same event and no
+    // longer share copy; the decision is the PURE `uploadFailureVerdict`, checked
+    // by `check:wire` §7. Only the MESSAGE is logged, never the bytes.
+    let upload: UploadResult;
     try {
-      await uploadCapture(userId, captureId, uri);
+      upload = await uploadCapture(userId, captureId, uri);
     } catch (error) {
-      // ⚠️ FOUND ON GLASS (SCRUM-124): a bare `catch` here hid a Storage 413 for
-      // a whole session — the offering was marked spent and NOTHING reached the
-      // console, so the cause took a database dig and a synthetic upload to find.
-      // Log the MESSAGE only; the photo's bytes must never be logged.
+      // Anything `uploadCapture` could not classify (e.g. the manipulator module
+      // itself failing). ⚠️ `retry`, NOT `spent`: an unrecognised failure must
+      // never destroy an offering, and — now that `registerCapture` tolerates a
+      // duplicate key — re-running this step is safe and free.
       console.warn(
-        'capture_upload_failed:',
+        'capture_upload_threw:',
         error instanceof Error ? error.message : String(error),
       );
-      // ⚠️ The row exists but the object does not, so the offering can never be
-      // generated. Treated as spent rather than "try again": retrying would
-      // insert the same primary key again and fail on the constraint.
+      setPhase({ kind: 'offline', reason: 'capture_upload_failed' });
+      return;
+    }
+
+    if (upload.kind === 'unusable') {
+      // The SAME photo cannot succeed (too large for the bucket, or refused on
+      // its type): a new capture is genuinely the only way on, which is exactly
+      // what `spent` means.
+      console.warn('capture_upload_unusable:', upload.reason);
       setPhase({ kind: 'spent' });
       return;
     }
 
-    // ── 3 · the ask. The mapping lives in ritual-map.ts and is gate-tested. ──
-    const outcome = await requestCartoonize(captureId);
-
-    if (outcome.kind === 'transient') {
-      // Nothing was generated, so nothing was spent — a genuine retry.
-      setPhase({ kind: 'offline', reason: outcome.reason });
+    if (upload.kind === 'transient') {
+      // The photo is intact; the network was not. Nothing was generated and
+      // nothing was spent, so this is a genuine retry.
+      console.warn('capture_upload_transient:', upload.reason);
+      setPhase({ kind: 'offline', reason: upload.reason });
       return;
     }
 
-    const event = outcome.events[0];
-    if (event?.type === 'BUDGET_PARKED') {
-      setPhase({ kind: 'parked' });
-      return;
+    /**
+     * ⚠️ COMPILE-TIME ENFORCEMENT, and it is the honest way to gate this: the
+     * regression was that ONE branch swallowed every cause. `UploadResult` is a
+     * discriminated union, so if a new outcome is ever added — or either branch
+     * above is deleted — `upload` stops being `never` here and `tsc` fails. That
+     * is stronger than a source-text assertion, which is why `check:wire` stays
+     * dependency-free and does not read this file.
+     */
+    if (upload.kind !== 'ok') {
+      const unhandled: never = upload;
+      throw new Error(`unhandled upload result: ${String(unhandled)}`);
     }
-    if (event?.type === 'GENERATION_FAILED') {
-      setPhase({ kind: 'spent' });
-      return;
-    }
-    if (event?.type === 'STYLED') {
-      setPhase({ kind: 'done' });
-      // ⚠️ Built by the route contract, not inline: `preparing` was the one hop
-      // that bypassed `toBurnParams`, which is how a param gets dropped silently.
-      router.push({ pathname: '/burn', params: toBurnParams(captureId, uri) });
+
+    // ── 3 · the ask, and — when the job is already in flight — the WAIT ──────
+    // ⚠️ THE DEFECT THIS LOOP FIXES. `requestCartoonize` answers at once, but the
+    // job it names may still be running: the orchestrator returns the EXISTING
+    // row (`already_requested`) when the job for this capture is no longer
+    // `queued`, and that row can be `running`. The mapper calls that `CART_DRAFT`,
+    // and this screen used to have NO branch for it — so `phase` stayed
+    // `{ kind: 'working' }` and the spinner span forever. It is reachable
+    // whenever the first request's answer is lost (a timeout, a killed app) and
+    // the offering is retried.
+    //
+    // The verdict is PURE (`probeVerdict` in ritual-map.ts), so `check:wire`
+    // proves no outcome can leave this screen spinning, and the bound is what
+    // makes the loop terminate — never the server's cooperation.
+    let probes = 0;
+    for (;;) {
+      const outcome = await requestCartoonize(captureId);
+      probes += 1;
+      const verdict = probeVerdict(outcome, probes);
+
+      if (verdict === 'done') {
+        setPhase({ kind: 'done' });
+        // ⚠️ Built by the route contract, not inline: `preparing` was the one hop
+        // that bypassed `toBurnParams`, which is how a param gets dropped silently.
+        router.push({ pathname: '/burn', params: toBurnParams(captureId, uri) });
+        return;
+      }
+
+      // Rule ③ — `ritual_busy`, NOT an error string: the shrine is healthy, the
+      // offering is intact, and the job keeps its row.
+      if (verdict === 'parked') {
+        setPhase({ kind: 'parked' });
+        return;
+      }
+
+      // Rule ② — the capture is spent, so the only way on is a new capture.
+      if (verdict === 'spent') {
+        setPhase({ kind: 'spent' });
+        return;
+      }
+
+      // Nothing is in flight (a transport failure), or the wait itself ran out.
+      // Either way nothing was generated, so nothing was spent — a genuine retry.
+      if (verdict === 'retriable') {
+        setPhase({
+          kind: 'offline',
+          reason: outcome.kind === 'transient' ? outcome.reason : 'still_preparing',
+        });
+        return;
+      }
+
+      // 'again' — the job exists and is legitimately in flight. Wait, then re-ask.
+      // Re-asking is FREE and cannot double-charge: `request_cartoonize` is
+      // idempotent per capture (`unique(capture_id)`), and the orchestrator
+      // short-circuits any job that is no longer `queued` without ever reaching
+      // the provider.
+      await new Promise((resolve) => setTimeout(resolve, PROBE_DELAY_MS));
     }
   }, [captureId, uri, demo, router]);
 
