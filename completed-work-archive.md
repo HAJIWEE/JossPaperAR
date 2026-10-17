@@ -807,3 +807,34 @@ The PM merged **PR #40** (`cline/9059b-league`, 14 commits) **off-session at 202
 ⚠️ **The lesson that cost the most:** a heavy plugin call **outlives the tab heartbeat** — `findShapes()` in a loop (16 scans of an 11,751-shape file) timed out and the removal **silently never applied**; only a re-read caught it. **Verify Penpot with a single snapshot.**
 
 ✅ Merged in **PR #42** (07:16:57Z, verified with `git merge-base --is-ancestor`); named versions `S56c` → `S56h` (revn 381); `npm run check` **16/16** (contrast 85 · lib 388). **Cost US$0.00.**
+---
+
+## 7 · Completed follow-ups — 2026-10-17 (S59)
+
+> ⚠️ **Note on the gap.** Section 6 ends at **2026-10-12 (S56)**; the sessions between then and S59 (S57 · S58) are recorded in [[next-ai-context]]'s own entries rather than repeated here.
+
+**The session in one line:** the `Response.blob()` dev-warning the PM reported turned out **not** to be the bug; chasing it found **three** upload defects, and the device run that followed **completed the slice's whole ritual on a real phone**. Merged as **PRs #55 · #56 · #57**. ⚠️ **Spend ≈US$0.09 / ≈S$0.12 — one generation** (the run that proved it), logged in [[project-costs]].
+
+### ✅ `SCRUM-124` — a real-phone capture could never be prepared → `Done`
+
+**The headline symptom is fixed and verified on the hardware that exposed it.** An **874,762-byte** raw photo is now resized and lands as **~100 KB** against the bucket's **300 KB** limit.
+- **AC 1 ✅** (option A: honour the documented budget) · **AC 2 ✅** `check:capturesize` (**39 checks**, drift-guarded against the bucket's `file_size_limit`, fault-tested) · **AC 3 ⚠️ SPLIT, not cut** — logging ✅ and the *too-large vs network* classification ✅, but the third part (*"rather than showing the same cannot-prepare copy for both"*) is **`SCRUM-127`**, because it needs signed-off copy in both locales.
+- ⚠️ **Three further defects were found on the glass run and fixed** (PR #56):
+  1. **The upload sent `upsert: true`** — an upsert needs **UPDATE** on `storage.objects`, and the `captures` bucket has **only INSERT + SELECT**. So the second upload answered `403 AccessDenied / new row violates row-level security policy`: **the retry could never succeed.** Fixed by sending no upsert and treating the `409 KeyAlreadyExists` as **success** (the object is present with the same bytes). ⚠️ **Same idempotency lesson as `registerCapture`'s `23505` — both halves were needed.**
+  2. **A dead check in the classifier**: the measured too-large refusal is **HTTP 400 with `statusCode: "413"`**, *not* an HTTP 413 — so `status === 413` was near-dead and the **message patterns** were what saved it.
+  3. **`registerCapture` refused a duplicate key**, so a retry re-ran the insert that had just been refused.
+
+### ✅ `SCRUM-125` — `/preparing` spun for ever on a job already `running` → `Done`
+
+`requestCartoonize` answers immediately, but a job that already exists and is still `running` (the orchestrator's `already_requested`) was mapped to `CART_DRAFT` for which the screen had **no branch** — `phase` stayed `working` with **no poll, no timeout, no error**. ⚠️ `ritual-map.ts` documented *"the UI polls"* and `check:lib` asserted *"a DRAFT the UI waits on"*; **neither was true.**
+- Fixed by the **pure** `probeVerdict`, which resolves every outcome and returns `'again'` **only while a bound remains**.
+- ⚠️ **The anti-hang is MEASURED, not merely observed:** forcing `status = 'running'` produced **20 consecutive orchestrator requests ~3.08 s apart, then nothing** — an exact match with `MAX_PROBES = 20` at `PROBE_DELAY_MS = 3000`. **The count matching the constant is what proves it: 20 probes, no 21st.**
+- `check:wire` §6 — **11 new checks**, fault-tested (forcing the `CART_DRAFT` arm to `'again'` → **4 RED**).
+
+### ⚠️ Two environment traps recorded this session — one of them now a repo rule
+
+1. ⚠️ **A worktree has NO gitignored files.** `supabase/functions/.env` in the worktree held **19 bytes with a 10-character `FAL_KEY`** while the vault's holds **2,260 bytes with a 72-character key** — so `ls` succeeded, the value *looked* set, and the orchestrator failed at step 4 with *"FAL_KEY is not set"*. ⚠️ **Now a rule in `AGENTS.md`** (PR #57), including *verify by size, not presence*.
+2. ⚠️ **The LOCAL stack cannot finish Path C.** `createSignedUrl` returns the orchestrator's own base URL, which inside `supabase start` is the Docker-internal **`http://kong:8000`** — unreachable by fal.ai (`422 file_download_error`, `cost_micros` NULL, **nothing charged**). **A generation run must target the HOSTED project.**
+3. ⚠️ **Expo's dev server rewrites `tsconfig.json` on boot** (drops `.expo/types/**` and `expo-env.d.ts`) — revert it, never commit it.
+
+**Left open deliberately:** **`SCRUM-126`** (a stale `running` job — a **money** decision) and **`SCRUM-127`** (the copy half of SCRUM-124's AC 3).
