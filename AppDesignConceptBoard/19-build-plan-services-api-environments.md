@@ -598,7 +598,13 @@ The measured matrix (one real call each, against the local stack — these are t
 
 **⚠️ ENVIRONMENTAL, NOT A DEFECT (stated so it is not mis-read as one):** `FAL_KEY` is unset locally, so the orchestrator failed *after* creating its job row with *"FAL_KEY is not set"*. That is the function behaving correctly (it never reached the provider, so nothing was spent), and the client classified the 502 as **retriable** — the player gets *Check again*, not *Offer a new photo*. ✅ **The alternates were exhausted first and at US$0.00** (absence from the Git worktrees, `.env.example`'s real URL with an empty key, and a key/URL search) — and bringing the pipeline up was verified against the **local** stack rather than the hosted project.
 
-✅ `tsc` 0 · `npm run check` exit 0 · `check:wire` **76 → 85**, §8 fault-tested **both ways** (`uploadAlreadyPresent` pinned false → 4 RED; pinned true → 3 RED) · **US$0.00** — no AI call, no deploy.
+**⑤ ALSO FOUND ON GLASS — the copy still conflates the two causes, even after ④ separated them.** The screen renders three lines that contradict each other:
+
+> **The offering is being prepared…** · This offering cannot be prepared. · **[ Check again ]**
+
+Because `ritual_preparing` is a **permanent title**, and the `offline` branch shares the **`spent` body string**: both render `ritual.cannotPrepare`, and only the *button* differs (`common.retry` vs `common.recapture`). ⚠️ **So the branching now distinguishes the two causes but the copy does not** — and the offering in that very screenshot was perfectly **recoverable** (the only fault was an unset `FAL_KEY`). ⚠️ Filed as **`SCRUM-127`** rather than fixed: the fix is a new key in **both locales**, and the i18n table holds **signed-off product copy**, so inventing bilingual player-facing copy is a PM/brand call — the same reason SCRUM-97's strings went out for review. It also raises whether the *title* should be phase-aware.
+
+✅ `tsc` 0 · `npm run check` exit 0 · `check:wire` **76 → 85**, §8 fault-tested **both ways** (`uploadAlreadyPresent` pinned false → 4 RED; pinned true → 3 RED) · **CI 3/3 green on PR #56** · **US$0.00** — no AI call, no deploy.
 
 ### 12.37 · S59 — SCRUM-124's CLIENT half: the upload's Blob was the slow path, and `/preparing` could hang forever (2026-10-17)
 
