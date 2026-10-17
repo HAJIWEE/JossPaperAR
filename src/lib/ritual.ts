@@ -16,11 +16,11 @@ import {
   shrinkStep,
 } from './capture-size.ts';
 import { escapeForNativeLoader, unescapeFromNativeLoader } from './native-path.ts';
-import { eventsFromResponse, outcomeFromHttpFailure, uploadFailureVerdict, type Outcome, type OrchestratorResponse } from './ritual-map.ts';
+import { eventsFromResponse, outcomeFromHttpFailure, uploadAlreadyPresent, uploadFailureVerdict, type Outcome, type OrchestratorResponse } from './ritual-map.ts';
 import { captureStoragePath } from './storage-path.ts';
 import { supabase, supabaseConfig } from './supabase.ts';
 
-export { eventsFromResponse, httpFailureReason, isTransportCode, outcomeFromHttpFailure, probeVerdict, uploadFailureVerdict, MAX_PROBES, type Outcome, type OrchestratorResponse, type ProbeVerdict, type UploadFailureSignal, type UploadVerdict } from './ritual-map.ts';
+export { eventsFromResponse, httpFailureReason, isTransportCode, outcomeFromHttpFailure, probeVerdict, uploadAlreadyPresent, uploadFailureVerdict, MAX_PROBES, type Outcome, type OrchestratorResponse, type ProbeVerdict, type UploadFailureSignal, type UploadVerdict } from './ritual-map.ts';
 
 /**
  * Ask the orchestrator to prepare the offering under the client-minted id.
@@ -243,19 +243,34 @@ export async function uploadCapture(
 
   const { error } = await supabase().storage.from('captures').upload(path, blob, {
     contentType: 'image/jpeg',
-    // The row already exists (rule ①); re-uploading the same bytes must not 409
-    // and strand an offering whose row is already committed.
-    upsert: true,
+    /**
+     * ⚠️ **NO `upsert` — and that is the fix, not an omission.** It used to be
+     * `upsert: true`, "so re-uploading must not 409". But an upsert needs UPDATE
+     * permission on `storage.objects`, and the `captures` bucket has only INSERT
+     * and SELECT policies — so on every RETRY the upload returned
+     * `403 AccessDenied / new row violates row-level security policy` and the
+     * offering could never be re-prepared. Measured on the local stack; the
+     * matrix is in `uploadAlreadyPresent`'s header.
+     *
+     * Without it, a first upload is a plain INSERT (200), and a repeat is a clean
+     * `409 KeyAlreadyExists` — which is SUCCESS, because the object is present
+     * with the same bytes. Handled below.
+     */
   });
 
   if (error) {
-    // ⚠️ The verdict is PURE and checked (`check:wire` §7) so the screen cannot
+    // ⚠️ The verdicts are PURE and checked (`check:wire` §7) so the screen cannot
     // re-learn the wrong lesson: a 413 on these bytes is `unusable` (a new photo
     // is the only way on), while a dropped connection is `transient` (the photo
     // is fine and re-running is free). `StorageError` carries `status` and
     // `statusCode`; `StorageApiError` adds `code` — read structurally so this
     // file needs no import from the client library.
     const signal = error as { status?: number; statusCode?: string; code?: string; message?: string };
+
+    // The object is already there with these bytes — the idempotent outcome, and
+    // exactly what a retry should reach. Not an error.
+    if (uploadAlreadyPresent(signal)) return { kind: 'ok', path };
+
     return {
       kind: uploadFailureVerdict(signal) === 'unusable' ? 'unusable' : 'transient',
       reason: error.message,

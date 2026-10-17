@@ -565,6 +565,41 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.38 · S59b — THE DEVICE RUN: the whole capture path ran on glass, and it found a THIRD upload defect (2026-10-17)
+
+**Device:** Xiaomi `25128PC17G` (`arctic`) · **Android 16 / API 36** · arm64-v8a · **3.6 GB RAM** · **720×1600** — floor-class, which is the target this project names (doc 14 §1). ⚠️ Not the Tier-F handset (`SCRUM-109` is still undelivered); this is the PM's own phone.
+**Environment:** the **local Supabase stack** (`127.0.0.1:54321`, migrations applied from the files) + **Expo Go 57.0.9**, port-reversed over USB. ⚠️ **No dev build was needed** — `expo-blob` ships *inside* Expo Go for SDK 57, which is why this run could happen the moment the PM said the phone was connected (the standing advice to build a dev client is for a *standalone* build, not for this).
+
+**✅ PROVEN ON GLASS**
+
+- **The upload path works end-to-end, with a real sensor photo.** `captures` row → **`storage.objects` row**, `image/jpeg`, **101,873 bytes** (and 102,315 on the first attempt) against the bucket's **307,200-byte** limit. ⚠️ **The raw photo off this sensor is 874,762 B** — so the resize is doing exactly what SCRUM-124's AC 1 asked, and it was previously a `413`. **This is SCRUM-124's original defect, verified fixed on the hardware that exposed it.**
+- **`expo-blob` loads and is not the slow path.** No `requireNativeModule('ExpoBlob')` failure, and **no *"copies the response into the native blob store…"* warning** — so `Response.blob()` took the fast branch (§12.37 ①). It is on this path twice (the `.blob()` read and the `FormData` part `storage-js` builds).
+- **The anti-hang works.** The screen never stuck: it resolved to the retry affordance. Before §12.37 ② this state was an unbounded spinner.
+- **The whole pipeline reached the orchestrator.** The Edge runtime logged *`serving the request with supabase/functions/cartoonize-orchestrator`* and a **`cartoonize_jobs` row was created** — i.e. `registerCapture` → upload → `requestCartoonize` all executed.
+
+**⭐ FOUND ON GLASS — and it is the reason the retry could never succeed.** Every previous device attempt had died in a way that masked this: the offering was marked `spent` and the **retry button could not retry**, because the upload sent **`upsert: true`**. An upsert is `INSERT … ON CONFLICT DO UPDATE`, which needs **UPDATE** permission on `storage.objects` — and the `captures` bucket has **only INSERT and SELECT** policies. So the *second* upload of the same path answered:
+
+```
+{"statusCode":"403","error":"Unauthorized","code":"AccessDenied",
+ "message":"new row violates row-level security policy"}
+```
+
+The measured matrix (one real call each, against the local stack — these are the bodies, not guesses):
+
+| case | result |
+|---|---|
+| object **absent**, upsert omitted | **200** `{"Key":"captures/…","Id":"…"}` |
+| object **exists**, upsert omitted | `{"statusCode":"409","code":"KeyAlreadyExists","message":"The resource already exists"}` |
+| object **exists**, `x-upsert: true` | `{"statusCode":"403","code":"AccessDenied", …RLS…}` |
+
+**The fix is to send NO upsert and treat the 409 as the SUCCESS it is** — the object is present with the same bytes, which is precisely what a retry wants. ⚠️ It deliberately does **not** widen storage permissions to make `upsert` legal: a client that can rewrite its own raw capture is a much larger change than an upload that declines to rewrite identical bytes. This is **the same idempotency lesson as `registerCapture`'s `23505`, on the other half of the step** (§12.37 ②) — and the two had to be fixed **together** for a retry to work at all.
+
+⚠️ **AND FIXING IT EXPOSED A DEAD CHECK IN MY OWN §12.37 CODE.** The measured too-large refusal is **HTTP 400 with `statusCode: "413"`**, *not* an HTTP 413 — so `uploadFailureVerdict`'s `status === 413` arm was near-dead, and the reason the classifier still worked was the **message patterns** catching it. `statusCode === '413'` is now checked too, asserted as the measured shape.
+
+**⚠️ ENVIRONMENTAL, NOT A DEFECT (stated so it is not mis-read as one):** `FAL_KEY` is unset locally, so the orchestrator failed *after* creating its job row with *"FAL_KEY is not set"*. That is the function behaving correctly (it never reached the provider, so nothing was spent), and the client classified the 502 as **retriable** — the player gets *Check again*, not *Offer a new photo*. ✅ **The alternates were exhausted first and at US$0.00** (absence from the Git worktrees, `.env.example`'s real URL with an empty key, and a key/URL search) — and bringing the pipeline up was verified against the **local** stack rather than the hosted project.
+
+✅ `tsc` 0 · `npm run check` exit 0 · `check:wire` **76 → 85**, §8 fault-tested **both ways** (`uploadAlreadyPresent` pinned false → 4 RED; pinned true → 3 RED) · **US$0.00** — no AI call, no deploy.
+
 ### 12.37 · S59 — SCRUM-124's CLIENT half: the upload's Blob was the slow path, and `/preparing` could hang forever (2026-10-17)
 
 ⚠️ **Neither finding is SCRUM-124's 413.** That root cause — the real photo exceeds the `captures` bucket's 300 KB, so Storage answers `413 EntityTooLarge` — was **fixed and merged the same day** (`expo-image-manipulator` + `src/lib/capture-size.ts` + `src/lib/native-path.ts`, PR #54). These are the two defects that were standing *next to* it, found while chasing the session's own dev-warning.

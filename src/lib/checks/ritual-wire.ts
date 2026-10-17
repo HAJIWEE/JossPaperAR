@@ -45,6 +45,7 @@ import {
   MAX_PROBES,
   outcomeFromHttpFailure,
   probeVerdict,
+  uploadAlreadyPresent,
   uploadFailureVerdict,
   type Outcome,
 } from '../ritual-map.ts';
@@ -327,6 +328,10 @@ section('7 · An upload failure is classified — too-large is not a dropped con
 // keying on only one of them cannot quietly pass.
 check('a 413 is UNUSABLE (the same bytes can never be accepted)', uploadFailureVerdict({ status: 413 }) === 'unusable');
 check(
+  '⚠️ MEASURED shape: too-large is HTTP **400** with statusCode "413" — not an HTTP 413',
+  uploadFailureVerdict({ status: 400, statusCode: '413' }) === 'unusable',
+);
+check(
   "⚠️ the message the PM actually hit classifies without a code",
   uploadFailureVerdict({ message: 'The object exceeded the maximum allowed size' }) === 'unusable',
 );
@@ -367,6 +372,52 @@ check(
 // branches, fails `tsc` rather than silently re-lumping the causes. This file
 // deliberately stays dependency-free (no `node:fs`), which is what lets it run on
 // a bare checkout.
+
+// ── 8 · THE UPLOAD IS IDEMPOTENT — the retry can actually retry ─────────────
+// ⚠️ FOUND ON GLASS (2026-10-17), and it is why the retry in §6 could never
+// succeed: the upload sent `upsert: true`, an upsert needs UPDATE permission on
+// `storage.objects`, and the `captures` bucket has only INSERT + SELECT policies.
+// On the SECOND attempt the upload answered
+// `403 AccessDenied / new row violates row-level security policy` and died.
+//
+// ⚠️ The rows below are the REAL response bodies, measured one call each against
+// the local stack — not invented shapes. That is what makes them worth asserting:
+//   object ABSENT, upsert omitted → 200 {"Key":"captures/…","Id":"…"}
+//   object EXISTS, upsert omitted → 400 {"statusCode":"409","code":"KeyAlreadyExists"}
+//   object EXISTS, x-upsert: true → 400 {"statusCode":"403","code":"AccessDenied",
+//                                        "message":"new row violates row-level security policy"}
+//
+// ⚠️ FAULT-TEST IT: make `uploadAlreadyPresent` return false and the first four
+// rows go RED; make it return true and the last three go RED.
+section('8 · The upload is idempotent — an existing object is SUCCESS, not a failure');
+
+check(
+  'the measured duplicate (statusCode 409 / KeyAlreadyExists) is ALREADY PRESENT',
+  uploadAlreadyPresent({ status: 400, statusCode: '409', code: 'KeyAlreadyExists', message: 'The resource already exists' }) === true,
+);
+check("KeyAlreadyExists alone is enough", uploadAlreadyPresent({ code: 'KeyAlreadyExists' }) === true);
+check("statusCode '409' alone is enough", uploadAlreadyPresent({ statusCode: '409' }) === true);
+check(
+  '…and the message alone is enough, so a shape change cannot silently break the retry',
+  uploadAlreadyPresent({ message: 'The resource already exists' }) === true,
+);
+
+// ⚠️ And the RLS refusal that the OLD `upsert: true` produced must NOT be read as
+// "already present" — it is a real failure, and treating it as success would skip
+// an upload that never happened. This is the row that keeps the fix honest.
+check(
+  '⚠️ the OLD upsert RLS refusal (403 AccessDenied) is NOT already-present',
+  uploadAlreadyPresent({ status: 400, statusCode: '403', code: 'AccessDenied', message: 'new row violates row-level security policy' }) === false,
+);
+check('a dropped connection is not already-present', uploadAlreadyPresent({ message: 'Network request failed' }) === false);
+check('⚠️ an EMPTY signal is not already-present — never claim an upload happened', uploadAlreadyPresent({}) === false);
+
+// The two predicates must not overlap: an object that is already there is
+// SUCCESS, so it must never also read as a failure verdict the screen would act on.
+check(
+  '⚠️ an already-present object is not ALSO classified as unusable',
+  uploadFailureVerdict({ statusCode: '409', code: 'KeyAlreadyExists' }) === 'retry',
+);
 
 // ── verdict ─────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(64)}`);
