@@ -6,6 +6,16 @@
  * session (see that file's header).
  */
 
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+
+import {
+  CAPTURE_BUCKET_MAX_BYTES,
+  CAPTURE_MIN_BYTES,
+  CAPTURE_SHRINK_ATTEMPTS,
+  isUploadableCaptureSize,
+  shrinkStep,
+} from './capture-size.ts';
+import { escapeForNativeLoader, unescapeFromNativeLoader } from './native-path.ts';
 import { eventsFromResponse, outcomeFromHttpFailure, type Outcome, type OrchestratorResponse } from './ritual-map.ts';
 import { captureStoragePath } from './storage-path.ts';
 import { supabase, supabaseConfig } from './supabase.ts';
@@ -109,6 +119,57 @@ export async function registerCapture(captureId: string): Promise<{ userId: stri
 }
 
 /**
+ * Shrink the captured JPEG until it fits the bucket, then hand back the bytes.
+ *
+ * ⚠️ SCRUM-124 — the upload used to send the camera's own bytes and *assume*
+ * `quality: 0.7` kept them under 300 KB. On a real sensor it did not, Storage
+ * answered `413 Payload too large`, and every real offering died at `/preparing`.
+ *
+ * So this measures and retries rather than hopes: resize to the policy edge,
+ * read the actual byte length, and if it is still over, shrink harder (bounded
+ * by `CAPTURE_SHRINK_ATTEMPTS`). The size is read from the BLOB, not from a file
+ * API, because that is the number Storage will see.
+ *
+ * The original `fileUri` is never modified — the raw photo keeps its own life.
+ */
+async function boundedJpegBlob(fileUri: string): Promise<Blob> {
+  // ⚠️ TRAP (SCRUM-124, measured): expo-router percent-encodes route params, so
+  // the uri arrives with `%40`/`%2F` in it — but those escapes are a LITERAL
+  // part of Expo Go's on-disk sandbox path, not something to undo. Decoding it
+  // produced `status=404` and `java.lang.Exception: Loading bitmap failed`,
+  // because the decoded path does not exist. `fetch` on the uri AS GIVEN reads
+  // the real file (874,762 bytes at the time of measurement) — so the uri is
+  // passed through untouched.
+  let uri = escapeForNativeLoader(fileUri);
+  let lastSize = -1;
+
+  for (let attempt = 0; attempt < CAPTURE_SHRINK_ATTEMPTS; attempt += 1) {
+    const { edge, compress } = shrinkStep(attempt);
+    const resized = await manipulateAsync(uri, [{ resize: { width: edge } }], {
+      compress,
+      format: SaveFormat.JPEG,
+    });
+
+    const raw = await (await fetch(unescapeFromNativeLoader(resized.uri))).blob();
+    lastSize = raw.size;
+
+    if (isUploadableCaptureSize(lastSize)) {
+      // ② still applies: an untyped Blob uploads as `text/plain` and is rejected.
+      return raw.type === 'image/jpeg' ? raw : new Blob([raw], { type: 'image/jpeg' });
+    }
+
+    // Feed the manipulator ITS OWN uri (it expects the escaped form) and shrink harder.
+    uri = resized.uri;
+  }
+
+  throw new Error(
+    `capture_unusable: last read was ${lastSize} bytes, which is outside the `
+      + `${CAPTURE_MIN_BYTES}–${CAPTURE_BUCKET_MAX_BYTES}-byte window after `
+      + `${CAPTURE_SHRINK_ATTEMPTS} attempts`,
+  );
+}
+
+/**
  * Upload the photo bytes into the private `captures` bucket.
  *
  * The object lands at exactly `captureStoragePath(...)` — the same string the row
@@ -133,10 +194,10 @@ export async function uploadCapture(
   //     image/*; an untyped Blob uploads as `text/plain` and is REJECTED
   //     ("mime type text/plain is not supported"). Re-wrap with an explicit type.
   // The bytes go up AS A BLOB (RN fetch's array-buffer form is not reliable
-  // across platforms); the bucket's file_size_limit enforces 300 KB regardless.
-  const res = await fetch(fileUri);
-  const raw = await res.blob();
-  const blob = raw.type === 'image/jpeg' ? raw : new Blob([raw], { type: 'image/jpeg' });
+  // across platforms), and they go up SHRUNK — see `boundedJpegBlob`. The bucket
+  // still enforces its own 300 KB limit; we now arrive under it instead of
+  // discovering it as a 413 after the row was already committed (SCRUM-124).
+  const blob = await boundedJpegBlob(fileUri);
 
   const { error } = await supabase().storage.from('captures').upload(path, blob, {
     contentType: 'image/jpeg',
