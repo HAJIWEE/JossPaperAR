@@ -16,11 +16,11 @@ import {
   shrinkStep,
 } from './capture-size.ts';
 import { escapeForNativeLoader, unescapeFromNativeLoader } from './native-path.ts';
-import { eventsFromResponse, outcomeFromHttpFailure, type Outcome, type OrchestratorResponse } from './ritual-map.ts';
+import { eventsFromResponse, outcomeFromHttpFailure, uploadFailureVerdict, type Outcome, type OrchestratorResponse } from './ritual-map.ts';
 import { captureStoragePath } from './storage-path.ts';
 import { supabase, supabaseConfig } from './supabase.ts';
 
-export { eventsFromResponse, httpFailureReason, isTransportCode, outcomeFromHttpFailure, probeVerdict, MAX_PROBES, type Outcome, type OrchestratorResponse, type ProbeVerdict } from './ritual-map.ts';
+export { eventsFromResponse, httpFailureReason, isTransportCode, outcomeFromHttpFailure, probeVerdict, uploadFailureVerdict, MAX_PROBES, type Outcome, type OrchestratorResponse, type ProbeVerdict, type UploadFailureSignal, type UploadVerdict } from './ritual-map.ts';
 
 /**
  * Ask the orchestrator to prepare the offering under the client-minted id.
@@ -187,6 +187,19 @@ async function boundedJpegBlob(fileUri: string): Promise<Blob> {
 }
 
 /**
+ * What `uploadCapture` decided. ⚠️ IT NO LONGER THROWS for the two outcomes it
+ * can classify — a bare `throw` forced every caller to guess the cause, and
+ * `/preparing` guessed "spent" every time. See `uploadFailureVerdict` for why the
+ * two are not the same event.
+ */
+export type UploadResult =
+  | { readonly kind: 'ok'; readonly path: string }
+  /** The same photo cannot succeed — a new capture is the only way on. */
+  | { readonly kind: 'unusable'; readonly reason: string }
+  /** Nothing about the photo is wrong: the whole step may simply be re-run. */
+  | { readonly kind: 'transient'; readonly reason: string };
+
+/**
  * Upload the photo bytes into the private `captures` bucket.
  *
  * The object lands at exactly `captureStoragePath(...)` — the same string the row
@@ -199,7 +212,7 @@ export async function uploadCapture(
   userId: string,
   captureId: string,
   fileUri: string,
-): Promise<{ path: string }> {
+): Promise<UploadResult> {
   const path = captureStoragePath(userId, captureId);
 
   // ⚠️ FOUND ON GLASS (2026-10-07) — this path had never actually run (the S31
@@ -214,7 +227,19 @@ export async function uploadCapture(
   // across platforms), and they go up SHRUNK — see `boundedJpegBlob`. The bucket
   // still enforces its own 300 KB limit; we now arrive under it instead of
   // discovering it as a 413 after the row was already committed (SCRUM-124).
-  const blob = await boundedJpegBlob(fileUri);
+  let blob: Blob;
+  try {
+    blob = await boundedJpegBlob(fileUri);
+  } catch (error) {
+    // The client's own shrink loop gave up: it measured the bytes and they are
+    // outside the bucket's window, so this photo cannot be uploaded at any
+    // setting we have. `unusable` — NOT a retry, which would re-measure and
+    // reach the same conclusion.
+    return {
+      kind: 'unusable',
+      reason: error instanceof Error ? error.message : 'capture_unusable',
+    };
+  }
 
   const { error } = await supabase().storage.from('captures').upload(path, blob, {
     contentType: 'image/jpeg',
@@ -222,8 +247,22 @@ export async function uploadCapture(
     // and strand an offering whose row is already committed.
     upsert: true,
   });
-  if (error) throw new Error(`capture_upload_failed: ${error.message}`);
-  return { path };
+
+  if (error) {
+    // ⚠️ The verdict is PURE and checked (`check:wire` §7) so the screen cannot
+    // re-learn the wrong lesson: a 413 on these bytes is `unusable` (a new photo
+    // is the only way on), while a dropped connection is `transient` (the photo
+    // is fine and re-running is free). `StorageError` carries `status` and
+    // `statusCode`; `StorageApiError` adds `code` — read structurally so this
+    // file needs no import from the client library.
+    const signal = error as { status?: number; statusCode?: string; code?: string; message?: string };
+    return {
+      kind: uploadFailureVerdict(signal) === 'unusable' ? 'unusable' : 'transient',
+      reason: error.message,
+    };
+  }
+
+  return { kind: 'ok', path };
 }
 
 /**

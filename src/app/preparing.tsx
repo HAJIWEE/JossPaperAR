@@ -43,6 +43,7 @@ import {
   registerCapture,
   requestCartoonize,
   uploadCapture,
+  type UploadResult,
 } from '@/lib/ritual';
 import { ensureAnonymousSession } from '@/lib/session';
 import { TUTORIAL_WAIT_MS, isDemo } from '@/lib/tutorial';
@@ -125,26 +126,56 @@ export default function Preparing(): React.JSX.Element {
     }
 
     // ── 2 · the bytes, to exactly the path the row records ─────────────────
+    // ⚠️ FOUND ON GLASS (SCRUM-124): this used to be a bare `catch` that marked
+    // the offering `spent` for EVERY failure, so a momentary network blip during
+    // the upload told the player to photograph the object again — throwing away a
+    // perfectly good offering. The two causes are not the same event and no
+    // longer share copy; the decision is the PURE `uploadFailureVerdict`, checked
+    // by `check:wire` §7. Only the MESSAGE is logged, never the bytes.
+    let upload: UploadResult;
     try {
-      await uploadCapture(userId, captureId, uri);
+      upload = await uploadCapture(userId, captureId, uri);
     } catch (error) {
-      // ⚠️ FOUND ON GLASS (SCRUM-124): a bare `catch` here hid a Storage 413 for
-      // a whole session — the offering was marked spent and NOTHING reached the
-      // console, so the cause took a database dig and a synthetic upload to find.
-      // Log the MESSAGE only; the photo's bytes must never be logged.
+      // Anything `uploadCapture` could not classify (e.g. the manipulator module
+      // itself failing). ⚠️ `retry`, NOT `spent`: an unrecognised failure must
+      // never destroy an offering, and — now that `registerCapture` tolerates a
+      // duplicate key — re-running this step is safe and free.
       console.warn(
-        'capture_upload_failed:',
+        'capture_upload_threw:',
         error instanceof Error ? error.message : String(error),
       );
-      // ⚠️ The row exists but the object does not, so the offering can never be
-      // generated. Kept as `spent` rather than a retry: the usual cause is a
-      // photo Storage refused (413, SCRUM-124), and repeating that cannot fix it.
-      // ⚠️ `registerCapture` no longer refuses a duplicate key, so a retry is now
-      // POSSIBLE where it used to dead-end on the constraint — telling "too
-      // large" apart from "the network blinked", and offering a retry only for
-      // the second, is SCRUM-124's open AC and is NOT decided here.
+      setPhase({ kind: 'offline', reason: 'capture_upload_failed' });
+      return;
+    }
+
+    if (upload.kind === 'unusable') {
+      // The SAME photo cannot succeed (too large for the bucket, or refused on
+      // its type): a new capture is genuinely the only way on, which is exactly
+      // what `spent` means.
+      console.warn('capture_upload_unusable:', upload.reason);
       setPhase({ kind: 'spent' });
       return;
+    }
+
+    if (upload.kind === 'transient') {
+      // The photo is intact; the network was not. Nothing was generated and
+      // nothing was spent, so this is a genuine retry.
+      console.warn('capture_upload_transient:', upload.reason);
+      setPhase({ kind: 'offline', reason: upload.reason });
+      return;
+    }
+
+    /**
+     * ⚠️ COMPILE-TIME ENFORCEMENT, and it is the honest way to gate this: the
+     * regression was that ONE branch swallowed every cause. `UploadResult` is a
+     * discriminated union, so if a new outcome is ever added — or either branch
+     * above is deleted — `upload` stops being `never` here and `tsc` fails. That
+     * is stronger than a source-text assertion, which is why `check:wire` stays
+     * dependency-free and does not read this file.
+     */
+    if (upload.kind !== 'ok') {
+      const unhandled: never = upload;
+      throw new Error(`unhandled upload result: ${String(unhandled)}`);
     }
 
     // ── 3 · the ask, and — when the job is already in flight — the WAIT ──────

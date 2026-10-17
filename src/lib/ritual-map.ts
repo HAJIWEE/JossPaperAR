@@ -222,3 +222,83 @@ export function probeVerdict(
       return 'retriable';
   }
 }
+
+/**
+ * ── THE UPLOAD'S VERDICT: did the PHOTO fail, or did the NETWORK? ───────────
+ *
+ * ⚠️ SCRUM-124 AC 3, and it is not cosmetic. `/preparing` used to mark EVERY
+ * upload failure `spent` — the branch whose own comment says *"the capture is
+ * spent, offering a retry would be a lie"* — and show *"This offering cannot be
+ * prepared · Offer a new photo"* for both. So a momentary network blip during the
+ * upload threw away a perfectly good offering and told the player to photograph
+ * the object again. The two causes are not the same event and must not share copy:
+ *
+ *   unusable → the SAME photo cannot succeed. Storage refused the bytes on a
+ *              ground that does not change between attempts (too large, wrong
+ *              MIME), or the client's own shrink loop gave up. A new capture is
+ *              genuinely the only way on — which is what `spent` MEANS.
+ *   retry    → nothing about the photo is wrong: a dropped connection, a 5xx, or
+ *              a session that needs re-adopting. `registerCapture` now tolerates
+ *              a duplicate key, so re-running the whole step is safe and free.
+ *
+ * ⚠️ THE DEFAULT IS `retry`, deliberately. An unrecognised failure must never be
+ * allowed to DESTROY an offering: waiting one more round costs nothing, while
+ * telling a player their photo is unusable when it is not is unrecoverable (the
+ * object has usually been put away by then).
+ */
+
+export type UploadVerdict = 'unusable' | 'retry';
+
+/**
+ * The parts of a failure that decide the verdict — a message and a status, never
+ * the bytes. Shaped to accept Supabase's `StorageError` (`status` · `statusCode`)
+ * and `StorageApiError` (`code`) without this module importing either: keeping it
+ * structurally typed is what keeps this file loadable under plain Node.
+ */
+export interface UploadFailureSignal {
+  readonly status?: number;
+  readonly statusCode?: string;
+  readonly code?: string;
+  readonly message?: string;
+}
+
+/**
+ * The service's own error codes for "these bytes can never be accepted"
+ * (supabase.com/docs/guides/storage/debugging/error-codes). `capture_unusable` is
+ * OURS — it is what the client's shrink loop reports when it gives up.
+ */
+const UNUSABLE_UPLOAD_CODES = new Set([
+  'EntityTooLarge',
+  'PayloadTooLarge',
+  'InvalidMimeType',
+  'invalid_mime_type',
+  'capture_unusable',
+]);
+
+/**
+ * Message fallbacks, lower-cased. ⚠️ These duplicate the codes ON PURPOSE: the
+ * 413 the PM hit on glass arrived as *"The object exceeded the maximum allowed
+ * size"* with the code absent, so keying only on codes would have classified the
+ * one failure we have actually seen as retryable.
+ */
+const UNUSABLE_UPLOAD_PATTERNS = [
+  'payload too large',
+  'exceeded the maximum allowed size',
+  'entity too large',
+  'mime type',
+];
+
+export function uploadFailureVerdict(failure: UploadFailureSignal): UploadVerdict {
+  // The status is the strongest signal and needs no string matching.
+  if (failure.status === 413) return 'unusable';
+
+  if (failure.code && UNUSABLE_UPLOAD_CODES.has(failure.code)) return 'unusable';
+  if (failure.statusCode && UNUSABLE_UPLOAD_CODES.has(failure.statusCode)) return 'unusable';
+
+  const message = (failure.message ?? '').toLowerCase();
+  if (UNUSABLE_UPLOAD_PATTERNS.some((pattern) => message.includes(pattern))) return 'unusable';
+
+  // Everything else — offline, DNS, TLS, a 5xx, an expired session — leaves the
+  // photo intact. Re-running the step is free and is the honest next action.
+  return 'retry';
+}

@@ -45,6 +45,7 @@ import {
   MAX_PROBES,
   outcomeFromHttpFailure,
   probeVerdict,
+  uploadFailureVerdict,
   type Outcome,
 } from '../ritual-map.ts';
 
@@ -308,6 +309,64 @@ check(
   '⚠️ a bound of zero refuses the first poll — so the bound is load-bearing, not decoration',
   probeVerdict(draftOutcome, 0, 0) === 'retriable',
 );
+
+// ── 7 · AN UPLOAD FAILURE IS CLASSIFIED, NOT LUMPED (SCRUM-124 AC 3) ───────
+// ⚠️ THE DEFECT THIS PINS. `/preparing` used to mark EVERY upload failure `spent`
+// and show "This offering cannot be prepared · Offer a new photo" for both — so a
+// momentary network blip during the upload threw away a perfectly good offering
+// and told the player to photograph the object again. `uploadFailureVerdict` is
+// the pure decision that separates "these bytes can never be accepted" from "the
+// network blinked", and it must default to the RECOVERABLE answer.
+//
+// ⚠️ FAULT-TEST IT: make the function return 'unusable' unconditionally and the
+// retry rows below go RED; return 'retry' unconditionally and the top rows go RED.
+section('7 · An upload failure is classified — too-large is not a dropped connection');
+
+// The failure we have actually SEEN (SCRUM-124, on glass): a 413 whose message is
+// the service's wording and whose code was absent. Both halves are asserted, so
+// keying on only one of them cannot quietly pass.
+check('a 413 is UNUSABLE (the same bytes can never be accepted)', uploadFailureVerdict({ status: 413 }) === 'unusable');
+check(
+  "⚠️ the message the PM actually hit classifies without a code",
+  uploadFailureVerdict({ message: 'The object exceeded the maximum allowed size' }) === 'unusable',
+);
+check("a 'Payload too large' message is UNUSABLE", uploadFailureVerdict({ message: 'Payload too large' }) === 'unusable');
+check("the EntityTooLarge code is UNUSABLE", uploadFailureVerdict({ code: 'EntityTooLarge' }) === 'unusable');
+check("the statusCode form is UNUSABLE too", uploadFailureVerdict({ statusCode: 'EntityTooLarge' }) === 'unusable');
+check("our own shrink-loop code is UNUSABLE", uploadFailureVerdict({ code: 'capture_unusable' }) === 'unusable');
+check(
+  'a MIME refusal is UNUSABLE — a retry would send the same rejected type',
+  uploadFailureVerdict({ status: 400, message: 'mime type text/plain is not supported' }) === 'unusable',
+);
+
+// ⚠️ THE ROWS THAT MATTER MOST — and they are the ones the old code got wrong.
+check('a dropped connection is RETRY', uploadFailureVerdict({ message: 'Network request failed' }) === 'retry');
+check('a 5xx is RETRY (the photo is fine)', uploadFailureVerdict({ status: 503, message: 'Service Unavailable' }) === 'retry');
+check('an expired session is RETRY (the retry re-adopts it)', uploadFailureVerdict({ status: 401, message: 'JWT expired' }) === 'retry');
+check(
+  '⚠️ an EMPTY signal is RETRY — an unclassifiable failure must never destroy an offering',
+  uploadFailureVerdict({}) === 'retry',
+);
+check(
+  'a non-numeric status does not throw',
+  uploadFailureVerdict({ status: undefined, message: undefined }) === 'retry',
+);
+
+// The inverse control, so §7 cannot pass vacuously: the two verdicts must be
+// distinguishable at all. If both rows below ever agree, the classifier is a
+// constant and every assertion above means nothing.
+check(
+  '⚠️ the classifier is not a constant — a 413 and a 503 disagree',
+  uploadFailureVerdict({ status: 413 }) !== uploadFailureVerdict({ status: 503 }),
+);
+
+// ⚠️ The SCREEN's side of this is enforced by the TYPE SYSTEM, not by a source
+// assertion here: `uploadCapture` returns a discriminated union whose only
+// `'ok'` variant carries the path, and `preparing.tsx` branches on it with a
+// `default: never` guard — so adding a third outcome, or dropping one of the two
+// branches, fails `tsc` rather than silently re-lumping the causes. This file
+// deliberately stays dependency-free (no `node:fs`), which is what lets it run on
+// a bare checkout.
 
 // ── verdict ─────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(64)}`);
