@@ -1260,6 +1260,26 @@ which read `20261008200000` — one migration short. **`npx supabase db reset` r
 
 ---
 
+### 12.14 · S65 — the lasso's raster was SCREEN-SIZED: an "honest limit" that was false, and a masked offering that reached the styler at a fifth of the detail (2026-10-18)
+
+**The owner's report.** *"the lassoed image was not cartoonized"* — after a full lasso run that completed `styled` and cost 91,000 micros. ⚠️ **Every number in that receipt was plausible**, which is the point of this entry.
+
+**What it actually was.** Not the mask. The mask view rendered correctly and the rasterized PNG was **correct** — but it was **280 × 280 px**. `Svg.toDataURL()` called with no size renders the **VIEW**, and the view is laid out in **dp** (`Bitmap.createBitmap(getWidth(), getHeight())` is that view in *pixels*). The rect path cuts the same selection from the photo's own **1313 × 1313** pixels, so the two modes differed by **≈22× in pixels (≈5× linear)** and the masked offering arrived at the styler as a smear.
+
+**⚠️ And the defect was hidden by a FALSE "honest limit".** `crop-frame.ts`'s header listed it as a deliberate, accepted limit: *"THE RASTER IS SCREEN-SIZED … That is still at or above the upload budget's own 1080 px ceiling"*. **Measured: 280 px — BELOW the ceiling.** `crop.tsx` passed no `options` for the same reason, believing the view's bounds meant *"as big as the photo is drawn"*; they mean as big as the **SCREEN** draws it. **A false limit is a defect with a permission slip** — so both comments now carry the measurement instead of the reassurance.
+
+**The fix.** `maskRasterSize(regionPx)` — pure, in `crop-frame.ts`: the raster is requested at the region's size **in the photo's own pixels** (the same space `rectToImagePixels` crops in), capped at `CAPTURE_MAX_EDGE_PX`, because `boundedJpegBlob` shrinks to that ceiling anyway and an uncapped request for a full-photo selection would allocate 3000 × 4000 as ARGB_8888 (48 MB). `rasterRequestSize` — in the screen, where `Platform`/`PixelRatio` are importable — converts the units: **Android reads `options` as PIXELS, iOS as POINTS × the screen scale.** That trap is real and the old comment had identified it; the answer was to convert, not to give up the size.
+
+**Measured on glass** (HN615L005386 · Android 16 · density 2): `region 140 × 140 dp` → `maskPixels 1313 × 1313` → raster request **1080 × 1080**; base64 **114,880 → 962,464 chars**. The raster was **rendered on screen and compared with the mask preview** — the octagon, the photo inside it and the flat fill outside are unchanged, only sharper.
+
+**⚠️ How it was found for US$0.00.** A temporary probe that **displayed the raster instead of sending it**. Three hypotheses were killed by *looking*: an inverted mask, an unrendered `SvgImage`, and a mis-computed `region`. **The receipt could not have told us any of that.**
+
+**The same run's two other asks, taken from the board.** `EN · 4 Burn` draws `art · held offering · car D` at **132 × 96 centred (133, 686)** with the swipe hint at **y 790–810** → `OFFERING_SIZE` **72 → 132** and `REST_AT.y` **0.74 → 0.81** (centre **1184 → 1296 px** on this device). ⚠️ **Recorded consequence:** the hand→heart gesture lengthens to **296 dp**, where the board's own pairing (heart at 0.557) gives **216 dp**. The grade is unaffected — bands are radii from the heart measured at RELEASE.
+
+**Gates.** `check:framing` **185 → 193** (five pure assertions on the raster size, two source assertions that it reaches `toDataURL` and that the platform units are converted); **fault-tested TWICE** (cap removed → **3 of 193 red**; `toDataURL(finish, undefined)` restored → **2 of 193 red**). ⚠️ **The pre-existing assertion `cropSrc.includes('rasterizeMask()')` went red on the change** — the gate caught it, and it was upgraded rather than deleted. `npm run check` exit 0 · `tsc` clean.
+
+**⚠️ Still open — asked, not guessed.** *"the ritual camera overlay is not full screen"* is **not reproduced**: both camera screens render `CameraView` with `StyleSheet.absoluteFill` inside a `flex: 1` screen and `_layout.tsx` sets `headerShown: false`, and a screenshot on glass shows the preview **edge-to-edge**, matching the board's full-board `art · bg · base`. The one **measured** discrepancy is the fire's heart — the board puts it at **0.557** (`art · aim sight` centred at y 470 of 844) while the code has **`HEART_AT.y` 0.44**, raised 12 % on the owner's own S64 instruction.
+
 ### 12.13 · S35 — the hosted project was THREE MIGRATIONS BEHIND, and a fresh worktree is not linked (2026-10-09)
 
 **The finding, measured.** `npx supabase migration list` read **remote 11 / local 14**. Three migrations — `0012` (*clan_management_api*), `0013` (*clan_head_exit*) and `0014` (*clan_successor_rank*) — had **never been pushed**. So the **entire clan system that `main` had just merged was dead on the live backend**: `set_member_role` · `remove_member` · `leave_clan` · `rename_clan` · `delete_clan` · `clan_book` were all **404 by absence**, and SCRUM-82's fixed award path was running against a schema that predated its own guard.

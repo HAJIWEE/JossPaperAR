@@ -51,15 +51,19 @@
  *     photographic PNG is over budget even at 640 px — so it is a *decision*
  *     (bucket limit + a second upload format), not a bug to fix here.
  *
- *  ② THE RASTER IS SCREEN-SIZED. `toDataURL` renders the view at its own size, so
- *     the masked file is as detailed as the phone's rendering of the photo
- *     (~3× the box in dp), not the photo's true pixel size. That is still at or
- *     above the upload budget's own 1080 px ceiling, so nothing downstream is
- *     coarser than it already was — but it is worth knowing that the rect mode's
- *     crop stays sharper, because a rectangle can be cut from the ORIGINAL pixels
- *     by the manipulator. The modes differ by nature: a crop discards, a mask
- *     replaces.
+ *  ② ⚠️ THE RASTER WAS SCREEN-SIZED — a defect, MEASURED and fixed in S64. It used
+ *     to be only as detailed as the phone's rendering of the photo (**280 × 280 px**
+ *     for a 140 dp selection on a 2× screen), while the rect path cut the SAME
+ *     selection from the photo's own **1313 × 1313** pixels — so the lasso reached
+ *     the styler at a fifth of the linear detail. This header used to claim that was
+ *     *"still at or above the upload budget's own 1080 px ceiling"*: it is BELOW it,
+ *     and a false "honest limit" is what hid the defect. `maskRasterSize` below is
+ *     the fix — the raster is asked for at the region's size in the PHOTO's pixels,
+ *     capped at the budget's ceiling. The two modes still differ by nature (a crop
+ *     discards, a mask replaces), but they are now equally sharp.
  */
+
+import { CAPTURE_MAX_EDGE_PX } from './capture-size.ts';
 
 /** A pixel size — the photo, or the box it is drawn into. */
 export interface Size {
@@ -358,6 +362,46 @@ export function isUsableCropRect(rect: Rect, image: Size): boolean {
   if (rect.x < 0 || rect.y < 0) return false;
   if (rect.width < MIN_CROP_EDGE_PX || rect.height < MIN_CROP_EDGE_PX) return false;
   return rect.x + rect.width <= image.width && rect.y + rect.height <= image.height;
+}
+
+/**
+ * ⚠️ THE RASTER'S PIXEL SIZE — and the defect this function exists to fix (S64).
+ *
+ * `Svg.toDataURL()` with no size renders the view at its OWN bounds, and the view
+ * is laid out in **dp**. So the masked file was only as detailed as the phone's
+ * rendering of the photo: for a 140 dp selection on a 2× screen, **280 × 280 px**,
+ * while the rect path cuts the SAME selection from the photo's own
+ * **1313 × 1313** pixels. The lasso therefore reached the styler at a fifth of the
+ * linear detail (≈22× fewer pixels) — the difference between a cartoon of the
+ * offering and a smear. It was invisible because both paths "worked".
+ *
+ * ⚠️ THIS FILE USED TO CLAIM THE OPPOSITE. Its header said the screen-sized raster
+ * was *"still at or above the upload budget's own 1080 px ceiling"*. MEASURED on
+ * glass 2026-10-18 with a probe on the frame screen: `region 140 × 140 dp` →
+ * `toDataURL()` → **280 × 280 px**, i.e. below the ceiling, not above it. A false
+ * "honest limit" is worse than an unstated one: it is a defect with a permission
+ * slip.
+ *
+ * So the raster is now asked for at the region's size IN THE PHOTO'S OWN PIXELS —
+ * the same space `rectToImagePixels` crops in — capped at the upload budget's
+ * longest edge. The cap is not arbitrary: `boundedJpegBlob` shrinks to exactly that
+ * ceiling anyway, so anything above it is wasted work, and an uncapped request for
+ * a selection that covers the whole photo would allocate 3000 × 4000 as
+ * ARGB_8888 (48 MB).
+ *
+ * ⚠️ Integer, and at least 1: the Android bridge reads these with `getInt`.
+ */
+export function maskRasterSize(regionPx: Size): Size {
+  const width = Math.max(1, Math.round(regionPx.width));
+  const height = Math.max(1, Math.round(regionPx.height));
+  const longest = Math.max(width, height);
+  if (longest <= CAPTURE_MAX_EDGE_PX) return { width, height };
+  // ONE scale for BOTH axes, or the mask would come out stretched.
+  const scale = CAPTURE_MAX_EDGE_PX / longest;
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
 }
 
 /** Accumulated straight-line length of a path, in the path's own units. */

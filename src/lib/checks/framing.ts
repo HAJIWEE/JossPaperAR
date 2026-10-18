@@ -56,6 +56,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { MESSAGES, t } from '../i18n.ts';
+import { CAPTURE_MAX_EDGE_PX } from '../capture-size.ts';
 import {
   containRect,
   cropRectFor,
@@ -64,6 +65,7 @@ import {
   isUsableCropRect,
   isWholeImage,
   lassoBounds,
+  maskRasterSize,
   MIN_CROP_EDGE_PX,
   normaliseDrag,
   pathLength,
@@ -605,6 +607,32 @@ check('…so an outline dragged into the letterbox is clipped to the PHOTO, not 
 check('…and an outline entirely off the photo has no region at all',
   lassoRegion([{ x: -200, y: -200 }, { x: -150, y: -200 }, { x: -150, y: -150 }], BOX) === null);
 
+/**
+ * ⚠️ THE RASTER'S SIZE — the S64 defect, as an assertion.
+ *
+ * `toDataURL()` with no size renders the VIEW, and the view is laid out in dp: MEASURED
+ * on glass 2026-10-18, a 140 dp selection on a 2× screen produced a **280 × 280 px** PNG,
+ * where the rect path cuts the same selection from the photo's own **1313 × 1313**
+ * pixels. The masked offering therefore reached the styler at a fifth of the linear
+ * detail — a smear, not a cartoon. These assertions are what make that regression loud:
+ * restore the unsized call and §③ below fails, not the player.
+ */
+check('the raster is asked for at the PHOTO\'s pixels, capped by the upload budget',
+  JSON.stringify(maskRasterSize({ width: 1313, height: 1313 }))
+    === JSON.stringify({ width: 1080, height: 1080 }));
+check('…capped on the LONGEST edge with ONE scale for both axes (a mask must not stretch)',
+  JSON.stringify(maskRasterSize({ width: 2160, height: 1080 }))
+    === JSON.stringify({ width: 1080, height: 540 }));
+check('…a region already inside the budget is passed through UNCHANGED',
+  JSON.stringify(maskRasterSize({ width: 640, height: 480 }))
+    === JSON.stringify({ width: 640, height: 480 }));
+check('…and the result is always INTEGERS of at least 1 (Android reads them with `getInt`)',
+  [maskRasterSize({ width: 0, height: 0 }), maskRasterSize({ width: 3.4, height: 9.6 })]
+    .every((s) => Number.isInteger(s.width) && Number.isInteger(s.height)
+      && s.width >= 1 && s.height >= 1));
+check('…capping at the budget\'s OWN 1080 px ceiling, so the two cannot drift apart',
+  maskRasterSize({ width: 4000, height: 4000 }).width === 1080 && CAPTURE_MAX_EDGE_PX === 1080);
+
 /** Every fault the module can produce — one list, so a new fault cannot be forgotten. */
 const ALL_FAULTS: readonly LassoFault[] = ['too_short', 'not_closed', 'crosses_itself', 'degenerate'];
 
@@ -678,7 +706,13 @@ check('…and the confirm button is gated on the validated polygon',
 check('⚠️ the rectangle crop is applied from the PIXEL rect the pure module produced',
   cropSrc.includes('cropRectFor(') && cropSrc.includes('originX: pixelCrop?.x ?? 0'));
 check('⚠️ …and the mask path does NOT go through the manipulator\'s crop (two paths, two jobs)',
-  cropSrc.includes("mode === 'lasso'") && cropSrc.includes('rasterizeMask()'));
+  cropSrc.includes("mode === 'lasso'") && cropSrc.includes('rasterizeMask('));
+check('⚠️ …and the raster is asked for at the REGION\'S size, not the view\'s dp bounds (S64)',
+  cropSrc.includes('maskRasterSize(maskPixels)') && cropSrc.includes('rasterRequestSize(size)'));
+check('⚠️ …so an EXPLICIT size reaches `toDataURL` — an unsized raster was the smear',
+  /toDataURL\(finish,\s*size === null \? undefined : rasterRequestSize\(size\)\)/.test(cropSrc));
+check('…and the platforms\' unit difference is handled, not ignored (px on Android, points on iOS)',
+  cropSrc.includes("Platform.OS === 'ios'") && cropSrc.includes('PixelRatio.get()'));
 check('⚠️ the file is SAVED before anything is handed onward (only the crop is sent)',
   cropSrc.indexOf('saveAsync(') > 0
     && cropSrc.indexOf('saveAsync(') < cropSrc.indexOf('goOn(uploadableUri(saved.uri))'));

@@ -101,8 +101,15 @@ const SPRITE_URL_TTL_S = 300;
  * put the opaque rectangle straight back and made the cut invisible. The sprite
  * carries its own ink outline, so it stays legible over the camera without a
  * card — adding a background here silently undoes the paid cutout.
+ * ⚠️ AND ITS SIZE IS THE BOARD'S, MEASURED (S64). `EN · 4 Burn` (390 × 844) draws
+ * `art · held offering · car D` at **132 × 96 px**, centred **(133, 686)** — with the
+ * swipe hint at y 790–810. So the offering is **132 wide, not 72**: at 72 a real
+ * offering read as a token rather than as the thing the player photographed. The box
+ * is square and `contain`-fitted, so a sprite with the board's own 1.375 aspect renders
+ * exactly 132 × 96; a squarer one renders up to 132 × 132, which is still within the
+ * room the board leaves above the hint.
  */
-const OFFERING_SIZE = 72;
+const OFFERING_SIZE = 132;
 
 /**
  * How far the held object trails the finger. This is the PROTOTYPE's authored
