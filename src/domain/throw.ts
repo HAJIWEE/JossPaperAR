@@ -84,12 +84,20 @@ export const HEART_AT = { x: 0.5, y: 0.44 } as const;
 /**
  * Where the offering rests — where the finger lifts off.
  *
- * ⚠️ It moved UP with the heart by the same 12 % (0.86 → 0.74) on 2026-10-18, so
- * the thumb's travel to the fire is unchanged by the fire having moved. Moving
- * one without the other would have changed the length of the gesture, which is
- * the aim.
+ * ⚠️ MOVED BACK DOWN TO THE BOARD'S OWN NUMBER (S64). `EN · 4 Burn` draws the held
+ * offering centred at y **686 of 844 = 0.813**, with the swipe hint at 790–810 — so
+ * the offering belongs LOW, near the hint, not floating at mid-screen. It had been
+ * raised to 0.74 alongside the heart on 2026-10-18 (0.86 → 0.74) to keep the thumb's
+ * travel unchanged when the fire moved up.
+ *
+ * ⚠️ Honest consequence of moving this one alone: the gesture from the hand to the
+ * heart is now LONGER than it was (0.81 − 0.44 = 0.37 of the height, where the board's
+ * own pairing of 0.813 with a heart at 0.557 gives 0.256). That is the owner's call —
+ * they asked for the offering to come down and did not ask for the fire to move — and
+ * the grade is unaffected: every band is a RADIUS from the heart measured at RELEASE,
+ * so the resting point's own position changes no offset.
  */
-export const REST_AT = { x: 0.5, y: 0.74 } as const;
+export const REST_AT = { x: 0.5, y: 0.81 } as const;
 
 /** The fire's heart as a CENTRE point, in the same px space the bands use. */
 export function heartPoint(width: number, height: number): FireHeart {

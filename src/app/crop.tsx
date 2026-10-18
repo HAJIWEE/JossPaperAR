@@ -63,6 +63,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Image,
   PanResponder,
+  PixelRatio,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -80,6 +82,7 @@ import {
   DIM_PATH_FILL_RULE,
   dimPathPolygon,
   isWholeImage,
+  maskRasterSize,
   normaliseDrag,
   polylinePoints,
   rectToViewStyle,
@@ -502,13 +505,23 @@ export default function CropScreen(): React.JSX.Element {
    * `MASK_RASTER_MIN_BASE64_CHARS` are REJECTED, and the screen says the frame could
    * not be applied instead of sending the wrong one.
    *
-   * ⚠️ No `options` argument: on Android the raster is `Bitmap.createBitmap(getWidth(),
-   * getHeight())` — the view in PIXELS — while on iOS the same `{width, height}` is
-   * interpreted in POINTS and multiplied by the device scale, so an explicit size would
-   * mean two different resolutions per platform. The view's own bounds have one
-   * meaning on both: "as big as the photo is drawn".
+   * ⚠️ AN EXPLICIT RASTER SIZE — the S64 fix, and it was MEASURED, not reasoned.
+   *
+   * With no size the native raster is the VIEW's own bounds, and the view is laid out
+   * in **dp**. A 140 dp selection on a 2× screen therefore produced a **280 × 280 px**
+   * PNG, while the rect path cuts the SAME selection from the photo's own
+   * **1313 × 1313** pixels — so a masked offering reached the styler at a fifth of the
+   * linear detail (≈22× fewer pixels) and came back a smear rather than a cartoon.
+   * The previous revision passed no size on purpose, believing the view's bounds meant
+   * "as big as the photo is drawn"; they mean as big as the SCREEN draws it.
+   *
+   * ⚠️ The size is in the PHOTO's pixels, capped at the upload budget's ceiling
+   * (`maskRasterSize`). The two platforms read `options` in different units — Android
+   * as PIXELS, iOS as POINTS (multiplied by the screen scale) — so the conversion
+   * lives in `rasterRequestSize` below rather than in the pure helper. Android is the
+   * shipped platform (ADR-001); the iOS branch is reasoned, not measured.
    */
-  const rasterizeMask = useCallback((): Promise<string> => new Promise((resolve, reject) => {
+  const rasterizeMask = useCallback((size: Size | null): Promise<string> => new Promise((resolve, reject) => {
     const view = svgRef.current;
     if (view === null) {
       reject(new Error('mask_view_missing'));
@@ -526,7 +539,7 @@ export default function CropScreen(): React.JSX.Element {
     };
     // The guard, so a callback that never arrives cannot strand the screen.
     setTimeout(() => finish(undefined), MASK_RASTER_TIMEOUT_MS);
-    view.toDataURL(finish, undefined);
+    view.toDataURL(finish, size === null ? undefined : rasterRequestSize(size));
   }), []);
 
   /**
@@ -562,10 +575,17 @@ export default function CropScreen(): React.JSX.Element {
     }
 
     setPhase({ kind: 'working' });
+
     try {
       const saved = mode === 'lasso'
         ? await (async () => {
-          const base64 = await rasterizeMask();
+          // ⚠️ The raster is asked for at the REGION's size in the PHOTO's own
+          // pixels — see `maskRasterSize`. Without it the file is screen-sized
+          // (280 × 280 px for a 140 dp selection on a 2× screen) and the offering
+          // reaches the styler as a smear rather than a cartoon.
+          const base64 = await rasterizeMask(
+            maskPixels === null ? null : maskRasterSize(maskPixels),
+          );
           const rendered = await ImageManipulator
             .manipulate(`data:image/png;base64,${base64}`)
             .renderAsync();
@@ -596,7 +616,7 @@ export default function CropScreen(): React.JSX.Element {
       // be burned (the same rule as `/burn`'s missing sprite).
       setPhase({ kind: 'failed' });
     }
-  }, [goOn, measured, mode, nativeUri, pixelCrop, polygon, rasterizeMask, skip]);
+  }, [goOn, maskPixels, measured, mode, nativeUri, pixelCrop, polygon, rasterizeMask, skip]);
 
   /**
    * The dimming rects, from the pure helper — the screen draws, `crop-frame` decides.
@@ -897,6 +917,27 @@ const CROP_MODES = ['rect', 'lasso'] as const satisfies readonly CropMode[];
  */
 function locationOf(event: GestureResponderEvent): Point {
   return { x: event.nativeEvent.locationX, y: event.nativeEvent.locationY };
+}
+
+/**
+ * The `toDataURL` size in the units THIS platform's bridge expects.
+ *
+ * ⚠️ THE UNITS DIFFER, AND THAT IS WHY THE PREVIOUS REVISION PASSED NOTHING AT ALL.
+ * Android reads `options.width/height` as PIXELS (`Bitmap.createBitmap(width, height)`);
+ * iOS reads them as POINTS and multiplies by the screen scale. So the same number would
+ * mean two different resolutions — a real trap, but the answer is to convert, not to
+ * give up the size: without one the raster is the VIEW's dp bounds, which is what made
+ * a masked offering a smear.
+ *
+ * Android is the shipped platform (ADR-001), so the Android branch is the measured one;
+ * the iOS division is reasoned from the documented behaviour and has NOT been run.
+ */
+function rasterRequestSize(px: Size): { width: number; height: number } {
+  const scale = Platform.OS === 'ios' ? PixelRatio.get() : 1;
+  return {
+    width: Math.max(1, Math.round(px.width / scale)),
+    height: Math.max(1, Math.round(px.height / scale)),
+  };
 }
 
 const styles = StyleSheet.create({
