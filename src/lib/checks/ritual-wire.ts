@@ -35,7 +35,7 @@
  * CART_DRAFT arm return `'again'` unconditionally — and confirm it goes RED.
  */
 
-import { readBurnParams, readRewardParams, toBurnParams, toRewardParams } from '../route-params.ts';
+import { readBurnParams, readCropParams, readRewardParams, toBurnParams, toCropParams, toPreparingParams, toRewardParams } from '../route-params.ts';
 import { captureStoragePath } from '../storage-path.ts';
 import { DEMO_VALUE } from '../tutorial.ts';
 import {
@@ -311,6 +311,34 @@ check('⚠️ a REAL reward hop reads demo:false', realRead.ok && realRead.demo 
 const hopped = readRewardParams(toRewardParams('c9', 20, 2, true));
 check('⚠️ the flag survives the WHOLE chain burn → reward',
   hopped.ok && hopped.demo === true && hopped.captureId === 'c9' && hopped.throwNumber === 2);
+
+// ⚠️ THE NEW HOP (SCRUM-131). `capture → CROP → preparing` inserted a screen into the
+// middle of the chain, which is exactly where a forgotten spread would turn a tutorial
+// into a paying ritual — the flag has to survive ONE MORE hop, and the same hop has to
+// carry the photo onward or the crop step has nothing to show. Asserted on both.
+const demoFrame = toCropParams('c1', 'file://a.jpg', 3000, 4000, true);
+const demoFrameRead = readCropParams(demoFrame);
+check('toCropParams carries the demo flag', demoFrame.demo === DEMO_VALUE);
+check('readCropParams reads the flag AND the photo back',
+  demoFrameRead.ok && demoFrameRead.demo === true && demoFrameRead.uri === 'file://a.jpg');
+check('…and the shutter\'s own size rides along as the fallback',
+  demoFrameRead.ok && demoFrameRead.declaredSize?.width === 3000
+    && demoFrameRead.declaredSize?.height === 4000);
+
+const realFrame = toCropParams('c1', 'file://a.jpg', 3000, 4000);
+check('⚠️ a REAL frame hop carries NO demo param at all', realFrame.demo === undefined);
+check('⚠️ …and reads back as a real ritual',
+  readCropParams(realFrame).ok && readCropParams(realFrame).demo === false);
+
+// ⚠️ The hop that actually spends money must be reachable from BOTH exits of the crop
+// step, and the id must be the SAME one the shutter minted — the crop step is a detour,
+// not a new capture (rule ①: the id is minted before the photo and never re-derived).
+const demoOnward = toPreparingParams('c1', 'file://a.jpg', true);
+const demoOnwardRead = readCropParams({ ...demoOnward, width: '10', height: '10' });
+check('⚠️ the crop step hands the SAME id onward',
+  demoOnwardRead.ok && demoOnwardRead.captureId === 'c1' && demoOnwardRead.demo === true);
+check('⚠️ a frame hop with no photo is REFUSED BY NAME',
+  readCropParams({ captureId: 'c1' }).ok === false);
 
 // ⚠️ AND THE DROP IS DETECTABLE: strip the key (what a forgotten spread does) and
 // the hop degrades to a REAL ritual — which is exactly why this section exists.

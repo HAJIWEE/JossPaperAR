@@ -37,7 +37,7 @@ import {
   CAPTURE_MIN_BYTES,
   isUploadableCaptureSize,
 } from '../capture-size.ts';
-import { escapeForNativeLoader, nativeLoaderUriFromDecoded, unescapeFromNativeLoader } from '../native-path.ts';
+import { escapeForNativeLoader, nativeLoaderUriFromDecoded, unescapeFromNativeLoader, uploadableUri } from '../native-path.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (rel: string): string => readFileSync(join(ROOT, rel), 'utf8');
@@ -209,6 +209,21 @@ check('a plain cache path has no ExperienceData and is left alone',
 check('a non-file url is not rebuilt', nativeLoaderUriFromDecoded('https://x.test/@a/b') === 'https://x.test/@a/b');
 check('a scope with no leaf is left alone (nothing to rebuild)',
   nativeLoaderUriFromDecoded('file:///x/ExperienceData/@scope/slug') === 'file:///x/ExperienceData/@scope/slug');
+
+// ⚠️ THE COMPOSITION (SCRUM-131). `/crop` introduced a screen that may hold the photo's
+// uri in ANY of the three forms above and must hand `/preparing` the ONE form
+// `uploadCapture` consumes. `uploadableUri` is that collapse, and all three forms are
+// asserted — because "form 3 only happens in Expo Go" is exactly the assumption that
+// made the black screen invisible for a whole session.
+check('raw form → uploadable', uploadableUri(ENCODED) === ENCODED);
+check('loader form → uploadable', uploadableUri(ESCAPED) === ENCODED);
+check('decoded form (a route param) → uploadable', uploadableUri(DECODED) === ENCODED);
+check('a plain cache path is untouched by the collapse',
+  uploadableUri('file:///data/user/0/app.josspaperar/cache/Camera/a.jpg')
+    === 'file:///data/user/0/app.josspaperar/cache/Camera/a.jpg');
+check('a non-file url is not collapsed for upload', uploadableUri('https://x.test/@a/b') === 'https://x.test/@a/b');
+check('⚠️ the collapse is what ritual.ts consumes: escape() undoes it',
+  escapeForNativeLoader(uploadableUri(DECODED)) === ESCAPED);
 
 // ── summary ──────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(64)}`);

@@ -57,6 +57,42 @@ export function unescapeFromNativeLoader(uri: string): string {
 }
 
 /**
+ * The form `uploadCapture` expects, from ANY form a screen happens to hold.
+ *
+ * ⚠️ WHY THIS EXISTS (SCRUM-131). The crop step introduces a SECOND and THIRD way to
+ * hold the photo's uri, and `uploadCapture` accepts exactly one of them:
+ *
+ *   · `escapeForNativeLoader`  — the raw `takePictureAsync` form (`…%40scope%2F…`)
+ *   · `unescapeFromNativeLoader` — `fetch` reads it as-is, so `%25` must be collapsed
+ *
+ * A screen may hold the uri in any of three forms, and they are indistinguishable by
+ * inspection (`%40` is a *literal directory name*, not an escape):
+ *
+ *   1. RAW     `…/ExperienceData/%40scope%2Fslug/Camera/a.jpg`  ← `takePictureAsync`
+ *   2. LOADER  `…/ExperienceData/%2540scope%252Fslug/…`         ← any native-loader form
+ *   3. DECODED `…/ExperienceData/@scope/slug/Camera/a.jpg`      ← a route param (S60)
+ *
+ * This function collapses all three onto form 1, which is the only one
+ * `uploadCapture` can consume:
+ *
+ *   · 1 → `nativeLoaderUriFromDecoded` is a no-op (no `@`), `unescape…` has no `%25`
+ *   · 2 → `nativeLoaderUriFromDecoded` is a no-op, `unescape…` gives form 1
+ *   · 3 → `nativeLoaderUriFromDecoded` rebuilds form 2, `unescape…` gives form 1
+ *
+ * ⚠️ It is COMPOSED of the two measured helpers rather than re-implemented, so the
+ * rules stay in one place and `check:capturesize` asserts this composition on all
+ * three forms. Do NOT "simplify" it to `decodeURIComponent` or to a bare `unescape`:
+ * either one loses form 3, which is the black-screen case this project has already
+ * paid for twice.
+ *
+ * A non-`file` uri (http, a `data:` uri) is returned unchanged — nothing to rebuild.
+ */
+export function uploadableUri(uri: string): string {
+  if (!uri.startsWith('file://')) return uri;
+  return unescapeFromNativeLoader(nativeLoaderUriFromDecoded(uri));
+}
+
+/**
  * Rebuild the native-loader form of a captured photo when the route param has
  * **already been decoded** — which is what `useLocalSearchParams` hands a screen.
  *
