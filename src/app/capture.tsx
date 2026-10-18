@@ -78,6 +78,18 @@ type Phase =
  */
 const ZOOM_THUMB_RADIUS = 14;
 
+/**
+ * The VISIBLE preset pill's box (dp) — half the touch target.
+ *
+ * ⚠️ TWO BOXES, ONE CONTROL (S64). The owner asked for the 1×/2×/4× pills at half
+ * their size. The pill they see is now this; the box their finger gets is still
+ * `TOUCH_TARGET` (44 dp), because that floor exists for this app's 40–50s audience
+ * (doc 15 §8 · `responsive.css`) and a control that is smaller *and* harder to hit
+ * would trade one complaint for a worse one. The relationship is derived, not
+ * typed twice, so the pill can never outgrow the target it sits in.
+ */
+const ZOOM_PILL_SIZE = TOUCH_TARGET / 2;
+
 export default function CaptureScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -254,7 +266,15 @@ export default function CaptureScreen() {
         zoom={zoomFraction}
       />
 
-      {/* The camera is the whole screen — the ritual is not a form. */}
+      {/*
+        The camera is the whole screen — the ritual is not a form.
+
+        ⚠️ `styles.hud` carries `flex: 1` (S64), and THAT is what puts the controls
+        at the bottom. The HUD absorbs every dp the screen has left over, so the
+        zoom strip and the shutter are pushed down to the thumb while the hint stays
+        on the HUD's own top edge. One flexible box does both jobs — no absolute
+        positioning, so nothing can drift when the safe area changes.
+      */}
       <View style={[styles.hud, { paddingTop: insets.top + space.md }]} pointerEvents="none">
         <Text style={styles.hint}>{t('capture.photoHint')}</Text>
       </View>
@@ -262,11 +282,17 @@ export default function CaptureScreen() {
       {/*
         THE ZOOM — the read-out, the analogue track, and the presets (S64).
 
+        ⚠️ IT SITS DIRECTLY ABOVE THE SHUTTER (S64, owner). It used to stack under
+        the hint at the top of the window — the far corner from the thumb, on a
+        screen whose whole gesture is one-handed. It is now the last thing before
+        the shutter, so the strip and the button it serves are one cluster.
+
         ⚠️ OUTSIDE the `pointerEvents="none"` HUD and AFTER the preview, or the
-        touches would land on the camera view. Every control here is a real 44 dp
-        target: the audience this is built for (40–50s, doc 15 §8) is the reason
-        `TOUCH_TARGET` exists, and a zoom you cannot reliably hit is worse than no
-        zoom.
+        touches would land on the camera view. Every control here is still a real
+        44 dp target: the audience this is built for (40–50s, doc 15 §8) is the
+        reason `TOUCH_TARGET` exists, and a zoom you cannot reliably hit is worse
+        than no zoom — which is why the presets shrank visually but NOT in their
+        touch boxes (see `zoomStop` in the styles below).
 
         ⚠️ THE READ-OUT IS THE POINT OF THE WHOLE STRIP. The owner's original
         report (SCRUM-131) was that a pinch had no visible answer; the number shows
@@ -339,13 +365,14 @@ export default function CaptureScreen() {
               // selected state, not just a colour (doc 19 §4.4).
               accessibilityState={{ selected: active }}
               onPress={() => applyPreset(stop.id)}
-              style={({ pressed }) => [
-                styles.zoomStop,
-                active && styles.zoomStopActive,
-                pressed && styles.pressed,
-              ]}
+              // ⚠️ The Pressable IS the 44 dp target; the pill the player sees is
+              // the child below it. Splitting them is the only way to honour both
+              // the owner's "half the size" and this project's touch floor.
+              style={({ pressed }) => [styles.zoomStop, pressed && styles.pressed]}
             >
-              <Text style={[styles.zoomLabel, active && styles.zoomLabelActive]}>{stop.label}</Text>
+              <View style={[styles.zoomStopPill, active && styles.zoomStopPillActive]}>
+                <Text style={[styles.zoomLabel, active && styles.zoomLabelActive]}>{stop.label}</Text>
+              </View>
             </Pressable>
           );
         })}
@@ -398,16 +425,33 @@ export default function CaptureScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: surface.camera },
-  hud: { alignItems: 'center' },
+  /**
+   * ⚠️ `flex: 1` IS THE LAYOUT, not decoration. The HUD takes every dp the screen
+   * has left over, which is what pushes the zoom strip and the shutter to the
+   * bottom (S64) while the hint stays on the HUD's own top edge. Remove it and the
+   * controls climb back up under the hint — the exact placement the owner asked to
+   * move away from.
+   */
+  hud: { flex: 1, alignItems: 'center' },
   hint: {
     color: onColorCream,
     fontSize: fontSize.caption.at390,
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
-  shutterRow: { alignItems: 'center', justifyContent: 'flex-end', flex: 1 },
   /**
-   * The zoom strip, sitting directly above the shutter (SCRUM-131).
+   * The shutter — now the LAST child, under the zoom strip (S64). It no longer
+   * needs `flex: 1` to reach the bottom (the HUD's flex does that), so it is only
+   * as tall as the button plus the safe-area padding, and `marginTop` keeps it from
+   * touching the presets above it.
+   */
+  shutterRow: {
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: space.md,
+  },
+  /**
+   * The zoom strip, directly above the shutter (SCRUM-131 · S64).
    * `row` + centred so the stops read as one control; the gap keeps two adjacent
    * 44 dp targets from sharing an edge, which is how a fat-finger picks 4× while
    * aiming at 2×.
@@ -416,7 +460,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: space.md,
+    /**
+     * ⚠️ THE GAP IS BETWEEN THE TARGETS, NOT THE PILLS THE EYE SEES. The pills
+     * shrank by half (S64) but their 44 dp boxes did not, so a gap of `md` would
+     * read as a wide, scattered strip. `xs` is a quarter of the old value and keeps
+     * the boxes from sharing an edge — the reason the gap exists at all.
+     */
+    gap: space.xs,
     marginTop: space.md,
   },
   /**
@@ -469,10 +519,36 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: surface.camera,
   },
+  /**
+   * ⚠️ THE TAP TARGET AND THE PILL ARE TWO BOXES, AND THE SPLIT IS THE POINT (S64).
+   *
+   * The owner asked for the 1×/2×/4× pills at HALF their size. Halving the
+   * Pressable itself would have halved the touch area too — and this project holds
+   * 44 dp for a 40–50s audience (doc 15 §8 · `responsive.css`), on a screen where
+   * the control is used one-handed while aiming. So the target keeps its 44 dp box
+   * and the VISIBLE pill is the child below it: the picture halves, the hit area
+   * does not. `hitSlop` could not do this — RN clips it to the parent's bounds, so
+   * a slop that crossed this row's own height would silently do nothing.
+   */
   zoomStop: {
     minWidth: TOUCH_TARGET,
     minHeight: TOUCH_TARGET,
-    paddingHorizontal: space.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /**
+   * The pill the player sees — `ZOOM_PILL_SIZE` (22 dp), centred in the 44 dp
+   * target above.
+   *
+   * ⚠️ `minWidth`/`minHeight`, never a fixed `width`/`height`: N11 honours system
+   * font scaling to ×1.5, and a hard 22 would clip the numeral at large type. The
+   * label at `caption` fits inside 22 dp with room to spare, so the box is round
+   * at default type and simply grows when the reader asks for bigger text.
+   */
+  zoomStopPill: {
+    minWidth: ZOOM_PILL_SIZE,
+    minHeight: ZOOM_PILL_SIZE,
+    paddingHorizontal: space.xs,
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: onColorCream,
@@ -487,8 +563,9 @@ const styles = StyleSheet.create({
    * screen's background uses — so the pair is the inverse of the idle state rather
    * than a new colour.
    */
-  zoomStopActive: { backgroundColor: onColorCream, borderColor: onColorCream },
-  zoomLabel: { color: onColorCream, fontSize: fontSize.body.at390, fontWeight: '600' },
+  zoomStopPillActive: { backgroundColor: onColorCream, borderColor: onColorCream },
+  /** `caption`, not `body`: the label shrank with the pill it sits in. */
+  zoomLabel: { color: onColorCream, fontSize: fontSize.caption.at390, fontWeight: '600' },
   zoomLabelActive: { color: surface.camera },
   shutter: {
     width: 76,
