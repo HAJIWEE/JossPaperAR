@@ -85,9 +85,28 @@ export default function Preparing(): React.JSX.Element {
   const [phase, setPhase] = useState<Phase>({ kind: 'working' });
   const started = useRef(false);
 
+  /**
+   * ⚠️ EVERY retryable failure now NAMES ITSELF IN THE LOG (S64).
+   *
+   * Added because a real failure on glass showed the player "This offering cannot be
+   * prepared" and left **no trace anywhere** — the `offline` phase covers five very
+   * different causes (no session · the row would not insert · the upload failed · a
+   * transport failure · the wait ran out), and four of them logged nothing. Diagnosing it
+   * meant reading the code and guessing, which is exactly what a log is for.
+   *
+   * ⚠️ The copy the player sees stays generic on purpose: `session_read_failed` is our
+   * vocabulary, not theirs, and the retry is the same button either way. The REASON is for
+   * us — `uploadFailureVerdict`'s two verdicts are the one place where the player is told
+   * apart (`ritual_busy` vs a retry), and that distinction is unaffected by this.
+   */
+  const goOffline = useCallback((reason: string) => {
+    console.warn('prepare_offline:', reason);
+    setPhase({ kind: 'offline', reason });
+  }, []);
+
   const run = useCallback(async () => {
     if (typeof captureId !== 'string' || typeof uri !== 'string') {
-      setPhase({ kind: 'offline', reason: 'bad_params' });
+      goOffline('bad_params');
       return;
     }
     setPhase({ kind: 'working' });
@@ -116,7 +135,7 @@ export default function Preparing(): React.JSX.Element {
     // spent if this fails, so it retries on the same road as a transport failure.
     const session = await ensureAnonymousSession();
     if (!session.ok) {
-      setPhase({ kind: 'offline', reason: session.reason });
+      goOffline(session.reason);
       return;
     }
 
@@ -125,7 +144,7 @@ export default function Preparing(): React.JSX.Element {
     try {
       ({ userId } = await registerCapture(captureId));
     } catch {
-      setPhase({ kind: 'offline', reason: 'capture_insert_failed' });
+      goOffline('capture_insert_failed');
       return;
     }
 
@@ -148,7 +167,7 @@ export default function Preparing(): React.JSX.Element {
         'capture_upload_threw:',
         error instanceof Error ? error.message : String(error),
       );
-      setPhase({ kind: 'offline', reason: 'capture_upload_failed' });
+      goOffline('capture_upload_failed');
       return;
     }
 
@@ -165,7 +184,7 @@ export default function Preparing(): React.JSX.Element {
       // The photo is intact; the network was not. Nothing was generated and
       // nothing was spent, so this is a genuine retry.
       console.warn('capture_upload_transient:', upload.reason);
-      setPhase({ kind: 'offline', reason: upload.reason });
+      goOffline(upload.reason);
       return;
     }
 
@@ -234,10 +253,7 @@ export default function Preparing(): React.JSX.Element {
       // Nothing is in flight (a transport failure), or the wait itself ran out.
       // Either way nothing was generated, so nothing was spent — a genuine retry.
       if (verdict === 'retriable') {
-        setPhase({
-          kind: 'offline',
-          reason: outcome.kind === 'transient' ? outcome.reason : 'still_preparing',
-        });
+        goOffline(outcome.kind === 'transient' ? outcome.reason : 'still_preparing');
         return;
       }
 
@@ -248,7 +264,7 @@ export default function Preparing(): React.JSX.Element {
       // the provider.
       await new Promise((resolve) => setTimeout(resolve, PROBE_DELAY_MS));
     }
-  }, [captureId, uri, demo, router]);
+  }, [captureId, uri, demo, router, goOffline]);
 
   // `started` guards against React 18 StrictMode double-invoking effects, which
   // would upload twice and — because `unique(capture_id)` makes the job

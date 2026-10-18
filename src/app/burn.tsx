@@ -53,7 +53,7 @@ import {
   restingPoint,
 } from '@/domain/throw';
 import { localized, t } from '@/lib/i18n';
-import { nativeLoaderUriFromDecoded } from '@/lib/native-path';
+import { nativeLoaderUriFromAnyForm } from '@/lib/native-path';
 import { readBurnParams, toRewardParams } from '@/lib/route-params';
 import { supabase, supabaseConfig } from '@/lib/supabase';
 import {
@@ -255,16 +255,21 @@ export default function BurnScreen() {
    * something and never saw it again. The demo now draws that photograph, which is
    * already on the device as the `uri` param and costs nothing.
    *
-   * ⚠️ THE URI NEEDS `nativeLoaderUriFromDecoded`, AND THAT IS MEASURED. The route
-   * param arrives DECODED (`…/ExperienceData/@scope/slug/Camera/a.jpg`) while the
-   * sandbox directory on disk is literally `%40scope%2Fslug`, and every native
-   * loader decodes a URI exactly once. Handing `<Image>` the param as-is draws
-   * nothing (a magenta test background showed through the whole box), and
-   * `Image.getSize` answers ENOENT; encoding it once (`%40…`) also ENOENTs, because
-   * the loader decodes it straight back. The double-encoded form is the one that
-   * resolves — `Image.getSize` returned **3000 × 4000**. Note this is NOT
-   * `escapeForNativeLoader`, which assumes the URI still carries its escapes (see
-   * that function's header, and `nativeLoaderUriFromDecoded`'s).
+   * ⚠️ THE URI NEEDS A NATIVE-LOADER ENCODING, AND WHICH ONE IS NOT FIXED — MEASURED TWICE.
+   * The route param arrives DECODED (`…/ExperienceData/@scope/slug/Camera/a.jpg`) while the
+   * sandbox directory on disk is literally `%40scope%2Fslug`, and every native loader decodes
+   * a URI exactly once. Handing `<Image>` the param as-is draws nothing (a magenta test
+   * background showed through the whole box), and `Image.getSize` answers ENOENT; encoding it
+   * once (`%40…`) also ENOENTs, because the loader decodes it straight back. The
+   * double-encoded form is the one that resolves — `Image.getSize` returned **3000 × 4000**.
+   *
+   * ⚠️ S64: *"the param arrives decoded"* is a property of the ROUTE, not of the photo — a
+   * hop that goes through a URL decodes it, and a sibling screen's `router.push` does not.
+   * The frame step measured the RAW form arriving on exactly this kind of hop this session
+   * and drew a black stage. So the encoding is now `nativeLoaderUriFromAnyForm`, which is
+   * correct whichever of the three forms turns up. ⚠️ Do NOT go back to
+   * `nativeLoaderUriFromDecoded` here: it is a no-op on the raw form, and the failure is
+   * silent — a missing picture, not an error.
    *
    * ⚠️ Deliberately demo-only. If signing fails on a REAL hop, drawing the original
    * photo would present the *unstyled* image as the thing the player paid to have
@@ -273,7 +278,7 @@ export default function BurnScreen() {
    */
   const demoOffering =
     spritePath === null && demo && photoUri.length > 0
-      ? nativeLoaderUriFromDecoded(photoUri)
+      ? nativeLoaderUriFromAnyForm(photoUri)
       : null;
 
   /** The image to draw, or `null` — derived, never stored, so it cannot go stale. */

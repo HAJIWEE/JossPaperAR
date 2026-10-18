@@ -62,13 +62,22 @@ export const MESSAGES = {
     // ⚠️ The stop LABELS themselves ("1×"/"2×"/"4×") are numerals and live in
     // `src/lib/zoom.ts` — see that file for why they are not translated.
     'zoom.stopA11y': 'Zoom %{label}',
+    // The analogue track's label. ⚠️ The VALUE it announces is the ratio, built in
+    // `zoom.ts` (a numeral, like the labels above).
+    'zoom.sliderA11y': 'Zoom',
     'crop.title': 'Frame your offering',
     'crop.hintRect': 'Drag over your offering.',
-    'crop.hintLasso': 'Draw around your offering.',
+    'crop.hintLasso': 'Draw a closed loop around your offering.',
     'crop.modeRect': 'Rectangle',
     'crop.modeLasso': 'Lasso',
-    // ⚠️ The honest sentence: the outline becomes a BOX. See SCRUM-130.
-    'crop.lassoNote': 'Freehand — used as the box around your outline.',
+    // ⚠️ Rewritten in S64: the outline is applied FREE-FORM now. See SCRUM-130.
+    'crop.lassoNote': 'Freehand — everything outside your outline is removed.',
+    // ── the outline's four refusals (S64, `src/lib/lasso.ts`) ──────────────
+    // ⚠️ Four sentences for four faults, because they need four different actions.
+    'crop.lassoTooShort': 'Draw a bigger loop around your offering.',
+    'crop.lassoDegenerate': 'That loop encloses nothing — draw around your offering.',
+    'crop.lassoOpen': 'Join the two ends — the outline must be a closed loop.',
+    'crop.lassoCrosses': 'Your outline crosses itself — draw one simple loop.',
     'crop.tooSmall': 'Choose a larger area.',
     'crop.skip': 'Use the whole photo',
     'crop.confirm': 'Use this frame',
@@ -277,13 +286,20 @@ export const MESSAGES = {
     // ── SCRUM-131：变焦档位与裁切／套索 ─────────────────────────────────────
     // ⚠️ 档位标签（"1×"／"2×"／"4×"）是数字，定义在 `src/lib/zoom.ts`。
     'zoom.stopA11y': '变焦 %{label}',
+    // 模拟滑杆的标签。⚠️ 它播报的数值是倍率，由 `zoom.ts` 生成。
+    'zoom.sliderA11y': '变焦',
     'crop.title': '框出您的供品',
     'crop.hintRect': '在供品上拖动框选。',
-    'crop.hintLasso': '沿供品画出范围。',
+    'crop.hintLasso': '沿供品画一圈并合上首尾。',
     'crop.modeRect': '方框',
     'crop.modeLasso': '套索',
-    // ⚠️ 老实说明：画出的范围会取其外框。见 SCRUM-130。
-    'crop.lassoNote': '手绘范围——按您轮廓的外框取用。',
+    // ⚠️ S64 改写：轮廓现在是自由形状套用。见 SCRUM-130。
+    'crop.lassoNote': '手绘圈选——轮廓之外的部分会被去除。',
+    // ── 轮廓的四种拒绝（S64，`src/lib/lasso.ts`）──────────────────────────
+    'crop.lassoTooShort': '请绕着供品画大一点的圈。',
+    'crop.lassoDegenerate': '这个圈没有围出范围——请绕着供品画。',
+    'crop.lassoOpen': '请把首尾连起来——轮廓必须是闭合的圈。',
+    'crop.lassoCrosses': '轮廓自己交叉了——请画一个简单的圈。',
     'crop.tooSmall': '请选择更大的范围。',
     'crop.skip': '使用整张照片',
     'crop.confirm': '使用此框',
