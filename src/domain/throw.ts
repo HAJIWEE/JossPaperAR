@@ -73,14 +73,23 @@ export interface FireHeart {
  * which is the class of defect a type cannot catch and a screenshot does not
  * reveal.
  *
- * So the coupling is a function now (`fireBoxTop`), and `check:throw` asserts the
- * box's centre lands on the heart — including that the offset is NOT zero, so a
- * future "simplification" back to `top = height × HEART_AT.y` goes red.
+ * So the coupling is a function now (`fireBoxTop`) — and `/burn` goes further: it
+ * hands `heartPoint` straight to `FireArt`, which anchors its own box on that
+ * point, so the artwork cannot be positioned by its edge at all. `fireBoxTop`
+ * remains the pure rule for any box centred on the heart, and `check:throw`
+ * asserts it, so the old `top = height × HEART_AT.y` form cannot come back.
  */
-export const HEART_AT = { x: 0.5, y: 0.56 } as const;
+export const HEART_AT = { x: 0.5, y: 0.44 } as const;
 
-/** Where the offering rests — where the finger lifts off. */
-export const REST_AT = { x: 0.5, y: 0.86 } as const;
+/**
+ * Where the offering rests — where the finger lifts off.
+ *
+ * ⚠️ It moved UP with the heart by the same 12 % (0.86 → 0.74) on 2026-10-18, so
+ * the thumb's travel to the fire is unchanged by the fire having moved. Moving
+ * one without the other would have changed the length of the gesture, which is
+ * the aim.
+ */
+export const REST_AT = { x: 0.5, y: 0.74 } as const;
 
 /** The fire's heart as a CENTRE point, in the same px space the bands use. */
 export function heartPoint(width: number, height: number): FireHeart {

@@ -18,12 +18,19 @@
  *      show a preview and submits the *offset*; `submit_burn` re-derives the
  *      band server-side. `gradeThrow` returning `previewBand` is a display
  *      concern, not an authority — the field is named for it.
+ *   3. **The throw is DRAWN, not merely graded.** The offering lags the finger
+ *      and the release sends it along a Bézier that LANDS on the release point —
+ *      which is the very point `gradeThrow` measures from. So "where it visibly
+ *      lands" and "what it scored" are one number, and a graze cannot look like
+ *      a bullseye. The fire only answers once the offering has arrived.
  */
 
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
   Image,
   PanResponder,
   Pressable,
@@ -34,12 +41,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ART_SCALE, FLAME_TOP_ABOVE_HEART, FireArt, type FireReaction } from '@/components/fire-art';
 import type { BandId } from '@/domain/aim';
 import {
   MAX_THROWS,
   bandLabel,
   canThrow,
-  fireBoxTop,
   gradeThrow,
   heartPoint,
   offsetFromHeart,
@@ -49,25 +56,31 @@ import { localized, t } from '@/lib/i18n';
 import { nativeLoaderUriFromDecoded } from '@/lib/native-path';
 import { readBurnParams, toRewardParams } from '@/lib/route-params';
 import { supabase, supabaseConfig } from '@/lib/supabase';
-import { TOUCH_TARGET, fontSize, onColorCream, radius, space, surface, text } from '@/theme/tokens';
+import {
+  TOUCH_TARGET,
+  brand,
+  fontSize,
+  onColorCream,
+  radius,
+  space,
+  surface,
+  text,
+} from '@/theme/tokens';
 
 /**
- * ⚠️ `HEART_AT` / `REST_AT` / `heartPoint` / `restingPoint` / `fireBoxTop` live in
+ * ⚠️ `HEART_AT` / `REST_AT` / `heartPoint` / `restingPoint` live in
  * `src/domain/throw.ts`, NOT here — deliberately.
  *
  * They used to be local constants, and that is precisely how the artwork drifted
- * from the grader: this screen positioned the fire by its TOP EDGE while
- * `gradeThrow` graded against the heart's CENTRE, so the flame was drawn 60 px
- * below the point the throw was scored against. Keeping both halves of that
- * coupling in one pure module is what lets `check:throw` assert they agree
- * without a device. Do not re-localise them.
+ * from the grader. Keeping both halves of that coupling in one pure module is
+ * what lets `check:throw` assert they agree without a device. Do not re-localise
+ * them.
+ *
+ * Both were raised 12 % on 2026-10-18 (`HEART_AT.y` 0.56 → 0.44,
+ * `REST_AT.y` 0.86 → 0.74). Raising the heart is GRADING-SAFE: every band is a
+ * RADIUS from that point, so moving the point moves the whole target and changes
+ * no offset. `FireArt` draws AROUND the heart, never beside it.
  */
-
-/** The fire's drawn diameter. `fireBoxTop` centres a box of this size on the heart. */
-const FIRE_SIZE = 120;
-
-/** The held offering's drawn size (doc 17 §3: the sprite is an overlay layer). */
-const SPRITE_SIZE = 140;
 
 /**
  * How long a signed sprite URL is good for. The burn screen is the last hop of
@@ -75,6 +88,82 @@ const SPRITE_SIZE = 140;
  * point, because the sprite is private (`styled_read_own`).
  */
 const SPRITE_URL_TTL_S = 300;
+
+/** The offered object: the styled sprite, mounted on its paper card. */
+const OFFERING_SIZE = 72;
+
+/**
+ * How far the held object trails the finger. This is the PROTOTYPE's authored
+ * feel (`dx * .35, dy * .55`, `public/demo/app.js`): the finger's real travel is
+ * the aim and the sprite lags it — which is also what gives the release
+ * something to fly across, since the arc starts where the sprite is.
+ */
+const DRAG_LAG = { x: 0.35, y: 0.55 } as const;
+
+/** Flight time per band. A miss hangs longest — it has the farthest to fall. */
+const FLIGHT_MS = { bullseye: 620, devout: 620, graze: 700, miss: 780 } as const;
+
+/** The missed offering's glide back to the hand (S9: it is never destroyed). */
+const RETURN_MS = 520;
+
+interface Point {
+  readonly x: number;
+  readonly y: number;
+}
+
+/**
+ * One throw's arc, pre-sampled into the arrays `Animated.interpolate` needs.
+ * All offsets are relative to the resting point, because that is where the
+ * offering's box is anchored.
+ */
+interface FlightPlan {
+  /** Interpolation stops, 0 → 1. */
+  at: number[];
+  x: number[];
+  y: number[];
+  /** Absolute screen points — kept so a return can start from where it landed. */
+  from: Point;
+  to: Point;
+}
+
+/** Before the first throw: the object is home and not moving. */
+const HOME_PLAN: FlightPlan = {
+  at: [0, 1],
+  x: [0, 0],
+  y: [0, 0],
+  from: { x: 0, y: 0 },
+  to: { x: 0, y: 0 },
+};
+
+/**
+ * The throw's arc.
+ *
+ * A quadratic Bézier through the two ends whose control point sits halfway
+ * across — which makes x LINEAR in time and y a parabola: exactly the shape the
+ * prototype flew (`controlPoint` in `public/demo/app.js`). `apexY` is the height
+ * the curve actually peaks at, not a control point, so the caller can say "clear
+ * the flame by half the offering" and get it.
+ *
+ * ⚠️ SAMPLED, not eased: `Easing` maps progress to a single NUMBER, but the path
+ * needs a different curve for x and y. Twelve chords put the error well under a
+ * pixel at this size, and the whole flight is drawn on the JS driver anyway.
+ */
+function arcPlan(from: Point, to: Point, apexY: number, origin: Point): FlightPlan {
+  const cx = (from.x + to.x) / 2;
+  const cy = 2 * apexY - (from.y + to.y) / 2;
+  const steps = 12;
+  const at: number[] = [];
+  const x: number[] = [];
+  const y: number[] = [];
+  for (let i = 0; i <= steps; i += 1) {
+    const t = i / steps;
+    const q = 1 - t;
+    at.push(t);
+    x.push(q * q * from.x + 2 * q * t * cx + t * t * to.x - origin.x);
+    y.push(q * q * from.y + 2 * q * t * cy + t * t * to.y - origin.y);
+  }
+  return { at, x, y, from, to };
+}
 
 interface Preview {
   readonly offsetPx: number;
@@ -129,6 +218,20 @@ export default function BurnScreen() {
   const [signed, setSigned] = useState<{ readonly path: string; readonly url: string } | null>(null);
   /** The URL to draw, or `null` — derived, never stored, so it cannot go stale. */
   const spriteUrl = spritePath !== null && signed?.path === spritePath ? signed.url : null;
+  /** The arc this throw is flying. `HOME_PLAN` = nothing in the air. */
+  const [plan, setPlan] = useState<FlightPlan>(HOME_PLAN);
+  /** The fire's answer, once the offering has actually arrived. */
+  const [reaction, setReaction] = useState<FireReaction | null>(null);
+  const [reactionNonce, setReactionNonce] = useState(0);
+  /**
+   * Has the offering finished flying? The GRADE is shown at release, but the
+   * buttons only appear once it has landed — so the throw is watchable, and so a
+   * rethrow cannot be pressed into the middle of a flight (`rethrow` re-plans the
+   * arc, which from mid-air would be a teleport).
+   */
+  const [arrived, setArrived] = useState(false);
+  /** True while a missed offering is gliding home, when no new throw may start. */
+  const [returning, setReturning] = useState(false);
 
   /**
    * THE TUTORIAL'S OFFERING — the photo the player just took.
@@ -144,7 +247,7 @@ export default function BurnScreen() {
    * param arrives DECODED (`…/ExperienceData/@scope/slug/Camera/a.jpg`) while the
    * sandbox directory on disk is literally `%40scope%2Fslug`, and every native
    * loader decodes a URI exactly once. Handing `<Image>` the param as-is draws
-   * nothing (a magenta test background showed through the whole 140 dp box), and
+   * nothing (a magenta test background showed through the whole box), and
    * `Image.getSize` answers ENOENT; encoding it once (`%40…`) also ENOENTs, because
    * the loader decodes it straight back. The double-encoded form is the one that
    * resolves — `Image.getSize` returned **3000 × 4000**. Note this is NOT
@@ -214,19 +317,45 @@ export default function BurnScreen() {
     };
   }, [spritePath]);
 
+  /**
+   * The offering's three transform sources.
+   *
+   * ⚠️ ALL THREE RUN ON THE JS DRIVER (`useNativeDriver: false`). The flight's
+   * interpolation range is re-planned for every throw — a different arc, a
+   * different landing point, a return from wherever the last one came to rest —
+   * and a native animated node does not reliably pick up a changed range. The
+   * fire's reaction stays on the UI thread (a fixed range, in `fire-art.tsx`).
+   * The screen does nothing else while an offering is in the air, so there is no
+   * JS work for the flight to contend with.
+   */
+  const [drag] = useState(() => new Animated.ValueXY());
+  const [flight] = useState(() => new Animated.Value(0));
+  const [landed] = useState(() => new Animated.Value(1));
+  /** The band whose flight is waiting for its arc to render. */
+  const pendingBand = useRef<BandId | null>(null);
+  /** Bumped per throw, so a stale completion cannot land or reset a live one. */
+  const flightToken = useRef(0);
+
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     setSize({ width, height });
   }, []);
 
+  /** The graded point, and the hand. Both derived from the ONE measured layout. */
+  const heart = useMemo(() => heartPoint(size.width, size.height), [size.width, size.height]);
+  const rest = useMemo(() => restingPoint(size.width, size.height), [size.width, size.height]);
+
   /** Grade the resting point of a drag, in screen px. */
   const gradeRest = useCallback(
     (dx: number, dy: number, n: number): Preview | null => {
       if (size.width === 0 || size.height === 0) return null;
-      const heart = heartPoint(size.width, size.height);
-      const base = restingPoint(size.width, size.height);
-      const resting = { x: base.x + dx, y: base.y + dy };
-      const outcome = gradeThrow(offsetFromHeart(resting, heart), n);
+      const release = { x: rest.x + dx, y: rest.y + dy };
+      // ⚠️ DIVIDE BY THE ART SCALE. The thresholds are the fire's own
+      // proportions in PENPOT units, but the artwork is drawn at `ART_SCALE`.
+      // Grading the raw screen distance would let 虔诚's boundary (±39.40) fall
+      // outside a flame whose visible half-width is now 33.7 dp — a throw that
+      // visibly misses the fire would still pay ×1.5.
+      const outcome = gradeThrow(offsetFromHeart(release, heart) / ART_SCALE, n);
       return {
         offsetPx: outcome.offsetPx,
         band: outcome.previewBand,
@@ -235,7 +364,112 @@ export default function BurnScreen() {
         spent: outcome.spent,
       };
     },
-    [size.width, size.height],
+    [heart, rest, size.width, size.height],
+  );
+
+  /**
+   * What the fire does when the offering arrives. The GRADE is already on screen
+   * — it was decided at release — so this is the visual half only.
+   */
+  const land = useCallback(
+    (band: BandId) => {
+      setArrived(true);
+      if (band === 'miss') {
+        // Not burned, so not dimmed out of existence: it lies where it fell,
+        // outside the pit, until the player decides to throw it again.
+        Animated.timing(landed, { toValue: 0.6, duration: 240, useNativeDriver: false }).start();
+        return;
+      }
+      const takes = band === 'bullseye' || band === 'devout';
+      setReaction(takes ? 'flare' : 'smoulder');
+      setReactionNonce((n) => n + 1);
+      Animated.timing(landed, {
+        // A hit is CONSUMED in the flame core; a graze is left charring on the coals.
+        toValue: takes ? 0 : 0.28,
+        duration: takes ? 240 : 320,
+        delay: takes ? 80 : 0,
+        useNativeDriver: false,
+      }).start();
+    },
+    [landed],
+  );
+
+  /**
+   * Kick the flight once its arc has rendered.
+   *
+   * ⚠️ NOT IN THE RELEASE HANDLER. `setPlan` is committed on the next render but
+   * `Animated.Value.setValue` takes effect immediately, so resetting the values
+   * there would apply them against the OLD arc for a frame — snapping the
+   * offering back to the hand before the new arc exists. After the commit the two
+   * agree (the new arc's t=0 IS the lagged position), so the handover is seamless.
+   */
+  useEffect(() => {
+    const band = pendingBand.current;
+    if (band === null) return;
+    pendingBand.current = null;
+    flightToken.current += 1;
+    const token = flightToken.current;
+    drag.setValue({ x: 0, y: 0 });
+    flight.setValue(0);
+    landed.stopAnimation();
+    landed.setValue(1);
+    Animated.timing(flight, {
+      toValue: 1,
+      duration: FLIGHT_MS[band],
+      // ⚠️ LINEAR. The Bézier IS the easing; a second easing would bend the
+      // parabola into something that no longer lands where it was aimed.
+      easing: Easing.linear,
+      useNativeDriver: false,
+    }).start(({ finished }) => {
+      if (finished && token === flightToken.current) land(band);
+    });
+  }, [plan, drag, flight, landed, land]);
+
+  /**
+   * Release = one throw.
+   *
+   * The finger's real travel is still the AIM — exactly as before this screen
+   * drew anything, so the four bands are untouched. What is new is that the
+   * sprite lags the finger (`DRAG_LAG`), so the arc has a real distance to cover:
+   * it starts where the sprite is and lands where the finger let go. Because the
+   * grade is a RADIUS from the heart, landing at the release point puts the
+   * offering in the flame, on the coals or in the dirt for free — the same
+   * geometry that graded it.
+   */
+  const releaseThrow = useCallback(
+    (dx: number, dy: number) => {
+      const graded = gradeRest(dx, dy, throwNumber);
+      if (graded === null) return;
+      setPreview(graded);
+      setArrived(false);
+      setReaction(null);
+
+      const from = { x: rest.x + dx * DRAG_LAG.x, y: rest.y + dy * DRAG_LAG.y };
+      const to = { x: rest.x + dx, y: rest.y + dy };
+      // Clear the flame by half the offering, and never fly under the HUD.
+      const apexY = Math.max(
+        heart.y - FLAME_TOP_ABOVE_HEART - OFFERING_SIZE / 2,
+        insets.top + OFFERING_SIZE,
+      );
+      // Hand off to the effect above: the arc has to render before the flight
+      // can be started against it (see the note there).
+      pendingBand.current = graded.band;
+      setPlan(arcPlan(from, to, apexY, rest));
+    },
+    [gradeRest, throwNumber, rest, heart.y, insets.top],
+  );
+
+  /**
+   * Nothing may call setState after the screen is gone. A stopped animation
+   * reports `finished: false`, which every callback above already ignores.
+   */
+  useEffect(
+    () => () => {
+      drag.stopAnimation();
+      flight.stopAnimation();
+      landed.stopAnimation();
+    },
+    [drag, flight, landed],
   );
 
   // The responder needs the measured layout, so it is rebuilt when the layout or
@@ -243,14 +477,34 @@ export default function BurnScreen() {
   const responder = useMemo(
     () =>
       PanResponder.create({
-        onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > TOUCH_TARGET,
-        onPanResponderRelease: (_e, g) => {
-          const graded = gradeRest(g.dx, g.dy, throwNumber);
-          if (graded) setPreview(graded);
+        // ONE throw at a time: once a grade is on screen the buttons drive
+        // (Confirm / Throw again), so a second swipe cannot re-grade underneath
+        // an offering that is still in the air. Nor while a missed offering is
+        // still gliding home — that would cut its arc short.
+        onMoveShouldSetPanResponder: (_e, g) =>
+          preview === null && !returning && Math.abs(g.dy) > TOUCH_TARGET,
+        onPanResponderMove: (_e, g) => {
+          drag.setValue({ x: g.dx * DRAG_LAG.x, y: g.dy * DRAG_LAG.y });
         },
+        onPanResponderRelease: (_e, g) => releaseThrow(g.dx, g.dy),
+        onPanResponderTerminate: () => drag.setValue({ x: 0, y: 0 }),
       }),
-    [gradeRest, throwNumber],
+    [preview, returning, releaseThrow, drag],
   );
+
+  // The offering's flight, read off the current plan. `flight` is the throw's
+  // progress: 0 = in the hand, 1 = where it was aimed (or, after a re-plan, the
+  // same 0..1 walked backwards to bring it home).
+  const flyX = flight.interpolate({ inputRange: plan.at, outputRange: plan.x });
+  const flyY = flight.interpolate({ inputRange: plan.at, outputRange: plan.y });
+  const flyScale = flight.interpolate({ inputRange: [0, 1], outputRange: [1, 0.58] });
+  // It is further from the hand, so it shrinks; and it tumbles late, then rights
+  // itself just before it lands. 0 at rest — a tilted offering in the hand is a
+  // different object, and the return path passes through this same curve.
+  const flyTilt = flight.interpolate({
+    inputRange: [0, 0.82, 1],
+    outputRange: ['0deg', '-16.4deg', '3.4deg'],
+  });
 
 /**
    * Confirm the graded throw. The client sends the **offset**; the server
@@ -269,13 +523,40 @@ export default function BurnScreen() {
     });
   }, [preview, router, throwNumber, captureId, demo]);
 
-  /** The offering RETURNS on a miss (S9) — the sprite is not consumed. */
+  /**
+   * The offering RETURNS on a miss (S9) — the sprite is not consumed. It glides
+   * home along a fresh arc that STOPS where it lay, then the throw re-arms.
+   *
+   * ⚠️ The handover is a RE-PLAN, not a jump. The return is built with the hand
+   * at t=0 and the ditch at t=1, so `flight` is already 1 and its position is the
+   * landing point — the first frame of the return is the last frame of the
+   * throw. Animating to 0 then walks the same parameter backwards, home.
+   */
   const rethrow = useCallback(() => {
-    if (preview?.returns === true && canThrow(throwNumber + 1)) {
-      setThrowNumber((n) => n + 1);
-      setPreview(null);
-    }
-  }, [preview, throwNumber]);
+    if (preview?.returns !== true || !canThrow(throwNumber + 1)) return;
+    const token = flightToken.current;
+    setReturning(true);
+    setPlan(arcPlan(rest, plan.to, Math.min(rest.y, plan.to.y) - 30, rest));
+    Animated.timing(landed, { toValue: 1, duration: RETURN_MS, useNativeDriver: false }).start();
+    Animated.timing(flight, {
+      toValue: 0,
+      duration: RETURN_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start(({ finished }) => {
+      setReturning(false);
+      // A new throw may have claimed the token while the offering was gliding
+      // home; its arc must not be reset out from under it.
+      if (!finished || token !== flightToken.current) return;
+      // Only now is it safe to forget the arc: at 0 the home plan is the same
+      // place. Resetting it mid-flight would teleport the sprite to the hand.
+      setPlan(HOME_PLAN);
+      drag.setValue({ x: 0, y: 0 });
+    });
+    setReaction(null);
+    setThrowNumber((n) => n + 1);
+    setPreview(null);
+  }, [preview, throwNumber, plan.to, rest, flight, drag, landed]);
 
   if (permission && !permission.granted) {
     return <View style={styles.screen} />;
@@ -311,63 +592,52 @@ export default function BurnScreen() {
     <View style={styles.screen} onLayout={onLayout} {...responder.panHandlers}>
       <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
 
-      {/*
-        THE OFFERING — the cartoonized sprite, held at the throw's resting point
-        (doc 17 §3: "offering (the styled sprite being held)").
+      {/* The fire: fixed, screen-relative (ADR-003 — non-AR AR). Its heart is the
+          exact point `HEART_AT` grades against, so the artwork is anchored TO it
+          rather than laid out around it — the bands cannot drift off the flame. */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <FireArt
+          width={size.width}
+          heartX={heart.x}
+          heartY={heart.y}
+          reaction={reaction}
+          reactionNonce={reactionNonce}
+        />
+      </View>
 
-        ⚠️ THE BUG THIS FIXES (2026-10-18). The ritual generated a sprite, stored
-        it, and then showed the player a live camera feed — the thing they paid to
-        see was never on screen. Two independent faults, both needed: the key was
-        never passed from `/preparing` (`toBurnParams` had no field for it), and
-        this screen had no `<Image>` to receive it. `uri` is the ORIGINAL photo,
-        which is why passing it would have *looked* like a fix.
-
-        ⚠️ AND THE TUTORIAL HAD NO OFFERING AT ALL (fixed 2026-10-18, same day).
-        The demo hop carries no `spritePath` on purpose — it must not spend — so
-        this block drew nothing at all and the player never saw the photo they had
-        just taken. `offeringUri` falls back to that photo for the demo only; see
-        its definition for why a real hop must NOT fall back.
-
-        It is drawn ABOVE the camera and BELOW the fire, at the resting point's
-        baseline (`top` is offset by its own height so it sits *above* "here" in
-        the drag hint rather than covering it). Rendered only once the layout is
-        measured, for the same reason as the fire below.
-      */}
+      {/* The offering: held at the hand, then thrown at it.
+          ⚠️ `pointerEvents="none"` — the whole screen is the PanResponder, and an
+          overlay that swallowed the touch would make the throw undemonstrable.
+          The box is anchored at the HAND and every transform is relative to it,
+          so the drag, the flight and the return share one coordinate space.
+          Rendered only once there is BOTH an image and a measured layout: `rest`
+          is (0,0) before `onLayout`, so drawing earlier would flash it top-left. */}
       {offeringUri !== null && size.height > 0 ? (
-        <View
-          style={[styles.spriteLayer, { top: restingPoint(size.width, size.height).y - SPRITE_SIZE }]}
-          pointerEvents="none"
-        >
-          <Image
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Animated.View
             testID="burn-offering"
-            source={{ uri: offeringUri }}
-            style={styles.sprite}
-            resizeMode="contain"
-            accessibilityIgnoresInvertColors
-          />
-        </View>
-      ) : null}
-
-      {/*
-        The fire: fixed, screen-relative (ADR-003 — non-AR AR).
-
-        ⚠️ TWO THINGS THAT WERE WRONG HERE.
-          1. `top` took `height × HEART_AT.y` — which is the heart's CENTRE — and
-             used it as the box's TOP EDGE, so the drawn flame sat `FIRE_SIZE / 2`
-             below the point `gradeThrow` grades against. The player aimed at the
-             fire they could see and was scored against one 60 px higher.
-             `fireBoxTop` now owns that centring, and `check:throw` asserts it.
-          2. `size.height` is 0 until `onLayout` fires, so on the first frame the
-             flame snapped to the very top of the screen and then jumped. It is
-             now not drawn until there is a measurement to place it with.
-      */}
-      {size.height > 0 ? (
-        <View
-          style={[styles.fire, { top: fireBoxTop(size.height, FIRE_SIZE) }]}
-          pointerEvents="none"
-        >
-          <View style={styles.heart} />
-          <Text style={styles.fireLabel}>火</Text>
+            style={[
+              styles.offering,
+              {
+                left: rest.x - OFFERING_SIZE / 2,
+                top: rest.y - OFFERING_SIZE / 2,
+                opacity: landed,
+                transform: [
+                  { translateX: Animated.add(drag.x, flyX) },
+                  { translateY: Animated.add(drag.y, flyY) },
+                  { scale: flyScale },
+                  { rotate: flyTilt },
+                ],
+              },
+            ]}
+          >
+            <Image
+              source={{ uri: offeringUri }}
+              style={styles.offeringImage}
+              resizeMode="cover"
+              accessibilityIgnoresInvertColors
+            />
+          </Animated.View>
         </View>
       ) : null}
 
@@ -396,22 +666,27 @@ export default function BurnScreen() {
               </Text>
             )}
 
-            {exhausted ? (
-              <Text style={styles.caption}>{t('burn.exhausted')}</Text>
-            ) : (
-              <View style={styles.row}>
-                {preview.returns && (
-                  <Pressable accessibilityRole="button" onPress={rethrow} style={styles.button}>
-                    <Text style={styles.buttonLabel}>{t('burn.rethrow')}</Text>
-                  </Pressable>
-                )}
-                {!preview.returns && (
-                  <Pressable accessibilityRole="button" onPress={confirm} style={styles.button}>
-                    <Text style={styles.buttonLabel}>{t('common.confirm')}</Text>
-                  </Pressable>
-                )}
-              </View>
-            )}
+            {/* ⚠️ The action waits for the offering to LAND. The grade is honest
+                the moment it leaves the hand, but a rethrow pressed mid-flight
+                would re-plan the arc underneath a sprite that is still in the
+                air — and the throw is worth watching anyway. */}
+            {arrived &&
+              (exhausted ? (
+                <Text style={styles.caption}>{t('burn.exhausted')}</Text>
+              ) : (
+                <View style={styles.row}>
+                  {preview.returns && (
+                    <Pressable accessibilityRole="button" onPress={rethrow} style={styles.button}>
+                      <Text style={styles.buttonLabel}>{t('burn.rethrow')}</Text>
+                    </Pressable>
+                  )}
+                  {!preview.returns && (
+                    <Pressable accessibilityRole="button" onPress={confirm} style={styles.button}>
+                      <Text style={styles.buttonLabel}>{t('common.confirm')}</Text>
+                    </Pressable>
+                  )}
+                </View>
+              ))}
           </>
         )}
       </View>
@@ -421,50 +696,23 @@ export default function BurnScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: surface.camera },
-  lost: { alignItems: 'center', justifyContent: 'center' },
   /**
-   * ⚠️ `height: FIRE_SIZE` + `justifyContent: 'center'` are load-bearing, and the
-   * `FIRE_SIZE` passed to `fireBoxTop(...)` must be the SAME number: the offset it
-   * applies is `boxSize / 2`, so a box of a different height would put the flame's
-   * centre off the graded heart again — silently, and only on a device.
+   * The offered object: the sprite on its paper card. Brand gold on paper, so it
+   * is legible over ANY camera frame without a scrim — the card does the work the
+   * dark overlay would otherwise have to.
    */
-  fire: {
+  offering: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    height: FIRE_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heart: {
-    width: FIRE_SIZE,
-    height: FIRE_SIZE,
-    borderRadius: FIRE_SIZE / 2,
-    backgroundColor: 'rgba(212,175,55,0.18)',
+    width: OFFERING_SIZE,
+    height: OFFERING_SIZE,
+    borderRadius: radius.md,
     borderWidth: 2,
-    borderColor: 'rgba(212,175,55,0.55)',
+    borderColor: brand.gold,
+    backgroundColor: surface.paper,
+    overflow: 'hidden',
   },
-  /**
-   * Absolutely positioned (not a flex sibling with negative margin): it must sit
-   * squarely ON the heart's centre, and `marginTop: -72` only faked that by
-   * guessing at the glyph's line height. With no `top`/`left` given, Yoga aligns
-   * an absolute child by the parent's `justifyContent`/`alignItems` — which above
-   * are both `'center'`, so the glyph lands on the heart without a magic number.
-   */
-  fireLabel: {
-    position: 'absolute',
-    color: onColorCream,
-    fontSize: fontSize.display.at390,
-    opacity: 0.9,
-  },
-  /** The held offering: full width so `alignItems` can centre it at REST_AT.x. */
-  spriteLayer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  sprite: { width: SPRITE_SIZE, height: SPRITE_SIZE },
+  offeringImage: { width: '100%', height: '100%' },
+  lost: { alignItems: 'center', justifyContent: 'center' },
   hud: { alignItems: 'center' },
   hint: { color: onColorCream, fontSize: fontSize.caption.at390, opacity: 0.85 },
   throws: { color: onColorCream, fontSize: fontSize.caption.at390, opacity: 0.6, marginTop: space.xs },

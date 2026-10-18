@@ -152,10 +152,14 @@ section('④ The drawn fire IS the graded heart — the coupling that broke');
 // exactly `height × HEART_AT.y`. The flame was therefore drawn `FIRE_SIZE / 2`
 // (60 px) BELOW the point the throw was scored against — two individually correct
 // numbers whose COUPLING was wrong. Nothing caught it: the types agreed, and a
-// screenshot looks plausible either way. `fireBoxTop` is now the one place that
-// centring happens, and the checks below make the coupling falsifiable.
+// screenshot looks plausible either way.
+//
+// `/burn` now draws `FireArt` anchored on `heartPoint(...)` directly, so the
+// coupling is structural on that screen. `fireBoxTop` is kept as the pure rule
+// for any box centred on the heart — and pinned here, so the old `top = heart`
+// form cannot return through a future refactor.
 const VIEW_H = 800;
-/** The burn screen's drawn diameter, as the literal the screen uses (`FIRE_SIZE`). */
+/** A representative fire-box diameter. The arithmetic is size-independent. */
 const FIRE_SIZE_CHECK = 120;
 const fireTop = fireBoxTop(VIEW_H, FIRE_SIZE_CHECK);
 const gradedHeart = heartPoint(390, VIEW_H);
