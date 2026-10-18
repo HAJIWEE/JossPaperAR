@@ -42,6 +42,7 @@ import {
   probeVerdict,
   registerCapture,
   requestCartoonize,
+  styledPathOf,
   uploadCapture,
   type UploadResult,
 } from '@/lib/ritual';
@@ -102,7 +103,10 @@ export default function Preparing(): React.JSX.Element {
     if (demo) {
       await new Promise((resolve) => setTimeout(resolve, TUTORIAL_WAIT_MS));
       setPhase({ kind: 'done' });
-      router.push({ pathname: '/burn', params: toBurnParams(captureId, uri, true) });
+      // ⚠️ `null`, not a guessed path: the tutorial never contacts the
+      // orchestrator, so there IS no sprite in the `styled` bucket. Inventing a
+      // key here would make `/burn` sign an object that was never uploaded.
+      router.push({ pathname: '/burn', params: toBurnParams(captureId, uri, null, true) });
       return;
     }
 
@@ -201,7 +205,16 @@ export default function Preparing(): React.JSX.Element {
         setPhase({ kind: 'done' });
         // ⚠️ Built by the route contract, not inline: `preparing` was the one hop
         // that bypassed `toBurnParams`, which is how a param gets dropped silently.
-        router.push({ pathname: '/burn', params: toBurnParams(captureId, uri) });
+        //
+        // ⚠️ AND THE SPRITE KEY MUST RIDE ALONG (fixed 2026-10-18). The
+        // orchestrator has ALREADY uploaded the cartoonized sprite into the
+        // private `styled` bucket by the time this verdict lands, but nothing was
+        // handing its key to `/burn` — so the burn screen had no sprite to show
+        // and the player saw the live camera instead of their offering. The key
+        // is read from the STYLED event (`styledPathOf`), never rebuilt here: the
+        // object's extension is decided by the generator, not by this screen.
+        const spritePath = styledPathOf(outcome);
+        router.push({ pathname: '/burn', params: toBurnParams(captureId, uri, spritePath, demo) });
         return;
       }
 

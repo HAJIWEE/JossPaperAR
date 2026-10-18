@@ -56,6 +56,54 @@ export interface FireHeart {
 }
 
 /**
+ * ── WHERE THE FIRE AND THE HAND SIT ON SCREEN ───────────────────────────────
+ *
+ * These are FRACTIONS of the view, not px: ADR-003 makes the fire screen-fixed,
+ * so the heart is a fraction measured on layout and never a world coordinate.
+ *
+ * They live here, beside the grading maths, for exactly one reason — **the
+ * artwork and the grader must agree**.
+ *
+ * ⚠️ THEY DID NOT, AND NOTHING COULD SEE IT (found 2026-10-18). `/burn` drew the
+ * fire box with its **top edge** at `height × HEART_AT.y`, while `gradeThrow`
+ * measured the throw against a heart at exactly `height × HEART_AT.y`. The drawn
+ * flame therefore sat `FIRE_SIZE / 2` (60 px) BELOW the point being graded: the
+ * player aimed at the fire they could see and was scored against one they could
+ * not. Both numbers were individually "correct" — only their COUPLING was wrong,
+ * which is the class of defect a type cannot catch and a screenshot does not
+ * reveal.
+ *
+ * So the coupling is a function now (`fireBoxTop`), and `check:throw` asserts the
+ * box's centre lands on the heart — including that the offset is NOT zero, so a
+ * future "simplification" back to `top = height × HEART_AT.y` goes red.
+ */
+export const HEART_AT = { x: 0.5, y: 0.56 } as const;
+
+/** Where the offering rests — where the finger lifts off. */
+export const REST_AT = { x: 0.5, y: 0.86 } as const;
+
+/** The fire's heart as a CENTRE point, in the same px space the bands use. */
+export function heartPoint(width: number, height: number): FireHeart {
+  return { x: width * HEART_AT.x, y: height * HEART_AT.y };
+}
+
+/** The offering's resting point as a CENTRE point, in px. */
+export function restingPoint(width: number, height: number): Point {
+  return { x: width * REST_AT.x, y: height * REST_AT.y };
+}
+
+/**
+ * The `top` for a fire box of `boxSize` px whose CENTRE must sit on the heart.
+ *
+ * ⚠️ Not `height × HEART_AT.y`: that value is the CENTRE, and `top` positions the
+ * box's TOP EDGE. The `− boxSize / 2` is the whole fix — see the note on
+ * `HEART_AT`.
+ */
+export function fireBoxTop(height: number, boxSize: number): number {
+  return height * HEART_AT.y - boxSize / 2;
+}
+
+/**
  * Distance in px from the throw's resting point to the fire's heart.
  *
  * This is the number the server grades. It must be a plain Euclidean distance

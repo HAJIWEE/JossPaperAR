@@ -45,6 +45,7 @@ import {
   MAX_PROBES,
   outcomeFromHttpFailure,
   probeVerdict,
+  styledPathOf,
   uploadAlreadyPresent,
   uploadFailureVerdict,
   type Outcome,
@@ -125,10 +126,45 @@ check(
 );
 
 // The burn hop has the same rule: preparing → burn must carry both.
-check('the burn hop carries the id and the uri', toBurnParams('cap-1', 'file://a.jpg').uri === 'file://a.jpg');
+check('the burn hop carries the id and the uri', toBurnParams('cap-1', 'file://a.jpg', null).uri === 'file://a.jpg');
 check('a burn route without a uri is refused', readBurnParams({ captureId: 'cap-1' }).ok === false);
 check('a burn route without a capture id is refused', readBurnParams({ uri: 'file://a.jpg' }).ok === false);
 check('a complete burn route reads back ok', readBurnParams({ captureId: 'cap-1', uri: 'file://a.jpg' }).ok === true);
+
+// ⚠️ THE SPRITE KEY IS PART OF THE CONTRACT (fixed 2026-10-18). The orchestrator
+// uploads the cartoonized sprite into the PRIVATE `styled` bucket before
+// `/preparing` finishes, but the key was never carried to `/burn` — so the burn
+// screen had no sprite to show and drew the live camera instead of the offering.
+// The key cannot be rebuilt downstream: the generator picks the extension.
+check(
+  'the burn hop carries the sprite key',
+  toBurnParams('cap-1', 'file://a.jpg', 'u1/cap-1.webp').spritePath === 'u1/cap-1.webp',
+);
+check(
+  'readBurnParams reads the sprite key back',
+  (() => {
+    const r = readBurnParams({ captureId: 'cap-1', uri: 'file://a.jpg', spritePath: 'u1/cap-1.webp' });
+    return r.ok && r.spritePath === 'u1/cap-1.webp';
+  })(),
+);
+check(
+  '⚠️ a route with NO sprite is still a valid burn — the throw must not depend on art',
+  (() => {
+    const r = readBurnParams({ captureId: 'cap-1', uri: 'file://a.jpg' });
+    return r.ok && r.spritePath === null;
+  })(),
+);
+check(
+  '⚠️ a BLANK sprite param collapses to null, not to an empty key to sign',
+  (() => {
+    const r = readBurnParams({ captureId: 'cap-1', uri: 'file://a.jpg', spritePath: '   ' });
+    return r.ok && r.spritePath === null;
+  })(),
+);
+check(
+  '⚠️ a REAL turn with no sprite grows no spritePath param at all',
+  toBurnParams('cap-1', 'file://a.jpg', null).spritePath === undefined,
+);
 
 // ── 2 · A refusal is never a failed generation (defect ②) ────────────────────
 section('2 · HTTP failures — a refusal must not masquerade as rule ②');
@@ -174,6 +210,34 @@ check(
   eventsFromResponse({ job_id: 'j4', status: 'styled', styled_path: 'styled/j4' })[0]?.type === 'STYLED',
 );
 
+// ⚠️ THE SPRITE KEY SURVIVES THE MAPPING (fixed 2026-10-18). `eventsFromResponse`
+// resolves the key (the server's `styled_path`, falling back to `styled/{job_id}`);
+// `/preparing` must hand THAT key on rather than rebuild it, because the
+// generator — not the client — decides the extension. `styledPathOf` is the single
+// extraction point, and its negative cases matter as much as its positive one: a
+// park or a transport error must NEVER produce a key, or `/burn` would try to sign
+// an object that was never uploaded.
+check(
+  'styledPathOf extracts the key the mapper resolved',
+  styledPathOf({
+    kind: 'ok',
+    jobId: 'j4',
+    events: eventsFromResponse({ job_id: 'j4', status: 'styled', styled_path: 'u1/c.webp' }),
+  }) === 'u1/c.webp',
+);
+check(
+  '⚠️ a PARKED outcome has no sprite key',
+  styledPathOf({
+    kind: 'ok',
+    jobId: 'j5',
+    events: eventsFromResponse({ job_id: 'j5', status: 'queued', queued: true, code: 'shrine_busy' }),
+  }) === null,
+);
+check(
+  '⚠️ a transport failure has no sprite key',
+  styledPathOf({ kind: 'transient', reason: 'network_error' }) === null,
+);
+
 // `isTransportCode` existed unused; it now has a named consumer, and the
 // distinction it draws is the one the queue uses to decide retry vs drop.
 check('a transport code is classified as transport', isTransportCode('network_error'));
@@ -214,13 +278,23 @@ check(
 // on BOTH builders, BOTH readers, and through a full four-hop chain.
 section('5 · The tutorial flag survives every hop (SCRUM-85)');
 
-const demoTurn = toBurnParams('c1', 'file://x.jpg', true);
+const demoTurn = toBurnParams('c1', 'file://x.jpg', null, true);
 const demoTurnRead = readBurnParams(demoTurn);
 check('toBurnParams carries the demo flag', demoTurn.demo === DEMO_VALUE);
 check('readBurnParams reads it back', demoTurnRead.ok && demoTurnRead.demo === true);
 
+// ⚠️ THE TUTORIAL'S OFFERING DEPENDS ON `uri` (2026-10-18). A demo hop never gets
+// a styled sprite — it must not spend — so `/burn` draws the PHOTO the player took
+// instead, and that photo reaches the screen only as the `uri` param. Drop it and
+// the tutorial silently returns to teaching the ritual with an empty place where
+// the offering belongs (the defect this pins; found on glass 2026-10-18).
+check(
+  '⚠️ the TUTORIAL hop keeps the photo /burn draws as its offering',
+  demoTurnRead.ok && demoTurnRead.uri === 'file://x.jpg' && demoTurnRead.spritePath === null,
+);
+
 // ⚠️ A REAL ritual's URL must not grow a param it never had.
-const realTurn = toBurnParams('c1', 'file://x.jpg');
+const realTurn = toBurnParams('c1', 'file://x.jpg', null);
 const realTurnRead = readBurnParams(realTurn);
 check('⚠️ a REAL turn carries NO demo param at all', realTurn.demo === undefined);
 check('⚠️ …and reading it back is false, not undefined-ish',
@@ -240,7 +314,7 @@ check('⚠️ the flag survives the WHOLE chain burn → reward',
 
 // ⚠️ AND THE DROP IS DETECTABLE: strip the key (what a forgotten spread does) and
 // the hop degrades to a REAL ritual — which is exactly why this section exists.
-const { demo: _omitted, ...droppedTurn } = toBurnParams('c1', 'file://x.jpg', true);
+const { demo: _omitted, ...droppedTurn } = toBurnParams('c1', 'file://x.jpg', null, true);
 const droppedRead = readBurnParams(droppedTurn);
 check('⚠️ a DROPPED flag reads as a real turn — the failure this pins',
   droppedRead.ok && droppedRead.demo === false);

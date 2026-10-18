@@ -14,8 +14,11 @@ import {
   MAX_THROWS,
   RETHROW_CAP,
   canThrow,
+  fireBoxTop,
   gradeThrow,
+  heartPoint,
   offsetFromHeart,
+  restingPoint,
   type ThrowOutcome,
 } from '../throw.ts';
 
@@ -141,13 +144,53 @@ check(
 );
 check('…and the real assertion above still holds', grade(0, 2).previewBand === RETHROW_CAP);
 
-console.log('');
-if (failed > 0) {
-  console.error(`✗ ${failed} throw checks FAILED:\n${failures.map((f) => `  · ${f}`).join('\n')}\n`);
-  process.exit(1);
-}
-console.log(`✓ all ${passed} throw checks passed\n`);
+/* ── GEOMETRY: the drawn fire must BE the graded heart ───────────────────── */
+section('④ The drawn fire IS the graded heart — the coupling that broke');
 
+// ⚠️ THE DEFECT THIS PINS (2026-10-18). `/burn` positioned the fire box by its
+// TOP EDGE at `height × HEART_AT.y`, while the grader measured against a heart at
+// exactly `height × HEART_AT.y`. The flame was therefore drawn `FIRE_SIZE / 2`
+// (60 px) BELOW the point the throw was scored against — two individually correct
+// numbers whose COUPLING was wrong. Nothing caught it: the types agreed, and a
+// screenshot looks plausible either way. `fireBoxTop` is now the one place that
+// centring happens, and the checks below make the coupling falsifiable.
+const VIEW_H = 800;
+/** The burn screen's drawn diameter, as the literal the screen uses (`FIRE_SIZE`). */
+const FIRE_SIZE_CHECK = 120;
+const fireTop = fireBoxTop(VIEW_H, FIRE_SIZE_CHECK);
+const gradedHeart = heartPoint(390, VIEW_H);
+
+check("the fire box's CENTRE lands on the graded heart", fireTop + FIRE_SIZE_CHECK / 2 === gradedHeart.y);
+check('⚠️ …and the offset is NOT zero — `top = heart` is the bug, not the fix', fireTop !== gradedHeart.y);
+check(
+  '⚠️ the drift was exactly half the box — 60 px, enough to cost TWO bands',
+  gradedHeart.y - fireTop === FIRE_SIZE_CHECK / 2,
+);
+check(
+  '⚠️ a dead-centre throw scored 60 px low grades graze, not bullseye',
+  grade(0, 1).previewBand === 'bullseye' && grade(60, 1).previewBand === 'graze',
+);
+check(
+  'the heart scales with the view (ADR-003: screen-fixed, not world-locked)',
+  heartPoint(390, VIEW_H * 2).y === gradedHeart.y * 2,
+);
+check(
+  'the offering rests BELOW the fire, so an upward drag is the gesture',
+  restingPoint(390, VIEW_H).y > gradedHeart.y,
+);
+check('…and fire and hand share a column — the drag is vertical', restingPoint(390, VIEW_H).x === gradedHeart.x);
+check(
+  'the offset to the heart is 0, and the old drift scored 60 px',
+  offsetFromHeart(gradedHeart, gradedHeart) === 0
+    && offsetFromHeart({ x: gradedHeart.x, y: gradedHeart.y + 60 }, gradedHeart) === 60,
+);
+
+/* ── the outcome fields the burn screen actually renders ──────────────────── */
+section('⑤ Grading fields the burn screen renders');
+
+// ⚠️ These six used to live BELOW the pass/fail summary, so they printed a ✓ and
+// then incremented counters nobody read — they could never fail the build. They
+// are real assertions; the verdict block is now last.
 check('a dead-centre throw is 正中 Bullseye', grade(0).previewBand === 'bullseye');
 check('far outside the fire is 偏失 Miss', grade(500).previewBand === 'miss');
 check('a miss RETURNS the offering (S9 — never destroyed)', grade(500).returns === true);
@@ -157,3 +200,14 @@ check(
   'the local preview agrees with the server-side derivation on throw 1',
   AIM_BANDS.every((b) => grade(b.maxOffsetPx).previewBand === deriveBand(b.maxOffsetPx)),
 );
+
+/* ── verdict ──────────────────────────────────────────────────────────────── */
+// ⚠️ LAST — and that IS part of the fix. This block used to sit above §⑤, so
+// those checks ran after `passed`/`failed` had been tallied and could not change
+// the exit code. A check that cannot fail is not a check.
+console.log('');
+if (failed > 0) {
+  console.error(`✗ ${failed} throw checks FAILED:\n${failures.map((f) => `  · ${f}`).join('\n')}\n`);
+  process.exit(1);
+}
+console.log(`✓ all ${passed} throw checks passed\n`);

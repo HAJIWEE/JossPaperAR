@@ -8,10 +8,11 @@
  *   2. QUOTA GATE — `request_cartoonize`, idempotent per capture
  *      (unique(capture_id)), so a retried request cannot pay twice
  *   3. sign a short-lived URL for the private `captures` object
- *   4. run PATH C (ADR-002, locked): identify → zod-validate → generate
+ *   4. run PATH C (ADR-002, locked): identify → zod-validate → generate → cut
+ *      out (stage ④, Amendment 2 — the sprite must carry ALPHA)
  *   5. moderation: a provider refusal marks the capture `rejected`
- *   6. upload the PNG into the private `styled` bucket — the bucket's own
- *      file_size_limit (150 KB) enforces the NFR sprite budget
+ *   6. upload the **transparent WebP** into the private `styled` bucket — the
+ *      bucket's own file_size_limit (150 KB) enforces the NFR sprite budget
  *   7. record status + `cost_micros` + `latency_ms` + `retries` on the job,
  *      which is how cost and latency are LEARNED in production (doc 07 §5.3)
  *
@@ -21,7 +22,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { publishableKey, secretKey, supabaseUrl } from '../_shared/env.ts';
 import { bearerToken, fail, json, preflight, rpcErrorToHttp } from '../_shared/http.ts';
-import { type FalError, runPathC } from '../_shared/pathc.ts';
+import { type FalError, type Spent, runPathC } from '../_shared/pathc.ts';
 
 /** doc 19 §3.3 — the styled sprite budget (the bucket enforces it too). */
 const STYLED_MAX_BYTES = 153_600;
@@ -184,7 +185,13 @@ Deno.serve(async (request: Request): Promise<Response> => {
       objects: result.objects,
     });
   } catch (caught) {
-    const error = caught as FalError & { code?: string };
+    const error = caught as FalError & { code?: string; spent?: Spent };
+
+    // ⚠️ A FAILED RUN THAT PAID IS STILL A PAID RUN. `runPathC` attaches what it
+    // had spent when it threw (identify → generate → cutout all cost money), so
+    // a cutout failure after a successful generate cannot hide US$0.09 from the
+    // job row — the one thing doc 07 §5.3 says this row exists to prevent.
+    if (!paid && error.spent) paid = error.spent;
 
     if (error.moderation === true) {
       // doc 13 §6: the provider refused it BEFORE stylization — mark the
@@ -192,6 +199,13 @@ Deno.serve(async (request: Request): Promise<Response> => {
       await admin.from('cartoonize_jobs').update({
         status: 'rejected',
         error: 'provider_moderation',
+        ...(paid
+          ? {
+            cost_micros: paid.costMicros,
+            latency_ms: paid.latencyMs,
+            retries: paid.retries,
+          }
+          : {}),
       }).eq('id', jobId);
       await admin.from('captures').update({
         status: 'rejected',
