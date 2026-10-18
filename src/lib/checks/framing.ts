@@ -30,6 +30,11 @@
  * above rather than re-deciding — including the two gates on the *rasterizer*, because a
  * mask that is drawn but never sent (or sent but never drawn) is invisible to `tsc`.
  *
+ * Section ⑤ (S64) pins the four COSMETIC decisions the owner asked for on the shutter and
+ * burn screens — where the zoom strip sits, how small the preset pills are, what the hint
+ * chip is made of, and that the fire is never still. They are layout and appearance, so no
+ * other gate can see them; the reasoning and the fault-test are at the section itself.
+ *
  * ⚠️ FAULT-TESTED FIVE TIMES THIS SESSION (S64) — every number MEASURED, not asserted,
  * against a green baseline of 174 checks:
  *   · `rectToViewStyle` returned to `{ x, y, width, height }` (the reported bug) →
@@ -782,6 +787,103 @@ check('the zoom a11y label interpolates the numeral (and announces it)',
   t('zoom.stopA11y', { label: '2×' }).includes('2×')
     && !t('zoom.stopA11y', { label: '2×' }).includes('%{')
     && t('zoom.stopA11y', { label: '2×' }) !== t('zoom.stopA11y', { label: '4×' }));
+
+// ── ⑤ the S64 polish: WHERE the controls sit and WHAT they look like ─────────
+/*
+ * ⚠️ WHY THIS SECTION EXISTS. Four changes came from the owner in one message, and
+ * every one of them is the class a later "tidy-up" reverts without noticing: the zoom
+ * strip could climb back up under the hint, the preset pills could be shrunk by
+ * shrinking their TAP TARGET, the hint chip's inset or its translucency could be
+ * dropped as "unnecessary", and the fire's idle loop could be deleted as "an
+ * animation nobody asked for". None of it fails `tsc`, none of it fails a test, and
+ * all of it is visible only on glass — so each one is pinned here by the PROPERTY
+ * that makes it right, never by the pixel value, so re-tuning the numbers cannot
+ * break the check.
+ *
+ * ⚠️ FAULT-TESTED — EVERY CHECK, BY BREAKING THE PROPERTY IT ASSERTS. Measured against
+ * a green baseline of 193 → **now 205**, in three rounds of four breaks each, each
+ * round restored to green afterwards:
+ *   · the shutter rendered BEFORE the zoom strip → 1 red;
+ *   · `hud: { flex: 1 … }` reverted to `{ alignItems: 'center' }` and `flex: 1` put
+ *     back on the shutter row → 1 red;
+ *   · the pill's `minWidth` made a literal `22` → 1 red;
+ *   · the pill inlined INTO the Pressable (`zoomStopPill` folded into `zoomStop`) → 1 red;
+ *   · both hints returned to bare `<Text>` over the camera → 1 red;
+ *   · `maxWidth: '88%'` dropped from the chip → 1 red;
+ *   · the chip's `opacity: 0.72` raised to `1` → 1 red;
+ *   · `opacity: 0.85` put back on the chipped label → 1 red;
+ *   · `IDLE.swayDeg` replaced by a literal → 1 red;
+ *   · `isInteraction: false` dropped from the endless loop → 1 red;
+ *   · the idle breath no longer multiplied into the reaction's scale → 1 red;
+ *   · `rotate: idleSway` added to the ember bed → 1 red.
+ * 12 breaks, 12 reds, 0 survivors. Restored → 205/205 green.
+ */
+section('⑤ the S64 polish — where the controls sit and what the fire does');
+
+const fireSrc = read('src/components/fire-art.tsx');
+
+/*
+ * THE PLACEMENT. Asserted as an ORDER over the render, not as a style value: the
+ * owner's request was "right above the shutter button", and the only thing that can
+ * state that is the position of the strip in the tree relative to the two elements
+ * it sits between.
+ */
+const hudAt = captureSrc.indexOf('styles.hud');
+const zoomAt = captureSrc.indexOf('styles.zoomRow');
+const shutterAt = captureSrc.indexOf('styles.shutterRow');
+check('⚠️ the zoom strip renders BETWEEN the hint and the shutter (S64 — the owner moved it)',
+  hudAt > 0 && hudAt < zoomAt && zoomAt < shutterAt);
+check('⚠️ …and the HUD is the box that absorbs the slack — NOT the shutter',
+  /hud: \{ flex: 1, alignItems: 'center' \}/.test(captureSrc)
+    && !/shutterRow: \{[^}]*flex: 1/.test(captureSrc));
+
+/*
+ * THE PILL. The relationship is the assertion: the visible pill is half the target,
+ * and the target is still the 44 dp floor. Written this way so the pill can be
+ * re-sized (or the floor re-derived) without the check becoming a lie.
+ */
+check('⚠️ the preset pill is HALF the touch target, and the target is still 44 dp (S64)',
+  /const ZOOM_PILL_SIZE = TOUCH_TARGET \/ 2;/.test(captureSrc)
+    && /zoomStop: \{[^}]*minWidth: TOUCH_TARGET/.test(captureSrc)
+    && /zoomStopPill: \{[^}]*minWidth: ZOOM_PILL_SIZE/.test(captureSrc));
+const pillPressableAt = captureSrc.indexOf('styles.zoomStop, pressed && styles.pressed]');
+const pillViewAt = captureSrc.indexOf('<View style={[styles.zoomStopPill');
+check('⚠️ …and the pill is drawn INSIDE the target, not instead of it (the whole point)',
+  pillPressableAt > 0 && pillViewAt > pillPressableAt
+    && pillViewAt < captureSrc.indexOf('</Pressable>', pillPressableAt));
+
+/*
+ * THE HINT CHIP. Both hints, the float, and the translucency — three separate ways
+ * this could regress to the thing the owner complained about.
+ */
+check('⚠️ BOTH ritual hints sit in the chip, not bare over the camera (S64)',
+  /styles\.hintChip\}>\s*<Text style=\{styles\.hint\}>/.test(burnSrc)
+    && /styles\.hintChip\}>\s*<Text style=\{\[styles\.caption, styles\.captionInChip\]\}>/.test(burnSrc));
+check('⚠️ …and the chip FLOATS: inset from the sides at any type size, never edge to edge',
+  /hintChip: \{[^}]*marginHorizontal: space\.lg/.test(burnSrc)
+    && /hintChip: \{[^}]*maxWidth: '88%'/.test(burnSrc));
+check('⚠️ …and it is TRANSLUCENT — a solid chip would hide the camera it sits on',
+  /hintChip: \{[^}]*opacity: 0\.\d+/.test(burnSrc));
+check('…and the label is not faded ON TOP of the chip (the two alphas must not stack)',
+  !/hint: \{ color: onColorCream, fontSize: fontSize\.caption\.at390, opacity/.test(burnSrc)
+    && burnSrc.includes('captionInChip: { marginTop: 0, opacity: 1 }'));
+
+/*
+ * THE FIRE. "Too dead" is the complaint; an endless native-driver loop that composes
+ * with the reaction is the answer, and a JS-driver loop or one that claims the
+ * InteractionManager would be a worse bug than the stillness it replaced.
+ */
+check('⚠️ the fire is never DEAD: one endless loop drives sway, breath and brightness (S64)',
+  fireSrc.includes('Animated.loop(') && fireSrc.includes('IDLE.swayDeg')
+    && fireSrc.includes('IDLE.breath') && fireSrc.includes('IDLE.glowMin'));
+check('⚠️ …on the NATIVE driver, and WITHOUT claiming the InteractionManager',
+  /Animated\.loop\([\s\S]{0,1200}?useNativeDriver: true[\s\S]{0,300}?isInteraction: false/.test(fireSrc));
+check('⚠️ …and the idle motion COMPOSES with the reaction instead of replacing it',
+  fireSrc.includes('Animated.multiply(flameScale, idleBreath)')
+    && fireSrc.includes('Animated.multiply(glowScale, idleBreath)'));
+check('⚠️ …and only the FLAME sways — the ember bed is planted, not tilted',
+  (fireSrc.match(/rotate: idleSway/g) ?? []).length === 1
+    && fireSrc.indexOf('BED.apex.map') < fireSrc.indexOf('{ rotate: idleSway }'));
 
 // ── summary ──────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(64)}`);

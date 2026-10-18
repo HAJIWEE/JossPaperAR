@@ -114,6 +114,40 @@ const SIGHT = {
   opacity: 0.34,
 } as const;
 
+/**
+ * ── THE IDLE MOTION (S64, owner) ─────────────────────────────────────────────
+ *
+ * ⚠️ THE DEFECT IT FIXES: the artwork only ever moved when an offering landed on
+ * it. Between throws the flame was a STILL IMAGE over a live camera — and a still
+ * image over a live camera reads as a sticker, not as fire.
+ *
+ * Half of the idle cycle (ms). ⚠️ SLOW IS THE POINT — the owner asked for a fire
+ * that "slightly" sways, grows and pulses, not for a flicker, so a full breath is
+ * 2 × this and every amplitude below is at the edge of noticeable.
+ */
+const IDLE_HALF_MS = 2600;
+
+/**
+ * The idle amplitudes. Each one is small on purpose; together they read as life.
+ *
+ * ⚠️ THE SWAY IS A ROTATION OF THE FLAME ONLY — the ember bed is the ground the
+ * fire stands on, and tilting the pit would look like the ground tilting. It is
+ * about the flame's own view centre, which sits 12 dp above the heart, so ±2° moves
+ * the graded point by ≈0.4 dp — far below the grade's resolution (the bands are
+ * ±14.55 / ±39.40 / ±96.97 in art units) and the same order as the drift the flare
+ * reaction already has. Nothing here can move a throw between two bands.
+ */
+const IDLE = {
+  /** Degrees each way. The tip is ~82 dp above the pivot, so this is ~3 dp of travel. */
+  swayDeg: 2,
+  /** ±3 % — the fire's breath. */
+  breath: 0.03,
+  /** The glow's brightness floor (1 at the top of the breath). */
+  glowMin: 0.78,
+  /** The flame's own brightness floor — a quieter pulse under the glow's. */
+  flameMin: 0.94,
+} as const;
+
 interface Props {
   /** Screen width in dp — the sight spans it, so it needs the measured value. */
   readonly width: number;
@@ -163,6 +197,49 @@ export function FireArt({ width, heartX, heartY, reaction = null, reactionNonce 
     ]).start();
   }, [reaction, reactionNonce, pulse]);
 
+  /**
+   * THE IDLE LOOP — one value driving sway, breath and brightness together.
+   *
+   * ⚠️ ONE VALUE, NOT THREE, AND ALL THREE MOTIONS IN PHASE: the fire leans,
+   * swells and brightens at the same moment and returns together, which is what a
+   * breathing fire does. It also means the whole effect is ONE native animation.
+   *
+   * ⚠️ `useNativeDriver: true` BECAUSE IT NEVER STOPS. The loop runs for as long as
+   * the screen is up, so anything on the JS driver would compete with the throw's
+   * flight (which is deliberately on the JS driver) and would keep the bridge busy
+   * for the entire ritual. Transforms and opacity only — which is exactly what the
+   * native driver accepts.
+   *
+   * ⚠️ AND `isInteraction: false` IS NOT OPTIONAL: an endless loop that claimed the
+   * InteractionManager would starve every `runAfterInteractions` callback on this
+   * screen — including the sprite URL signing that fetches the offering itself.
+   */
+  const [idle] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(idle, {
+          toValue: 1,
+          duration: IDLE_HALF_MS,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+          isInteraction: false,
+        }),
+        Animated.timing(idle, {
+          toValue: 0,
+          duration: IDLE_HALF_MS,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+          isInteraction: false,
+        }),
+      ]),
+    );
+    loop.start();
+    // The screen can unmount mid-breath; a stopped loop is silent by construction.
+    return () => loop.stop();
+  }, [idle]);
+
   if (width === 0 || heartX === 0 || heartY === 0) return null;
 
   // Anchor each layer by its own heart offset inside its art box, so the heart
@@ -200,10 +277,33 @@ export function FireArt({ width, heartX, heartY, reaction = null, reactionNonce 
   const glowScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] });
   const flameScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
 
+  /*
+   * The idle motion, derived from the ONE loop value above.
+   *
+   * ⚠️ `multiply`, NOT a second transform: the reaction and the idle motion are
+   * independent and both have to hold at the same time — an offering that lands
+   * mid-breath must still flare. A plain second `scale` in the same transform list
+   * would REPLACE rather than compound, so the flare would be swallowed by whichever
+   * of the two wrote last.
+   */
+  const idleSway = idle.interpolate({
+    inputRange: [0, 1],
+    outputRange: [`-${IDLE.swayDeg}deg`, `${IDLE.swayDeg}deg`],
+  });
+  const idleBreath = idle.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1 - IDLE.breath, 1 + IDLE.breath],
+  });
+  const idleGlow = idle.interpolate({ inputRange: [0, 1], outputRange: [IDLE.glowMin, 1] });
+  const idleFlame = idle.interpolate({ inputRange: [0, 1], outputRange: [IDLE.flameMin, 1] });
+
   return (
     <>
       {/* Glow — the warm halo the camera image shows through. Centred on the
-          heart, so its reaction scales about the point being graded. */}
+          heart, so its reaction scales about the point being graded.
+          ⚠️ It carries the idle BRIGHTNESS PULSE as well as the reaction's swell:
+          the halo is what the eye reads as "the fire is alive" from across a room,
+          and it is one opacity on the native driver. */}
       <Animated.View
         style={{
           position: 'absolute',
@@ -211,7 +311,8 @@ export function FireArt({ width, heartX, heartY, reaction = null, reactionNonce 
           top: glowTop,
           width: glowSize,
           height: glowSize,
-          transform: [{ scale: glowScale }],
+          opacity: idleGlow,
+          transform: [{ scale: Animated.multiply(glowScale, idleBreath) }],
         }}
       >
         <Svg width={glowSize} height={glowSize}>
@@ -232,7 +333,18 @@ export function FireArt({ width, heartX, heartY, reaction = null, reactionNonce 
         </Svg>
       </Animated.View>
 
-      {/* The flame itself: embers behind, then the stack coolest layer first. */}
+      {/*
+        THE EMBER BED AND THE DRIFTING SPARKS — the part that does NOT sway.
+
+        ⚠️ WHY THE FIRE IS TWO VIEWS NOW (S64): the coals are the ground the fire
+        stands on. Swaying them would tilt the pit, which reads as the ground moving
+        rather than the flame moving. So the bed keeps the reaction's swell (exactly
+        what a flare always did) and nothing else, while the flame above it leans.
+
+        ⚠️ The split changes no colour and no painting ORDER that matters: the embers
+        stay behind the flame, and the bed sits below the flame's lowest point
+        (705.04 vs 709.68), so it was never overlapping it in the first place.
+      */}
       <Animated.View
         style={{
           position: 'absolute',
@@ -256,6 +368,42 @@ export function FireArt({ width, heartX, heartY, reaction = null, reactionNonce 
             />
           ))}
 
+          {BED.apex.map((apex, i) => (
+            <Polygon
+              key={apex}
+              points={`${BED.edge[i]},${BED.baseY} ${apex},${BED.apexY} ${BED.edge[i + 1]},${BED.baseY}`}
+              fill={BED.fill[i]}
+              stroke={BED.stroke}
+              strokeWidth={BED.strokeWidth}
+              strokeLinejoin="round"
+            />
+          ))}
+        </Svg>
+      </Animated.View>
+
+      {/*
+        THE FLAME — the part that sways and breathes (S64).
+
+        ⚠️ `rotate` BEFORE `scale`, and both composed with the reaction's
+        `flameScale` rather than replacing it: a throw that lands mid-breath still
+        flares. The rotation is about this view's centre — 12 dp from the heart — so
+        the graded point moves ≈0.4 dp at the extremes; the arithmetic is at `IDLE`.
+      */}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          left: flameLeft,
+          top: flameTop,
+          width: flameSize,
+          height: flameSize,
+          opacity: idleFlame,
+          transform: [
+            { rotate: idleSway },
+            { scale: Animated.multiply(flameScale, idleBreath) },
+          ],
+        }}
+      >
+        <Svg width={flameSize} height={flameSize} viewBox={ART.viewBox}>
           {FLAME_FILLS.map((fill, i) => {
             const k = LAYER_SCALE ** i;
             return (
@@ -267,17 +415,6 @@ export function FireArt({ width, heartX, heartY, reaction = null, reactionNonce 
               </G>
             );
           })}
-
-          {BED.apex.map((apex, i) => (
-            <Polygon
-              key={apex}
-              points={`${BED.edge[i]},${BED.baseY} ${apex},${BED.apexY} ${BED.edge[i + 1]},${BED.baseY}`}
-              fill={BED.fill[i]}
-              stroke={BED.stroke}
-              strokeWidth={BED.strokeWidth}
-              strokeLinejoin="round"
-            />
-          ))}
         </Svg>
       </Animated.View>
 

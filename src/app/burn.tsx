@@ -101,15 +101,23 @@ const SPRITE_URL_TTL_S = 300;
  * put the opaque rectangle straight back and made the cut invisible. The sprite
  * carries its own ink outline, so it stays legible over the camera without a
  * card — adding a background here silently undoes the paid cutout.
- * ⚠️ AND ITS SIZE IS THE BOARD'S, MEASURED (S64). `EN · 4 Burn` (390 × 844) draws
- * `art · held offering · car D` at **132 × 96 px**, centred **(133, 686)** — with the
- * swipe hint at y 790–810. So the offering is **132 wide, not 72**: at 72 a real
- * offering read as a token rather than as the thing the player photographed. The box
- * is square and `contain`-fitted, so a sprite with the board's own 1.375 aspect renders
- * exactly 132 × 96; a squarer one renders up to 132 × 132, which is still within the
- * room the board leaves above the hint.
+ * ⚠️ AND ITS SIZE IS THE BOARD'S, MEASURED (S64) — THEN DOUBLED ON THE OWNER'S CALL.
+ * `EN · 4 Burn` (390 × 844) draws `art · held offering · car D` at **132 × 96 px**,
+ * centred **(133, 686)** — with the swipe hint at y 790–810. So the offering is
+ * **132 wide, not 72**: at 72 a real offering read as a token rather than as the
+ * thing the player photographed. The box is square and `contain`-fitted, so a sprite
+ * with the board's own 1.375 aspect renders exactly 132 × 96; a squarer one renders
+ * up to 132 × 132, which is still within the room the board leaves above the hint.
+ *
+ * ⚠️ 132 → 264 (S64 follow-up, owner): *"the offering size on the ritual page is
+ * still too small — make it twice as big as it is now."* The board's own number is
+ * the FLOOR, not the ceiling, and the glass run is the authority on how it reads at
+ * arm's length. The box is still square and `contain`-fitted, so the doubled box
+ * holds a 264 × 192 sprite on the board's aspect — and because every flight
+ * transform is relative to this box's centre, the drag, the arc and the return
+ * needed no change at all. One number moved.
  */
-const OFFERING_SIZE = 132;
+const OFFERING_SIZE = 264;
 
 /**
  * How far the held object trails the finger. This is the PROTOTYPE's authored
@@ -668,8 +676,19 @@ export default function BurnScreen() {
         </View>
       ) : null}
 
+      {/*
+        THE HINT — a floating chip, not bare text (S64, owner).
+
+        ⚠️ WHY IT EXISTS: this screen runs over a LIVE CAMERA, and the hint was cream
+        text with no background — against a pale wall, or in daylight, the words
+        vanished. The chip gives them a surface of their own. It is inset from the
+        sides and translucent, so it reads as a label over the scene rather than a
+        header bar — see `hintChip` in the styles for the arithmetic.
+      */}
       <View style={[styles.hud, { paddingTop: insets.top + space.md }]} pointerEvents="none">
-        <Text style={styles.hint}>{t('burn.aimHint')}</Text>
+        <View style={styles.hintChip}>
+          <Text style={styles.hint}>{t('burn.aimHint')}</Text>
+        </View>
         <Text style={styles.throws}>
           {throwNumber} / {MAX_THROWS}
         </Text>
@@ -677,7 +696,13 @@ export default function BurnScreen() {
 
       <View style={[styles.result, { paddingBottom: insets.bottom + space.lg }]} pointerEvents="box-none">
         {preview === null ? (
-          <Text style={styles.caption}>{t('burn.dragHint')}</Text>
+          /* ⚠️ The SECOND hint wears the same chip as the first (S64, owner). It is
+             the line the thumb sits on, and it had the same defect: cream text with
+             no background, over a camera, at the brightest part of the scene. One
+             chip style, two hints — the screen would look half-fixed otherwise. */
+          <View style={styles.hintChip}>
+            <Text style={[styles.caption, styles.captionInChip]}>{t('burn.dragHint')}</Text>
+          </View>
         ) : (
           <>
             <Text style={styles.bandText}>{localized(bandLabel(preview.band))}</Text>
@@ -739,7 +764,38 @@ const styles = StyleSheet.create({
   offeringImage: { width: '100%', height: '100%' },
   lost: { alignItems: 'center', justifyContent: 'center' },
   hud: { alignItems: 'center' },
-  hint: { color: onColorCream, fontSize: fontSize.caption.at390, opacity: 0.85 },
+  /**
+   * ⚠️ THE HINT'S CHIP — floating, rounded, TRANSLUCENT (S64, owner).
+   *
+   * WHY IT EXISTS: this screen runs over a live camera and the hint was cream text
+   * with NO background, so against a pale wall — or in daylight — the words vanished.
+   * The chip gives the words a surface of their own without hiding the scene.
+   *
+   * ⚠️ AND WHY IT FLOATS RATHER THAN SPANS: `maxWidth` + `marginHorizontal` keep it
+   * off the left and right glass at ANY type size (a long line wraps inside the chip
+   * instead of reaching the edge), and its parents centre it, so it never reaches the
+   * bottom either. A chip that touched the edges would read as a header bar rather
+   * than as a label floating over the scene — which is the whole request.
+   *
+   * ⚠️ THE OPACITY IS PARTIAL ON PURPOSE (0.72), and it is a WHOLE-GROUP opacity, so
+   * the words are softened with the fill — that is the trade the owner chose ("do not
+   * use full opacity"), and it is why the label is no longer faded ON TOP of it: the
+   * two alphas used to stack (0.85 over 0.72) and the text would have gone grey.
+   * Measured: composited over a blown-out white scene the cream words still land at
+   * ≈7:1 against their own chip, so the fill darkens what is behind the text without
+   * dimming the text itself below AA.
+   */
+  hintChip: {
+    backgroundColor: surface.camera,
+    opacity: 0.72,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.md,
+    paddingVertical: space.xs,
+    marginHorizontal: space.lg,
+    maxWidth: '88%',
+  },
+  /** Full opacity now: the chip above supplies the contrast the fade was standing in for. */
+  hint: { color: onColorCream, fontSize: fontSize.caption.at390 },
   throws: { color: onColorCream, fontSize: fontSize.caption.at390, opacity: 0.6, marginTop: space.xs },
   result: { flex: 1, justifyContent: 'flex-end', alignItems: 'center', paddingHorizontal: space.lg },
   bandText: { color: onColorCream, fontSize: fontSize.titleScreen.at390, fontWeight: '700' },
@@ -751,6 +807,12 @@ const styles = StyleSheet.create({
     marginTop: space.sm,
     opacity: 0.85,
   },
+  /**
+   * A caption INSIDE a chip. Two overrides, both mechanical: the chip already
+   * supplies the spacing (`marginTop` would offset the words inside it), and the
+   * chip's own translucency is the fade — a second one on the text would dim it twice.
+   */
+  captionInChip: { marginTop: 0, opacity: 1 },
   row: { flexDirection: 'row', gap: space.md, marginTop: space.md },
   button: {
     backgroundColor: surface.camera,
