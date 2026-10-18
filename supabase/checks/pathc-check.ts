@@ -13,9 +13,18 @@
  * ⚠️ FAULT-TEST IT: delete one clause from the template and confirm it goes RED.
  */
 
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import {
   COLOUR_LEAK_MIN_TOKENS,
   COST_MICROS,
+  CUTOUT_CONTENT_TYPE,
+  CUTOUT_MODEL,
+  CUTOUT_OPERATING_RESOLUTION,
+  CUTOUT_OUTPUT_FORMAT,
+  CUTOUT_VARIANT,
   GENERATE_CONTENT_TYPE,
   GENERATE_MODEL,
   GENERATE_OUTPUT_FORMAT,
@@ -51,6 +60,18 @@ function section(title: string): void {
   console.log(`\n${title}`);
 }
 
+/**
+ * The repo root, so this check can assert what the PIPELINE *does*, not only
+ * what its constants *say*.
+ *
+ * ⚠️ THAT DISTINCTION IS THE WHOLE POINT HERE. Deleting the stage-④ call from
+ * `pathc.ts` would leave every constant intact and every other assertion green
+ * — which is precisely how "clean background by construction" survived long
+ * enough to ship an opaque cream card. The last checks in §1b read this file.
+ */
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const pipelineSource = readFileSync(join(ROOT, 'supabase/functions/_shared/pathc.ts'), 'utf8');
+
 // ── 1 · the locked endpoints (ADR-002) ──────────────────────────────────────
 section('1 · The locked endpoints and caps (ADR-002, PM-locked 2026-09-26)');
 check('identify is fal-ai/moondream2/visual-query', IDENTIFY_MODEL === 'fal-ai/moondream2/visual-query');
@@ -58,19 +79,79 @@ check('generate is fal-ai/nano-banana-2 (t2i, NOT the edit path)', GENERATE_MODE
 check('the object cap is 3', MAX_OBJECTS === 3);
 check('exactly one retry is permitted (doc 11 §4)', MAX_RETRIES === 1);
 check(
-  'unit costs are $0.01 + $0.08 = $0.09/picture',
-  COST_MICROS.identify === 10_000 && COST_MICROS.generate === 80_000,
-  `${COST_MICROS.identify} / ${COST_MICROS.generate}`,
+  'unit costs are $0.01 + $0.08 + $0.001 = $0.091/picture',
+  COST_MICROS.identify === 10_000
+    && COST_MICROS.generate === 80_000
+    && COST_MICROS.cutout === 1_000,
+  `${COST_MICROS.identify} / ${COST_MICROS.generate} / ${COST_MICROS.cutout}`,
 );
-check('a clean run costs 90,000 micros', costMicrosFor(0) === 90_000, String(costMicrosFor(0)));
-check('the one-retry case costs 180,000 micros', costMicrosFor(1) === 180_000, String(costMicrosFor(1)));
-check('retries are clamped at the cap', costMicrosFor(9) === 180_000);
+check('a clean run costs 91,000 micros', costMicrosFor(0) === 91_000, String(costMicrosFor(0)));
+check('the one-retry case costs 182,000 micros', costMicrosFor(1) === 182_000, String(costMicrosFor(1)));
+check('retries are clamped at the cap', costMicrosFor(9) === 182_000);
 
 // The sprite budget decision (doc 14 §3): measured 2026-10-04 — 1K PNG is
 // ≈1.3 MB, 1K WebP is ≈50 KB, against a 150 KB budget. Guarded here so nobody
 // "tidies" it back to PNG and silently breaks the NFR.
 check('the sprite format is webp (the 150 KB budget is otherwise unreachable)', GENERATE_OUTPUT_FORMAT === 'webp');
 check('the sprite MIME is image/webp (the styled bucket allows it)', GENERATE_CONTENT_TYPE === 'image/webp');
+
+// ── 1b · STAGE ④ — the cutout that makes the sprite TRANSPARENT ─────────────
+//
+// ⚠️ MEASURED ON GLASS 2026-10-18: without this stage the stored WebP is an
+// OPAQUE CREAM CARD (#F3EDD8) floating over the live camera. "Clean background
+// by construction" was true of the CONTENTS and false of the ALPHA CHANNEL —
+// a t2i model paints the background and emits no transparency. ADR-002
+// Amendment 2 adds the cut; these assertions stop it being dropped again.
+section('1b · Stage ④ — the cutout (ADR-002 Amendment 2, measured 2026-10-18)');
+check('the cutout is fal-ai/birefnet/v2', CUTOUT_MODEL === 'fal-ai/birefnet/v2');
+check(
+  'it runs the variant the measurement chose',
+  CUTOUT_VARIANT === 'General Use (Light)',
+  CUTOUT_VARIANT,
+);
+check(
+  'it operates at the 1K point the generator used',
+  CUTOUT_OPERATING_RESOLUTION === '1024x1024',
+  CUTOUT_OPERATING_RESOLUTION,
+);
+check(
+  'it ASKS for webp — PNG is the endpoint default and is 1.3 MB-class',
+  CUTOUT_OUTPUT_FORMAT === 'webp' && CUTOUT_CONTENT_TYPE === 'image/webp',
+  `${CUTOUT_OUTPUT_FORMAT} / ${CUTOUT_CONTENT_TYPE}`,
+);
+// The cutout produces the bytes that are stored, so ITS container is the
+// sprite's container. If these ever disagree, the bucket MIME and the client's
+// decoder both break — and the failure would look like a missing image.
+check(
+  'the cutout format IS the stored sprite format (nothing re-encodes in between)',
+  CUTOUT_OUTPUT_FORMAT === GENERATE_OUTPUT_FORMAT && CUTOUT_CONTENT_TYPE === GENERATE_CONTENT_TYPE,
+  `${CUTOUT_OUTPUT_FORMAT} vs ${GENERATE_OUTPUT_FORMAT}`,
+);
+check(
+  'the paid cutout is inside the per-picture unit cost',
+  costMicrosFor(0) === COST_MICROS.identify + COST_MICROS.generate + COST_MICROS.cutout,
+  String(costMicrosFor(0)),
+);
+
+// ⚠️ THE ASSERTIONS THAT WOULD HAVE CAUGHT THE ORIGINAL BUG: constants alone
+// prove nothing about the pipeline that uses them.
+check(
+  'the pipeline ACTUALLY runs the cutout',
+  /falRun\(\s*CUTOUT_MODEL/.test(pipelineSource),
+);
+check(
+  'the cutout is asked for webp explicitly',
+  /output_format:\s*CUTOUT_OUTPUT_FORMAT/.test(pipelineSource),
+);
+check(
+  'the URL it returns is the CUTOUT, not the generator frame',
+  /const styledUrl = cut\?\.image\?\.url/.test(pipelineSource),
+);
+check(
+  'guard: the source assertion is not vacuous (the file was really read)',
+  pipelineSource.includes('export async function runPathC') && pipelineSource.length > 5_000,
+  `${pipelineSource.length} chars`,
+);
 
 // ── 2 · the template clauses that must never disappear ─────────────────────
 section('2 · The v3 template clauses (ADR-002 §2 — each one was paid for)');

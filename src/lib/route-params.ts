@@ -54,6 +54,24 @@ export type RewardParams = {
 export type BurnParams = {
   readonly captureId: string;
   readonly uri: string;
+  /**
+   * The CARTOONIZED sprite's key inside the **private** `styled` bucket
+   * (`{userId}/{captureId}.{ext}`), NOT a URL.
+   *
+   * ⚠️ WHY IT IS A ROUTE PARAM AT ALL. The orchestrator has already uploaded the
+   * sprite by the time `/preparing` finishes, and `styled` has **no public read**
+   * (migration `0006`: the bucket is private, with a `styled_read_own` select
+   * policy). So the burn screen cannot re-derive the object's name and cannot
+   * guess its extension — it must be handed the key. Dropping it is the SAME
+   * failure mode as the dropped `captureId` this file was written for: the hop
+   * still "works", and the player simply never sees the thing they paid for.
+   * `check:wire` §1 now asserts it survives.
+   *
+   * Optional on purpose: the TUTORIAL hop has no server-generated sprite (no
+   * network, no spend), so it must be able to say so by omission — the same
+   * reasoning as `demo`.
+   */
+  readonly spritePath?: string;
   readonly demo?: string;
 };
 
@@ -85,9 +103,26 @@ export function toRewardParams(
   };
 }
 
-/** Build the `/burn` params (preparing → burn). */
-export function toBurnParams(captureId: string, uri: string, demo = false): BurnParams {
-  return { captureId, uri, ...(demo ? { demo: DEMO_VALUE } : {}) };
+/**
+ * Build the `/burn` params (preparing → burn).
+ *
+ * `spritePath` is a REQUIRED argument even though the field it sets is optional.
+ * That asymmetry is deliberate: a caller must decide, explicitly, whether this
+ * offering has a sprite — passing `null` is a statement, whereas an omitted
+ * default would silently reproduce the bug this parameter exists to fix.
+ */
+export function toBurnParams(
+  captureId: string,
+  uri: string,
+  spritePath: string | null,
+  demo = false,
+): BurnParams {
+  return {
+    captureId,
+    uri,
+    ...(spritePath ? { spritePath } : {}),
+    ...(demo ? { demo: DEMO_VALUE } : {}),
+  };
 }
 
 export type RewardParamProblem = 'missing_capture_id' | 'bad_accuracy' | 'bad_throw_number';
@@ -148,20 +183,37 @@ export function readRewardParams(raw: {
   };
 }
 
-/** Read and validate `/burn`'s params. Same rule: the id is not optional. */
+/**
+ * Read and validate `/burn`'s params. Same rule: the id is not optional.
+ *
+ * `spritePath` reads back as `string | null` rather than `undefined`, so the
+ * screen has one falsy case to handle instead of two. A blank/whitespace value
+ * (what a `?spritePath=` with an empty value produces) collapses to `null`: a
+ * signed URL for `''` would fail at the storage client anyway, and an empty
+ * string masquerading as "a sprite exists" is the more expensive mistake.
+ */
 export function readBurnParams(raw: {
   readonly captureId?: string | string[];
   readonly uri?: string | string[];
+  readonly spritePath?: string | string[];
   readonly demo?: string | string[];
 }): {
   readonly ok: true;
   readonly captureId: string;
   readonly uri: string;
+  readonly spritePath: string | null;
   readonly demo: boolean;
 } | { readonly ok: false; readonly reason: 'missing_capture_id' | 'missing_uri' } {
   const captureId = first(raw.captureId)?.trim() ?? '';
   if (captureId.length === 0) return { ok: false, reason: 'missing_capture_id' };
   const uri = first(raw.uri)?.trim() ?? '';
   if (uri.length === 0) return { ok: false, reason: 'missing_uri' };
-  return { ok: true, captureId, uri, demo: isDemo(first(raw.demo)) };
+  const spritePath = first(raw.spritePath)?.trim() ?? '';
+  return {
+    ok: true,
+    captureId,
+    uri,
+    spritePath: spritePath.length > 0 ? spritePath : null,
+    demo: isDemo(first(raw.demo)),
+  };
 }

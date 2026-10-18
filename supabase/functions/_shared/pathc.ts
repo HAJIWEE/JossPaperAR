@@ -7,6 +7,8 @@
  *      then deduped and colour-sanity-checked (ADR-002 §4). A failure costs one
  *      targeted re-probe, and only one (doc 11 §4: "AI retries / picture: 1").
  *   ③ generate  `fal-ai/nano-banana-2` text-to-image with the v3 template
+ *   ④ cut out   `fal-ai/birefnet/v2` removes the painted rice-paper background
+ *      and returns the TRANSPARENT WebP the caller actually stores (Amendment 2).
  *
  * Cost and latency are returned so the orchestrator can record them on
  * `cartoonize_jobs` (the spike's numbers live there in production — doc 07 §5.3).
@@ -19,7 +21,11 @@ import { z } from 'npm:zod@3';
 import { falKey } from './env.ts';
 import {
   COST_MICROS,
-  GENERATE_CONTENT_TYPE,
+  CUTOUT_CONTENT_TYPE,
+  CUTOUT_MODEL,
+  CUTOUT_OPERATING_RESOLUTION,
+  CUTOUT_OUTPUT_FORMAT,
+  CUTOUT_VARIANT,
   GENERATE_MODEL,
   GENERATE_OUTPUT_FORMAT,
   IDENTIFY_MODEL,
@@ -160,6 +166,20 @@ export function parseIdentify(raw: string): IdentifyParse {
 export interface FalError extends Error {
   status?: number;
   moderation?: boolean;
+  /**
+   * What this run cost before it stopped — set by `runPathC` on every failure
+   * AFTER a provider was called. The orchestrator records it on the job row:
+   * a paid run whose spend is invisible is the failure the row exists to
+   * prevent (doc 07 §5.3).
+   */
+  spent?: Spent;
+}
+
+/** The cost/latency a run had accrued when it stopped. */
+export interface Spent {
+  readonly costMicros: number;
+  readonly latencyMs: number;
+  readonly retries: number;
 }
 
 /** One synchronous fal call. `fal.run` returns the finished result directly. */
@@ -183,15 +203,28 @@ async function falRun(model: string, body: unknown): Promise<unknown> {
 }
 
 export interface PathCResult {
-  /** Where fal parked the generated sprite (downloaded + re-uploaded by the caller). */
+  /**
+   * The **TRANSPARENT** sprite Stage ④ produced — downloaded + re-uploaded by
+   * the caller. This, and only this, is what belongs in the `styled` bucket.
+   */
   readonly styledUrl: string;
+  /**
+   * The raw stylized frame BEFORE the cut: opaque, cream rice-paper background.
+   * Kept so a failure downstream can be explained — **never stored as the
+   * sprite** (it is the floating-card defect Amendment 2 exists to fix).
+   */
+  readonly generatedUrl: string;
   /** The validated attributes, kept so a run can be explained after the fact. */
   readonly objects: readonly IdentifiedObject[];
   /** Extra identify attempts actually spent (0 or 1). */
   readonly retries: number;
   readonly costMicros: number;
   /** The itemised unit costs, so the job row explains the total. */
-  readonly unitCostMicros: { readonly identify: number; readonly generate: number };
+  readonly unitCostMicros: {
+    readonly identify: number;
+    readonly generate: number;
+    readonly cutout: number;
+  };
   /** The MIME type of the produced sprite (the bucket must allow it). */
   readonly contentType: string;
   /** The file extension to store it under — matches `contentType`. */
@@ -214,6 +247,18 @@ export async function runPathC(
   let retries = 0;
   let objects: IdentifiedObject[] | null = null;
   let lastReason = 'no attempt ran';
+
+  /**
+   * The conservative, BUDGETED cost of everything attempted so far — the same
+   * unit the success path records, so an interrupted run cannot look cheaper
+   * than the run it interrupted. Over-counting is the safe direction for the
+   * daily stop-rule; an ABSENT line is not (doc 10 §4).
+   */
+  const spentSoFar = (): Spent => ({
+    costMicros: costMicrosFor(retries),
+    latencyMs: Date.now() - startedAt,
+    retries,
+  });
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
     const prompt = attempt === 0 ? IDENTIFY_PROMPT : IDENTIFY_PROMPT_RETRY;
@@ -249,33 +294,79 @@ export async function runPathC(
     // diagnosable from the response, without keeping the model's text.
     const error = new Error(
       `extraction_unusable: the identifier did not return attributes that pass validation (${lastReason})`,
-    ) as Error & { code: string };
+    ) as FalError & { code: string };
     error.code = 'extraction_unusable';
+    // The identify calls were PAID FOR — carry the spend so the job row keeps it.
+    error.spent = spentSoFar();
     throw error;
   }
 
-  const generated = await falRun(GENERATE_MODEL, {
-    prompt: stylePrompt(objects),
-    num_images: 1,
-    output_format: GENERATE_OUTPUT_FORMAT, // WebP — 49.7 KB vs PNG's 1.3 MB (measured)
-    resolution: '1K',                      // the honest cost/latency point (ADR-002 §1)
-    safety_tolerance: '4',                 // the model default; provider moderation still runs
-    limit_generations: true,
-  }) as { images?: { url?: unknown }[] };
+  // ══ ③ GENERATE + ④ CUT OUT — both are PAID, so both must report spend ════
+  try {
+    const generated = await falRun(GENERATE_MODEL, {
+      prompt: stylePrompt(objects),
+      num_images: 1,
+      // ⚠️ The generator's container is an INTERMEDIATE now: stage ④ re-encodes
+      // it, and the cutout's format is what gets stored. Kept webp anyway so the
+      // intermediate is ~50 KB rather than ~1.3 MB.
+      output_format: GENERATE_OUTPUT_FORMAT,
+      resolution: '1K',                      // the honest cost/latency point (ADR-002 §1)
+      safety_tolerance: '4',                 // the model default; provider moderation still runs
+      limit_generations: true,
+    }) as { images?: { url?: unknown }[] };
 
-  const styledUrl = generated?.images?.[0]?.url;
-  if (typeof styledUrl !== 'string' || styledUrl.length === 0) {
-    throw new Error('generate returned no image url');
+    const generatedUrl = generated?.images?.[0]?.url;
+    if (typeof generatedUrl !== 'string' || generatedUrl.length === 0) {
+      throw new Error('generate returned no image url');
+    }
+
+    /**
+     * ④ THE CUTOUT (Amendment 2 — the measured evidence lives on `CUTOUT_MODEL`).
+     *
+     * ⚠️ WITHOUT THIS THE SPRITE IS AN OPAQUE CREAM CARD. The v3 template asks
+     * for a "blank, warm rice-paper background"; the generator PAINTS it, so the
+     * bytes arrive with no alpha and read as a rectangle floating over the live
+     * camera (measured #F3EDD8 on glass, 2026-10-18). Asking the prompt for
+     * transparency cannot fix it — a text-to-image model does not emit alpha —
+     * so the generated frame is CUT, and the cut is what gets stored.
+     *
+     * ⚠️ A CUTOUT FAILURE IS A FAILURE, NOT A FALLBACK. Falling back to
+     * `generatedUrl` would ship the exact defect being fixed while reporting
+     * success; the capture stays `pending` and can be retried instead.
+     */
+    const cut = await falRun(CUTOUT_MODEL, {
+      image_url: generatedUrl,
+      model: CUTOUT_VARIANT,
+      operating_resolution: CUTOUT_OPERATING_RESOLUTION,
+      output_format: CUTOUT_OUTPUT_FORMAT,
+      refine_foreground: true,
+    }) as { image?: { url?: unknown } };
+
+    const styledUrl = cut?.image?.url;
+    if (typeof styledUrl !== 'string' || styledUrl.length === 0) {
+      throw new Error('cutout returned no image url');
+    }
+
+    return {
+      styledUrl,
+      generatedUrl,
+      objects,
+      retries,
+      costMicros: costMicrosFor(retries),
+      unitCostMicros: {
+        identify: COST_MICROS.identify,
+        generate: COST_MICROS.generate,
+        cutout: COST_MICROS.cutout,
+      },
+      contentType: CUTOUT_CONTENT_TYPE,
+      fileExtension: CUTOUT_OUTPUT_FORMAT,
+      latencyMs: Date.now() - startedAt,
+    };
+  } catch (caught) {
+    // EVERYTHING ABOVE WAS PAID FOR. Hand the spend to the caller with the
+    // error, or a cutout failure would make US$0.09 vanish from the job row.
+    const error = (caught instanceof Error ? caught : new Error(String(caught))) as FalError;
+    error.spent = spentSoFar();
+    throw error;
   }
-
-  return {
-    styledUrl,
-    objects,
-    retries,
-    costMicros: costMicrosFor(retries),
-    unitCostMicros: { identify: COST_MICROS.identify, generate: COST_MICROS.generate },
-    contentType: GENERATE_CONTENT_TYPE,
-    fileExtension: GENERATE_OUTPUT_FORMAT,
-    latencyMs: Date.now() - startedAt,
-  };
 }

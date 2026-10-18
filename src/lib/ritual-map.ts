@@ -94,6 +94,28 @@ export function eventsFromResponse(res: OrchestratorResponse): readonly SliceEve
 }
 
 /**
+ * The sprite key carried by a successful outcome, or `null`.
+ *
+ * ⚠️ WHY THIS IS A FUNCTION AND NOT AN INLINE LOOP IN THE SCREEN. `/preparing`
+ * needs the sprite's key to hand to `/burn`, but the key only exists inside the
+ * `STYLED` event that `eventsFromResponse` emits — i.e. it is a property of the
+ * DECISION, not of the response body. Putting the lookup here keeps `ritual-map`
+ * pure (so `check:wire` can assert it with no network) and keeps the screen from
+ * re-deriving a path the mapper already resolved.
+ *
+ * `null` for anything that is not a `STYLED` outcome: a park, a failure and a
+ * transport error all mean "no sprite yet", and none of them may be mistaken for
+ * one — `/burn` would then try to sign a key that was never uploaded.
+ */
+export function styledPathOf(outcome: Outcome): string | null {
+  if (outcome.kind !== 'ok') return null;
+  for (const event of outcome.events) {
+    if (event.type === 'STYLED') return event.spritePath;
+  }
+  return null;
+}
+
+/**
  * Failure codes that mean "the request never got an answer", as opposed to a
  * refusal the server understood and meant. The two must not be conflated: a
  * transport failure leaves the capture UNSPENT, so the offering is still whole.

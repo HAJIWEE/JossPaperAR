@@ -20,7 +20,7 @@ import { eventsFromResponse, outcomeFromHttpFailure, uploadAlreadyPresent, uploa
 import { captureStoragePath } from './storage-path.ts';
 import { supabase, supabaseConfig } from './supabase.ts';
 
-export { eventsFromResponse, httpFailureReason, isTransportCode, outcomeFromHttpFailure, probeVerdict, uploadAlreadyPresent, uploadFailureVerdict, MAX_PROBES, type Outcome, type OrchestratorResponse, type ProbeVerdict, type UploadFailureSignal, type UploadVerdict } from './ritual-map.ts';
+export { eventsFromResponse, httpFailureReason, isTransportCode, outcomeFromHttpFailure, probeVerdict, styledPathOf, uploadAlreadyPresent, uploadFailureVerdict, MAX_PROBES, type Outcome, type OrchestratorResponse, type ProbeVerdict, type UploadFailureSignal, type UploadVerdict } from './ritual-map.ts';
 
 /**
  * Ask the orchestrator to prepare the offering under the client-minted id.

@@ -134,12 +134,12 @@ commit it.
 
 **You do not need to ask before spending fal.ai credit, as long as the spend stays inside the approved budget.**
 
-* **Approved:** US$10–20 for the AI work; **US$5.16 spent** as of 2026-10-08 (≈ S$6.61 at the Mastercard rate 1.2808 — two Path C runs on 2026-10-07; reconciled at SCRUM-41). The full Path C pipeline is ≈ **US$0.09/run**. *Re-derive this figure from `project-costs.md` rather than trusting this line — it goes stale silently.*
+* **Approved:** US$10–20 for the AI work; **US$5.43 spent** as of 2026-10-18 (≈ S$6.96 at the Mastercard rate 1.2808 — reconciled row-by-row in `project-costs.md`). The full Path C pipeline is ≈ **US$0.091/run** — identify $0.01 + generate $0.08 + **cutout $0.001** (stage ④, ADR-002 Amendment 2). *Re-derive this figure from `project-costs.md` rather than trusting this line — it goes stale silently.*
 * **In scope without asking:** any number of verification runs that keep the total **under US$20**.
 * **Still ask first:** anything that would take the total **over US$20**, a new service or subscription, or a purchase of physical hardware.
 * **Always:** log the spend in `project-costs.md` (SGD @ the Mastercard rate, with the USD figure and the derivation inline) and say what it bought. A $0.00 line beats an absent one.
 
-Rationale: the ceiling exists so an unmetered bill cannot surprise us (doc 10 §6), not to require a round-trip before every $0.09 run. The stop-rule already bounds the *global* spend per day (`app_config.daily_ai_budget_micros`).
+Rationale: the ceiling exists so an unmetered bill cannot surprise us (doc 10 §6), not to require a round-trip before every $0.091 run. The stop-rule already bounds the *global* spend per day (`app_config.daily_ai_budget_micros`).
 
 ### Docs are part of "done"
 
@@ -166,7 +166,7 @@ npx supabase db push --yes
 npx tsc --noEmit
 ```
 
-**Known traps:** no local `psql` and no `supabase query` subcommand — to run SQL, add a migration file, `db push`, then delete it and `migration repair --status reverted <version>` or remote history drifts. `app_config` is a kill switch — any script that writes it must restore it from an `EXIT` trap. The Storage bulk-delete `{"prefixes":[…]}` answers `200` and deletes nothing; delete objects **by path**. A Path C generation is ≈ **US$0.09** — check the budget before spending.
+**Known traps:** no local `psql` and no `supabase query` subcommand — to run SQL, add a migration file, `db push`, then delete it and `migration repair --status reverted <version>` or remote history drifts. `app_config` is a kill switch — any script that writes it must restore it from an `EXIT` trap. The Storage bulk-delete `{"prefixes":[…]}` answers `200` and deletes nothing; delete objects **by path**. A Path C generation is ≈ **US$0.091** — check the budget before spending.
 
 ⚠️ **`npm run check` structurally cannot see the CI failure you are most likely to hit.** `expo-doctor` compares the installed packages against the **latest patch for the SDK — a target Expo keeps moving** — so an **untouched repo goes red**. Symptom: *"Check that packages match versions required by installed Expo SDK — expected `~57.0.x`, found an older patch"*, with **no dependency change to explain it**. Measured 2026-10-16: PR #48's `App checks` failed while `package.json` · `package-lock.json` · `app.json` were **byte-identical to `main`**, and the same check had **passed the day before**.
 

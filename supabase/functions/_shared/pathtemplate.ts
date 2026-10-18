@@ -18,8 +18,8 @@
  *                  must light from directly above or the look breaks.
  *   glass          "make the glass transparent" was a PM-demanded change.
  *   noGroundShadow the app draws the shadow; a baked one double-shadows.
- *   background     blank warm rice-paper, subject isolated → a clean sprite by
- *                  construction (no bg-removal stage at all).
+ *   background     blank warm rice-paper, subject isolated → a FLAT, uniform
+ *                  field. ⚠️ That is NOT transparency by itself: see stage ④.
  *   facets         coarse 40–60 flat facets (variant-D fidelity, PM-locked).
  *   ink            ONE consistent ink outline weight.
  *   matte          no speculars — the spike's biggest recurring defect.
@@ -37,8 +37,18 @@ export const MAX_OBJECTS = 3;
 /** ADR-002 §4 / doc 11 §4: exactly ONE retry per picture. */
 export const MAX_RETRIES = 1;
 
-/** Measured unit costs, in micro-dollars (ADR-002 §1: $0.01 + $0.08). */
-export const COST_MICROS = { identify: 10_000, generate: 80_000 } as const;
+/**
+ * Measured unit costs, in micro-dollars.
+ * identify $0.01 + generate $0.08 (ADR-002 §1) + cutout $0.001 (stage ④).
+ *
+ * ⚠️ THE CUTOUT LINE IS AN UPPER BOUND ON A MEASURED RUN, not a published flat
+ * price: `birefnet/v2` bills **$0.000575 per compute second**, and the measured
+ * synchronous call took **1.09 s** ≈ $0.00063. $0.001 covers up to ≈1.7 s, so a
+ * slow run cannot quietly under-record. A clean picture is therefore **91,000
+ * micros (US$0.091)** — still "≈ US$0.09", the number the economy model and the
+ * daily stop-rule were built on.
+ */
+export const COST_MICROS = { identify: 10_000, generate: 80_000, cutout: 1_000 } as const;
 
 /**
  * ⚠️ THE OUTPUT FORMAT IS WEBP, AND THAT IS A MEASURED DECISION (2026-10-04).
@@ -57,6 +67,45 @@ export const COST_MICROS = { identify: 10_000, generate: 80_000 } as const;
 export const GENERATE_OUTPUT_FORMAT = 'webp';
 /** The MIME type that format produces (the `styled` bucket must allow it). */
 export const GENERATE_CONTENT_TYPE = 'image/webp';
+
+/**
+ * ═══ STAGE ④ — THE CUTOUT (added 2026-10-18 · ADR-002 Amendment 2) ══════════
+ *
+ * ⚠️ ADR-002 §Decision 1 dropped the edit path's bg-removal stages on the claim
+ * that Path C's "blank rice-paper background" made the sprite **clean by
+ * construction**. MEASURED ON GLASS 2026-10-18, THAT CLAIM WAS FALSE IN THE WAY
+ * THAT MATTERS: the generator *paints* the background, so the stored WebP
+ * arrives with an **opaque cream card** behind the subject — #F3EDD8, sampled
+ * off the burn screen — which reads as a floating rectangle over the live
+ * camera. "Clean" was true of the contents; the sprite needs **ALPHA**, and a
+ * text-to-image model does not emit it.
+ *
+ * The spike had already found this (RESULTS round 4: *"the stylizer generates a
+ * background … the pipeline needs a second bg-removal (stage ④,
+ * post-stylization)"*) — it was simply never carried into the accepted pipeline.
+ *
+ * So stage ④ cuts the generated frame. Evidence for these exact settings
+ * (2026-10-18, the real sprite cropped off the burn screen, 280×153):
+ *   · `output_format: webp` → 4-channel RGBA, alpha **0** at every corner,
+ *     **71.2%** of pixels fully transparent, **20.7 KB** (150 KB budget intact)
+ *   · 'General Use (Light)' @1024 vs 'General Use (Heavy)' @1024 → 71.2% vs
+ *     70.5% transparent, visually identical on magenta, at **~1.09 s** sync and
+ *     ≈US$0.0006. Light is fal's recommended default, so Light is what we run.
+ *   · the thin ink outline survives the cut (inspected, not assumed)
+ *
+ * ⚠️ ASK FOR WEBP — do not let it default to PNG. The cutout produces the bytes
+ * that get stored, so its container must be the one the bucket and the client
+ * expect; `check:pathc` asserts the two formats agree.
+ */
+export const CUTOUT_MODEL = 'fal-ai/birefnet/v2';
+/** fal's recommended default; measured equivalent to Heavy on stylizer output. */
+export const CUTOUT_VARIANT = 'General Use (Light)';
+/** Matches the generator's `resolution: '1K'` point. */
+export const CUTOUT_OPERATING_RESOLUTION = '1024x1024';
+/** The sprite's real container — stage ④, not the generator, produces it. */
+export const CUTOUT_OUTPUT_FORMAT = 'webp';
+/** The MIME type that format produces (the `styled` bucket must allow it). */
+export const CUTOUT_CONTENT_TYPE = 'image/webp';
 
 /**
  * The identify prompt. ⚠️ IT MUST CONTAIN NO EXAMPLE COLOURS: the spike's
@@ -255,6 +304,6 @@ export function dedupeObjects(objects: readonly IdentifiedObject[]): IdentifiedO
 
 /** Total unit cost of a pipeline run with `retries` extra identify+generate pairs. */
 export function costMicrosFor(retries: number): number {
-  const perAttempt = COST_MICROS.identify + COST_MICROS.generate;
+  const perAttempt = COST_MICROS.identify + COST_MICROS.generate + COST_MICROS.cutout;
   return perAttempt * (1 + Math.max(0, Math.min(retries, MAX_RETRIES)));
 }

@@ -110,15 +110,15 @@ We need AI tools for **two distinct purposes**:
 | `nano-banana-2/edit` + `nano-banana-2` **t2i** | stylizer | $0.080 | 11.8s / 21.6s (edit) · 11.5s (t2i) | ✅ **chosen stylizer** (ADR-002) |
 | `flux-pro/kontext` | stylizer | $0.040 | 9.8s | ❌ fidelity below D |
 | `image-editing/cartoonify` / `cartoonify` (3D) | stylizer | $0.040 / $0.100 | 11.7s / 10.7–58.4s ⚠️ | ❌ high variance, not D |
-| **`birefnet/v2`** | **background removal** | ≈$0.0015/img (0.0008/compute-s) | 1.0s | ✅ stage ① + post-stylize re-cut in the *edit* path — **dropped under Path C** (clean by construction) |
+| **`birefnet/v2`** | **background removal** | ≈$0.0015/img (0.000575/compute-s; measured 1.09 s ≈ $0.0006) | 1.0s | ✅ stage ① in the *edit* path — and **restored as Path C stage ④** (ADR-002 Amendment 2, 2026-10-18): t2i emits no alpha, so the sprite needs the cut |
 | `moondream2/visual-query` | identify | $0.01/query | 1.1s | ✅ **chosen stage ①** — must be **closed-set** (Track B: zero-shot called joss paper "packaged snacks") |
 | `hunyuan-3d` (geometry) | image→3D | $0.015/mesh | minutes | ❌ reserve only (Path B) |
 
-**Decision → [[ADRs/ADR-002-path-c-describe-then-generate|ADR-002]] ✅ Accepted (2026-09-26):** **Path C — describe-then-generate** = `moondream2` identify → `nano-banana-2` t2i from the normative style-D template. **≈ US$0.09/picture steady-state (≤$0.13 with retries) · p50 ≈ 13s · clean background by construction** — the pipeline makes **no background-removal call at all**; the edit path (incl. birefnet) is retained as the documented fallback. Scorecard: **13/13 pass** after the correction loop (3/13 needed ≥1 targeted retry).
+**Decision → [[ADRs/ADR-002-path-c-describe-then-generate|ADR-002]] ✅ Accepted (2026-09-26):** **Path C — describe-then-generate** = `moondream2` identify → `nano-banana-2` t2i from the normative style-D template → **`birefnet/v2` cutout (stage ④, Amendment 2, 2026-10-18)**. **≈ US$0.091/picture steady-state · p50 ≈ 13.7s · transparent sprite.** ⚠️ **"Clean background by construction" was FALSE** — the generator *paints* the rice-paper field the template asks for and a t2i model emits no alpha, so the stored sprite was an opaque cream card until stage ④ existed. The edit path's *other* stages (pre-stylization cutout, lighting filter) remain dropped. Scorecard: **13/13 pass** after the correction loop (3/13 needed ≥1 targeted retry).
 
 ### ✅ Open questions — answered
 
-1. **Per-image cost** → **≈ US$0.09** steady-state / ≤$0.13 worst-case (ADR-002 §5) ≈ **$90 per 1,000 captures** — the measured input to the economy/quota model (**SCRUM-18** ✅ Done).
+1. **Per-image cost** → **≈ US$0.091** steady-state (91,000 micros: 0.01 identify + 0.08 generate + 0.001 cutout) ≈ **$91 per 1,000 captures** — the measured input to the economy/quota model (**SCRUM-18** ✅ Done).
 2. **Latency budget** → measured **p50 ≈ 13s** (1.1s identify + 11.5s generate), above the 3–10s assumption → accepted as a **loading-ritual wait**; seedream's 34s/54.6s killed the cheaper option.
 3. **Style consistency** → the **v3 template is normative** (source-exact colours · top-down lighting · transparent glass · no ground shadow · coarse low-poly + one ink weight) + the **mandatory closed-set catalogue short-circuit** (Track B) for culturally specific store offerings.
 4. **Moderation** → **provider-side gate before stylization**: `captures.status: pending → styled | rejected` (**S5** in doc 12 · posture in doc 13 §6); a rejected capture generates nothing and is purged inside the 7-day raw-photo window.
@@ -135,7 +135,7 @@ We need AI tools for **two distinct purposes**:
 | UI design & wireframes | **Penpot (free)** | $0 | Open-source, MCP-wired into our AI workflow, SVG/CSS-native hand-off |
 | Quick assets & marketing | **Canva Free/Pro** | Free → low monthly | Fast, templates, easy for non-designers |
 | Style exploration (moodboards) | **Canva AI / Adobe Firefly / OpenArt** | Bundled / free credits | Test style directions fast (Penpot carries no built-in image gen) |
-| Runtime cartoonization | **Path C — `moondream2` → `nano-banana-2` t2i on fal.ai** ([[ADRs/ADR-002-path-c-describe-then-generate\|ADR-002]]) | **≈ US$0.09/picture** | Measured in the spike: holds style D, clean background by construction, p50 ≈ 13s |
+| Runtime cartoonization | **Path C — `moondream2` → `nano-banana-2` t2i → `birefnet/v2` cutout on fal.ai** ([[ADRs/ADR-002-path-c-describe-then-generate\|ADR-002]]) | **≈ US$0.091/picture** | Measured in the spike + on glass: holds style D, **transparent** sprite via stage ④, p50 ≈ 13.7s |
 
 ### Budget-Friendly Path (Hobby Project)
 1. **Now**: Penpot (free cloud or self-host) + its free MCP server + Canva free + free AI credits → complete design phase for **$0**

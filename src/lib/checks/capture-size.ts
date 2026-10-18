@@ -37,7 +37,7 @@ import {
   CAPTURE_MIN_BYTES,
   isUploadableCaptureSize,
 } from '../capture-size.ts';
-import { escapeForNativeLoader, unescapeFromNativeLoader } from '../native-path.ts';
+import { escapeForNativeLoader, nativeLoaderUriFromDecoded, unescapeFromNativeLoader } from '../native-path.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (rel: string): string => readFileSync(join(ROOT, rel), 'utf8');
@@ -188,6 +188,27 @@ check(
   unescapeFromNativeLoader(escapeForNativeLoader(ENCODED)) === ENCODED,
 );
 check('ritual.ts fetches the collapsed manipulator uri', ritualSource.includes('unescapeFromNativeLoader(resized.uri)'));
+
+// ⚠️ The OTHER form of the same trap (measured 2026-10-18, S60): a screen that
+// reads the photo out of a ROUTE PARAM gets it DECODED, and on that form
+// `escapeForNativeLoader` is a no-op — so `/burn`'s tutorial drew nothing. The
+// scope directory must be re-encoded and then escaped once more, because the
+// native loader decodes exactly once. `Image.getSize` returned 3000×4000 only
+// for the double-encoded form; the other two answered ENOENT.
+const DECODED = 'file:///data/user/0/host.exp.exponent/cache/ExperienceData/@scope/slug/Camera/a.jpg';
+
+check('a DECODED sandbox path is rebuilt for the native loader', nativeLoaderUriFromDecoded(DECODED) === ESCAPED);
+check(
+  'one native decode of the rebuilt uri lands on the literal on-disk directory',
+  decodeURIComponent(nativeLoaderUriFromDecoded(DECODED).replace('file://', ''))
+    === '/data/user/0/host.exp.exponent/cache/ExperienceData/%40scope%2Fslug/Camera/a.jpg',
+);
+check('a plain cache path has no ExperienceData and is left alone',
+  nativeLoaderUriFromDecoded('file:///data/user/0/app.josspaperar/cache/Camera/a.jpg')
+    === 'file:///data/user/0/app.josspaperar/cache/Camera/a.jpg');
+check('a non-file url is not rebuilt', nativeLoaderUriFromDecoded('https://x.test/@a/b') === 'https://x.test/@a/b');
+check('a scope with no leaf is left alone (nothing to rebuild)',
+  nativeLoaderUriFromDecoded('file:///x/ExperienceData/@scope/slug') === 'file:///x/ExperienceData/@scope/slug');
 
 // ── summary ──────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(64)}`);

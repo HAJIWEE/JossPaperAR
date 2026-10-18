@@ -55,3 +55,42 @@ export function unescapeFromNativeLoader(uri: string): string {
   if (!uri.startsWith('file://')) return uri;
   return uri.replace(/%25/g, '%');
 }
+
+/**
+ * Rebuild the native-loader form of a captured photo when the route param has
+ * **already been decoded** — which is what `useLocalSearchParams` hands a screen.
+ *
+ * ⚠️ MEASURED ON GLASS (2026-10-18, S60). `escapeForNativeLoader` above assumes the
+ * URI still carries `%40…` (the form `takePictureAsync` returns). A screen that
+ * reads the same photo out of a **route param** instead gets the DECODED form
+ * (`…/ExperienceData/@scope/slug/Camera/a.jpg`), because expo-router decodes it on
+ * read — and on that form `escapeForNativeLoader` is a no-op, so the loader still
+ * lands on a missing path. Measured with `Image.getSize` on the tutorial's photo:
+ *
+ *   · `…/@scope/slug/…`              → ENOENT
+ *   · `…/%40scope%2Fslug/…`          → ENOENT (the loader decodes it back)
+ *   · `…/%2540scope%252Fslug/…`      → **3000 × 4000** ✓
+ *
+ * So the scope directory has to be re-encoded (`@` → `%40`, `/` → `%2F`) and then
+ * escaped once more (`%` → `%25`), because the loader performs exactly ONE decode.
+ * The same two facts as the header — the on-disk name is literal, the loader
+ * decodes once — applied to a URI that lost its escapes on the way through a param.
+ *
+ * The marker is `ExperienceData/`, which only Expo Go creates. A dev/preview build
+ * (`…/app.josspaperar/cache/…`) has no such segment, so this is a no-op there.
+ */
+export function nativeLoaderUriFromDecoded(uri: string): string {
+  if (!uri.startsWith('file://')) return uri;
+  const marker = '/ExperienceData/';
+  const at = uri.indexOf(marker);
+  if (at === -1) return uri;
+  const head = uri.slice(0, at + marker.length);
+  const rest = uri.slice(at + marker.length).split('/');
+  const [scope, slug] = rest;
+  // `@scope/slug` is ONE directory on disk, so it needs two segments to rebuild
+  // and at least one more (the leaf file) to be a path at all.
+  if (scope === undefined || !scope.startsWith('@') || slug === undefined || rest.length < 3) {
+    return uri;
+  }
+  return `${head}%2540${scope.slice(1)}%252F${slug}/${rest.slice(2).join('/')}`;
+}
