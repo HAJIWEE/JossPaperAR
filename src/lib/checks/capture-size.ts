@@ -37,7 +37,13 @@ import {
   CAPTURE_MIN_BYTES,
   isUploadableCaptureSize,
 } from '../capture-size.ts';
-import { escapeForNativeLoader, nativeLoaderUriFromDecoded, unescapeFromNativeLoader, uploadableUri } from '../native-path.ts';
+import {
+  escapeForNativeLoader,
+  nativeLoaderUriFromAnyForm,
+  nativeLoaderUriFromDecoded,
+  unescapeFromNativeLoader,
+  uploadableUri,
+} from '../native-path.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (rel: string): string => readFileSync(join(ROOT, rel), 'utf8');
@@ -171,7 +177,19 @@ check(
   'one native decode of the escaped uri lands on the literal path',
   decodeURIComponent(escapeForNativeLoader(ENCODED).replace('file://', '')) === ENCODED.replace('file://', ''),
 );
-check('ritual.ts escapes before the native decoder sees it', ritualSource.includes('escapeForNativeLoader(fileUri)'));
+// ⚠️ AND THE SOURCE ASSERTION MOVED TO THE FORM-AGNOSTIC HELPER (S64, MEASURED ON GLASS).
+// It used to assert `escapeForNativeLoader(fileUri)` — which was right for the RAW form and
+// a NO-OP on the DECODED form that `/preparing` actually receives from `/crop`. The probe:
+//
+//     [blob-in] …/@josspaperar/…  → loader: …/@josspaperar/…   ← unchanged
+//     → Context.renderAsync rejected: Could not load the image: …/@josspaperar/…
+//
+// …so every upload was `unusable` and no offering could ever be prepared. Asserting the
+// dispatcher here is what makes that a red check rather than a device session.
+check('ritual.ts dispatches on the form present before the native decoder sees it',
+  ritualSource.includes('nativeLoaderUriFromAnyForm(fileUri)'));
+check('⚠️ …and does NOT pick a single encoding branch (the S64 regression)',
+  !ritualSource.includes('escapeForNativeLoader(fileUri)'));
 check('ritual.ts does not pre-decode the uri', !ritualSource.includes('decodeURIComponent'));
 
 // ⚠️ And the inverse, for the manipulator's OWN output: it escapes one level
@@ -224,6 +242,41 @@ check('a plain cache path is untouched by the collapse',
 check('a non-file url is not collapsed for upload', uploadableUri('https://x.test/@a/b') === 'https://x.test/@a/b');
 check('⚠️ the collapse is what ritual.ts consumes: escape() undoes it',
   escapeForNativeLoader(uploadableUri(DECODED)) === ESCAPED);
+
+/*
+ * ⚠️ THE OTHER DIRECTION, AND THE BLACK SCREEN THAT PROVED IT WAS NEEDED (S64).
+ *
+ * `uploadableUri` above answers "what does the uploader get". This answers "what does a
+ * NATIVE DECODER get" — and until S64 there was no single answer: a screen had to know
+ * whether its param had been through a URL (form 3, decoded) or not (form 1, raw), and the
+ * frame step guessed wrong and drew a black stage, silently, because `Image.getSize`'s
+ * failure fell back to the declared capture size. `nativeLoaderUriFromAnyForm` is that
+ * single answer, and all three forms are asserted — including the fixed-point property that
+ * makes the dispatch safe (`escapeForNativeLoader` is NOT idempotent, so composing the two
+ * older helpers would escape form 2 twice).
+ */
+check('⚠️ raw form (what a real capture arrives as) → the form the loader can read',
+  nativeLoaderUriFromAnyForm(ENCODED) === ESCAPED);
+check('decoded form (a URL round trip) → the same form',
+  nativeLoaderUriFromAnyForm(DECODED) === ESCAPED);
+check('⚠️ loader form is a FIXED POINT — it must not be escaped a second time',
+  nativeLoaderUriFromAnyForm(ESCAPED) === ESCAPED);
+check('…and the older helper would have got that wrong (why the dispatch exists)',
+  escapeForNativeLoader(nativeLoaderUriFromDecoded(ESCAPED)) !== ESCAPED);
+check('a plain cache path is left alone (a dev build has no ExperienceData segment)',
+  nativeLoaderUriFromAnyForm('file:///data/user/0/app.josspaperar/cache/Camera/a.jpg')
+    === 'file:///data/user/0/app.josspaperar/cache/Camera/a.jpg');
+check('a non-file url is not rebuilt',
+  nativeLoaderUriFromAnyForm('https://x.test/@a/b') === 'https://x.test/@a/b');
+check('⚠️ EVERY form lands on a uri the uploader can consume unchanged',
+  [ENCODED, ESCAPED, DECODED].every(
+    (form) => uploadableUri(nativeLoaderUriFromAnyForm(form)) === ENCODED,
+  ));
+check('⚠️ …and one native decode of it lands on the LITERAL on-disk directory',
+  [ENCODED, DECODED].every(
+    (form) => decodeURIComponent(nativeLoaderUriFromAnyForm(form).replace('file://', ''))
+      === '/data/user/0/host.exp.exponent/cache/ExperienceData/%40scope%2Fslug/Camera/a.jpg',
+  ));
 
 // ── summary ──────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(64)}`);

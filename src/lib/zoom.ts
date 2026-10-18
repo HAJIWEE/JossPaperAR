@@ -1,5 +1,5 @@
 /**
- * zoom.ts — the shutter screen's zoom STOPS, as a decision a gate can read.
+ * zoom.ts — the shutter screen's zoom, as a decision a gate can read.
  *
  * ── WHY THIS FILE EXISTS (SCRUM-131, 2026-10-18) ─────────────────────────────
  * The owner pinched the camera preview, saw it zoom, and could not tell whether
@@ -44,6 +44,31 @@
  * PILL that is approximate. That trade is a PM decision, filed as **SCRUM-132**
  * (accept the assumption / drop the ratio labels / read the real range natively).
  * If it is answered, THIS CONSTANT is the only thing that changes.
+ *
+ * ── THE CONTROL IS ANALOGUE; THE PILLS ARE PRESETS (S64, 2026-10-18) ─────────
+ * SCRUM-131 shipped three pills and nothing else, so the owner's report was
+ * exactly *"the zoom now only does 1× 2× 4× — it should still retain a slider
+ * for analogue zooming"*. The fix is a change of SUBJECT, not an extra control:
+ *
+ *   · the screen stores the **FRACTION** — the one value `<CameraView zoom>` takes
+ *     — and the slider is a direct 1:1 view of it;
+ *   · the ratio on the label is DERIVED from that fraction through the natives'
+ *     own arithmetic (`zoomRatioFrom`), so the number can only ever say what the
+ *     hardware is doing rather than what we asked for;
+ *   · the three pills became PRESETS: tapping one writes that preset's fraction
+ *     (the same solve the gate already verifies), and a pill lights only while
+ *     the value IS that preset (`zoomPresetForFraction`).
+ *
+ * ⚠️ So the old "store the stop, derive the fraction" note is now INVERTED, and
+ * deliberately: with an analogue input there is no stop to store. What must not
+ * come back is the third possibility — storing the *ratio* the label shows, which
+ * would make the label a second opinion on the camera's state instead of a
+ * read-out of it. The ratio is never state; it is a rendering of the fraction.
+ *
+ * ⚠️ The track is linear in the FRACTION, not in the ratio. A ratio-linear track
+ * would need the per-platform inverse solve on every drag pixel and would still
+ * disagree with what iOS actually does (its mapping is exponential) — so the
+ * track would be a straight lie on one of the two platforms.
  */
 
 /**
@@ -195,4 +220,127 @@ export function zoomStopForFraction(
     const there = Math.abs(zoomFractionFor(nearest.ratio, platform, max) - f);
     return here < there ? stop : nearest;
   }, ZOOM_STOPS[0] ?? last);
+}
+
+// ── the ANALOGUE control (S64): the fraction is the subject ───────────────────
+
+/** The ratio at fraction `0` — the floor of the a11y range and of the label. */
+export const MIN_ZOOM_RATIO = 1;
+
+/**
+ * One a11y step on the track, as a fraction of the whole range: 1/16.
+ *
+ * Deliberately coarse. A screen-reader user swipes to move; sixteen steps across
+ * a range whose top is an ASSUMED 8× means each step is a visible change, while a
+ * finer step would make reaching the top an endurance test.
+ */
+export const ZOOM_SLIDER_STEP = 1 / 16;
+
+/**
+ * How close to a preset the value must be for its pill to light: half a step.
+ *
+ * ⚠️ This is a UX rule, not a floating-point guard, and the difference matters.
+ * Tapping a pill writes the preset's own fraction, so an exact compare would do
+ * — but a player who *slides* onto 2× would then see no pill lit, and one who
+ * slides a hair off would see it stay lit for ever. Half a step makes the
+ * highlight mean "you are on this preset", and extinguishes it as they leave.
+ */
+export const ZOOM_PRESET_MATCH_TOLERANCE = ZOOM_SLIDER_STEP / 2;
+
+/**
+ * The ratio the camera is actually at, for a fraction — THE label's source.
+ *
+ * ⚠️ A named re-export of `zoomRatioFrom`, not a second implementation: the label
+ * must be the natives' arithmetic applied to the value we send, or the number and
+ * the picture can disagree.
+ */
+export function zoomRatioForFraction(
+  fraction: number,
+  platform: ZoomPlatform,
+  max: number = ASSUMED_MAX_ZOOM_RATIO,
+): number {
+  return zoomRatioFrom(fraction, platform, max);
+}
+
+/**
+ * A ratio as the numeral the label shows — `1×`, `2×`, `2.4×`.
+ *
+ * ⚠️ A NUMERAL, and therefore NOT in the i18n table, for the same reason the
+ * preset labels are not (see `ZOOM_STOPS`): "2.4×" is the camera idiom in both of
+ * this app's locales. `check:framing` asserts the table stays free of it.
+ *
+ * One decimal below 10×, whole numbers above (where a tenth is noise), and never
+ * below `1×` however small the fraction.
+ */
+export function zoomLabel(ratio: number): string {
+  if (!Number.isFinite(ratio) || ratio <= MIN_ZOOM_RATIO) return `${MIN_ZOOM_RATIO}×`;
+  const rounded = ratio >= 10 ? Math.round(ratio) : Math.round(ratio * 10) / 10;
+  // A 1.04 ratio rounds to 1, and "1×" is what it is; never print "1.0×".
+  return `${rounded}×`;
+}
+
+/**
+ * The fraction for a touch at `offsetX` along a track `trackWidth` wide.
+ *
+ * Pure, so the geometry is assertable: the left edge is the UNZOOMED end (`0`),
+ * the right edge is the device maximum (`1`), and anything off either end clamps
+ * rather than wrapping — a drag that leaves the track must not flip the zoom.
+ * A degenerate track (0 or NaN wide) is the unzoomed end, not a division by zero.
+ */
+export function zoomFractionFromTrack(offsetX: number, trackWidth: number): number {
+  if (!Number.isFinite(trackWidth) || trackWidth <= 0) return 0;
+  if (!Number.isFinite(offsetX)) return 0;
+  return clampFraction(offsetX / trackWidth);
+}
+
+/**
+ * The thumb's offset along that track — the inverse of `zoomFractionFromTrack`.
+ *
+ * ⚠️ Both directions exist on purpose: the screen positions the thumb with this
+ * while the drag sets the fraction with the other, so a gate can prove the two
+ * agree. One-direction-only geometry is how a thumb ends up not under the finger.
+ */
+export function zoomTrackOffset(
+  fraction: number,
+  trackWidth: number,
+): number {
+  if (!Number.isFinite(trackWidth) || trackWidth <= 0) return 0;
+  return clampFraction(fraction) * trackWidth;
+}
+
+/**
+ * The fraction one a11y step away from `fraction`. `direction` is -1 or +1.
+ *
+ * ⚠️ It quantises to the step grid rather than adding a step to an arbitrary
+ * value, so repeated increments always reach the same places and the top is
+ * exactly `1` — the same reasoning as the pill solve, applied to the keyboard.
+ */
+export function zoomSteppedFraction(
+  fraction: number,
+  direction: -1 | 1,
+): number {
+  const current = clampFraction(fraction);
+  const steps = Math.round(current / ZOOM_SLIDER_STEP) + direction;
+  return clampFraction(steps * ZOOM_SLIDER_STEP);
+}
+
+/**
+ * The PRESET the value is sitting on, or `null` when it is between presets.
+ *
+ * ⚠️ `zoomStopForFraction` (above) answers a different question — "which preset
+ * is NEAREST" — and it is deliberately kept for the relative-pinch harness. Using
+ * it for the pill highlight would light 1× at every value below 1.5×, which reads
+ * as a selected stop the player never chose. This one lights nothing until the
+ * value really is the preset.
+ */
+export function zoomPresetForFraction(
+  fraction: number,
+  platform: ZoomPlatform,
+  max: number = ASSUMED_MAX_ZOOM_RATIO,
+): ZoomStop | null {
+  const f = clampFraction(fraction);
+  return ZOOM_STOPS.find(
+    (stop) => Math.abs(zoomFractionFor(stop.ratio, platform, max) - f)
+      <= ZOOM_PRESET_MATCH_TOLERANCE,
+  ) ?? null;
 }

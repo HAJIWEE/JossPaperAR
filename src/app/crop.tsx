@@ -23,28 +23,38 @@
  * nothing. `Image.getSize` answers `ENOENT`; `<Image>` paints the background.
  *
  * So the display URI and the manipulator input BOTH go through
- * `nativeLoaderUriFromDecoded` — the same fix `/burn` needed for the tutorial
+ * `nativeLoaderUriFromAnyForm` — the same fix `/burn` needed for the tutorial
  * offering (`src/lib/native-path.ts` measures all three encodings). ⚠️ Do not
  * "simplify" that away: the raw param renders a black rectangle, and it does so
- * silently.
+ * silently. ⚠️ And it is the FORM-AGNOSTIC one on purpose — S64 measured a real capture
+ * arriving as the RAW form on this very hop, which `nativeLoaderUriFromDecoded` (the S60
+ * answer, right for the decoded form) passes through untouched.
  *
- * ── THE TWO MODES, AND THE HONEST LIMIT OF THE SECOND ────────────────────────
+ * ── THE TWO MODES, AND WHAT EACH ONE ACTUALLY SENDS (rewritten in S64) ───────
  *   RECTANGLE — a true pixel crop. Drag a box; `rectToImagePixels` maps it to whole
- *               image pixels and refuses anything under `MIN_CROP_EDGE_PX`.
- *   LASSO     — a freehand outline, APPLIED AS ITS BOUNDING BOX. `expo-image-manipulator`
- *               can only crop rectangles (`ActionCrop`: "fields specify top-left
- *               corner and dimensions of a crop rectangle"), so a masked selection
- *               would need a rasterizer this app does not depend on. The box is
- *               therefore DRAWN over the outline before the player confirms, and
- *               `crop.lassoNote` says so in words — the one thing a lasso must not do
- *               here is quietly send something the player did not see. Filed as
- *               **SCRUM-130**.
+ *               image pixels and refuses anything under `MIN_CROP_EDGE_PX`. The
+ *               manipulator cuts it from the PHOTO'S OWN pixels.
+ *   LASSO     — a FREE-FORM mask (S64). The outline must be a closed, simple,
+ *               non-degenerate loop (`src/lib/lasso.ts` refuses it by name
+ *               otherwise), and everything outside it is painted out of the picture
+ *               before the file is written. ⚠️ SCRUM-130 shipped this as its
+ *               BOUNDING BOX and the owner rejected it — "the Lasso tool currently
+ *               is effecting a rectangle area which defeats the purpose" — so the
+ *               mask is now the drawn shape, rasterized from the very view the
+ *               player is looking at (`Svg.toDataURL`, see `crop-frame.ts`).
+ *
+ * ⚠️ THE TWO MODES SEND DIFFERENTLY-SHAPED FILES, because the tools differ:
+ * a rectangle DISCARDS the outside, a mask REPLACES it with flat dark (JPEG has no
+ * alpha — the long version is in `crop-frame.ts`'s header). Both are honest about
+ * it on screen: the rectangle draws a frame around what it will cut, and the lasso
+ * shows the masked picture itself.
  *
  * ── IT CANNOT BLOCK THE RITUAL ───────────────────────────────────────────────
- * Every failure path below — unreadable photo, a crop the manipulator refuses, bad
- * route params — still offers a way forward that costs nothing: use the whole photo,
- * or retake. A screen between the player and their offering must never be the reason
- * nothing can be burned (the same rule as `/burn`'s missing sprite).
+ * Every failure path below — unreadable photo, a frame the manipulator refuses, an
+ * outline that does not close, bad route params — still offers a way forward that
+ * costs nothing: use the whole photo, or retake. A screen between the player and
+ * their offering must never be the reason nothing can be burned (the same rule as
+ * `/burn`'s missing sprite).
  */
 
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
@@ -61,16 +71,18 @@ import {
   type LayoutChangeEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Polyline } from 'react-native-svg';
+import Svg, { Image as SvgImage, Path, Polyline } from 'react-native-svg';
 
 import {
+  clampRectToBox,
   containRect,
   cropRectFor,
-  isUsableLasso,
+  DIM_PATH_FILL_RULE,
+  dimPathPolygon,
   isWholeImage,
-  lassoBounds,
   normaliseDrag,
   polylinePoints,
+  rectToViewStyle,
   scrimAround,
   type CropMode,
   type Point,
@@ -79,9 +91,35 @@ import {
 } from '@/lib/crop-frame';
 import { CAPTURE_COMPRESS } from '@/lib/capture-size';
 import { t } from '@/lib/i18n';
-import { nativeLoaderUriFromDecoded, uploadableUri } from '@/lib/native-path';
+import { lassoFault, lassoFaultMessageKey, lassoPolygon, lassoRegion } from '@/lib/lasso';
+import { nativeLoaderUriFromAnyForm, uploadableUri } from '@/lib/native-path';
 import { readCropParams, toPreparingParams } from '@/lib/route-params';
 import { TOUCH_TARGET, brand, fontSize, onColorCream, radius, space, surface } from '@/theme/tokens';
+
+/**
+ * How long we wait for the mask to rasterize before saying it could not be done.
+ *
+ * ⚠️ A guard, not a policy. `toDataURL`'s callback is deferred by the native module
+ * until the view has been rendered, and a promise that never settles would leave the
+ * confirm button reading "Framing your offering…" for ever, with no way out but
+ * the back gesture. Eight seconds is far longer than a raster that works takes
+ * (tens of milliseconds) and far shorter than a player's patience.
+ */
+const MASK_RASTER_TIMEOUT_MS = 8000;
+
+/**
+ * The smallest PNG base64 we will believe is a real mask.
+ *
+ * ⚠️ THIS FLOOR IS LOAD-BEARING — the same lesson as `CAPTURE_MIN_BYTES`. If the
+ * mask view's photo never loads, the raster is still *produced*: it is the opaque
+ * flat fill and nothing else, which PNG compresses to a couple of hundred bytes.
+ * Handed to the manipulator, that becomes a perfectly valid black JPEG — a silent
+ * wrong offering bought for ≈US$0.09. A real mask is a photographic region at
+ * view resolution, so it is tens of thousands of base64 characters; 12,000
+ * (~9 KB of PNG) is an order of magnitude above an empty raster and an order of
+ * magnitude below a real one. Measured: an empty 512×512 raster is ≈440 chars.
+ */
+const MASK_RASTER_MIN_BASE64_CHARS = 12_000;
 
 type Phase =
   | { readonly kind: 'framing' }
@@ -136,8 +174,29 @@ export default function CropScreen(): React.JSX.Element {
    * the same kind of consumer (a native decoder that decodes once), so they must be
    * given the same encoding. Deriving it once is also what stops the two drifting
    * apart into "the preview loads but the crop fails".
+   *
+   * ⚠️ S64 ADDENDUM — THIS WAS THE BLACK SCREEN, AND THE `getSize` FALLBACK HID IT. A probe
+   * run this session caught a REAL capture arriving as form 1 (`%40scope%2Fslug…`), on which
+   * `nativeLoaderUriFromDecoded` is a no-op and every native decoder answers ENOENT — while
+   * the declared-size fallback below kept the screen laying out its overlays, so it looked
+   * like a working screen whose photo happened to be dark. The uri now goes through
+   * `nativeLoaderUriFromAnyForm`, which is right for all three encodings.
+   *
+   * ⚠️ Four things about the fix are load-bearing, because each was a way this broke before:
+   *
+   *  ① The DISPLAY and the MANIPULATOR get the SAME string, derived once — they are the same
+   *     kind of consumer (a native decoder that decodes once), so two derivations would only
+   *     let them drift into "the preview loads but the crop fails".
+   *  ② The SVG mask's `<SvgImage href={nativeUri}>` is that same string — a third consumer,
+   *     same encoding, no separate rule.
+   *  ③ `uploadableUri` is the OTHER side of the same fact: it wants form 1, and — unlike a
+   *     naive pass-through — it is correct for all three forms too, so the skip path and the
+   *     framed path hand the uploader the same shape.
+   *  ④ So nothing on this screen may call `nativeLoaderUriFromDecoded` or
+   *     `escapeForNativeLoader` directly. `check:framing` asserts the form-agnostic helper is
+   *     the one used.
    */
-  const nativeUri = useMemo(() => (uri.length > 0 ? nativeLoaderUriFromDecoded(uri) : ''), [uri]);
+  const nativeUri = useMemo(() => (uri.length > 0 ? nativeLoaderUriFromAnyForm(uri) : ''), [uri]);
 
   /** The photo's true pixel size, measured — never assumed. See the effect below. */
   const [measured, setMeasured] = useState<Size | null>(null);
@@ -151,6 +210,15 @@ export default function CropScreen(): React.JSX.Element {
   const [rect, setRect] = useState<Rect | null>(null);
   /** The lasso stroke, in VIEW coordinates. */
   const [path, setPath] = useState<readonly Point[]>([]);
+  /**
+   * Is a finger DOWN on the drawing surface right now?
+   *
+   * ⚠️ The outline's verdict is held back until the finger comes up (S64). Judging a
+   * half-drawn loop would flash "join the two ends" under the player's own hand while
+   * they are still drawing, which reads as the screen arguing with a gesture that has
+   * not finished. One boolean, set on grant and cleared on release.
+   */
+  const [strokeOpen, setStrokeOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>({ kind: 'framing' });
 
   /**
@@ -215,30 +283,94 @@ export default function CropScreen(): React.JSX.Element {
       : { width, height }));
   }, []);
 
-  /** The selection as DRAWN — clipped to the photo, so it never outlines the letterbox. */
-  const drawnSelection = useMemo((): Rect | null => {
-    if (box === null) return null;
-    const proposed = mode === 'rect' ? rect : lassoBounds(path);
-    if (proposed === null) return null;
-    const left = Math.max(proposed.x, box.x);
-    const top = Math.max(proposed.y, box.y);
-    const right = Math.min(proposed.x + proposed.width, box.x + box.width);
-    const bottom = Math.min(proposed.y + proposed.height, box.y + box.height);
-    if (!(right > left) || !(bottom > top)) return null;
-    return { x: left, y: top, width: right - left, height: bottom - top };
-  }, [box, mode, rect, path]);
+  /**
+   * SOMETHING HAS BEEN DRAWN, AND THE GESTURE IS OVER — the moment a verdict is welcome.
+   *
+   * ⚠️ `path.length > 1`, not `isUsableLasso(path)`: a stroke that is too flat or too short
+   * to be a selection is still SOMETHING the player drew, and it needs a sentence (a
+   * disabled button with no explanation is the failure this avoids). `rect !== null` is the
+   * rectangle's own answer to the same question.
+   */
+  const strokeEnded = mode === 'lasso' ? path.length > 1 && !strokeOpen : rect !== null;
 
-  /** `null` when the selection cannot be honoured — the screen says so, never sends it. */
-  const preview = useMemo(
-    () => (box === null || measured === null
-      ? null
-      : cropRectFor(mode, { ...(rect !== null ? { rect } : {}), path }, box, measured)),
-    [box, measured, mode, rect, path],
+  /**
+   * THE OUTLINE, VALIDATED — `null` until the drawn loop is a closed, simple,
+   * non-degenerate shape (see `src/lib/lasso.ts` for the rules and why each one
+   * exists). This is what the confirm button is gated on, so an outline that would
+   * mask the wrong region can never be sent.
+   */
+  const polygon = useMemo(
+    () => (mode === 'lasso' ? lassoPolygon(path) : null),
+    [mode, path],
   );
 
-  const hasSelection = mode === 'rect' ? rect !== null : isUsableLasso(path);
-  /** Drawn, but too small (or off the photo) to become a crop. */
-  const tooSmall = hasSelection && preview === null;
+  /**
+   * WHICH fault the outline has, for the sentence shown to the player.
+   *
+   * ⚠️ Only asked once a stroke has ENDED (`strokeEnded`): a half-drawn loop is not
+   * "not closed", it is *not finished*, and a refusal that appears under the player's own
+   * finger reads as the screen arguing with them. Nothing has been drawn at all → no
+   * verdict either; the instruction above the stage is what they need then.
+   */
+  const fault = useMemo(
+    () => (mode === 'lasso' && strokeEnded ? lassoFault(path) : null),
+    [mode, path, strokeEnded],
+  );
+
+  /**
+   * THE REGION — the area this frame will send, in whole view coordinates.
+   *
+   *   · rectangle — the dragged box, clipped to the photo.
+   *   · lasso     — the outline's bounding box, clipped the same way. The MASK is
+   *                 free-form; the REGION is still a box, because the file has to be
+   *                 a rectangle and the outline is drawn inside it.
+   *
+   * Both go through `clampRectToBox`/`lassoRegion`, so neither mode can select the
+   * letterbox — the arithmetic the gate holds still with a selection dragged off the
+   * photo's edge.
+   */
+  const region = useMemo((): Rect | null => {
+    if (box === null) return null;
+    if (mode === 'lasso') return polygon === null ? null : lassoRegion(polygon, box);
+    return rect === null ? null : clampRectToBox(rect, box);
+  }, [box, mode, polygon, rect]);
+
+  /**
+   * THE PIXEL CROP — rectangle mode only, and the sharper of the two paths: the
+   * manipulator cuts it from the PHOTO'S OWN pixels, not from the screen.
+   */
+  const pixelCrop = useMemo(
+    () => (mode !== 'rect' || box === null || measured === null || rect === null
+      ? null
+      : cropRectFor('rect', { rect }, box, measured)),
+    [box, measured, mode, rect],
+  );
+
+  /**
+   * THE MASK'S PIXEL SIZE — lasso mode's equivalent of the pixel crop, and it exists
+   * for ONE reason: the minimum-size rule.
+   *
+   * ⚠️ It runs the RAW path through the same mode-aware entry point the rectangle uses
+   * (`cropRectFor`, whose lasso branch is `lassoBounds` → clip → `rectToImagePixels` →
+   * `isUsableCropRect`), so both modes are held to ONE minimum. The rect it returns cuts
+   * nothing — the renderer produces the mask from the view — which is why this looks like
+   * an unused result. It is the rule, not the crop.
+   */
+  const maskPixels = useMemo(
+    () => (mode !== 'lasso' || box === null || measured === null
+      ? null
+      : cropRectFor('lasso', { path }, box, measured)),
+    [box, measured, mode, path],
+  );
+
+  /**
+   * Drawn, but not sendable — too small, off the photo, or (lasso) not watertight.
+   *
+   * ⚠️ A fault takes precedence: "your outline crosses itself" is a more useful sentence
+   * than "choose a larger area" when both happen to be true.
+   */
+  const canSend = mode === 'rect' ? pixelCrop !== null : polygon !== null && maskPixels !== null;
+  const tooSmall = strokeEnded && fault === null && !canSend;
 
   /**
    * The gesture's start point — TRANSIENT, so it lives in a ref.
@@ -247,6 +379,15 @@ export default function CropScreen(): React.JSX.Element {
    * the gesture callbacks ever reads it.
    */
   const dragStart = useRef<Point | null>(null);
+
+  /**
+   * The MASK VIEW — the raster source, and the reason the lasso's preview and its file
+   * cannot drift: they are the same view.
+   *
+   * ⚠️ A ref, not state: assigning it must not re-render, and `toDataURL` needs the
+   * native handle rather than anything React renders.
+   */
+  const svgRef = useRef<Svg | null>(null);
 
   /**
    * The drawing surface.
@@ -272,6 +413,7 @@ export default function CropScreen(): React.JSX.Element {
       onPanResponderGrant: (event) => {
         const point = locationOf(event);
         dragStart.current = point;
+        setStrokeOpen(true);
         if (mode === 'rect') {
           // A new drag REPLACES the box — that is how the selection is adjusted, so
           // there is no separate "clear" affordance to explain.
@@ -301,6 +443,8 @@ export default function CropScreen(): React.JSX.Element {
       },
       onPanResponderRelease: () => {
         dragStart.current = null;
+        // The finger is up: from here the outline can be judged (S64).
+        setStrokeOpen(false);
         if (mode !== 'rect') return;
         // A TAP must not leave a degenerate box behind — it would then read as "choose a
         // larger area" for a gesture the player never meant as a selection.
@@ -311,6 +455,7 @@ export default function CropScreen(): React.JSX.Element {
       },
       onPanResponderTerminate: () => {
         dragStart.current = null;
+        setStrokeOpen(false);
       },
     }),
     [mode],
@@ -346,34 +491,99 @@ export default function CropScreen(): React.JSX.Element {
   }, [goOn, uri]);
 
   /**
-   * Apply the frame, then hand on ONLY the cropped file.
+   * Rasterize the mask view into PNG base64 — `Svg.toDataURL`, the only rasterizer
+   * this app has (see `crop-frame.ts`'s header for why the mask lives in SVG).
    *
-   * ⚠️ The order is the point: the crop is written and SAVED before anything is handed
-   * onward, so what `/preparing` uploads is the crop — never the original frame carrying
-   * an intent to crop it later. A failure here falls back to nothing worse than the whole
+   * ⚠️ THE RESULT IS MEASURED, NOT TRUSTED. Two things can go wrong silently here and
+   * both produce a *valid file*: the native module can call back with nothing (it does,
+   * on iOS, when the view has not rendered yet), and a mask whose photo never loaded
+   * rasterizes as flat fill — a black offering nobody would notice until the styler
+   * returned. So both an empty callback and a raster below
+   * `MASK_RASTER_MIN_BASE64_CHARS` are REJECTED, and the screen says the frame could
+   * not be applied instead of sending the wrong one.
+   *
+   * ⚠️ No `options` argument: on Android the raster is `Bitmap.createBitmap(getWidth(),
+   * getHeight())` — the view in PIXELS — while on iOS the same `{width, height}` is
+   * interpreted in POINTS and multiplied by the device scale, so an explicit size would
+   * mean two different resolutions per platform. The view's own bounds have one
+   * meaning on both: "as big as the photo is drawn".
+   */
+  const rasterizeMask = useCallback((): Promise<string> => new Promise((resolve, reject) => {
+    const view = svgRef.current;
+    if (view === null) {
+      reject(new Error('mask_view_missing'));
+      return;
+    }
+    let settled = false;
+    const finish = (base64: string | undefined): void => {
+      if (settled) return;
+      settled = true;
+      if (typeof base64 === 'string' && base64.length >= MASK_RASTER_MIN_BASE64_CHARS) {
+        resolve(base64);
+      } else {
+        reject(new Error('mask_raster_empty'));
+      }
+    };
+    // The guard, so a callback that never arrives cannot strand the screen.
+    setTimeout(() => finish(undefined), MASK_RASTER_TIMEOUT_MS);
+    view.toDataURL(finish, undefined);
+  }), []);
+
+  /**
+   * Apply the frame, then hand on ONLY the framed file.
+   *
+   * ⚠️ The order is the point: the file is written and SAVED before anything is handed
+   * onward, so what `/preparing` uploads is the frame — never the original carrying an
+   * intent to frame it later. A failure here falls back to nothing worse than the whole
    * photo, which is free and cannot cost the player a spent capture.
+   *
+   * ⚠️ TWO PATHS, and they are not two spellings of one idea:
+   *
+   *   · RECTANGLE — the manipulator crops the photo's own pixels. Exact, and the
+   *     sharpest thing we can send.
+   *   · LASSO — the mask view is rasterized (`toDataURL` → PNG base64), then fed to the
+   *     manipulator as a `data:` URI purely to WRITE IT AS A FILE at the upload budget's
+   *     compression. The SDK documents base64 data URIs as a valid source ("Should be on
+   *     the local file system or a base64 data URI"), and iOS reads `url.scheme == "data"`
+   *     in `ImageManipulatorUtils.swift`; on Android the loader is Glide, which resolves
+   *     `data:` through its own `DataUrlLoader`.
    */
   const confirm = useCallback(async () => {
-    if (preview === null || measured === null || nativeUri.length === 0) return;
+    if (measured === null || nativeUri.length === 0) return;
+    if (mode === 'rect' && pixelCrop === null) return;
+    if (mode === 'lasso' && polygon === null) return;
 
-    // A "crop" that covers the whole photo needs no file: do not pay a re-encode for an
-    // image identical to the one we already have.
-    if (isWholeImage(preview, measured)) {
+    // A rectangle that covers the whole photo needs no file: do not pay a re-encode for
+    // an image identical to the one we already have. ⚠️ A MASK never skips — the player
+    // drew a shape, and the shape changes the picture.
+    if (mode === 'rect' && pixelCrop !== null && isWholeImage(pixelCrop, measured)) {
       skip();
       return;
     }
 
     setPhase({ kind: 'working' });
     try {
-      const rendered = await ImageManipulator.manipulate(nativeUri)
-        .crop({
-          originX: preview.x,
-          originY: preview.y,
-          width: preview.width,
-          height: preview.height,
-        })
-        .renderAsync();
-      const saved = await rendered.saveAsync({ compress: CAPTURE_COMPRESS, format: CROP_FORMAT });
+      const saved = mode === 'lasso'
+        ? await (async () => {
+          const base64 = await rasterizeMask();
+          const rendered = await ImageManipulator
+            .manipulate(`data:image/png;base64,${base64}`)
+            .renderAsync();
+          return rendered.saveAsync({ compress: CAPTURE_COMPRESS, format: CROP_FORMAT });
+        })()
+        : await (async () => {
+          const rendered = await ImageManipulator.manipulate(nativeUri)
+            .crop({
+              // `pixelCrop` is non-null on this branch (guarded above); the fallbacks are
+              // here because a nested closure cannot narrow it for the type checker.
+              originX: pixelCrop?.x ?? 0,
+              originY: pixelCrop?.y ?? 0,
+              width: pixelCrop?.width ?? 0,
+              height: pixelCrop?.height ?? 0,
+            })
+            .renderAsync();
+          return rendered.saveAsync({ compress: CAPTURE_COMPRESS, format: CROP_FORMAT });
+        })();
 
       // ⚠️ `saved.uri` was written for a NATIVE LOADER, so it is escaped one level
       // further than the disk path; `uploadableUri` collapses it to the form
@@ -386,16 +596,33 @@ export default function CropScreen(): React.JSX.Element {
       // be burned (the same rule as `/burn`'s missing sprite).
       setPhase({ kind: 'failed' });
     }
-  }, [goOn, measured, nativeUri, preview, skip]);
+  }, [goOn, measured, mode, nativeUri, pixelCrop, polygon, rasterizeMask, skip]);
 
-  /** The dimming rects, from the pure helper — the screen draws, `crop-frame` decides. */
+  /**
+   * The dimming rects, from the pure helper — the screen draws, `crop-frame` decides.
+   *
+   * ⚠️ `rectToViewStyle` is what turns them into a style, because React Native has no
+   * `x`/`y` style property. Spreading the `Rect` straight into `style` — which is what
+   * this screen first did — silently drops its position and piles all four rects onto
+   * the stage's top-left corner. That was the owner's inverted-dimming bug; see
+   * `rectToViewStyle`'s header for the measurement.
+   */
   const scrims = useMemo(
-    () => (box === null || drawnSelection === null ? [] : scrimAround(drawnSelection, box)),
-    [box, drawnSelection],
+    () => (box === null || region === null ? [] : scrimAround(region, box)),
+    [box, region],
+  );
+
+  /**
+   * The mask path — the ONE path that paints everything outside the outline (S64). An
+   * empty string means "no mask to draw"; `canSend` has already refused in that case.
+   */
+  const maskPath = useMemo(
+    () => (region === null || polygon === null ? '' : dimPathPolygon(region, polygon)),
+    [polygon, region],
   );
 
   const busy = phase.kind === 'working';
-  const canConfirm = preview !== null && !busy;
+  const canConfirm = canSend && !busy;
 
   // ── the two ways in that cost nothing ──────────────────────────────────────
   // ⚠️ Both are rendered BEFORE any hook-dependent UI below, but AFTER every hook
@@ -476,13 +703,66 @@ export default function CropScreen(): React.JSX.Element {
               <View
                 key={`scrim-${index}`}
                 pointerEvents="none"
-                style={[styles.scrim, scrim]}
+                style={[styles.scrim, rectToViewStyle(scrim)]}
               />
             ))}
 
             {/*
-              The freehand stroke, drawn where it was drawn. The BOX below is what will
-              actually be sent — showing both is the honesty requirement (SCRUM-130).
+              THE FREE-FORM MASK (S64) — the lasso's picture AND the file's source.
+
+              ⚠️ Everything about this view is load-bearing:
+
+              · it is sized to the REGION and `viewBox`ed to the same box, so the same
+                content scales to any raster size — the preview and the sent file are
+                one view at two resolutions, which is why "what you see is what is
+                sent" is true rather than aspirational;
+              · the photo is drawn INSIDE it (`SvgImage`), offset so it lands exactly
+                where the plain `<Image>` above drew it — and the plain image stays
+                mounted so the rest of the screen is still the photo, softly dimmed;
+              · the mask is ONE even-odd path (`dimPathPolygon`): the region's box with
+                the outline as a hole, so everything outside the drawn shape is painted
+                out. `DIM_PATH_FILL_RULE` is `evenodd` or the hole would not exist.
+            */}
+            {mode === 'lasso' && region !== null && maskPath !== '' ? (
+              <Svg
+                ref={svgRef}
+                testID="crop-mask"
+                style={{
+                  position: 'absolute',
+                  left: region.x,
+                  top: region.y,
+                  width: region.width,
+                  height: region.height,
+                }}
+                viewBox={`0 0 ${region.width} ${region.height}`}
+                preserveAspectRatio="none"
+              >
+                <SvgImage
+                  href={nativeUri}
+                  x={box.x - region.x}
+                  y={box.y - region.y}
+                  width={box.width}
+                  height={box.height}
+                  // The image's box already has the photo's aspect ratio, so `none`
+                  // cannot distort it — and it removes one scaling rule from a chain we
+                  // cannot see.
+                  preserveAspectRatio="none"
+                />
+                <Path
+                  d={maskPath}
+                  fill={surface.camera}
+                  fillRule={DIM_PATH_FILL_RULE}
+                />
+              </Svg>
+            ) : null}
+
+            {/*
+              The freehand stroke, drawn where it was drawn — ON TOP of the mask, so the
+              player can still see the line they are drawing over their offering.
+
+              ⚠️ The dashed "this outline becomes a box" frame that used to sit here is
+              GONE: it disclosed a limit that no longer exists. With the mask in place the
+              picture shows the truth directly, which is better than a frame around it.
             */}
             {mode === 'lasso' && path.length > 1 ? (
               <Svg pointerEvents="none" style={StyleSheet.absoluteFill}>
@@ -495,17 +775,16 @@ export default function CropScreen(): React.JSX.Element {
               </Svg>
             ) : null}
 
-            {drawnSelection !== null ? (
+            {/*
+              ⚠️ RECTANGLE MODE ONLY: the frame that WILL be cut. In lasso mode the mask
+              above already shows what is sent, and a second rectangle around it would
+              suggest a box crop the lasso is not doing.
+            */}
+            {mode === 'rect' && region !== null ? (
               <View
                 pointerEvents="none"
                 testID="crop-selection"
-                style={[
-                  styles.selection,
-                  drawnSelection,
-                  // The lasso's frame is DASHED — a visual cue that it is a derived box
-                  // around the outline, not the outline itself.
-                  mode === 'lasso' && styles.selectionApplied,
-                ]}
+                style={[styles.selection, rectToViewStyle(region)]}
               />
             ) : null}
 
@@ -545,11 +824,23 @@ export default function CropScreen(): React.JSX.Element {
       </View>
 
       {/*
-        ⚠️ The lasso's limit, in words, whenever the lasso is the active mode. The pill
-        and the dashed frame say it visually; this says it in a sentence, because "I drew
-        a circle and got a square" must not be a surprise after the player pays for a run.
+        ⚠️ What the lasso DOES, in words — rewritten in S64. SCRUM-130's sentence said
+        the outline would be used as a box, which is now false, and a screen that keeps
+        explaining a limit it no longer has is worse than one that says nothing.
       */}
       {mode === 'lasso' ? <Text style={styles.note}>{t('crop.lassoNote')}</Text> : null}
+
+      {/*
+        A FAULT IN THE OUTLINE, named (S64). ⚠️ Each fault gets its OWN sentence rather
+        than one generic refusal: "your outline is not closed" and "your outline crosses
+        itself" are two different things to do about it, and the owner asked for exactly
+        this — *"else error out to the user and reject it"*.
+      */}
+      {fault !== null ? (
+        <Text testID="crop-lasso-fault" style={styles.warn}>
+          {t(lassoFaultMessageKey(fault))}
+        </Text>
+      ) : null}
 
       {/* A drawn-but-unusable selection, and a failed apply — both are the SAME kind of
           message to the player: nothing is wrong with the photo, choose again. */}
@@ -641,13 +932,8 @@ const styles = StyleSheet.create({
   stageNote: { color: onColorCream, fontSize: fontSize.body.at390, opacity: 0.75 },
   /** Everything outside the selection — dark enough to read as "not included". */
   scrim: { position: 'absolute', backgroundColor: surface.camera, opacity: 0.55 },
-  /** The frame that WILL be sent. */
+  /** The frame that WILL be sent — rectangle mode only (see the stage). */
   selection: { position: 'absolute', borderWidth: 2, borderColor: onColorCream },
-  /**
-   * The lasso's derived box: dashed and gold, so it cannot be confused with the
-   * freehand stroke the player drew (which is solid cream, in the Svg above it).
-   */
-  selectionApplied: { borderWidth: 1, borderStyle: 'dashed', borderColor: brand.gold },
   modeRow: {
     flexDirection: 'row',
     justifyContent: 'center',

@@ -1,35 +1,54 @@
 /**
  * FRAMING CHECKS — `node src/lib/checks/framing.ts`
  *
- * ⚠️ WHY THIS FILE EXISTS (SCRUM-131, 2026-10-18)
+ * ⚠️ WHY THIS FILE EXISTS (SCRUM-131, 2026-10-18; extended S64, 2026-10-18)
  *
- * Two features landed together and neither is visible to any existing gate:
+ * Three features, none of them visible to any other gate:
  *
- *   ① ZOOM STOPS on the shutter screen. `expo-camera`'s `zoom` prop is a FRACTION of
- *      the device's maximum, and the two platforms convert it with DIFFERENT arithmetic
- *      (Android multiplies, iOS raises to a power). So "2×" is not a constant — it is a
- *      solve, per platform, against an assumed device maximum. Nothing but a check can
- *      hold that still, and getting it wrong is invisible: the preview simply zooms the
+ *   ① ZOOM on the shutter screen — first three stops, now an ANALOGUE SLIDER with the
+ *      stops kept as presets. `expo-camera`'s `zoom` prop is a FRACTION of the device's
+ *      maximum, and the two platforms convert it with DIFFERENT arithmetic (Android
+ *      multiplies, iOS raises to a power). So "2×" is not a constant — it is a solve,
+ *      per platform, against an assumed device maximum. Nothing but a check can hold
+ *      that still, and getting it wrong is invisible: the preview simply zooms the
  *      wrong amount.
  *
  *   ② THE CROP/LASSO STEP. Its whole promise is that what leaves the screen is the
  *      region the player chose. The failure modes are geometric and silent — a selection
  *      measured against the CONTAINER instead of the letterboxed photo, a crop one pixel
- *      wide, a lasso applied as something other than its box, `NaN` handed to a native
- *      decoder. Every one of those produces a plausible-looking screen and a wrong
- *      offering, and every one is arithmetic — so it is asserted here, with no device.
+ *      wide, `NaN` handed to a native decoder, and (the one the owner actually hit) a
+ *      dimming overlay laid out with `x`/`y`, which React Native has no style property
+ *      for. Every one of those is arithmetic, so it is asserted here, with no device.
  *
- * Section ③ is the SOURCE assertions: that the two screens actually consume the pure
- * modules above rather than re-deciding. A gate over pure functions that the app does not
- * call is a gate over nothing — the mistake `check:capturesize` was written to fix.
+ *   ③ THE FREE-FORM LASSO (S64). A region defined by a drawn outline is only defined if
+ *      that outline CLOSES, does not CROSS ITSELF and encloses something — otherwise the
+ *      mask is computed from a shape nobody drew and the player pays for the wrong
+ *      region. The rules live in `src/lib/lasso.ts`; the path that applies them lives in
+ *      `crop-frame.ts`; both are asserted here.
  *
- * ⚠️ FAULT-TEST IT, TWICE (one per feature) — both MEASURED, not asserted:
+ * Section ③ is the SOURCE assertions: that the screens actually consume the pure modules
+ * above rather than re-deciding — including the two gates on the *rasterizer*, because a
+ * mask that is drawn but never sent (or sent but never drawn) is invisible to `tsc`.
+ *
+ * ⚠️ FAULT-TESTED FIVE TIMES THIS SESSION (S64) — every number MEASURED, not asserted,
+ * against a green baseline of 174 checks:
+ *   · `rectToViewStyle` returned to `{ x, y, width, height }` (the reported bug) →
+ *     **3 of 174 red**, and `tsc` ALSO catches it (TS2353 — the return type is spelled out,
+ *     so the type system and the gate agree);
+ *   · `dimPathPolygon` made to drop its hole (the mask does nothing) → **3 of 174 red**;
+ *   · `LASSO_CLOSE_TOLERANCE_PX` 28 → 1000 (an open loop silently accepted) →
+ *     **4 of 174 red**;
+ *   · the slider's drag mapping left unclamped → **1 of 174 red**;
+ *   · the raster's `data:image/png;base64,` prefix changed → **1 of 174 red**.
+ * Restored → 174/174 green.
+ *
+ * ⚠️ AND THE ORIGINAL TWO, MEASURED WHEN THEY WERE WRITTEN (the count then was 88):
  *   · change the Android branch of `zoomRatioFrom` to `1 + f * (max - 1)` (the arithmetic
- *     the SDK does NOT use) → **2 of 88 go red**, the two per-platform solves. A stop whose
- *     RATIO is edited instead is caught by the "three standard stops" check, because a
- *     solve is self-consistent by construction — this check catches MAPPING drift.
+ *     the SDK does NOT use) → the per-platform solves go red. A stop whose RATIO is edited
+ *     instead is caught by the "three standard stops" check, because a solve is
+ *     self-consistent by construction — this catches MAPPING drift.
  *   · change `manipulate(nativeUri)` to `manipulate(uri)` in `crop.tsx` (the black screen)
- *     → **2 of 88 go red**, the uri assertions in section ③.
+ *     → the uri assertions in section ③ go red.
  */
 
 import { readFileSync } from 'node:fs';
@@ -40,30 +59,57 @@ import { MESSAGES, t } from '../i18n.ts';
 import {
   containRect,
   cropRectFor,
+  DIM_PATH_FILL_RULE,
+  dimPathPolygon,
   isUsableCropRect,
-  isUsableLasso,
   isWholeImage,
   lassoBounds,
   MIN_CROP_EDGE_PX,
   normaliseDrag,
   pathLength,
+  polygonPath,
   polylinePoints,
   rectToImagePixels,
+  rectToViewStyle,
   scrimAround,
   type Point,
   type Rect,
   type Size,
 } from '../crop-frame.ts';
 import {
+  LASSO_CLOSE_TOLERANCE_PX,
+  LASSO_INTERSECT_TOLERANCE_PX,
+  LASSO_JUNCTION_GUARD_PX,
+  lassoFault,
+  lassoFaultMessageKey,
+  lassoPolygon,
+  lassoRegion,
+  lassoVertices,
+  pathCrossesItself,
+  pathIsClosed,
+  polygonArea,
+  segmentsCross,
+  type LassoFault,
+} from '../lasso.ts';
+import {
   ASSUMED_MAX_ZOOM_RATIO,
   DEFAULT_ZOOM_STOP,
+  MIN_ZOOM_RATIO,
+  ZOOM_PRESET_MATCH_TOLERANCE,
+  ZOOM_SLIDER_STEP,
   ZOOM_STOPS,
   zoomFractionFor,
   zoomFractionForStop,
+  zoomFractionFromTrack,
+  zoomLabel,
   zoomPlatformFor,
+  zoomPresetForFraction,
+  zoomRatioForFraction,
   zoomRatioFrom,
+  zoomSteppedFraction,
   zoomStop,
   zoomStopForFraction,
+  zoomTrackOffset,
 } from '../zoom.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -137,6 +183,85 @@ check('the round trip holds under a DIFFERENT assumed maximum',
 
 check('Platform.OS maps: ios → ios', zoomPlatformFor('ios') === 'ios');
 check('…and anything else → android (no silent third case)', zoomPlatformFor('web') === 'android');
+
+// ── ①b the ANALOGUE slider (S64) — the control the owner asked for ───────────
+/*
+ * ⚠️ THE ROUND TRIP IS THE CHECK THAT MATTERS. The thumb is POSITIONED by one function
+ * and the VALUE comes from the other, so if they ever disagreed the thumb would sit
+ * somewhere other than the finger — and no screenshot would say which of the two was
+ * wrong. (This is the same shape as the zoom solve above: two things that must agree,
+ * proven against each other rather than against a hardcoded number.)
+ */
+const TRACK = 300;
+
+check('the left end of the track is the UNZOOMED end', zoomFractionFromTrack(0, TRACK) === 0);
+check('the right end is the device maximum', zoomFractionFromTrack(TRACK, TRACK) === 1);
+check('the middle is the middle', near(zoomFractionFromTrack(TRACK / 2, TRACK), 0.5));
+check('⚠️ a drag that leaves the track CLAMPS — it does not wrap',
+  zoomFractionFromTrack(-40, TRACK) === 0 && zoomFractionFromTrack(TRACK + 40, TRACK) === 1);
+check('a track that has not been laid out yet (width 0) is the unzoomed end, not NaN',
+  zoomFractionFromTrack(50, 0) === 0 && zoomFractionFromTrack(50, Number.NaN) === 0);
+check('a NaN location is refused rather than propagated',
+  zoomFractionFromTrack(Number.NaN, TRACK) === 0);
+
+const roundTrip: number[] = [];
+for (const fraction of [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]) {
+  roundTrip.push(zoomFractionFromTrack(zoomTrackOffset(fraction, TRACK), TRACK));
+}
+check('⚠️ the thumb offset is the INVERSE of the drag mapping (all seven probes)',
+  roundTrip.every((value, index) => near(value, [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1][index] ?? -1, 1e-9)));
+check('a fraction outside the range cannot push the thumb off the track',
+  zoomTrackOffset(-1, TRACK) === 0 && zoomTrackOffset(2, TRACK) === TRACK);
+
+/*
+ * THE LABEL. It is DERIVED (`zoomRatioForFraction` → `zoomLabel`), never stored, and it
+ * is a NUMERAL rather than a translated string — the same rule as the stop labels.
+ */
+check('the ratio is derived from the fraction through the natives, on both platforms',
+  ZOOM_STOPS.every((stop) => (['android', 'ios'] as const).every(
+    (platform) => zoomLabel(zoomRatioForFraction(zoomFractionForStop(stop.id, platform), platform))
+      === stop.label,
+  )));
+check('the a11y range is the real one: fraction 0 is 1× and fraction 1 is the assumed max',
+  (['android', 'ios'] as const).every((platform) => zoomRatioForFraction(0, platform) === MIN_ZOOM_RATIO
+    && near(zoomRatioForFraction(1, platform), ASSUMED_MAX_ZOOM_RATIO, 1e-9)));
+check('the label reads as a camera ratio', zoomLabel(1) === '1×' && zoomLabel(2) === '2×');
+check('…a tenth below 10×, whole numbers above (where a tenth is noise)',
+  zoomLabel(2.44) === '2.4×' && zoomLabel(12.4) === '12×');
+check('…and never below 1×, however small the value', zoomLabel(0.2) === '1×');
+check('a NaN ratio labels as the unzoomed end rather than as "NaN×"', zoomLabel(Number.NaN) === '1×');
+
+/*
+ * THE PRESETS. `zoomStopForFraction` answers "which is NEAREST" (kept for the pinch
+ * harness), but a HIGHLIGHT must answer "is it THIS one" — a pill that lights at 1× for
+ * every value below 1.5× claims a selection the player never made.
+ */
+check('a preset lights when the value IS that preset',
+  zoomPresetForFraction(zoomFractionForStop('2x', 'android'), 'android')?.id === '2x');
+check('…on iOS too (a different fraction, the same preset)',
+  zoomPresetForFraction(zoomFractionForStop('2x', 'ios'), 'ios')?.id === '2x');
+check('⚠️ NOTHING lights between presets', zoomPresetForFraction(0.4, 'android') === null);
+check('the unzoomed end lights 1×', zoomPresetForFraction(0, 'android')?.id === '1x');
+check('⚠️ a pill is not clingy — half a step away releases it',
+  zoomPresetForFraction(zoomFractionForStop('2x', 'android') + ZOOM_SLIDER_STEP, 'android') === null);
+check('the tolerance is half a step, so "on the preset" means the player is on it',
+  near(ZOOM_PRESET_MATCH_TOLERANCE, ZOOM_SLIDER_STEP / 2, 1e-12));
+
+/*
+ * THE a11y STEP — quantised to the grid, so a screen-reader user reaches the same values
+ * every time and the top is EXACTLY 1.
+ */
+check('an increment is one step', near(zoomSteppedFraction(0, 1), ZOOM_SLIDER_STEP, 1e-12));
+check('incrementing from the top stays at the top', zoomSteppedFraction(1, 1) === 1);
+check('decrementing from the unzoomed end stays at the unzoomed end',
+  zoomSteppedFraction(0, -1) === 0);
+check('a full sweep of increments reaches the maximum exactly', (() => {
+  let value = 0;
+  for (let i = 0; i < 32; i += 1) value = zoomSteppedFraction(value, 1);
+  return value === 1;
+})());
+check('…and a value that is not on the grid still lands on it',
+  near(zoomSteppedFraction(0.31, 1), Math.round(0.31 / ZOOM_SLIDER_STEP) * ZOOM_SLIDER_STEP + ZOOM_SLIDER_STEP, 1e-9));
 
 // The strip highlights the stop the player tapped: the fraction must READ BACK as it.
 for (const stop of ZOOM_STOPS) {
@@ -215,12 +340,20 @@ check('a NaN point poisons nothing — it is refused',
   lassoBounds([{ x: 0, y: 0 }, { x: 100, y: 100 }, { x: Number.NaN, y: 5 }]) === null);
 
 const stroke: readonly Point[] = [{ x: 10, y: 10 }, { x: 100, y: 200 }, { x: 10, y: 300 }];
-check('a drawn stroke becomes its BOUNDING BOX (what a lasso is applied as here)',
+check('a drawn stroke becomes its BOUNDING BOX — the REGION a mask is drawn inside',
   JSON.stringify(lassoBounds(stroke)) === JSON.stringify({ x: 10, y: 10, width: 90, height: 290 }));
 check('the stroke\'s accumulated length is measured along the path, not across its box',
   pathLength(stroke) > 300);
-check('isUsableLasso agrees with lassoBounds (one rule, two readers)',
-  isUsableLasso(stroke) && !isUsableLasso([{ x: 0, y: 0 }]));
+/*
+ * ⚠️ `isUsableLasso` USED TO LIVE HERE — a one-line alias of `lassoBounds(points) !== null`,
+ * kept because the screen needed a "has anything been drawn?" predicate. S64 replaced that
+ * question with two better ones (`path.length > 1` for "drawn", `lassoFault` for "usable"),
+ * so the alias became a function nothing called — and a gate over a function the app does
+ * not call is a gate over nothing. The rule it expressed is still asserted, twice: by
+ * `lassoBounds` below, and by `lassoFault`'s `too_short` threshold in §②d.
+ */
+check('…and a stroke below the travel threshold is not a selection at all',
+  lassoBounds([{ x: 100, y: 100 }, { x: 101, y: 100 }, { x: 100, y: 101 }]) === null);
 
 // ⚠️ THE MODE MUST SELECT. A silent fallback from one mode's empty selection to the
 // other's would crop something the player did not draw in the mode they are in.
@@ -255,6 +388,232 @@ check('a polyline string drops a bad point rather than drawing through the origi
 check('one pixel off the whole image is still a crop',
   !isWholeImage({ x: 0, y: 0, width: 2999, height: 4000 }, IMAGE));
 
+// ── ②b the DIMMING OVERLAY — the owner's inverted-dimming bug (S64) ──────────
+/*
+ * ⚠️ THE BUG THIS PINS, because nothing else in the toolchain can see it. The screen
+ * used to spread a bare `Rect` into a style — `style={[styles.scrim, scrim]}`, i.e.
+ * `{ x, y, width, height }`. React Native has no `x`/`y` STYLE property: `LayoutProps`
+ * declares `left`/`top`/`right`/`bottom`, and `ReactNativeStyleAttributes` — the map that
+ * decides which style keys actually reach the native view — has no `'x'` and no `'y'`
+ * entry. So the POSITION was dropped silently, the size was honoured, and all four scrims
+ * piled onto the stage's top-left corner. Reported by the owner as:
+ *
+ *     "inside the crop rectangle selected area is actually getting darker than the
+ *      outside unselected area."
+ *
+ * …which is exactly what a stack of four 55%-dark rects at the origin looks like. The fix
+ * is `rectToViewStyle`, and these three checks are what stop it coming back: a Nitro/SDK
+ * upgrade cannot re-break it, and neither can a well-meaning "simplification".
+ */
+const styleForScrim = rectToViewStyle({ x: 12, y: 34, width: 56, height: 78 });
+check('a Rect becomes a style with the right keys AND values',
+  styleForScrim.left === 12 && styleForScrim.top === 34
+    && styleForScrim.width === 56 && styleForScrim.height === 78
+    && Object.keys(styleForScrim).sort().join(',') === 'height,left,top,width');
+check('⚠️ …and carries NO `x`/`y`, which React Native would drop silently',
+  !Object.hasOwn(styleForScrim, 'x') && !Object.hasOwn(styleForScrim, 'y'));
+// ⚠️ The overlay must also still FRAME the selection after the conversion: a correct
+// conversion of the wrong rect is still the reported bug.
+check('…and the four scrims converted this way still frame the selection',
+  scrims.every((s) => {
+    const style = rectToViewStyle(s);
+    return style.left + style.width <= centred.x + 0.5
+      || style.left >= centred.x + centred.width - 0.5
+      || style.top + style.height <= centred.y + 0.5
+      || style.top >= centred.y + centred.height - 0.5;
+  }));
+
+// ── ②c the FREE-FORM MASK (S64) — the path that removes the outside ──────────
+const maskBox: Rect = { x: 100, y: 200, width: 200, height: 300 };
+const maskOutline: readonly Point[] = [{ x: 120, y: 240 }, { x: 280, y: 260 }, { x: 200, y: 460 }];
+const maskPath = dimPathPolygon(maskBox, maskOutline);
+
+check('the mask is ONE path: the region, then the outline as a second subpath',
+  maskPath.split('M').length === 3 && maskPath.trim().endsWith('Z'));
+check('the region is the outer subpath, drawn at the region own size',
+  maskPath.includes('H200.0 V300.0 H0.0 Z') && maskPath.startsWith('M0.0,0.0 '));
+check('⚠️ every coordinate is relative to the REGION, not to the stage',
+  maskPath.includes('M20.0,40.0') && maskPath.includes('L180.0,60.0')
+    && maskPath.includes('L100.0,260.0'));
+check('⚠️ the fill rule the mask needs is even-odd, or the outline would not be a hole',
+  DIM_PATH_FILL_RULE === 'evenodd');
+check('⚠️ a degenerate region has NO mask at all (a zero-sized view is never rasterized)',
+  dimPathPolygon({ x: 0, y: 0, width: 0, height: 100 }, maskOutline) === ''
+    && dimPathPolygon({ x: 0, y: 0, width: 100, height: Number.NaN }, maskOutline) === '');
+check('an outline with a NaN point is refused rather than drawn through the origin',
+  dimPathPolygon(maskBox, [{ x: 0, y: 0 }, { x: Number.NaN, y: 5 }, { x: 3, y: 4 }]) === '');
+check('a polygon path drops bad points, closes with Z, and refuses fewer than three',
+  polygonPath([{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: Number.NaN, y: 2 }])
+    === 'M0.0,0.0 L10.0,0.0 L10.0,10.0 Z'
+  && polygonPath([{ x: 0, y: 0 }, { x: 10, y: 0 }]) === '');
+
+// ── ②d the OUTLINE's WATERTIGHT RULES (S64, `src/lib/lasso.ts`) ──────────────
+/*
+ * ⚠️ WHY THESE ARE REFUSALS RATHER THAN WARNINGS. An unclosed or self-crossing outline
+ * still RENDERS as something: every rasterizer fills an open path as if closed, and an
+ * even-odd fill of a figure-eight silently drops one lobe. So the mask would be computed
+ * from a shape nobody drew, the player would pay ≈US$0.09 to have the wrong region
+ * restyled, and nothing in the pipeline would report a problem. The owner asked for this
+ * in as many words: "check if free form shape drawn by the user is a closed water tight
+ * shape else error out to the user and reject it".
+ */
+const closedSquare: readonly Point[] = [
+  { x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }, { x: 0, y: 0 },
+];
+/** The same square, its ends 100 px apart — a loop the player did not finish. */
+const openSquare: readonly Point[] = [
+  { x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 },
+];
+/** A bowtie with lobes of different sizes: it crosses, and its area is NOT zero. */
+const bowtie: readonly Point[] = [
+  { x: 0, y: 0 }, { x: 100, y: 100 }, { x: 100, y: 0 }, { x: 0, y: 150 }, { x: 0, y: 0 },
+];
+
+check('a closed square is a usable free-form shape', lassoFault(closedSquare) === null);
+check('⚠️ …and the closing duplicate is dropped for the mask (Z does that job)',
+  lassoPolygon(closedSquare)?.length === 4);
+check('an UNFINISHED loop is refused BY NAME', lassoFault(openSquare) === 'not_closed');
+check('…and it is not sent as its bounding box either', lassoPolygon(openSquare) === null);
+check('⚠️ a loop that crosses itself is refused BY NAME', lassoFault(bowtie) === 'crosses_itself');
+check('…and the bowtie really does cross (so the rule is not vacuous)',
+  pathCrossesItself(bowtie) && polygonArea(bowtie) > 0);
+check('⚠️ a tap is TOO SHORT, not "not closed" — the player is told the useful thing first',
+  lassoFault([{ x: 0, y: 0 }, { x: 1, y: 1 }]) === 'too_short'
+    && lassoFault([{ x: 10, y: 10 }, { x: 11, y: 10 }, { x: 10, y: 11 }]) === 'too_short');
+check('an outline drawn out and back along one line encloses nothing — DEGENERATE',
+  lassoFault([{ x: 0, y: 0 }, { x: 200, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }]) === 'degenerate');
+check('the closure tolerance is a finger, not a pixel',
+  LASSO_CLOSE_TOLERANCE_PX > 10 && LASSO_CLOSE_TOLERANCE_PX < 60);
+check('a loop whose ends are 10 px apart IS closed',
+  pathIsClosed([...openSquare, { x: 5, y: 5 }]) && lassoFault([...openSquare, { x: 5, y: 5 }]) === null);
+check('…and the same loop with a 100 px gap is not',
+  !pathIsClosed([...openSquare, { x: 0, y: -100 }]));
+check('a closed path\'s own neighbours are NOT read as a crossing',
+  !pathCrossesItself(closedSquare));
+
+/*
+ * ⚠️ THE CHECKS THE OWNER'S REPORT PRODUCED (S64) — the rule was TOO STRICT.
+ *
+ * A hand-closed loop lays its last few millimetres back over its first, so a genuine,
+ * obviously-a-loop gesture contains a real self-overlap at the CLOSURE. The first version of
+ * this rule refused it with "your outline crosses itself" — a correct answer to the wrong
+ * question. These are the verified fixtures, and both halves of the corrected rule are
+ * pinned: the junction overlap is tolerated, and a figure-eight is still refused.
+ */
+/**
+ * A realistic loop: 2 px sampling, a big body, and a tail that comes home ACROSS its own
+ * head and ends 11 px from the start — the spur the owner's drawing shows. The crossing is
+ * a genuine transversal intersection at (≈15.7, 0) on the head's (14,0)–(16,0) edge.
+ */
+function loopWithClosureCrossing(): Point[] {
+  const points: Point[] = [];
+  for (let step = 0; step <= 10; step += 1) points.push({ x: step * 2, y: 0 });
+  points.push(
+    { x: 200, y: 0 }, { x: 200, y: 300 }, { x: 0, y: 300 }, { x: -40, y: 150 }, { x: 30, y: 10 },
+  );
+  // Centres are offset off the y = 0 line, so no tail VERTEX sits exactly on the head —
+  // a vertex on the line would touch at an endpoint and (correctly) not count.
+  for (let step = 1; step <= 10; step += 1) points.push({ x: 30 - step * 3, y: 10 - step * 2.1 });
+  return points;
+}
+
+/**
+ * An ASYMMETRIC lemniscate: closed at t = 0/2π, crossing itself at its centre, with lobes
+ * of different sizes so the enclosed area is comfortably non-zero (a symmetric figure-eight
+ * has an area of ~0 and would be refused as `degenerate` instead — a different fault, and
+ * not the one under test here).
+ */
+function figureEight(steps = 73): Point[] {
+  const points: Point[] = [];
+  for (let step = 0; step <= steps; step += 1) {
+    const t = (step / steps) * Math.PI * 2;
+    points.push({
+      x: 200 + 150 * Math.cos(t),
+      y: 200 + (100 + 50 * Math.cos(t)) * Math.sin(2 * t),
+    });
+  }
+  return points;
+}
+
+const closureLoop = loopWithClosureCrossing();
+
+check('⚠️ a hand-closed loop that overlaps its own start IS accepted (the S64 report)',
+  lassoFault(closureLoop) === null && lassoPolygon(closureLoop) !== null);
+check('⚠️ …and the raw geometric question STILL sees that overlap — the guard is the fix',
+  pathCrossesItself(closureLoop, LASSO_INTERSECT_TOLERANCE_PX, 0));
+check('…with the junction guard it is no longer read as a crossing',
+  !pathCrossesItself(closureLoop));
+check('…and the guard is the fingertip scale — twice the closure tolerance',
+  near(LASSO_JUNCTION_GUARD_PX, 2 * LASSO_CLOSE_TOLERANCE_PX, 1e-9)
+    && LASSO_JUNCTION_GUARD_PX > LASSO_CLOSE_TOLERANCE_PX);
+check('⚠️ a figure-eight is STILL refused — the guard tolerates a closure, not a crossing',
+  lassoFault(figureEight()) === 'crosses_itself' && pathCrossesItself(figureEight()));
+check('…and its area is not ~0, so the verdict is the CROSSING and not "degenerate"',
+  polygonArea(lassoVertices(figureEight())) > 1_000);
+/*
+ * ⚠️ THE SHORT-SEGMENT TRAP, and it is the reason the crossing rule works on a REAL drawing
+ * at all. The stroke is sampled every 2 px, and the endpoint margin is `tolerance /
+ * segmentLength` — a FRACTION, so a margin of 1 px on a 1 px segment is 1.0, which excludes
+ * the entire segment and with it every crossing there. Measured this session: with the old
+ * 1 px tolerance and no clamp, `pathCrossesItself(closureLoop, 1, 0)` reported `false` for
+ * two segments that plainly cross. The clamp (`MAX_ENDPOINT_EPS`) is what keeps the rule
+ * alive on short edges, whatever the tolerance is set to.
+ */
+const shortA: Point = { x: 0, y: 0 };
+const shortB: Point = { x: 1, y: 0 };
+const shortC: Point = { x: 0.5, y: -1 };
+const shortD: Point = { x: 0.5, y: 1 };
+check('⚠️ a tolerance LARGER than the segment does not make its crossing invisible',
+  segmentsCross(shortA, shortB, shortC, shortD, 2));
+check('…and the unclamped fraction would have been > 1, which is why the clamp exists',
+  2 / 1 > 1 && 1 / 1 >= 1);
+check('the same crossing is still found at the real (sub-pixel) margin',
+  segmentsCross(shortA, shortB, shortC, shortD, LASSO_INTERSECT_TOLERANCE_PX));
+check('the numerical margin is sub-pixel (it is not a jitter tolerance any more)',
+  LASSO_INTERSECT_TOLERANCE_PX > 0 && LASSO_INTERSECT_TOLERANCE_PX < 1);
+
+check('two segments crossing in their interiors cross', segmentsCross(
+  { x: 0, y: 0 }, { x: 100, y: 100 }, { x: 100, y: 0 }, { x: 0, y: 100 },
+));
+check('…but merely TOUCHING at an endpoint does not (a loop\'s own corner)',
+  !segmentsCross({ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }));
+check('parallel segments that never meet do not cross',
+  !segmentsCross({ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 0, y: 10 }, { x: 100, y: 10 }));
+check('⚠️ a stroke that doubles back along itself DOES cross (two regions that cancel)',
+  segmentsCross({ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 20, y: 0 }, { x: 80, y: 0 }));
+check('a zero-length edge crosses nothing',
+  !segmentsCross({ x: 5, y: 5 }, { x: 5, y: 5 }, { x: 0, y: 0 }, { x: 100, y: 100 }));
+
+check('vertices closer than the gap are the SAME vertex',
+  lassoVertices([{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 0 }, { x: 100, y: 100 }]).length === 2);
+check('the enclosed area is the shoelace area', near(polygonArea(closedSquare), 10_000, 1e-9));
+check('a line encloses no area at all', polygonArea([{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 50, y: 0 }]) === 0);
+
+/** The same outline, drawn inside the photo box — for the region assertions. */
+const boxedSquare: readonly Point[] = [
+  { x: 100, y: 200 }, { x: 300, y: 200 }, { x: 300, y: 400 }, { x: 100, y: 400 }, { x: 100, y: 200 },
+];
+
+check('⚠️ the outline with no closure gap is a usable shape wherever it is drawn',
+  lassoFault(boxedSquare) === null && lassoPolygon(boxedSquare)?.length === 4);
+check('⚠️ the region is the outline\'s BOUNDING BOX when it lies inside the photo',
+  JSON.stringify(lassoRegion(boxedSquare, BOX))
+    === JSON.stringify({ x: 100, y: 200, width: 200, height: 200 }));
+check('…so an outline dragged into the letterbox is clipped to the PHOTO, not the container',
+  JSON.stringify(lassoRegion([{ x: -50, y: 0 }, { x: 200, y: 0 }, { x: 200, y: 200 }, { x: -50, y: 200 }], BOX))
+    === JSON.stringify({ x: BOX.x, y: BOX.y, width: 200, height: 200 - BOX.y }));
+check('…and an outline entirely off the photo has no region at all',
+  lassoRegion([{ x: -200, y: -200 }, { x: -150, y: -200 }, { x: -150, y: -150 }], BOX) === null);
+
+/** Every fault the module can produce — one list, so a new fault cannot be forgotten. */
+const ALL_FAULTS: readonly LassoFault[] = ['too_short', 'not_closed', 'crosses_itself', 'degenerate'];
+
+check('⚠️ EVERY fault has its own message key (a fault with no sentence strands the player)',
+  ALL_FAULTS.every((fault) => lassoFaultMessageKey(fault).startsWith('crop.lasso'))
+    && new Set(ALL_FAULTS.map((fault) => lassoFaultMessageKey(fault))).size === ALL_FAULTS.length);
+check('the intersection tolerance is sub-pixel (jitter is not a crossing)',
+  LASSO_INTERSECT_TOLERANCE_PX > 0 && LASSO_INTERSECT_TOLERANCE_PX < 3);
+
 // ── ③ the screens CONSUME these, rather than re-deciding ─────────────────────
 // ⚠️ The lesson of `check:capturesize`: a gate over pure functions the app never calls is a
 // gate over nothing. These are source assertions, with a negative control below proving the
@@ -263,28 +622,63 @@ section('③ the screens consume the pure modules (source assertions)');
 
 const captureSrc = read('src/app/capture.tsx');
 const cropSrc = read('src/app/crop.tsx');
+const burnSrc = read('src/app/burn.tsx');
 
 check('the shutter screen passes the DERIVED fraction to the camera',
   captureSrc.includes('zoom={zoomFraction}')
-    && captureSrc.includes('zoomFractionForStop(zoomStopId, zoomPlatform)'));
+    && captureSrc.includes('zoomFractionForStop(DEFAULT_ZOOM_STOP, zoomPlatform)'));
 check('…and never passes a raw ratio to `zoom`',
   !/zoom=\{(\s*\d|\s*stop\.ratio)/.test(captureSrc));
 check('the shutter screen renders a pill per stop',
   captureSrc.includes('ZOOM_STOPS.map') && captureSrc.includes('accessibilityState={{ selected: active }}'));
+check('⚠️ …and carries an ANALOGUE slider, not just the pills (the owner\'s S64 report)',
+  captureSrc.includes('zoomFractionFromTrack(') && captureSrc.includes('PanResponder.create('));
+check('…whose a11y role is `adjustable`, with a value and inc/dec actions',
+  captureSrc.includes('accessibilityRole="adjustable"')
+    && captureSrc.includes("accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}")
+    && captureSrc.includes("zoomSteppedFraction("));
+check('…and the thumb is placed by the INVERSE of the drag mapping',
+  captureSrc.includes('zoomTrackOffset(zoomFraction, trackWidth)'));
 check('the shutter screen hops to /crop, with the id and the size',
   captureSrc.includes("pathname: '/crop'") && captureSrc.includes('toCropParams('));
 check('⚠️ …and no longer pushes the whole frame straight at /preparing',
   !captureSrc.includes("pathname: '/preparing'"));
 
-check('⚠️ the crop screen loads the photo through the native-loader re-encode',
-  cropSrc.includes('nativeLoaderUriFromDecoded(uri)'));
-check('…and uses that SAME uri for the picture and the manipulator',
-  cropSrc.includes('source={{ uri: nativeUri }}') && cropSrc.includes('manipulate(nativeUri)'));
+check('⚠️ the crop screen loads the photo through the FORM-AGNOSTIC loader re-encode',
+  cropSrc.includes('nativeLoaderUriFromAnyForm(uri)'));
+check('…and uses that SAME uri for the picture, the manipulator and the mask',
+  cropSrc.includes('source={{ uri: nativeUri }}') && cropSrc.includes('manipulate(nativeUri)')
+    && cropSrc.includes('href={nativeUri}'));
 check('…so a raw route param is never handed to a native decoder',
   !cropSrc.includes('manipulate(uri)') && !cropSrc.includes('uri: uri'));
+check('⚠️ …and the screen never picks an encoding branch itself (S64\'s black screen)',
+  !cropSrc.includes('nativeLoaderUriFromDecoded(') && !cropSrc.includes('escapeForNativeLoader('));
+check('⚠️ …and the burn screen\'s tutorial offering uses the same helper, not the S60 branch',
+  burnSrc.includes('nativeLoaderUriFromAnyForm(photoUri)')
+    && !burnSrc.includes('nativeLoaderUriFromDecoded('));
+check('⚠️ the mask view is drawn by the pure path, with the even-odd rule it requires',
+  cropSrc.includes('dimPathPolygon(region, polygon)')
+    && cropSrc.includes('fillRule={DIM_PATH_FILL_RULE}')
+    && cropSrc.includes('testID="crop-mask"'));
+check('⚠️ the mask is RASTERIZED and then written as a file (or it would never be sent)',
+  cropSrc.includes('toDataURL(') && cropSrc.includes('data:image/png;base64,')
+    && cropSrc.includes('.manipulate(`data:image/png;base64,${base64}`)'));
+check('⚠️ an empty or blank raster is REFUSED, not sent as a black offering',
+  cropSrc.includes('MASK_RASTER_MIN_BASE64_CHARS') && cropSrc.includes('mask_raster_empty'));
+check('⚠️ …and a callback that never arrives cannot strand the screen',
+  cropSrc.includes('MASK_RASTER_TIMEOUT_MS'));
+check('⚠️ the dimming overlay is CONVERTED to a style, never spread as a bare Rect',
+  cropSrc.includes('rectToViewStyle(scrim)')
+    && !/style=\{\[styles\.scrim,\s*scrim\]\}/.test(cropSrc));
+check('the outline is REFUSED by name before it can be sent',
+  cropSrc.includes('lassoFault(') && cropSrc.includes('lassoFaultMessageKey(fault)'));
+check('…and the confirm button is gated on the validated polygon',
+  cropSrc.includes('const canSend =') && cropSrc.includes('lassoPolygon(path)'));
 
-check('⚠️ the crop is applied from the PIXEL rect the pure module produced',
-  cropSrc.includes('cropRectFor(') && cropSrc.includes('originX: preview.x'));
+check('⚠️ the rectangle crop is applied from the PIXEL rect the pure module produced',
+  cropSrc.includes('cropRectFor(') && cropSrc.includes('originX: pixelCrop?.x ?? 0'));
+check('⚠️ …and the mask path does NOT go through the manipulator\'s crop (two paths, two jobs)',
+  cropSrc.includes("mode === 'lasso'") && cropSrc.includes('rasterizeMask()'));
 check('⚠️ the file is SAVED before anything is handed onward (only the crop is sent)',
   cropSrc.indexOf('saveAsync(') > 0
     && cropSrc.indexOf('saveAsync(') < cropSrc.indexOf('goOn(uploadableUri(saved.uri))'));
@@ -294,7 +688,7 @@ check('⚠️ the crop is written at the UPLOAD BUDGET\'s compression, not a sec
   cropSrc.includes('compress: CAPTURE_COMPRESS')
     && cropSrc.includes("from '@/lib/capture-size'")
     && !/compress:\s*[\d.]+/.test(cropSrc));
-check('the lasso\'s limit is disclosed in the UI, not only in a comment',
+check('the lasso\'s behaviour is stated in the UI, not only in a comment', 
   cropSrc.includes("t('crop.lassoNote')") && cropSrc.includes("mode === 'lasso'"));
 check('every failure path out of the screen is free (skip is always reachable)',
   cropSrc.includes('onPress={skip}') && cropSrc.includes("t('crop.skip')"));
@@ -310,9 +704,10 @@ section('④ the frame step\'s copy is localised');
 const en = MESSAGES.en as unknown as Record<string, string>;
 const zh = MESSAGES.zh as unknown as Record<string, string>;
 const FRAME_KEYS = [
-  'zoom.stopA11y',
+  'zoom.stopA11y', 'zoom.sliderA11y',
   'crop.title', 'crop.hintRect', 'crop.hintLasso', 'crop.modeRect', 'crop.modeLasso',
-  'crop.lassoNote', 'crop.tooSmall', 'crop.skip', 'crop.confirm', 'crop.working',
+  'crop.lassoNote', 'crop.lassoTooShort', 'crop.lassoDegenerate', 'crop.lassoOpen',
+  'crop.lassoCrosses', 'crop.tooSmall', 'crop.skip', 'crop.confirm', 'crop.working',
   'crop.failed', 'crop.loading', 'crop.photoFailed', 'crop.badParams',
 ];
 
@@ -321,6 +716,23 @@ for (const key of FRAME_KEYS) {
     typeof en[key] === 'string' && en[key].length > 0
       && typeof zh[key] === 'string' && zh[key].length > 0);
 }
+
+/*
+ * ⚠️ EVERY FAULT AND EVERY MODE HAS A SENTENCE. A refusal the screen can produce but
+ * cannot explain leaves the player with a disabled button and no idea why — so the four
+ * fault keys are asserted per FAULT (through the same mapping the screen calls), not just
+ * as a list of strings that happen to exist.
+ */
+for (const fault of ALL_FAULTS) {
+  const key = lassoFaultMessageKey(fault);
+  check(`the ${fault} refusal is worded in BOTH locales`,
+    (en[key] ?? '').length > 0 && (zh[key] ?? '').length > 0);
+}
+check('⚠️ …and the four refusals are four DIFFERENT sentences (not one generic one)',
+  new Set(ALL_FAULTS.map((fault) => en[lassoFaultMessageKey(fault)] ?? '')).size === ALL_FAULTS.length);
+check('the new outline copy does NOT still promise a bounding box (the S64 rewrite)',
+  !(en['crop.lassoNote'] ?? '').toLowerCase().includes('box')
+    && !(zh['crop.lassoNote'] ?? '').includes('外框'));
 // ⚠️ The stop labels are NUMERALS and deliberately live in `zoom.ts` — assert they are NOT
 // in the message table, so nobody "fixes" them into it and drifts the two apart.
 check('⚠️ the numeral stop labels are NOT in the message table (they are not copy)',

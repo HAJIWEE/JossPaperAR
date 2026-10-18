@@ -22,18 +22,43 @@
  * is what lets `check:framing` assert every edge case without a device. The screen
  * does the drawing; this file decides what the drawing MEANS.
  *
- * ── ⚠️ THE LASSO IS ITS BOUNDING BOX, AND THAT IS A KNOWN LIMIT ──────────────
- * `expo-image-manipulator` (SDK 57) can crop / resize / rotate / flip and nothing
- * else: `ActionCrop` is documented as *"fields specify top-left corner and
- * dimensions of a crop rectangle"*, with no polygon or alpha-mask support. So a
- * freehand outline is applied as its BOUNDING RECTANGLE — deliberately, and
- * visibly: the step draws that rectangle over the drawn path, so the player sees
- * exactly what will be sent before they confirm. Filed as **SCRUM-130** (ship
- * this / add a rasterizer for a true mask / drop lasso for a plain rectangle).
+ * ── ⚠️ THE LASSO IS NOW A TRUE FREE-FORM MASK (S64, 2026-10-18) ──────────────
+ * SCRUM-130 shipped the lasso as its BOUNDING RECTANGLE, because
+ * `expo-image-manipulator` (SDK 57) can only crop rectangles (`ActionCrop`:
+ * *"fields specify top-left corner and dimensions of a crop rectangle"*) and the
+ * app has no rasterizer. The owner rejected that in one sentence: *"the Lasso tool
+ * currently is effecting a rectangle area which defeats the purpose."*
  *
- * It is not a cop-out: cropping to the selection's bounds still removes the
- * background AROUND the offering before the styler call, and stage ④ (the
- * server-side cutout, SCRUM-129) is what removes background INSIDE the box.
+ * So the mask is now real, and it is built where a rasterizer already exists — in
+ * `react-native-svg`, which this project already depends on (15.15.4):
+ *
+ *   · the outline is validated as a CLOSED, SIMPLE, non-degenerate loop
+ *     (`src/lib/lasso.ts` — the shape rules live there, with the copy that
+ *     refuses each fault by name);
+ *   · `dimPathPolygon` below emits the ONE path that draws everything outside the
+ *     loop — an even-odd hole in the photo's box — and the crop screen draws that
+ *     path over the photo, which is why the preview IS the sent image;
+ *   · `Svg.toDataURL()` rasterizes that same view into a PNG, which
+ *     `expo-image-manipulator` then re-encodes to the budget's JPEG.
+ *
+ * ⚠️ TWO HONEST LIMITS, both structural rather than lazy:
+ *
+ *  ① JPEG HAS NO ALPHA, so "removed" means FILLED — the mask is an opaque flat
+ *     fill in the app's own dark (`surface.camera`), not transparency. The fill is
+ *     what stage ④ (the server-side cutout, SCRUM-129) then throws away with the
+ *     rest of the background. A true-alpha PNG is not a small change: the `captures`
+ *     bucket allows 300 KB, `boundedJpegBlob` re-encodes everything as JPEG, and a
+ *     photographic PNG is over budget even at 640 px — so it is a *decision*
+ *     (bucket limit + a second upload format), not a bug to fix here.
+ *
+ *  ② THE RASTER IS SCREEN-SIZED. `toDataURL` renders the view at its own size, so
+ *     the masked file is as detailed as the phone's rendering of the photo
+ *     (~3× the box in dp), not the photo's true pixel size. That is still at or
+ *     above the upload budget's own 1080 px ceiling, so nothing downstream is
+ *     coarser than it already was — but it is worth knowing that the rect mode's
+ *     crop stays sharper, because a rectangle can be cut from the ORIGINAL pixels
+ *     by the manipulator. The modes differ by nature: a crop discards, a mask
+ *     replaces.
  */
 
 /** A pixel size — the photo, or the box it is drawn into. */
@@ -182,6 +207,116 @@ export function scrimAround(selection: Rect, box: Rect): readonly Rect[] {
   return [top, bottom, left, right].filter((r) => r.width > 0.5 && r.height > 0.5);
 }
 
+/**
+ * The RN view style for a rectangle — ⚠️ `left`/`top`, NOT `x`/`y`.
+ *
+ * ── THIS FUNCTION EXISTS BECAUSE OF A MEASURED BUG (S64, 2026-10-18) ─────────
+ * The frame step's first version spread a bare `Rect` straight into a style —
+ * `style={[styles.scrim, scrim]}`, i.e. `{x, y, width, height}`. React Native has
+ * no `x`/`y` **style** property: `LayoutProps` declares `left`, `top`, `right`,
+ * `bottom` and `inset*`, and `ReactNativeStyleAttributes` — the map that decides
+ * which style keys actually reach the native view — contains **no `'x'` and no
+ * `'y'` entry at all** (`node_modules/react-native/Libraries/Components/View/
+ * ReactNativeStyleAttributes.js`: 0 matches). So `x` and `y` were dropped
+ * silently, `width` and `height` were honoured, and all four scrims stacked at the
+ * stage's top-left corner. The owner's report was exact:
+ *
+ *     "the animation is inverted where inside the crop rectangle selected area is
+ *      actually getting darker than the outside unselected area."
+ *
+ * …which is precisely what four 55%-dark rects piled on the origin look like.
+ *
+ * ⚠️ Two things about the fix are load-bearing: it is a NAMED function, so a gate
+ * can assert which keys it emits, and it is the ONLY place a `Rect` becomes a
+ * style. Reverting it to `{x, y}` turns `check:framing` red — fault-tested, and
+ * the measurement is recorded in `handover-prompt.md` §6.
+ */
+export function rectToViewStyle(rect: Rect): {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+} {
+  return { left: rect.x, top: rect.y, width: rect.width, height: rect.height };
+}
+
+/** Path coordinates are rounded to a tenth of a pixel — the same as `polylinePoints`. */
+function pathNumber(value: number): string {
+  return value.toFixed(1);
+}
+
+/**
+ * ⚠️ THE FILL RULE THE PATHS BELOW REQUIRE, exported so the screen cannot use a
+ * different one by accident.
+ *
+ * An even-odd path of "box, then hole" paints everything inside the box OUTSIDE the
+ * hole. Under the DEFAULT rule (`nonzero`) the hole is a hole only if the two
+ * subpaths wind in opposite directions — which they do not, so the default fills
+ * the whole box and the selection disappears. That is the entire bug class this
+ * constant exists to prevent, and `check:framing` asserts the screen applies it.
+ */
+export const DIM_PATH_FILL_RULE = 'evenodd' as const;
+
+const ORIGIN: Point = { x: 0, y: 0 };
+
+/**
+ * `M… L… Z` for a closed polygon, in `origin`-relative units.
+ *
+ * Non-finite points are DROPPED rather than emitted (a `NaN` in a path is what
+ * makes a renderer draw a line through the origin), and fewer than three surviving
+ * points is not a polygon at all — `''` says so, which the caller must treat as
+ * "no mask" rather than as an empty one.
+ *
+ * ⚠️ `Z`, always. The mask is a CLOSED region; an open path would be filled as if
+ * closed, so the drawn shape and the validated shape would be two different
+ * things. `src/lib/lasso.ts` refuses an outline whose ends do not meet — this
+ * function then closes it for real.
+ */
+export function polygonPath(points: readonly Point[], origin: Point = ORIGIN): string {
+  const usable = points.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+  if (usable.length < 3) return '';
+  const commands = usable.map(
+    (p, index) => `${index === 0 ? 'M' : 'L'}${pathNumber(p.x - origin.x)},${pathNumber(p.y - origin.y)}`,
+  );
+  return `${commands.join(' ')} Z`;
+}
+
+/**
+ * The OUTER subpath: the region to paint, relative to the box it is drawn in.
+ * `''` for a degenerate box — the callers treat that as "no mask", which is what
+ * stops a zero-sized view from being rasterized.
+ */
+function boxOutlinePath(box: Rect): string {
+  if (!isPositive(box.width) || !isPositive(box.height)) return '';
+  return `M${pathNumber(0)},${pathNumber(0)} `
+    + `H${pathNumber(box.width)} V${pathNumber(box.height)} H${pathNumber(0)} Z`;
+}
+
+/**
+ * The even-odd path that masks everything in `box` EXCEPT a free-form `polygon` —
+ * the lasso's mask (S64).
+ *
+ * ⚠️ The polygon is NOT clipped to the box here, on purpose: the SVG view is the
+ * clip, and clipping the geometry first would change which points are inside
+ * (a polygon that leaves the box and comes back encloses area the even-odd rule
+ * must still count). Drawing and clipping are two different operations; the
+ * renderer does the second one for free.
+ *
+ * Coordinates are relative to `box` — the view the path is drawn in — and the
+ * polygon's own points may extend outside it.
+ *
+ * ⚠️ The rectangle mode does NOT use a path for its scrim: it keeps
+ * `scrimAround`'s four dimmed rects (positioned by `rectToViewStyle`), because that
+ * path is proven and the reported bug was in its POSITIONING, not its geometry. Two
+ * modes, two mechanisms, each one assertable on its own terms.
+ */
+export function dimPathPolygon(box: Rect, polygon: readonly Point[]): string {
+  const outer = boxOutlinePath(box);
+  if (outer === '') return '';
+  const inner = polygonPath(polygon, { x: box.x, y: box.y });
+  return inner === '' ? '' : `${outer} ${inner}`;
+}
+
 /** Keep an integer inside `[min, max]`, with the pair ordered if it was crossed. */
 function clampInt(value: number, min: number, max: number): number {
   if (!Number.isFinite(value) || !Number.isFinite(max)) return Math.min(min, max);
@@ -301,17 +436,6 @@ export function polylinePoints(points: readonly Point[]): string {
     .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
     .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
     .join(' ');
-}
-
-/**
- * `true` when the lasso has drawn enough to be applied as its bounding box.
- *
- * The screen shows its instruction/refusal copy off this, and it is deliberately
- * the SAME predicate `lassoBounds` enforces — two implementations of "is this a
- * selection?" is how a button becomes enabled while the crop is refused.
- */
-export function isUsableLasso(points: readonly Point[]): boolean {
-  return lassoBounds(points) !== null;
 }
 
 /**

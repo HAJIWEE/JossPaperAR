@@ -15,7 +15,7 @@ import {
   isUploadableCaptureSize,
   shrinkStep,
 } from './capture-size.ts';
-import { escapeForNativeLoader, unescapeFromNativeLoader } from './native-path.ts';
+import { nativeLoaderUriFromAnyForm, unescapeFromNativeLoader } from './native-path.ts';
 import { eventsFromResponse, outcomeFromHttpFailure, uploadAlreadyPresent, uploadFailureVerdict, type Outcome, type OrchestratorResponse } from './ritual-map.ts';
 import { captureStoragePath } from './storage-path.ts';
 import { supabase, supabaseConfig } from './supabase.ts';
@@ -150,14 +150,33 @@ export async function registerCapture(captureId: string): Promise<{ userId: stri
  * The original `fileUri` is never modified — the raw photo keeps its own life.
  */
 async function boundedJpegBlob(fileUri: string): Promise<Blob> {
-  // ⚠️ TRAP (SCRUM-124, measured): expo-router percent-encodes route params, so
-  // the uri arrives with `%40`/`%2F` in it — but those escapes are a LITERAL
-  // part of Expo Go's on-disk sandbox path, not something to undo. Decoding it
-  // produced `status=404` and `java.lang.Exception: Loading bitmap failed`,
-  // because the decoded path does not exist. `fetch` on the uri AS GIVEN reads
-  // the real file (874,762 bytes at the time of measurement) — so the uri is
-  // passed through untouched.
-  let uri = escapeForNativeLoader(fileUri);
+  // ⚠️ THE FORM OF THIS URI IS NOT FIXED, AND ASSUMING IT WAS COST A WHOLE PIPELINE (S64).
+  //
+  // The comment that used to sit here described ONE case — the route param arriving with
+  // `%40`/`%2F` in it — and this function therefore used `escapeForNativeLoader`, which is
+  // correct for exactly that form and a NO-OP on any other. Probed on glass, the uri that
+  // actually reached this function was the FULLY DECODED form:
+  //
+  //     [prep-in]  …/ExperienceData/@josspaperar/joss-paper-ar/Camera/eb332db2….jpg
+  //     [blob-in]  …/@josspaperar/…  → loader: …/@josspaperar/…   ← unchanged
+  //     → Context.renderAsync rejected: Could not load the image: …/@josspaperar/…
+  //
+  // Three attempts, each re-encoding its own output, all "unusable" — so `/preparing`
+  // correctly reported `capture_upload_unusable` and the offering could never be prepared.
+  // ⚠️ Note `escapes are a LITERAL part of the on-disk path` and `the uri is passed through
+  // untouched` were BOTH true and still led here: they describe form 1, and this hop
+  // delivers form 3.
+  //
+  // ⚠️ WHICH FORM A HOP DELIVERS DEPENDS ON THE HOP, NOT ON THE PHOTO: `/crop` receives the
+  // RAW form from the camera screen and `/preparing` receives the DECODED form from `/crop`
+  // (both measured this session, with the probe lines above). So nothing here may pick a
+  // branch — `nativeLoaderUriFromAnyForm` dispatches on what is actually present and is right
+  // for all three (see its header).
+  //
+  // ⚠️ And do not "simplify" the OUTPUT side either: the manipulator RETURNS a uri escaped
+  // one level further than the disk path, and `fetch` does not decode, so `resized.uri` must
+  // be unescaped before it is read — that half is measured too (SCRUM-124).
+  let uri = nativeLoaderUriFromAnyForm(fileUri);
   let lastSize = -1;
 
   for (let attempt = 0; attempt < CAPTURE_SHRINK_ATTEMPTS; attempt += 1) {

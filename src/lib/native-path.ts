@@ -93,6 +93,55 @@ export function uploadableUri(uri: string): string {
 }
 
 /**
+ * A native-loader URI from ANY of the three forms — the function a screen should call
+ * when it does not know (and should not have to know) which form it holds.
+ *
+ * ── WHY THIS EXISTS (S64, 2026-10-18 — MEASURED, and it cost a black screen) ──
+ * The frame step used `nativeLoaderUriFromDecoded`, on the S60 finding that *"a route param
+ * arrives DECODED"*. That finding is true of SOME params and false of others, and the
+ * difference is the ROUTE, not the photo. Probed on glass this session with a real capture:
+ *
+ *     param   = file:///…/ExperienceData/%40josspaperar%2Fjoss-paper-ar/Camera/c50bf903….jpg
+ *     derived = file:///…/ExperienceData/%40josspaperar%2Fjoss-paper-ar/Camera/c50bf903….jpg
+ *                                                                  ↑ UNCHANGED — a no-op
+ *
+ * — because `useLocalSearchParams` hands back whatever was PUT there, and a `router.push`
+ * from another screen of the same app passes params as objects, with no URL round-trip to
+ * decode them. So the segment is `%40josspaperar%2Fjoss-paper-ar`, not `@josspaperar/…`,
+ * `nativeLoaderUriFromDecoded` finds no `@` and returns the uri untouched — and the RAW
+ * form is precisely the one S60 measured as `ENOENT` in every native decoder:
+ *
+ *     …/@scope/slug/…           → ENOENT      (form 3, decoded)
+ *     …/%40scope%2Fslug/…       → ENOENT      (form 1, RAW — what actually arrives)
+ *     …/%2540scope%252Fslug/…   → 3000 × 4000 ✓ (form 2, escaped for the loader)
+ *
+ * ⚠️ AND THE FAILURE WAS SILENT, which is the part worth remembering: `<Image>` painted the
+ * dark stage background, and `Image.getSize`'s failure fell back to the DECLARED capture size
+ * (`crop.tsx`), so the screen still laid out its overlays and looked — to the code and to a
+ * screenshot — like a working screen whose photo happened to be dark.
+ *
+ * ── THE DISPATCH, AND WHY IT IS NOT `escape(nativeLoaderUriFromDecoded(uri))` ──
+ * Composition is not safe here, because `escapeForNativeLoader` is NOT idempotent: applied
+ * to form 2 it escapes a second time (`%2540…` → `%252540…`) and the loader lands on a path
+ * that does not exist. So this DISPATCHES on the form actually present:
+ *
+ *   · form 2 (`%2540…` present)  → returned unchanged; it is already the loader form.
+ *   · form 3 (decoded)           → `nativeLoaderUriFromDecoded` rebuilds form 2.
+ *   · form 1 (raw, or a plain path with no escapes) → `escapeForNativeLoader`, which is a
+ *     no-op on a dev-build path (`…/app.josspaperar/cache/…`) and correct on form 1.
+ *
+ * `check:capturesize` asserts all THREE forms against this one function AND asserts the
+ * invariants that make the dispatch safe (form 2 is a fixed point; every form lands on a
+ * uri `uploadCapture` can consume).
+ */
+export function nativeLoaderUriFromAnyForm(uri: string): string {
+  if (!uri.startsWith('file://')) return uri;
+  // Form 2 — already escaped for the loader. Re-escaping it would break it, so stop here.
+  if (uri.includes('%2540')) return uri;
+  return nativeLoaderUriFromDecoded(escapeForNativeLoader(uri));
+}
+
+/**
  * Rebuild the native-loader form of a captured photo when the route param has
  * **already been decoded** — which is what `useLocalSearchParams` hands a screen.
  *
@@ -111,6 +160,13 @@ export function uploadableUri(uri: string): string {
  * escaped once more (`%` → `%25`), because the loader performs exactly ONE decode.
  * The same two facts as the header — the on-disk name is literal, the loader
  * decodes once — applied to a URI that lost its escapes on the way through a param.
+ *
+ * ⚠️ S64 ADDENDUM: that "expo-router decodes it on read" is only true when the param went
+ * through a URL. A sibling screen's `router.push` passes params untouched, so the SAME
+ * screenshot can arrive as form 1 instead — which is why screens should call
+ * `nativeLoaderUriFromAnyForm` and not this function directly. It stays exported because it
+ * is one of the two branches that dispatch needs (and because `check:capturesize` asserts
+ * both branches separately).
  *
  * The marker is `ExperienceData/`, which only Expo Go creates. A dev/preview build
  * (`…/app.josspaperar/cache/…`) has no such segment, so this is a no-op there.
