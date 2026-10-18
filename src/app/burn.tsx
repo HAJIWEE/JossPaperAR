@@ -58,7 +58,6 @@ import { readBurnParams, toRewardParams } from '@/lib/route-params';
 import { supabase, supabaseConfig } from '@/lib/supabase';
 import {
   TOUCH_TARGET,
-  brand,
   fontSize,
   onColorCream,
   radius,
@@ -89,7 +88,20 @@ import {
  */
 const SPRITE_URL_TTL_S = 300;
 
-/** The offered object: the styled sprite, mounted on its paper card. */
+/**
+ * The offered object: the cut-out sprite, drawn at its own alpha.
+ *
+ * ⚠️ The box is a MAXIMUM, not a crop. The sprite comes back from stage ④ with
+ * transparent pixels and a bounding box that is not square, so it is FITTED
+ * inside this box (`resizeMode="contain"`) rather than filled into it — `cover`
+ * scales the image up until it covers the box, which cuts the offering off.
+ *
+ * ⚠️ AND NOTHING MAY BE PAINTED BEHIND IT. #60 mounted the sprite on a
+ * `surface.paper` card (#F5F0E8, the same cream stage ④ had just cut away), which
+ * put the opaque rectangle straight back and made the cut invisible. The sprite
+ * carries its own ink outline, so it stays legible over the camera without a
+ * card — adding a background here silently undoes the paid cutout.
+ */
 const OFFERING_SIZE = 72;
 
 /**
@@ -631,10 +643,13 @@ export default function BurnScreen() {
               },
             ]}
           >
+            {/* ⚠️ `contain`, never `cover`: the cut-out is not square, and
+                `cover` fills the box by cropping the offering. `contain` fits
+                the whole sprite inside it and keeps the aspect ratio. */}
             <Image
               source={{ uri: offeringUri }}
               style={styles.offeringImage}
-              resizeMode="cover"
+              resizeMode="contain"
               accessibilityIgnoresInvertColors
             />
           </Animated.View>
@@ -697,19 +712,17 @@ export default function BurnScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: surface.camera },
   /**
-   * The offered object: the sprite on its paper card. Brand gold on paper, so it
-   * is legible over ANY camera frame without a scrim — the card does the work the
-   * dark overlay would otherwise have to.
+   * The offered object itself — NO card.
+   *
+   * ⚠️ This style is the whole transparency contract: a `backgroundColor`, a
+   * `borderWidth` or `overflow: 'hidden'` here draws a frame around a cut-out
+   * that stage ④ paid to make transparent. Keep it bare; the sprite's own ink
+   * outline is what makes it legible over the camera.
    */
   offering: {
     position: 'absolute',
     width: OFFERING_SIZE,
     height: OFFERING_SIZE,
-    borderRadius: radius.md,
-    borderWidth: 2,
-    borderColor: brand.gold,
-    backgroundColor: surface.paper,
-    overflow: 'hidden',
   },
   offeringImage: { width: '100%', height: '100%' },
   lost: { alignItems: 'center', justifyContent: 'center' },
