@@ -81,6 +81,102 @@ function first(value: string | string[] | undefined): string | undefined {
 }
 
 /**
+ * The `/preparing` params — the hop that actually spends money.
+ *
+ * SCRUM-131: this used to be an inline object literal in TWO places (`capture.tsx`
+ * and now the crop step), which is exactly the shape that let `burn.tsx` drop a
+ * `captureId` in 2026-10-06. A builder with a REQUIRED id, and the demo flag
+ * appended only when true, keeps both hops byte-identical to each other.
+ */
+export type PreparingParams = {
+  readonly captureId: string;
+  readonly uri: string;
+  readonly demo?: string;
+};
+
+/** Build the `/preparing` params. `uri` is the image that will be uploaded. */
+export function toPreparingParams(captureId: string, uri: string, demo = false): PreparingParams {
+  return {
+    captureId,
+    uri,
+    ...(demo ? { demo: DEMO_VALUE } : {}),
+  };
+}
+
+/**
+ * The `/crop` params — the hop between the shutter and the upload.
+ *
+ * `width`/`height` are the pixel size `takePictureAsync` already reported. They are
+ * optional and are a FALLBACK only: the crop step measures the image with
+ * `Image.getSize` because that measures the very bitmap a native decoder will
+ * crop — but a device that cannot answer must still be able to frame the shot
+ * rather than fail, so the capture's own numbers ride along.
+ */
+export type CropParams = {
+  readonly captureId: string;
+  readonly uri: string;
+  readonly width?: string;
+  readonly height?: string;
+  readonly demo?: string;
+};
+
+/** Build the `/crop` params. Both dimensions are required arguments — see above. */
+export function toCropParams(
+  captureId: string,
+  uri: string,
+  width: number,
+  height: number,
+  demo = false,
+): CropParams {
+  return {
+    captureId,
+    uri,
+    width: String(Math.round(width)),
+    height: String(Math.round(height)),
+    ...(demo ? { demo: DEMO_VALUE } : {}),
+  };
+}
+
+export type CropParamProblem = 'missing_capture_id' | 'missing_uri';
+
+/**
+ * Read and validate `/crop`'s params.
+ *
+ * ⚠️ The URI is required but is NOT validated here beyond being non-empty: its
+ * encoding is a native-loader concern and `nativeLoaderUriFromDecoded` owns it
+ * (`src/lib/native-path.ts`). Validating a `file://` shape here would be a second
+ * opinion on a rule that already has a measured one — and a wrong one would refuse
+ * a photo that loads perfectly.
+ */
+export function readCropParams(raw: {
+  readonly captureId?: string | string[];
+  readonly uri?: string | string[];
+  readonly width?: string | string[];
+  readonly height?: string | string[];
+  readonly demo?: string | string[];
+}): {
+  readonly ok: true;
+  readonly captureId: string;
+  readonly uri: string;
+  readonly demo: boolean;
+  /** A fallback size, or `null` when the params did not carry a usable one. */
+  readonly declaredSize: { readonly width: number; readonly height: number } | null;
+} | { readonly ok: false; readonly reason: CropParamProblem } {
+  const captureId = first(raw.captureId)?.trim() ?? '';
+  if (captureId.length === 0) return { ok: false, reason: 'missing_capture_id' };
+  const uri = first(raw.uri)?.trim() ?? '';
+  if (uri.length === 0) return { ok: false, reason: 'missing_uri' };
+
+  const width = Number(first(raw.width));
+  const height = Number(first(raw.height));
+  const declaredSize = Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0
+    ? { width, height }
+    : null;
+
+  return { ok: true, captureId, uri, demo: isDemo(first(raw.demo)), declaredSize };
+}
+
+/**
  * Build the `/reward` params. The only sanctioned way to reach that screen: the
  * capture id is a **required argument**, so a caller cannot forget it the way
  * `burn.tsx` did.

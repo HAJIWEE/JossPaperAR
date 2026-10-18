@@ -1,8 +1,10 @@
 /**
  * CAPTURE — the first screen of the slice (SCRUM-53 / PR-4).
  *
- * `capture → cartoonize → burn → award → persist`. This screen owns step one and
- * nothing else: it mints a capture id, takes the photo, and hands both onward.
+ * `capture → FRAME (crop/lasso) → cartoonize → burn → award → persist`. This screen
+ * owns step one and nothing else: it mints a capture id, takes the photo, and hands
+ * the capture onward — to `/crop`, which is where the player decides what the
+ * offering IS (SCRUM-131).
  *
  * ── WHY THE ID IS MINTED HERE, NOT ON THE SERVER ────────────────────────────
  * Rule ① of doc 19 §12: **generate the capture id BEFORE the upload.**
@@ -30,12 +32,20 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { INITIAL_OFFERING, transition, type Offering } from '@/domain/slice';
 import { t } from '@/lib/i18n';
-import { DEMO_PARAM, DEMO_VALUE, isDemo } from '@/lib/tutorial';
+import { toCropParams } from '@/lib/route-params';
+import { isDemo } from '@/lib/tutorial';
+import {
+  DEFAULT_ZOOM_STOP,
+  ZOOM_STOPS,
+  type ZoomStopId,
+  zoomFractionForStop,
+  zoomPlatformFor,
+} from '@/lib/zoom';
 import { TOUCH_TARGET, brand, fontSize, onColorCream, radius, space, surface, text } from '@/theme/tokens';
 
 type Phase =
@@ -61,6 +71,22 @@ export default function CaptureScreen() {
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   /** The offering — owned by the state machine, never by this screen. */
   const [offering, setOffering] = useState<Offering>(INITIAL_OFFERING);
+
+  /**
+   * THE ZOOM STOP (SCRUM-131).
+   *
+   * ⚠️ The state is the STOP, not the fraction — the fraction is DERIVED below.
+   * Storing the fraction instead would make the indicator a second guess at what
+   * the camera is doing: two numbers that must agree, which is how they end up not
+   * agreeing. The stop is what the player tapped and what the pill highlights.
+   *
+   * The conversion to the prop `expo-camera` wants — and why it needs the platform
+   * and an assumed device maximum — is documented in `src/lib/zoom.ts`. It is not
+   * restated here on purpose.
+   */
+  const [zoomStopId, setZoomStopId] = useState<ZoomStopId>(DEFAULT_ZOOM_STOP);
+  const zoomPlatform = zoomPlatformFor(Platform.OS);
+  const zoomFraction = zoomFractionForStop(zoomStopId, zoomPlatform);
 
   const shoot = useCallback(async () => {
     const camera = cameraRef.current;
@@ -91,9 +117,15 @@ export default function CaptureScreen() {
       // The service layer uploads under THIS id, then requests the cartoonize.
       // ⚠️ The tutorial flag rides along (SCRUM-85): `preparing` branches on it and
       // skips the upload entirely for a demo.
+      //
+      // ⚠️ AND THE HOP NOW GOES TO `/crop`, NOT `/preparing` (SCRUM-131). The player
+      // frames their offering there, and what reaches `/preparing` is the CROPPED
+      // file — so the ≈US$0.09 styler call sees the offering rather than the room
+      // around it. `/crop` re-uses this same `captureId` and pushes onward itself;
+      // skipping the frame is one tap and sends this `photo.uri` untouched.
       router.push({
-        pathname: '/preparing',
-        params: { captureId, uri: photo.uri, ...(demo ? { [DEMO_PARAM]: DEMO_VALUE } : {}) },
+        pathname: '/crop',
+        params: toCropParams(captureId, photo.uri, photo.width ?? 0, photo.height ?? 0, demo),
       });
     } catch {
       // No photo ⇒ no row ⇒ no id consumed. Not rule ②: nothing was spent.
@@ -122,11 +154,53 @@ export default function CaptureScreen() {
 
   return (
     <View style={styles.screen}>
-      <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
+      {/*
+        ⚠️ `zoom` is the DERIVED fraction, never the stop's ratio — `expo-camera`
+        takes `0…1` of the device's maximum, and the platform decides how that
+        becomes a factor. See `src/lib/zoom.ts`.
+      */}
+      <CameraView
+        ref={cameraRef}
+        style={StyleSheet.absoluteFill}
+        facing="back"
+        zoom={zoomFraction}
+      />
 
       {/* The camera is the whole screen — the ritual is not a form. */}
       <View style={[styles.hud, { paddingTop: insets.top + space.md }]} pointerEvents="none">
         <Text style={styles.hint}>{t('capture.photoHint')}</Text>
+      </View>
+
+      {/*
+        THE ZOOM STOPS (SCRUM-131).
+        ⚠️ OUTSIDE the `pointerEvents="none"` HUD and AFTER the preview, or the taps
+        would land on the camera view. Each pill is a real 44 dp target: the audience
+        this is built for (40–50s, doc 15 §8) is the reason `TOUCH_TARGET` exists, and
+        a stop you cannot reliably hit is worse than no stop.
+      */}
+      <View style={styles.zoomRow}>
+        {ZOOM_STOPS.map((stop) => {
+          const active = stop.id === zoomStopId;
+          return (
+            <Pressable
+              key={stop.id}
+              testID={`zoom-stop-${stop.id}`}
+              accessibilityRole="button"
+              accessibilityLabel={t('zoom.stopA11y', { label: stop.label })}
+              // The active stop must be readable WITHOUT seeing the fill — a
+              // selected state, not just a colour (doc 19 §4.4).
+              accessibilityState={{ selected: active }}
+              onPress={() => setZoomStopId(stop.id)}
+              style={({ pressed }) => [
+                styles.zoomStop,
+                active && styles.zoomStopActive,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={[styles.zoomLabel, active && styles.zoomLabelActive]}>{stop.label}</Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       <View
@@ -184,6 +258,40 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   shutterRow: { alignItems: 'center', justifyContent: 'flex-end', flex: 1 },
+  /**
+   * The zoom strip, sitting directly above the shutter (SCRUM-131).
+   * `row` + centred so the stops read as one control; the gap keeps two adjacent
+   * 44 dp targets from sharing an edge, which is how a fat-finger picks 4× while
+   * aiming at 2×.
+   */
+  zoomRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: space.md,
+    marginTop: space.md,
+  },
+  zoomStop: {
+    minWidth: TOUCH_TARGET,
+    minHeight: TOUCH_TARGET,
+    paddingHorizontal: space.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: onColorCream,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /**
+   * ⚠️ The active stop INVERTS (cream fill, dark label) rather than merely
+   * brightening. On a live camera feed a subtle tint is invisible against a bright
+   * or busy scene, and the whole point of the strip is to answer "which zoom am I
+   * on?" at a glance. The label uses `surface.camera` — the same dark token the
+   * screen's background uses — so the pair is the inverse of the idle state rather
+   * than a new colour.
+   */
+  zoomStopActive: { backgroundColor: onColorCream, borderColor: onColorCream },
+  zoomLabel: { color: onColorCream, fontSize: fontSize.body.at390, fontWeight: '600' },
+  zoomLabelActive: { color: surface.camera },
   shutter: {
     width: 76,
     height: 76,
