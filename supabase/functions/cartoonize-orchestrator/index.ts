@@ -182,6 +182,12 @@ Deno.serve(async (request: Request): Promise<Response> => {
       latency_ms: result.latencyMs,
       cost_micros: result.costMicros,
       retries: result.retries,
+      // ⚠️ `subject` is the ONE object that was cartoonized; `objects` is
+      // everything the identifier detected (≤3), ranked, each with the
+      // probability that placed it (ADR-002 Amendment 3 — detect three,
+      // cartoonize one). The client reads neither; they exist so a run can be
+      // explained after the fact, which is the whole point of this response.
+      subject: result.subject,
       objects: result.objects,
     });
   } catch (caught) {

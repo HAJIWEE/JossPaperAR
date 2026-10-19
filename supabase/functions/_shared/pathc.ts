@@ -6,6 +6,9 @@
  *   ② validate  THE MODEL'S JSON IS CHECKED WITH ZOD BEFORE IT DRIVES A PROMPT,
  *      then deduped and colour-sanity-checked (ADR-002 §4). A failure costs one
  *      targeted re-probe, and only one (doc 11 §4: "AI retries / picture: 1").
+ *   ②b select   RANK the detected objects by prominence and take the argmax —
+ *      ONE object is cartoonized (ADR-002 Amendment 3, 2026-10-19). Detection
+ *      still returns up to three; only one is rendered.
  *   ③ generate  `fal-ai/nano-banana-2` text-to-image with the v3 template
  *   ④ cut out   `fal-ai/birefnet/v2` removes the painted rice-paper background
  *      and returns the TRANSPARENT WebP the caller actually stores (Amendment 2).
@@ -34,10 +37,13 @@ import {
   MAX_OBJECTS,
   MAX_RETRIES,
   type IdentifiedObject,
+  type RankedObject,
   colourLeak,
   colourNotes,
   costMicrosFor,
   dedupeObjects,
+  prominenceOf,
+  selectSubject,
   stylePrompt,
 } from './pathtemplate.ts';
 
@@ -45,6 +51,12 @@ import {
  * THE VALIDATION GATE. Nothing derived from the model is trusted until it has
  * been through this schema — the spike's extraction was the weak link (a missed
  * notebook, ×4 duplicates, an echoed example colour).
+ *
+ * ⚠️ `prominence` IS ACCEPTED LOOSELY ON PURPOSE. It is an OPTIONAL hint that
+ * only feeds the ranking, so a malformed one must NOT be able to fail the whole
+ * answer and buy a ≈US$0.09 re-probe — `prominenceOf` drops anything that is not
+ * a finite number and clamps the rest. `label` and `colours` stay strict: those
+ * are the attributes the prompt is actually built from.
  */
 export const IdentifySchema = z.object({
   objects: z
@@ -53,6 +65,7 @@ export const IdentifySchema = z.object({
         label: z.string().trim().min(1).max(40),
         colours: z.array(z.string().trim().min(1).max(48)).min(1).max(4),
         count: z.number().int().min(1).max(20).optional(),
+        prominence: z.union([z.number(), z.string()]).optional(),
       }),
     )
     .min(1)
@@ -150,12 +163,20 @@ export function parseIdentify(raw: string): IdentifyParse {
     return { objects: null, reason: `schema: ${issues}` };
   }
 
+  // ⚠️ `prominence` goes through `prominenceOf`, not straight through: the
+  // schema accepts a number OR a string (a VQA model often answers in prose), and
+  // the ranking must never see a `NaN` or an out-of-range value. An unusable hint
+  // is DROPPED — it is never a reason to spend a retry.
   const objects = dedupeObjects(
-    result.data.objects.map((o) =>
-      o.count === undefined
-        ? { label: o.label, colours: o.colours }
-        : { label: o.label, colours: o.colours, count: o.count },
-    ),
+    result.data.objects.map((o) => {
+      const prominence = prominenceOf(o.prominence);
+      return {
+        label: o.label,
+        colours: o.colours,
+        ...(o.count === undefined ? {} : { count: o.count }),
+        ...(prominence === undefined ? {} : { prominence }),
+      };
+    }),
   );
   return objects.length > 0
     ? { objects, reason: '' }
@@ -214,8 +235,19 @@ export interface PathCResult {
    * sprite** (it is the floating-card defect Amendment 2 exists to fix).
    */
   readonly generatedUrl: string;
-  /** The validated attributes, kept so a run can be explained after the fact. */
-  readonly objects: readonly IdentifiedObject[];
+  /**
+   * ⚠️ THE ONE OBJECT THAT WAS CARTOONIZED (ADR-002 Amendment 3) — the argmax of
+   * the prominence ranking, and the only thing `stylePrompt` ever saw. If a
+   * sprite shows the wrong subject, this field is the receipt for what the
+   * pipeline believed.
+   */
+  readonly subject: RankedObject;
+  /**
+   * Everything the identifier detected (≤3), RANKED, each carrying the `score`
+   * and `probability` that placed it. Kept so a run can be explained after the
+   * fact — ⚠️ only `subject` reaches the generator.
+   */
+  readonly objects: readonly RankedObject[];
   /** Extra identify attempts actually spent (0 or 1). */
   readonly retries: number;
   readonly costMicros: number;
@@ -301,10 +333,37 @@ export async function runPathC(
     throw error;
   }
 
+  /**
+   * ══ ②b SELECT — THE ANALYSIS THAT PICKS ONE OBJECT (ADR-002 Amendment 3) ══
+   *
+   * Everything above is DETECTION: the model may name up to three objects, and
+   * the extra ones are genuinely useful — they are what tells us which one the
+   * photograph is *about*. What changes here is that only the argmax is rendered.
+   *
+   * The ranking is LOGGED, with every candidate's probability, because the one
+   * thing that must never happen is a silent substitution: if the sprite shows
+   * the wrong subject, the log has to say what the pipeline believed and why.
+   */
+  const selection = selectSubject(objects);
+  if (!selection) {
+    const error = new Error(
+      'extraction_unusable: the identifier returned no objects to rank',
+    ) as FalError & { code: string };
+    error.code = 'extraction_unusable';
+    error.spent = spentSoFar();
+    throw error;
+  }
+  const { subject, ranked } = selection;
+  log(
+    `subject: "${subject.label}" (${subject.probability.toFixed(2)})`
+    + ` chosen from ${ranked.length} detected — `
+    + ranked.map((o) => `"${o.label}" ${o.probability.toFixed(2)}`).join(', '),
+  );
+
   // ══ ③ GENERATE + ④ CUT OUT — both are PAID, so both must report spend ════
   try {
     const generated = await falRun(GENERATE_MODEL, {
-      prompt: stylePrompt(objects),
+      prompt: stylePrompt(subject),
       num_images: 1,
       // ⚠️ The generator's container is an INTERMEDIATE now: stage ④ re-encodes
       // it, and the cutout's format is what gets stored. Kept webp anyway so the
@@ -350,7 +409,8 @@ export async function runPathC(
     return {
       styledUrl,
       generatedUrl,
-      objects,
+      subject,
+      objects: ranked,
       retries,
       costMicros: costMicrosFor(retries),
       unitCostMicros: {

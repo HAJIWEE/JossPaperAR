@@ -1260,6 +1260,34 @@ which read `20261008200000` — one migration short. **`npx supabase db reset` r
 
 ---
 
+### 12.40 · S67 — DETECT UP TO THREE, CARTOONIZE ONE: the extra objects were not wanted (2026-10-19)
+
+**The ask, verbatim.** *"After demonstrating it a few times, and gathering feedback. I decided that 3 objects generated max is not representative of the user's intent. The users' feedback says that the extra objects aren't wanted. So I decided that we will only have 1 object cartoonized. This means we should still detect if there is more than one object up to 3 objects but we should apply an analysis that assigns a probability factor to the objects and only cartoonize the one object with the highest probability."*
+
+**What the pipeline actually did.** ① identify returned **≤3 objects**, and **all of them** went into the generator prompt — `stylePrompt` composed `Subject: A; then B; then C.` So one offering photographed on a cluttered desk came back as a low-poly **diagram of the desk**. ⚠️ **And the contradiction was already on the record**: `STYLE_TEMPLATE_V3.output` has always said *"One object only, centred, whole, clean silhouette"*, while the composed prompt named three subjects — noted in S66 as *"the template contradicts itself … Framing is a design decision, not a bug fix."* The template was right; the pipeline was wrong. → **ADR-002 Amendment 3.**
+
+**The analysis — and the deliberate refusal to trust one number.** The probability is **computed by the code**, not read off the model. A VLM's self-reported confidence is uncalibrated and frequently absent (`moondream2` is a VQA model that answers in prose; the spike saw bare arrays), so making it the only signal would mean the decision is made by whichever field the model happened to emit. `rankObjects()` scores each object as a weighted sum of three terms — **only one of which comes from the model**:
+
+| term | weight | source | why |
+|---|---|---|---|
+| `stated` | **0.6** | the model's **optional** `prominence` (0–1) | the only model-supplied term; a hint, never the whole answer |
+| `order` | **0.35** | **position in the answer** | the identify prompt already asks for *"largest and most central first"* — position is a **measurement**, not a guess. Object 0 → 1.0, the last → 1/n |
+| `count` | **0.05** | `count > 1` | a **tie-break**: the narrowest order gap is `0.35 / 3 = 0.117`, so it can never out-rank a better-positioned object |
+
+Weights sum to 1, so a score is already in 0–1; the set is then **normalised into a probability distribution that sums to 1**, and `selectSubject()` takes the **argmax**. When nothing is stated the neutral default **0.5** applies to *every* unstated object — a constant that cannot change the argmax among them, so the ranking falls through to `order`.
+
+⚠️ **THE FIRST WEIGHT SET WAS WRONG, AND A SMOKE TEST FOUND IT — NOT REVIEW.** The first cut was `0.5 / 0.4 / 0.1`, and it looked reasonable. Run against a realistic answer it produced a **DEAD TIE**: two objects, the second explicitly ranked **0.9** by the model, scored **0.650 vs 0.650** against the unstated first — so the model's own ranking was worth *nothing*, and array order decided. The cause is structural: at n=2 the `order` gap is `order_weight × 0.5`, so `order` could out-shift a `stated` swing of the same size. `0.6 / 0.35 / 0.05` fixes it (**0.715 vs 0.650**), and the case is now an assertion. *A weight is a claim; it has to be run, not reasoned.*
+
+**The decision is enforced by the TYPE, not by the doc.** `stylePrompt(subject)` takes **one** object instead of an array — there is no expression that can hand the generator a list, and a caller holding three objects has to choose one. `STYLE_TEMPLATE_V3.output`'s *"One object only"* is now simply true.
+
+⚠️ **One consequence, flagged rather than assumed: a subject's `count` is RECORDED but NO LONGER RENDERED.** The prompt used to read `3 × candle`; with one object that would contradict the clause the whole decision rests on. It stays on the identified object (diagnosis, and the `count` term). *If a multi-instance subject should render as multiple items, that is a one-line change to `stylePrompt`.* ⚠️ **Also decided, not asked:** `prominence` is an **optional, loosely-typed** hint (`z.union([z.number(), z.string()])`, normalised by `prominenceOf()`, which **drops** anything non-finite and **clamps** the rest) — a malformed cosmetic field must never fail the whole answer and buy a **≈US$0.09** re-probe.
+
+**Guards — `check:pathc` 48 → 74, fault-tested 13 times (13 breaks → 13 reds, 0 survivors).** Sixteen assertions are behavioural (the ranking, the distribution, the tie-break invariant, the clamping, the empty set, the strong-vs-weak hint) and **four read `pathc.ts`** and assert the pipeline really calls `selectSubject(objects)` and really passes `stylePrompt(subject)` — **never the array**. ⚠️ The array form is asserted **absent**, because that is exactly the defect being fixed: `stylePrompt(objects)` restored turns **2 RED**. The strongest check is the weight invariant — `count < order / MAX_OBJECTS` — which is what a careless retune breaks. **`tsc` 0 · `npm run check` exit 0.**
+
+**⚠️ NOT verified on glass.** The change is gated and the analysis is exercised offline against realistic answers, but a **real Path C run** is the only thing that can show the sprite now carries **one** object — and that needs the hosted project (`FAL_KEY` + the deployed orchestrator), not the local stack. **US$0.00 — no AI call was made for this work.**
+
+---
+
 ### 12.39 · S66 — the four cosmetics: the controls move to the thumb, the pills halve without losing their targets, and the fire stops being a sticker (2026-10-18)
 
 **The ask, verbatim.** *"zoom controls … positioned right above the camera shutter button not at the top of the window and the 1x 2x 4x buttons are too big"* · *"the hint … is white font with no background, that makes it hard to spot in areas with a light background or areas with bright light … add a background with rounded corners … it must not be touching the bottom or sides of the window, it has to be floating. Do not use full opacity"* · *"the offering size on the ritual page is still too small — make it twice as big as it is now"* · *"the Fire is too dead — add some subtle animation to the fire slightly swaying, slightly growing and shrinking, slow pulsing of brightness."*

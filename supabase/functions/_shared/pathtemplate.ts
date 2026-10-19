@@ -32,8 +32,90 @@ export const GENERATE_MODEL = 'fal-ai/nano-banana-2';
 /** The identify model (ADR-002) — vision query, closed-set aware. */
 export const IDENTIFY_MODEL = 'fal-ai/moondream2/visual-query';
 
-/** ≤3 objects — the cap the spike validated (doc 07 §4.2). */
+/**
+ * ≤3 objects — the cap the spike validated (doc 07 §4.2).
+ *
+ * ⚠️ THIS IS THE **DETECTION** CAP, NOT THE RENDER CAP. The identifier may name
+ * up to three objects; exactly one of them is cartoonized. See
+ * `CARTOONIZED_OBJECTS` and `rankObjects` below.
+ */
 export const MAX_OBJECTS = 3;
+
+/**
+ * ═══ DETECT UP TO THREE, CARTOONIZE ONE (ADR-002 Amendment 3, 2026-10-19) ═══
+ *
+ * The pipeline used to hand **every** detected object to the generator
+ * (`stylePrompt` joined them with `"; then "`), so a photograph of one offering
+ * on a cluttered desk came back as a low-poly *diagram of the desk*. Demoed a
+ * few times and put in front of users, the feedback was consistent: **the extra
+ * objects were not wanted.** The owner's decision — *"we will only have 1 object
+ * cartoonized … we should still detect if there is more than one object up to 3
+ * objects but we should apply an analysis that assigns a probability factor to
+ * the objects and only cartoonize the one object with the highest probability."*
+ *
+ * So the pipeline keeps DETECTING up to `MAX_OBJECTS` (the extra objects are
+ * real information — they are what tells us which one the photograph is *about*)
+ * and renders `CARTOONIZED_OBJECTS`.
+ *
+ * ⚠️ It also settles a contradiction that was already written down and left
+ * standing: `STYLE_TEMPLATE_V3.output` says *"One object only, centred"* while
+ * the composed prompt listed three subjects. The template was right; the
+ * pipeline was wrong.
+ */
+export const CARTOONIZED_OBJECTS = 1;
+
+/**
+ * ⚠️ HOW THE SUBJECT IS CHOSEN, AND WHY IT IS NOT JUST "ASK THE MODEL FOR A
+ * CONFIDENCE". A VLM's self-reported number is **uncalibrated** and often absent
+ * — `moondream2` is a VQA model that answers in prose, and the spike showed it
+ * returning bare arrays. Making that number the ONLY signal would mean the
+ * decision is made by whichever field the model happened to emit.
+ *
+ * So the score is a weighted sum of three components, and only ONE of them comes
+ * from the model:
+ *
+ *   · `stated`  — the model's own optional `prominence` (0–1). The only
+ *                 model-supplied term; a hint, never the whole answer.
+ *   · `order`   — the identify prompt already asks for *"largest and most
+ *                 central first"*, so position IS a measurement, not a guess.
+ *                 Object 0 scores 1.0, the last scores 1/n.
+ *   · `count`   — `count > 1` means the subject appears more than once, which is
+ *                 weak evidence the photograph is about it. A TIE-BREAK only:
+ *                 at 0.1 it cannot overturn a full step of `order` (0.4).
+ *
+ * The weights sum to 1 so a score is already in 0–1; `rankObjects` then
+ * normalises the set into a probability distribution that sums to 1.
+ *
+ * ⚠️ THE WEIGHTS WERE RE-DERIVED FROM A SMOKE TEST, NOT GUESSED. The first cut
+ * was `0.5 / 0.4 / 0.1`, and it FAILED a realistic case: with two objects, a
+ * second object the model had explicitly ranked **0.9** scored **0.650** against
+ * the unstated first object's **0.650** — a dead tie, decided by array order. The
+ * model's own ranking was worth *nothing*. The cause is structural: for n=2 the
+ * `order` gap is `order_weight × 0.5`, so `order` could out-shift a `stated`
+ * swing of the same size.
+ *
+ * At `0.6 / 0.35 / 0.05` the intended relationships hold and are asserted:
+ *   · nothing stated      ⇒ the `stated` term is a constant (0.6 × 0.5 = 0.3)
+ *                           for every object, so **order decides** — the signal
+ *                           we trust when the model says nothing;
+ *   · a STRONG hint wins  ⇒ 0.9 on the second object beats an unstated first
+ *                           (0.715 vs 0.650). A stated prominence above ≈0.75
+ *                           overturns one position at n=2;
+ *   · a WEAK hint does not ⇒ 0.55 on the second object still loses (0.505 vs
+ *                           0.650). The hint is evidence, not a trump.
+ */
+export const PROMINENCE_WEIGHTS = { stated: 0.6, order: 0.35, count: 0.05 } as const;
+
+/**
+ * The `stated` value used when the model gives no prominence.
+ *
+ * ⚠️ A NEUTRAL CONSTANT, deliberately. It is added to EVERY unstated object
+ * equally, so it cannot change the argmax among them — the ranking then falls
+ * through to `order`, which is the signal we actually trust. A low default would
+ * instead *penalise* an object for the model's omission, which is not evidence.
+ */
+export const STATED_PROMINENCE_DEFAULT = 0.5;
+
 /** ADR-002 §4 / doc 11 §4: exactly ONE retry per picture. */
 export const MAX_RETRIES = 1;
 
@@ -121,7 +203,9 @@ export const IDENTIFY_PROMPT = [
   'Do NOT copy words from these instructions, and do NOT reuse any example',
   'colour from them. If an object is unclear or partly hidden, say so.',
   'Answer with JSON only, as an array of objects, each with the keys',
-  '"label", "colours" (an array) and optional "count".',
+  '"label", "colours" (an array), and the optional keys "count" (how many of',
+  'that object) and "prominence" (a number from 0 to 1 for how much this',
+  'photograph is about that object).',
 ].join(' ');
 
 /**
@@ -130,9 +214,11 @@ export const IDENTIFY_PROMPT = [
  */
 export const IDENTIFY_PROMPT_RETRY = [
   'Look carefully at this photograph and answer with JSON only.',
-  'Return an array of at most three objects, each an object with the keys',
-  '"label" (a short plain kind name) and "colours" (an array of the exact',
-  'colours visible on that object in this photo).',
+  'Return an array of at most three objects, largest and most central first,',
+  'each an object with the keys "label" (a short plain kind name) and "colours"',
+  '(an array of the exact colours visible on that object in this photo), plus',
+  'the optional keys "count" and "prominence" (a number from 0 to 1 for how',
+  'much this photograph is about that object).',
   'Use only words you can justify from the image itself.',
 ].join(' ');
 
@@ -173,25 +259,109 @@ export const STYLE_CLAUSES = Object.keys(STYLE_TEMPLATE_V3) as (keyof typeof STY
 export interface IdentifiedObject {
   readonly label: string;
   readonly colours: readonly string[];
+  /**
+   * How many of that kind the model saw. Recorded for diagnosis — ⚠️ it is NOT
+   * put into the prompt any more: `STYLE_TEMPLATE_V3.output` demands one object,
+   * and a `"3 × candle"` subject would contradict the clause the owner's
+   * decision depends on (ADR-002 Amendment 3).
+   */
   readonly count?: number;
+  /**
+   * The model's own optional 0–1 hint for how much the photograph is about this
+   * object. Absent on most answers — see `PROMINENCE_WEIGHTS`.
+   */
+  readonly prominence?: number;
+}
+
+/** An `IdentifiedObject` plus the analysis that ranked it. */
+export interface RankedObject extends IdentifiedObject {
+  /** The weighted prominence score, already in 0–1. */
+  readonly score: number;
+  /** `score` normalised across the set — a real probability, the set sums to 1. */
+  readonly probability: number;
+}
+
+/**
+ * The model's own prominence hint as a number in 0–1, or `undefined`.
+ *
+ * ⚠️ IT IS DELIBERATELY FORGIVING, AND THAT IS THE POINT. `prominence` is an
+ * OPTIONAL field: if a malformed one could fail schema validation it would turn
+ * a cosmetic omission into a **paid re-probe** (≈US$0.09) — the retry is for an
+ * answer we cannot use, not for a missing hint. Anything that is not a finite
+ * number is DROPPED, and the analysis falls back to the structural signals it
+ * owns. Out-of-range values are clamped rather than refused.
+ */
+export function prominenceOf(value: unknown): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'string' && value.trim().length === 0) return undefined;
+  const n = typeof value === 'number' ? value : Number(String(value).trim());
+  if (!Number.isFinite(n)) return undefined;
+  return Math.min(1, Math.max(0, n));
+}
+
+/**
+ * THE SELECTION ANALYSIS — assign every detected object a probability, best
+ * first. This is the "analysis that assigns a probability factor" (ADR-002
+ * Amendment 3); `selectSubject` takes the argmax.
+ *
+ * Pure and deterministic: the same attributes always give the same ranking,
+ * which is what makes the choice reviewable after the fact.
+ */
+export function rankObjects(objects: readonly IdentifiedObject[]): RankedObject[] {
+  const n = objects.length;
+  if (n === 0) return [];
+
+  const scored = objects.map((object, index) => {
+    const stated = prominenceOf(object.prominence) ?? STATED_PROMINENCE_DEFAULT;
+    // Object 0 is what the prompt asked for first ("largest and most central
+    // first"), so position carries real information: 1.0 down to 1/n.
+    const order = (n - index) / n;
+    const count = (object.count ?? 1) > 1 ? 1 : 0;
+    const score = PROMINENCE_WEIGHTS.stated * stated
+      + PROMINENCE_WEIGHTS.order * order
+      + PROMINENCE_WEIGHTS.count * count;
+    return { object, score };
+  });
+
+  const total = scored.reduce((sum, entry) => sum + entry.score, 0);
+  return scored
+    .map(({ object, score }) => ({
+      ...object,
+      score,
+      probability: total > 0 ? score / total : 1 / n,
+    }))
+    .sort((a, b) => b.score - a.score);
+}
+
+/**
+ * The ONE object the photograph is about — the argmax of `rankObjects`, with the
+ * full ranking alongside it so the caller can log *why*. `null` only for an
+ * empty set (which `parseIdentify` never produces — it treats "nothing usable"
+ * as a validation failure).
+ */
+export function selectSubject(
+  objects: readonly IdentifiedObject[],
+): { readonly subject: RankedObject; readonly ranked: RankedObject[] } | null {
+  const ranked = rankObjects(objects);
+  const subject = ranked[0];
+  return subject ? { subject, ranked } : null;
 }
 
 /**
  * Compose the final generation prompt from the validated attributes and the
  * locked template. Deterministic: the same attributes give the same prompt,
- * which is what makes the pipeline reviewable. `objects` is expected to be
- * already deduped and sanity-checked by the caller.
+ * which is what makes the pipeline reviewable. The subject is expected to be
+ * already deduped, sanity-checked and SELECTED by the caller.
+ *
+ * ⚠️ IT TAKES ONE OBJECT, NOT AN ARRAY — AND THAT IS THE GUARANTEE. The owner's
+ * decision is "only 1 object cartoonized" (ADR-002 Amendment 3), and a decision
+ * enforced by a doc is a decision that drifts. With a singular parameter there
+ * is no expression that feeds the generator a list: a caller holding three
+ * objects has to choose one, and the compiler says so.
  */
-export function stylePrompt(objects: readonly IdentifiedObject[]): string {
-  const subjects = objects
-    .map((o) => {
-      const count = o.count && o.count > 1 ? `${o.count} × ` : '';
-      return `${count}${o.label} (colours exactly: ${o.colours.join(', ')})`;
-    })
-    .join('; then ');
-
+export function stylePrompt(subject: IdentifiedObject): string {
   return [
-    `Subject: ${subjects}.`,
+    `Subject: ${subject.label} (colours exactly: ${subject.colours.join(', ')}).`,
     STYLE_TEMPLATE_V3.base,
     STYLE_TEMPLATE_V3.ink,
     STYLE_TEMPLATE_V3.matte,
@@ -284,6 +454,12 @@ export function colourNotes(objects: readonly IdentifiedObject[]): string[] {
  * Drop near-duplicates and cap at MAX_OBJECTS: the spike returned the same
  * object up to four times (glasses ×4), which inflates the prompt and skews
  * the count. Keeps the first occurrence and the HIGHEST count seen per label.
+ *
+ * ⚠️ A MERGE MUST NOT EAT THE RANKING SIGNAL. The merge branch builds a fresh
+ * object, so `prominence` has to be carried explicitly — otherwise a duplicate
+ * that stated its prominence would silently lose it, and `rankObjects` would
+ * fall back to order for an object the model had actually ranked. The highest
+ * stated value wins, mirroring the count rule.
  */
 export function dedupeObjects(objects: readonly IdentifiedObject[]): IdentifiedObject[] {
   const byKey = new Map<string, IdentifiedObject>();
@@ -297,7 +473,16 @@ export function dedupeObjects(objects: readonly IdentifiedObject[]): IdentifiedO
     }
     const count = Math.max(existing.count ?? 1, object.count ?? 1);
     const colours = [...new Set([...existing.colours, ...object.colours])].slice(0, 4);
-    byKey.set(key, count > 1 ? { label: existing.label, colours, count } : { label: existing.label, colours });
+    const prominence = Math.max(
+      prominenceOf(existing.prominence) ?? 0,
+      prominenceOf(object.prominence) ?? 0,
+    );
+    byKey.set(key, {
+      label: existing.label,
+      colours,
+      ...(count > 1 ? { count } : {}),
+      ...(prominence > 0 ? { prominence } : {}),
+    });
   }
   return [...byKey.values()].slice(0, MAX_OBJECTS);
 }

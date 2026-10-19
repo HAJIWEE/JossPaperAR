@@ -125,4 +125,42 @@ Output is 4-channel **RGBA**, alpha **0** at every corner, and the thin ink outl
 
 ---
 
-*Accepted 2026-09-26 (Session 18) on PM verdict after the Path-C scorecard (13/13 post-retries). Evidence: spike RESULTS §5b rounds 7–9 · `spike/results/path-C/` (19 images + iterations).*
+## Amendment 3 · 2026-10-19 — DETECT UP TO THREE, CARTOONIZE ONE
+
+**Status:** ✅ decided by the owner (2026-10-19) and implemented in the pipeline. `SCRUM-134`.
+
+**Context.** §Decision 1's identify stage extracts **≤3 objects** and the pipeline handed **every** one of them to the generator — `stylePrompt` composed `Subject: A; then B; then C.` So a photograph of one offering on a cluttered desk came back as a low-poly **diagram of the desk**. The feature was demoed a few times and put in front of users, and the feedback was consistent: **the extra objects were not wanted.**
+
+> *"3 objects generated max is not representative of the user's intent. The users' feedback says that the extra objects aren't wanted. So I decided that we will only have 1 object cartoonized. This means we should still detect if there is more than one object up to 3 objects but we should apply an analysis that assigns a probability factor to the objects and only cartoonize the one object with the highest probability."* — owner, 2026-10-19
+
+⚠️ **The contradiction was already on the record and left standing.** `STYLE_TEMPLATE_V3.output` has always said *"One object only, centred, whole, clean silhouette"* — while the composed prompt named three subjects. The template was right; the pipeline was wrong. (Noted in `next-ai-context.md`, S66: *"the template contradicts itself … Framing is a design decision, not a bug fix."*)
+
+**Amendment.** Path C gains a **selection stage between validate and generate**:
+
+> ① identify `moondream2` (**≤3 objects**) → ② validate → **②b select** — rank the detected objects and take the **argmax** → ③ generate `nano-banana-2` (v3) from **that one object** → ④ cut out `birefnet/v2`
+
+* **Detection is unchanged.** `MAX_OBJECTS = 3` still governs the identifier, and the extra objects are still *useful* — they are the evidence for which one the photograph is about. Only the RENDER cap is new: `CARTOONIZED_OBJECTS = 1`.
+* **The probability is an ANALYSIS the code owns, not a number we ask the model for.** A VLM's self-reported confidence is uncalibrated and frequently absent (`moondream2` is a VQA model that answers in prose; the spike saw bare arrays). So `rankObjects()` scores each object as a weighted sum of three terms, and **only one comes from the model**:
+
+  | term | weight | source |
+  |---|---|---|
+  | `stated` | **0.5** | the model's own **optional** `prominence` (0–1) — a hint, never the whole answer |
+  | `order` | **0.4** | **position in the answer.** The identify prompt already asks for *"largest and most central first"*, so position is a measurement, not a guess. Object 0 → 1.0, the last → 1/n |
+  | `count` | **0.1** | `count > 1` (the subject appears more than once) — a **tie-break**: at 0.1 it cannot overturn a full step of `order` (0.4) |
+
+  The weights sum to 1, so a score is already in 0–1; `rankObjects()` then **normalises the set into a probability distribution that sums to 1**, and `selectSubject()` takes the argmax. When nothing is stated the neutral default **0.5** is used for *every* unstated object — a constant that cannot change the argmax among them, so the ranking falls through to `order`, the signal we trust.
+* **`prominence` is an OPTIONAL, loosely-typed hint — deliberately.** It is accepted as `z.union([z.number(), z.string()])` and normalised by `prominenceOf()`, which **drops** anything that is not a finite number and **clamps** the rest. A malformed hint must never fail the whole answer: the retry is ≈US$0.09, and it exists for an extraction we cannot use — not for a missing cosmetic field.
+* **The single-object decision is enforced by the TYPE, not by a doc.** `stylePrompt(subject)` now takes **one** object instead of an array, so there is no expression that can hand the generator a list. A decision enforced only by prose is a decision that drifts — and `STYLE_TEMPLATE_V3.output`'s *"One object only"* is now simply true.
+* ⚠️ **A subject's `count` is recorded but NO LONGER RENDERED.** The prompt used to read `3 × candle`; with one object that would contradict the template clause the whole decision rests on. `count` stays on the identified object (diagnosis, and the `count` term of the ranking). *If a multi-instance subject should render as multiple items, that is a one-line change to `stylePrompt` — flagged, not assumed.*
+* **`dedupeObjects()` carries `prominence` through a merge** (highest wins, mirroring `count`). The merge branch builds a fresh object, so an un-carried field would silently drop the ranking signal for exactly the objects the model had ranked.
+* **The choice is LOGGED with every candidate's probability**, and returned as `subject` (the one rendered) plus `objects` (all detected, ranked) on both `PathCResult` and the orchestrator response. ⚠️ **A silent substitution is the failure mode to fear** — if the sprite shows the wrong subject, the log and the response have to say what the pipeline believed and why. The client reads neither field.
+
+**Rejected.** *Asking the model for a confidence and using it alone* — uncalibrated, often absent, and it makes the decision depend on whichever field the model happened to emit. *Keeping the array and trusting the prompt's "One object only" clause* — that is what was already being ignored. *Rendering a fixed "first" object with no analysis* — the owner asked for a probability factor, and the ordering the prompt requests is a measurement worth scoring rather than assuming. *Dropping detection to one object* — the extra objects are what make the selection possible.
+
+**Effect on §Consequences.** The *"Multi-object and partial/occluded captures work"* bullet is **narrowed, not removed**: multi-object captures are still *understood* (that is how the subject is chosen) but only **one object is rendered**. Cost and latency are **unchanged** — `identify`, `generate` and `cutout` are still exactly one call each, so the ≈US$0.091/run figure and the daily stop-rule stand.
+
+**Guards.** `check:pathc` **48 → 72**. Sixteen of the new assertions are **behavioural** (the ranking, the probability distribution, the tie-break, the clamping, the empty set) and four **read `pathc.ts`** and assert the pipeline really calls `selectSubject(objects)` and really passes `stylePrompt(subject)` — never the array. ⚠️ **Fault-tested 10 times: 10 breaks → 10 reds, 0 survivors** (render cap · neutral default · count weight · prominence dropped by a merge · the hint removed from the prompt · the count multiplier restored · normalisation removed · `stylePrompt(objects)` restored · selection removed · the schema made strict).
+
+---
+
+*Accepted 2026-09-26 (Session 18) on PM verdict after the Path-C scorecard (13/13 post-retries). Evidence: spike RESULTS §5b rounds 7–9 · `spike/results/path-C/` (19 images + iterations). Amendment 3 decided by the owner 2026-10-19 from demo + user feedback.*
