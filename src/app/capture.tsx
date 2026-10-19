@@ -44,6 +44,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { FullBleedCamera } from '@/components/full-bleed-camera';
 import { INITIAL_OFFERING, transition, type Offering } from '@/domain/slice';
 import { t } from '@/lib/i18n';
 import { toCropParams } from '@/lib/route-params';
@@ -258,10 +259,12 @@ export default function CaptureScreen() {
         ⚠️ `zoom` is the DERIVED fraction, never the stop's ratio — `expo-camera`
         takes `0…1` of the device's maximum, and the platform decides how that
         becomes a factor. See `src/lib/zoom.ts`.
+
+        ⚠️ AND IT IS `FullBleedCamera`, NOT A BARE `CameraView` (SCRUM-135). A bare
+        one can measure itself as a SQUARE and stay one — see that component.
       */}
-      <CameraView
+      <FullBleedCamera
         ref={cameraRef}
-        style={StyleSheet.absoluteFill}
         facing="back"
         zoom={zoomFraction}
       />

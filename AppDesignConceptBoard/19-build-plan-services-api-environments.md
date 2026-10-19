@@ -1260,6 +1260,58 @@ which read `20261008200000` — one migration short. **`npx supabase db reset` r
 
 ---
 
+### 12.41 · S68 — THE CAMERA OVERLAY RENDERED AS A SQUARE: `expo-camera` latches its own measure, and the JS layout was never wrong (2026-10-19)
+
+**The owner's report.** *"the camera overlay would only take up half the screen with the controls still taking the full screen. Its not always replicable."* ⚠️ **This is the S66 finding that could not be filed** — the Jira connector had answered *"the Cline account changed, start a new session"* mid-run. It is now **`SCRUM-135`**, with a reproduction *and* a fix.
+
+**The symptom, measured.** On `/burn` the preview is a **720 × 720 px SQUARE** — **360 × 360 dp** on a 360 × 800 dp screen — with the controls over the full screen and **pure black** below. ⚠️ **The JS layout is never wrong**: `onLayout` reports `360 × 800` and the Yoga box is correct, which is exactly why `tsc` and every gate were silent.
+
+**⚠️ "Not always replicable" was really "depends how you enter the screen".** Measured on `HN615L005386` / **25128PC17G · Android 16 / SDK 36 · 720 × 1600 px @ 320 dpi**, Expo Go 57.0.9, `demo=1` throughout (**US$0.00**):
+
+| entry path | runs | result |
+|---|---|---|
+| **direct deep link** to `/burn` | **12** | **FULL — 12/12** |
+| **the real flow** (`capture → shutter → crop → preparing → burn`) | **2** | **CLIPPED at exactly `y = 720` — 2/2** |
+
+⚠️ **And a first measurement was WRONG.** The first detector looked for rows with high colour variety — but the **offering itself is camera content**, so its box below the clip kept the "camera" reading alive and reported FULL on a clipped screen. The working detector reads the **left 60 px strip**, which carries no overlay (the fire and the offering are both centred). *A detector that can be fooled by the thing it is measuring is not a detector.*
+
+**The mechanism — a measure latch inside `expo-camera`, not a layout bug.** `ExpoCameraView.onMeasure` resolves its size **from its child `PreviewView`**:
+
+```kotlin
+setMeasuredDimension(
+  ViewGroup.resolveSize(previewView.measuredWidth,  widthMeasureSpec),
+  ViewGroup.resolveSize(previewView.measuredHeight, heightMeasureSpec)   // ⚠️
+)
+```
+
+`resolveSize(x, EXACTLY h)` is `h`; under **AT_MOST** it is `min(x, h)`. And the view's `init` installs a listener that **re-measures and re-lays the PreviewView with EXACTLY specs taken from the parent's own `measuredWidth/measuredHeight`** the moment CameraX adds its SurfaceView:
+
+```kotlin
+previewView.setOnHierarchyChangeListener(object : OnHierarchyChangeListener {
+  override fun onChildViewAdded(parent: View?, child: View?) {
+    parent?.measure(MeasureSpec.makeMeasureSpec(measuredWidth,  EXACTLY),
+                    MeasureSpec.makeMeasureSpec(measuredHeight, EXACTLY))
+    parent?.layout(0, 0, parent.measuredWidth, parent.measuredHeight)
+  }
+})
+```
+
+So a first measure pass whose height spec is not EXACT **latches the PreviewView to the child's own square** — and nothing re-lays it afterwards, because the parent's bounds never change again and `onLayout`'s `if (width != lastWidth || height != lastHeight)` guard therefore never fires. The wrong size is kept for the screen's lifetime.
+
+**The fix.** New **`src/components/full-bleed-camera.tsx`**, mounted by all three camera screens (`/capture` · `/burn` · `/clan/scan`): the wrapper measures itself and the `CameraView` is **not mounted until the box is known**, then pinned with an explicit pixel `width`/`height` — so its FIRST measure already carries an EXACT height.
+
+⚠️ **The two-pass form was tried first and was NOT enough.** Giving the camera `absoluteFill` for one pass and correcting it afterwards still clipped on **2 of 3** runs: the latch can already have happened before the correction lands. Mounting one frame later costs one frame of the screen's own near-black background and removes the race. ⚠️ The wrapper is `pointerEvents="none"` deliberately — `/burn`'s whole screen is one `PanResponder`, and an overlay that swallowed the touch would make the throw undemonstrable.
+
+⚠️ **A one-line probe settled where the black came from, and it was NOT the parent.** Setting `/burn`'s root background to magenta left **no magenta anywhere on screen** — so the black is the **camera view's own background over a full-screen view**, i.e. the view is right and its *child* is square. That is the opposite of the S66 note's reading, and it is what pointed at the PreviewView rather than the view.
+
+**Verified.** ✅ **`/burn` via the real flow: FULL 6/6** (was CLIPPED 2/2 before). ✅ **`/capture`: FULL** — no regression. ✅ **Corroborated by SurfaceFlinger:** the camera layer moved from a **square** (`bounds={0,0,720,720}`) to the **full screen in buffer space** (`bounds={0,0,1600,720}` — the 720 × 1600 screen rotated). ✅ `check:framing` **205 → 217** (section ⑥: all three screens mount the shared component, **no bare `<CameraView` remains**, the camera is not mounted before measurement), **fault-tested 7 times (7 breaks → 7 reds, 0 survivors)**. ✅ `tsc` 0 · `npm run check` exit 0.
+
+⚠️ **Unknowns, recorded rather than glossed.** **One device** (`25128PC17G`, Android 16) and **only in Expo Go 57.0.9** — whether the latch is device- or Expo-Go-specific is **unverified**; re-check in a development build. ⚠️ **`/clan/scan` was not exercised on glass** (it needs a clan) — it mounts the same component, so the fix applies, but that is reasoned, not measured. ⚠️ **A tooling trap that cost a verification round: Metro served 1-module deltas**, and one hot update threw `ReferenceError: Property 'FullBleedCamera' doesn't exist` — so a run that "tested the fix" had in fact run a stale bundle. `--clear` and a full re-bundle is the only trustworthy way to verify a new module on glass.
+
+**US$0.00 — client-only; every device run used `demo=1`.**
+
+---
+
 ### 12.40 · S67 — DETECT UP TO THREE, CARTOONIZE ONE: the extra objects were not wanted (2026-10-19)
 
 **The ask, verbatim.** *"After demonstrating it a few times, and gathering feedback. I decided that 3 objects generated max is not representative of the user's intent. The users' feedback says that the extra objects aren't wanted. So I decided that we will only have 1 object cartoonized. This means we should still detect if there is more than one object up to 3 objects but we should apply an analysis that assigns a probability factor to the objects and only cartoonize the one object with the highest probability."*
