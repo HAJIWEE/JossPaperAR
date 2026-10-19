@@ -1284,7 +1284,20 @@ Weights sum to 1, so a score is already in 0–1; the set is then **normalised i
 
 **Guards — `check:pathc` 48 → 74, fault-tested 13 times (13 breaks → 13 reds, 0 survivors).** Sixteen assertions are behavioural (the ranking, the distribution, the tie-break invariant, the clamping, the empty set, the strong-vs-weak hint) and **four read `pathc.ts`** and assert the pipeline really calls `selectSubject(objects)` and really passes `stylePrompt(subject)` — **never the array**. ⚠️ The array form is asserted **absent**, because that is exactly the defect being fixed: `stylePrompt(objects)` restored turns **2 RED**. The strongest check is the weight invariant — `count < order / MAX_OBJECTS` — which is what a careless retune breaks. **`tsc` 0 · `npm run check` exit 0.**
 
-**⚠️ NOT verified on glass.** The change is gated and the analysis is exercised offline against realistic answers, but a **real Path C run** is the only thing that can show the sprite now carries **one** object — and that needs the hosted project (`FAL_KEY` + the deployed orchestrator), not the local stack. **US$0.00 — no AI call was made for this work.**
+**✅ VERIFIED WITH A REAL CALL — one Path C run, ≈US$0.091, and the sprite was LOOKED AT.** ⚠️ The hosted orchestrator could **not** be redeployed from this worktree (no Supabase access token), so the run was driven **through the worktree's own `runPathC`** by a Deno harness against the **real fal API**, on the spike's own multi-object input **`S09.jpg`** (587,913 B, uploaded to fal and byte-verified).
+
+| | |
+|---|---|
+| **detected** | **3** — `Orange [orange, yellow]` · `Lemon [yellow, green]` · `Apple [red, pink]` |
+| **logged** | `subject: "Orange" (0.38) chosen from 3 detected — "Orange" 0.38, "Lemon" 0.33, "Apple" 0.29` |
+| **sprite** | **1408 × 768 RGBA WebP · 49,704 B · 78.5 % fully transparent · 20.0 % opaque · alpha 0 at all four corners** |
+| **looked at** | **ONE low-poly orange with a leaf.** Composited on magenta: clean, no leftover background |
+| **the "before"** | the spike's **already-paid-for** `spike/results/path-C/S09__pathC_v3_t2i.jpg` — **the SAME input**, old pipeline: **three** fruits (green lemon, orange, red apple) spread across a landscape frame |
+| **cost / latency** | **91,000 micros** · **17,894 ms** · **0 retries** |
+
+⚠️ **AND IT FOUND SOMETHING NO OFFLINE TEST COULD: the model returned `prominence: 1` for ALL THREE objects.** The hint **saturated** — so the `stated` term was a constant, it cancelled out, and **`order` decided**. That is precisely the case `PROMINENCE_WEIGHTS` was designed for, and it is now **measured rather than argued**: had the design trusted the model's number alone, this run would have had **nothing** to rank on. *(It also implies the weight the model's hint actually carries is often zero in practice — worth re-deriving if the prompt is ever tuned to produce a spread.)*
+
+⚠️ **NOT verified on glass — and that is a DEPLOY blocker, not a code one.** The hosted orchestrator still runs the **old** code, so a device run *today* would still produce three objects. Redeploying needs the project's own command — `npx supabase functions deploy cartoonize-orchestrator --project-ref yercgevebxvtzkgctfai --use-api` — which needs a Supabase access token **this worktree does not have** (`~/.supabase/access-token` is absent; `supabase login` is interactive). ⚠️ **The connector's deploy was deliberately NOT used as a workaround:** it takes a single file or a pre-built zip, while the orchestrator is **multi-file** (`../_shared/env.ts` · `http.ts` · `pathc.ts` · `pathtemplate.ts`) — a hand-rolled zip is exactly the wasted round-trip this repo's notes warn about. **One command from the owner unblocks the glass run.**
 
 ---
 
