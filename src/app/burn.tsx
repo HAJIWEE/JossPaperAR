@@ -42,6 +42,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ART_SCALE, FLAME_TOP_ABOVE_HEART, FireArt, type FireReaction } from '@/components/fire-art';
+import { FullBleedCamera } from '@/components/full-bleed-camera';
 import type { BandId } from '@/domain/aim';
 import {
   MAX_THROWS,
@@ -622,7 +623,10 @@ export default function BurnScreen() {
 
   return (
     <View style={styles.screen} onLayout={onLayout} {...responder.panHandlers}>
-      <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
+      {/* ⚠️ `FullBleedCamera`, not a bare `CameraView` (SCRUM-135): a bare one can
+          measure itself as a SQUARE and stay one — this is the screen the owner
+          reported it on. See `src/components/full-bleed-camera.tsx`. */}
+      <FullBleedCamera ref={cameraRef} facing="back" />
 
       {/* The fire: fixed, screen-relative (ADR-003 — non-AR AR). Its heart is the
           exact point `HEART_AT` grades against, so the artwork is anchored TO it

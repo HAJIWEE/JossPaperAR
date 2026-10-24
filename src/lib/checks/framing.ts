@@ -47,6 +47,17 @@
  *   · the raster's `data:image/png;base64,` prefix changed → **1 of 174 red**.
  * Restored → 174/174 green.
  *
+ * ⚠️ SECTION ⑥ — THE FULL-BLEED CAMERA (S68, 2026-10-19). Seven breaks, seven reds, zero
+ * survivors, restored green at 217:
+ *   · `burn.tsx` back to a bare `<CameraView style={absoluteFill}>` → **3 red**;
+ *   · the component mounting the camera BEFORE the container is measured (the two-pass
+ *     form that still clipped on 2 of 3 device runs) → **1 red**;
+ *   · `styles.pinned` gaining `right`/`bottom` (the ambiguity the fix removes) → **1 red**;
+ *   · the wrapper's `pointerEvents="none"` → `"box-none"` → **1 red**;
+ *   · the explicit pixel pin replaced by `absoluteFill` → **2 red**;
+ *   · `ref={ref}` dropped (the two capture screens lose their camera handle) → **1 red**;
+ *   · `clan/scan.tsx` back to a bare `<CameraView>` → **2 red**.
+ *
  * ⚠️ AND THE ORIGINAL TWO, MEASURED WHEN THEY WERE WRITTEN (the count then was 88):
  *   · change the Android branch of `zoomRatioFrom` to `1 + f * (max - 1)` (the arithmetic
  *     the SDK does NOT use) → the per-platform solves go red. A stop whose RATIO is edited
@@ -884,6 +895,93 @@ check('⚠️ …and the idle motion COMPOSES with the reaction instead of repla
 check('⚠️ …and only the FLAME sways — the ember bed is planted, not tilted',
   (fireSrc.match(/rotate: idleSway/g) ?? []).length === 1
     && fireSrc.indexOf('BED.apex.map') < fireSrc.indexOf('{ rotate: idleSway }'));
+
+// ── ⑥ the FULL-BLEED CAMERA (SCRUM-135, 2026-10-19) ─────────────────────────
+/*
+ * ⚠️ THE BUG THIS SECTION EXISTS FOR, AND WHY NOTHING ELSE COULD SEE IT.
+ *
+ * On `/burn` the live preview rendered as a **720 × 720 px SQUARE** — 360 × 360 dp
+ * on a 360 × 800 dp screen — with the ritual's controls over the full screen and
+ * black below. It was INTERMITTENT, and it depended on HOW the screen was
+ * entered: a direct deep link to `/burn` measured FULL in **12/12** runs, while
+ * the real flow (`capture → shutter → crop → preparing → burn`) measured CLIPPED
+ * at exactly `y = 720` in **2/2**.
+ *
+ * The JS layout was NEVER wrong, which is the whole reason `tsc` and every other
+ * gate were silent: `onLayout` on the screen reports `360 × 800` and the Yoga box
+ * is right. The fault is in `expo-camera`'s Android `onMeasure`, which resolves
+ * its own size from its child `PreviewView`:
+ *
+ *     setMeasuredDimension(resolveSize(previewView.measuredWidth,  wSpec),
+ *                          resolveSize(previewView.measuredHeight, hSpec))
+ *
+ * `resolveSize(x, EXACTLY h)` is `h`; under **AT_MOST** it is `min(x, h)`. So a
+ * first pass whose height spec is not EXACT latches the whole camera view to the
+ * child's own square, and because nothing ever changes its style, Yoga never
+ * re-measures it — the wrong size is kept for the screen's lifetime.
+ *
+ * MEASURED, not inferred — SurfaceFlinger on the reproduction (`25128PC17G`,
+ * Android 16, 720 × 1600 px):
+ *
+ *     Layer [8944] SurfaceView[host.exp.exponent/…]#8944
+ *         bounds={0,0,720,720}   toDisplayTransform={ scale x=1.3333 y=0.7500 }
+ *
+ * The fix is `src/components/full-bleed-camera.tsx`: once the container has been
+ * measured the camera is given an **explicit pixel width and height**, so its
+ * spec is EXACTLY the container's on every pass — and setting the size changes
+ * the style, which is what forces the re-measure that unsticks an already-square
+ * native view.
+ *
+ * THESE ASSERTIONS ARE SOURCE ASSERTIONS ON PURPOSE. The defect is invisible to
+ * every value-level test: it is a NATIVE measure pass, and the only place it can
+ * be caught without a device is in how the view is mounted. A bare
+ * `<CameraView style={StyleSheet.absoluteFill}>` anywhere is the defect coming
+ * back, so that is asserted ABSENT.
+ */
+section('⑥ the full-bleed camera — a native measure pass, gated at the mount');
+
+const cameraSrc = read('src/components/full-bleed-camera.tsx');
+const scanSrc = read('src/app/clan/scan.tsx');
+
+check('⚠️ all THREE camera screens mount the shared component',
+  captureSrc.includes('<FullBleedCamera')
+    && burnSrc.includes('<FullBleedCamera')
+    && scanSrc.includes('<FullBleedCamera'));
+/*
+ * ⚠️ THE TYPE USAGE IS STRIPPED FIRST, AND IT HAS TO BE. `useRef<CameraView>(null)`
+ * contains the literal `<CameraView>` — so a naive `/<CameraView[\s>]/` reports a
+ * false positive on the two screens that hold a ref. Only the JSX form matters.
+ */
+const bareCamera = (src: string): boolean =>
+  /<CameraView[\s/>]/.test(src.replace(/useRef<CameraView>/g, ''));
+check('⚠️ …and NONE of them renders a bare `<CameraView` (the defect returning)',
+  !bareCamera(captureSrc) && !bareCamera(burnSrc) && !bareCamera(scanSrc));
+check('guard: …and that assertion can still see a bare camera when there IS one',
+  bareCamera('<CameraView ref={r} style={StyleSheet.absoluteFill} facing="back" />')
+    && !bareCamera('const cameraRef = useRef<CameraView>(null);'));
+check('…and the camera view is never given `absoluteFill` as its final size',
+  !/style=\{StyleSheet\.absoluteFill\}\s*facing/.test(captureSrc)
+    && !/style=\{StyleSheet\.absoluteFill\}\s*facing/.test(burnSrc));
+check('⚠️ the component PINS an explicit pixel size (the fix itself)',
+  cameraSrc.includes('width: box.width, height: box.height')
+    && cameraSrc.includes('styles.pinned'));
+check('⚠️ …and the camera is NOT MOUNTED until the container is measured',
+  cameraSrc.includes('{box !== null && ('));
+check('⚠️ …so `absoluteFill` is never handed to the camera AT ALL (the two-pass form still clipped)',
+  !/style=\{\s*box === null[\s\S]{0,80}?StyleSheet\.absoluteFill/.test(cameraSrc)
+    && !/<CameraView[\s\S]{0,400}?style=\{StyleSheet\.absoluteFill\}/.test(cameraSrc));
+check('⚠️ …and the pin carries its OWN position, not `absoluteFill`\'s four insets',
+  /pinned: \{ position: 'absolute', left: 0, top: 0 \}/.test(cameraSrc)
+    && !/pinned: \{[^}]*right:/.test(cameraSrc)
+    && !/pinned: \{[^}]*bottom:/.test(cameraSrc));
+check('…so a re-layout of the same size cannot loop',
+  cameraSrc.includes('previous.width === width && previous.height === height'));
+check('⚠️ the wrapper is TOUCH-TRANSPARENT — /burn\'s whole screen is one PanResponder',
+  cameraSrc.includes('pointerEvents="none"'));
+check('…and the two screens that need a ref still get one',
+  cameraSrc.includes('ref?: Ref<CameraView>') && cameraSrc.includes('ref={ref}'));
+check('guard: the source assertions are not vacuous (the files were really read)',
+  cameraSrc.length > 1_500 && scanSrc.includes('ClanScanScreen'));
 
 // ── summary ──────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(64)}`);

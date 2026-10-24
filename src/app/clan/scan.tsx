@@ -18,13 +18,14 @@
  * anti-abuse rule by holding the phone still (doc 15 §5.2).
  */
 
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useCameraPermissions } from 'expo-camera';
 import { router } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GhostButton } from '@/components/clan-ui';
+import { FullBleedCamera } from '@/components/full-bleed-camera';
 import { scanDecision } from '@/lib/invite-flow';
 import { t } from '@/lib/i18n';
 import { fontSize, onColorCream, space, surface, text } from '@/theme/tokens';
@@ -86,8 +87,9 @@ export default function ClanScanScreen() {
 
   return (
     <View style={styles.screen}>
-      <CameraView
-        style={StyleSheet.absoluteFill}
+      {/* ⚠️ `FullBleedCamera`, not a bare `CameraView` (SCRUM-135) — a bare one can
+          measure itself as a SQUARE and stay one. See that component. */}
+      <FullBleedCamera
         facing="back"
         // ⚠️ QR only. Left open, the scanner would also try to read the app's
         // own packaging barcodes and report them as unreadable invites.

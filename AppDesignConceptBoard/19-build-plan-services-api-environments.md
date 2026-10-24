@@ -1260,6 +1260,99 @@ which read `20261008200000` — one migration short. **`npx supabase db reset` r
 
 ---
 
+### 12.41 · S68 — THE CAMERA OVERLAY RENDERED AS A SQUARE: `expo-camera` latches its own measure, and the JS layout was never wrong (2026-10-19)
+
+**The owner's report.** *"the camera overlay would only take up half the screen with the controls still taking the full screen. Its not always replicable."* ⚠️ **This is the S66 finding that could not be filed** — the Jira connector had answered *"the Cline account changed, start a new session"* mid-run. It is now **`SCRUM-135`**, with a reproduction *and* a fix.
+
+**The symptom, measured.** On `/burn` the preview is a **720 × 720 px SQUARE** — **360 × 360 dp** on a 360 × 800 dp screen — with the controls over the full screen and **pure black** below. ⚠️ **The JS layout is never wrong**: `onLayout` reports `360 × 800` and the Yoga box is correct, which is exactly why `tsc` and every gate were silent.
+
+**⚠️ "Not always replicable" was really "depends how you enter the screen".** Measured on `HN615L005386` / **25128PC17G · Android 16 / SDK 36 · 720 × 1600 px @ 320 dpi**, Expo Go 57.0.9, `demo=1` throughout (**US$0.00**):
+
+| entry path | runs | result |
+|---|---|---|
+| **direct deep link** to `/burn` | **12** | **FULL — 12/12** |
+| **the real flow** (`capture → shutter → crop → preparing → burn`) | **2** | **CLIPPED at exactly `y = 720` — 2/2** |
+
+⚠️ **And a first measurement was WRONG.** The first detector looked for rows with high colour variety — but the **offering itself is camera content**, so its box below the clip kept the "camera" reading alive and reported FULL on a clipped screen. The working detector reads the **left 60 px strip**, which carries no overlay (the fire and the offering are both centred). *A detector that can be fooled by the thing it is measuring is not a detector.*
+
+**The mechanism — a measure latch inside `expo-camera`, not a layout bug.** `ExpoCameraView.onMeasure` resolves its size **from its child `PreviewView`**:
+
+```kotlin
+setMeasuredDimension(
+  ViewGroup.resolveSize(previewView.measuredWidth,  widthMeasureSpec),
+  ViewGroup.resolveSize(previewView.measuredHeight, heightMeasureSpec)   // ⚠️
+)
+```
+
+`resolveSize(x, EXACTLY h)` is `h`; under **AT_MOST** it is `min(x, h)`. And the view's `init` installs a listener that **re-measures and re-lays the PreviewView with EXACTLY specs taken from the parent's own `measuredWidth/measuredHeight`** the moment CameraX adds its SurfaceView:
+
+```kotlin
+previewView.setOnHierarchyChangeListener(object : OnHierarchyChangeListener {
+  override fun onChildViewAdded(parent: View?, child: View?) {
+    parent?.measure(MeasureSpec.makeMeasureSpec(measuredWidth,  EXACTLY),
+                    MeasureSpec.makeMeasureSpec(measuredHeight, EXACTLY))
+    parent?.layout(0, 0, parent.measuredWidth, parent.measuredHeight)
+  }
+})
+```
+
+So a first measure pass whose height spec is not EXACT **latches the PreviewView to the child's own square** — and nothing re-lays it afterwards, because the parent's bounds never change again and `onLayout`'s `if (width != lastWidth || height != lastHeight)` guard therefore never fires. The wrong size is kept for the screen's lifetime.
+
+**The fix.** New **`src/components/full-bleed-camera.tsx`**, mounted by all three camera screens (`/capture` · `/burn` · `/clan/scan`): the wrapper measures itself and the `CameraView` is **not mounted until the box is known**, then pinned with an explicit pixel `width`/`height` — so its FIRST measure already carries an EXACT height.
+
+⚠️ **The two-pass form was tried first and was NOT enough.** Giving the camera `absoluteFill` for one pass and correcting it afterwards still clipped on **2 of 3** runs: the latch can already have happened before the correction lands. Mounting one frame later costs one frame of the screen's own near-black background and removes the race. ⚠️ The wrapper is `pointerEvents="none"` deliberately — `/burn`'s whole screen is one `PanResponder`, and an overlay that swallowed the touch would make the throw undemonstrable.
+
+⚠️ **A one-line probe settled where the black came from, and it was NOT the parent.** Setting `/burn`'s root background to magenta left **no magenta anywhere on screen** — so the black is the **camera view's own background over a full-screen view**, i.e. the view is right and its *child* is square. That is the opposite of the S66 note's reading, and it is what pointed at the PreviewView rather than the view.
+
+**Verified.** ✅ **`/burn` via the real flow: FULL 6/6** (was CLIPPED 2/2 before). ✅ **`/capture`: FULL** — no regression. ✅ **Corroborated by SurfaceFlinger:** the camera layer moved from a **square** (`bounds={0,0,720,720}`) to the **full screen in buffer space** (`bounds={0,0,1600,720}` — the 720 × 1600 screen rotated). ✅ `check:framing` **205 → 217** (section ⑥: all three screens mount the shared component, **no bare `<CameraView` remains**, the camera is not mounted before measurement), **fault-tested 7 times (7 breaks → 7 reds, 0 survivors)**. ✅ `tsc` 0 · `npm run check` exit 0.
+
+⚠️ **Unknowns, recorded rather than glossed.** **One device** (`25128PC17G`, Android 16) and **only in Expo Go 57.0.9** — whether the latch is device- or Expo-Go-specific is **unverified**; re-check in a development build. ⚠️ **`/clan/scan` was not exercised on glass** (it needs a clan) — it mounts the same component, so the fix applies, but that is reasoned, not measured. ⚠️ **A tooling trap that cost a verification round: Metro served 1-module deltas**, and one hot update threw `ReferenceError: Property 'FullBleedCamera' doesn't exist` — so a run that "tested the fix" had in fact run a stale bundle. `--clear` and a full re-bundle is the only trustworthy way to verify a new module on glass.
+
+**US$0.00 — client-only; every device run used `demo=1`.**
+
+---
+
+### 12.40 · S67 — DETECT UP TO THREE, CARTOONIZE ONE: the extra objects were not wanted (2026-10-19)
+
+**The ask, verbatim.** *"After demonstrating it a few times, and gathering feedback. I decided that 3 objects generated max is not representative of the user's intent. The users' feedback says that the extra objects aren't wanted. So I decided that we will only have 1 object cartoonized. This means we should still detect if there is more than one object up to 3 objects but we should apply an analysis that assigns a probability factor to the objects and only cartoonize the one object with the highest probability."*
+
+**What the pipeline actually did.** ① identify returned **≤3 objects**, and **all of them** went into the generator prompt — `stylePrompt` composed `Subject: A; then B; then C.` So one offering photographed on a cluttered desk came back as a low-poly **diagram of the desk**. ⚠️ **And the contradiction was already on the record**: `STYLE_TEMPLATE_V3.output` has always said *"One object only, centred, whole, clean silhouette"*, while the composed prompt named three subjects — noted in S66 as *"the template contradicts itself … Framing is a design decision, not a bug fix."* The template was right; the pipeline was wrong. → **ADR-002 Amendment 3.**
+
+**The analysis — and the deliberate refusal to trust one number.** The probability is **computed by the code**, not read off the model. A VLM's self-reported confidence is uncalibrated and frequently absent (`moondream2` is a VQA model that answers in prose; the spike saw bare arrays), so making it the only signal would mean the decision is made by whichever field the model happened to emit. `rankObjects()` scores each object as a weighted sum of three terms — **only one of which comes from the model**:
+
+| term | weight | source | why |
+|---|---|---|---|
+| `stated` | **0.6** | the model's **optional** `prominence` (0–1) | the only model-supplied term; a hint, never the whole answer |
+| `order` | **0.35** | **position in the answer** | the identify prompt already asks for *"largest and most central first"* — position is a **measurement**, not a guess. Object 0 → 1.0, the last → 1/n |
+| `count` | **0.05** | `count > 1` | a **tie-break**: the narrowest order gap is `0.35 / 3 = 0.117`, so it can never out-rank a better-positioned object |
+
+Weights sum to 1, so a score is already in 0–1; the set is then **normalised into a probability distribution that sums to 1**, and `selectSubject()` takes the **argmax**. When nothing is stated the neutral default **0.5** applies to *every* unstated object — a constant that cannot change the argmax among them, so the ranking falls through to `order`.
+
+⚠️ **THE FIRST WEIGHT SET WAS WRONG, AND A SMOKE TEST FOUND IT — NOT REVIEW.** The first cut was `0.5 / 0.4 / 0.1`, and it looked reasonable. Run against a realistic answer it produced a **DEAD TIE**: two objects, the second explicitly ranked **0.9** by the model, scored **0.650 vs 0.650** against the unstated first — so the model's own ranking was worth *nothing*, and array order decided. The cause is structural: at n=2 the `order` gap is `order_weight × 0.5`, so `order` could out-shift a `stated` swing of the same size. `0.6 / 0.35 / 0.05` fixes it (**0.715 vs 0.650**), and the case is now an assertion. *A weight is a claim; it has to be run, not reasoned.*
+
+**The decision is enforced by the TYPE, not by the doc.** `stylePrompt(subject)` takes **one** object instead of an array — there is no expression that can hand the generator a list, and a caller holding three objects has to choose one. `STYLE_TEMPLATE_V3.output`'s *"One object only"* is now simply true.
+
+⚠️ **One consequence, flagged rather than assumed: a subject's `count` is RECORDED but NO LONGER RENDERED.** The prompt used to read `3 × candle`; with one object that would contradict the clause the whole decision rests on. It stays on the identified object (diagnosis, and the `count` term). *If a multi-instance subject should render as multiple items, that is a one-line change to `stylePrompt`.* ⚠️ **Also decided, not asked:** `prominence` is an **optional, loosely-typed** hint (`z.union([z.number(), z.string()])`, normalised by `prominenceOf()`, which **drops** anything non-finite and **clamps** the rest) — a malformed cosmetic field must never fail the whole answer and buy a **≈US$0.09** re-probe.
+
+**Guards — `check:pathc` 48 → 74, fault-tested 13 times (13 breaks → 13 reds, 0 survivors).** Sixteen assertions are behavioural (the ranking, the distribution, the tie-break invariant, the clamping, the empty set, the strong-vs-weak hint) and **four read `pathc.ts`** and assert the pipeline really calls `selectSubject(objects)` and really passes `stylePrompt(subject)` — **never the array**. ⚠️ The array form is asserted **absent**, because that is exactly the defect being fixed: `stylePrompt(objects)` restored turns **2 RED**. The strongest check is the weight invariant — `count < order / MAX_OBJECTS` — which is what a careless retune breaks. **`tsc` 0 · `npm run check` exit 0.**
+
+**✅ VERIFIED WITH A REAL CALL — one Path C run, ≈US$0.091, and the sprite was LOOKED AT.** ⚠️ The hosted orchestrator could **not** be redeployed from this worktree (no Supabase access token), so the run was driven **through the worktree's own `runPathC`** by a Deno harness against the **real fal API**, on the spike's own multi-object input **`S09.jpg`** (587,913 B, uploaded to fal and byte-verified).
+
+| | |
+|---|---|
+| **detected** | **3** — `Orange [orange, yellow]` · `Lemon [yellow, green]` · `Apple [red, pink]` |
+| **logged** | `subject: "Orange" (0.38) chosen from 3 detected — "Orange" 0.38, "Lemon" 0.33, "Apple" 0.29` |
+| **sprite** | **1408 × 768 RGBA WebP · 49,704 B · 78.5 % fully transparent · 20.0 % opaque · alpha 0 at all four corners** |
+| **looked at** | **ONE low-poly orange with a leaf.** Composited on magenta: clean, no leftover background |
+| **the "before"** | the spike's **already-paid-for** `spike/results/path-C/S09__pathC_v3_t2i.jpg` — **the SAME input**, old pipeline: **three** fruits (green lemon, orange, red apple) spread across a landscape frame |
+| **cost / latency** | **91,000 micros** · **17,894 ms** · **0 retries** |
+
+⚠️ **AND IT FOUND SOMETHING NO OFFLINE TEST COULD: the model returned `prominence: 1` for ALL THREE objects.** The hint **saturated** — so the `stated` term was a constant, it cancelled out, and **`order` decided**. That is precisely the case `PROMINENCE_WEIGHTS` was designed for, and it is now **measured rather than argued**: had the design trusted the model's number alone, this run would have had **nothing** to rank on. *(It also implies the weight the model's hint actually carries is often zero in practice — worth re-deriving if the prompt is ever tuned to produce a spread.)*
+
+⚠️ **NOT verified on glass — and that is a DEPLOY blocker, not a code one.** The hosted orchestrator still runs the **old** code, so a device run *today* would still produce three objects. Redeploying needs the project's own command — `npx supabase functions deploy cartoonize-orchestrator --project-ref yercgevebxvtzkgctfai --use-api` — which needs a Supabase access token **this worktree does not have** (`~/.supabase/access-token` is absent; `supabase login` is interactive). ⚠️ **The connector's deploy was deliberately NOT used as a workaround:** it takes a single file or a pre-built zip, while the orchestrator is **multi-file** (`../_shared/env.ts` · `http.ts` · `pathc.ts` · `pathtemplate.ts`) — a hand-rolled zip is exactly the wasted round-trip this repo's notes warn about. **One command from the owner unblocks the glass run.**
+
+---
+
 ### 12.39 · S66 — the four cosmetics: the controls move to the thumb, the pills halve without losing their targets, and the fire stops being a sticker (2026-10-18)
 
 **The ask, verbatim.** *"zoom controls … positioned right above the camera shutter button not at the top of the window and the 1x 2x 4x buttons are too big"* · *"the hint … is white font with no background, that makes it hard to spot in areas with a light background or areas with bright light … add a background with rounded corners … it must not be touching the bottom or sides of the window, it has to be floating. Do not use full opacity"* · *"the offering size on the ritual page is still too small — make it twice as big as it is now"* · *"the Fire is too dead — add some subtle animation to the fire slightly swaying, slightly growing and shrinking, slow pulsing of brightness."*
