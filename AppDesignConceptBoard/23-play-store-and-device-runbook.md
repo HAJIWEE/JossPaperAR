@@ -211,6 +211,7 @@ npx eas-cli@latest build --profile development --platform android
 - ⚠️ **Why a dev build rather than Expo Go:** the app depends on native modules (`expo-camera`, `expo-sqlite`, `expo-secure-store`, `expo-localization`), and **a project needs a development build as soon as it has native code**. It also lets you reload JS without rebuilding.
 - **Install the result:** the build page offers a **QR code / URL** — ✅ **open it on the phone** to download and install the APK directly. That route also avoids the Xiaomi USB-install gate above.
 - ✅ **Rebuild only when native code changes.** A JS-only change does not need one; adding a library with native code does.
+- ⚠️ **For a DEMO — where the phone must run with no laptop at all — this is not the build you want.** Skip to **§B.3.1**.
 
 ### B.3 The dev loop
 
@@ -225,6 +226,30 @@ npx expo start              # then scan the QR from the dev build
 - ⚠️ **If the phone cannot see the dev server** (guest/corporate Wi-Fi often isolates clients): `npx expo start --tunnel`, or USB with `adb reverse tcp:8081 tcp:8081`.
 - **The dev menu:** shake the phone, or press `Ctrl+D` in the terminal.
 - ✅ `npm run bundle:android` (`expo export --platform android`) is a useful pre-flight — it proves the JS bundles **before** you carry a defect to the device.
+
+### B.3.1 ✅ The standalone demo build — the phone runs with **NO laptop** *(added 2026-10-18)*
+
+⚠️ **§B.2 + §B.3 describe a DEV build driven by `npx expo start`.** That is the right tool for *developing* — ⚠️ **and the wrong tool for a demo**: the phone is tethered to the dev server, so the laptop must be **on**, on the **same Wi-Fi**, with **Metro running**. Close the lid and the app is a blank screen. ✅ **`preview` is the profile that removes the laptop.**
+
+**Why `preview` and not `development`:** `eas.json`'s `preview` sets `distribution: internal` and **does NOT set `developmentClient: true`** — so the artifact is a **standalone app**: the JS bundle is compiled **into** the APK (`assets/index.android.bundle`), there is **no dev-launcher**, and it talks to the **hosted** Supabase over the internet. ✅ **Nothing of ours has to be running** — not Metro, not the local Supabase stack, not the laptop.
+
+```bash
+npx eas-cli build --profile preview --platform android             # cloud · free tier · ⚠️ queues
+npx eas-cli build --profile preview --platform android --local     # ⚠️ NO queue · same keystore · runs here
+adb install -r <the .apk>                                          # or open the build URL on the phone itself
+```
+
+- ⚠️ **THE TRAP THAT MADE THE FIRST `preview` APK USELESS — and the green tick does not show it.** A cloud build is a **git archive**: ⚠️ **`.env` is gitignored, so it never travels**, and `EXPO_PUBLIC_*` is inlined by **Metro at bundle time** (§B.3). With **no EAS environment variables set**, `process.env.EXPO_PUBLIC_SUPABASE_URL` inlines to `undefined`, the client falls back to `''`, and `supabase()` throws *"Supabase is not configured"* (`src/lib/supabase.ts`). ⚠️ **The build still succeeds** — measured on build `bc92bdce` (commit `f9bd675`, finished 2026-10-18): its bundle contains **0** occurrences of `yercgevebxvtzkgctfai`.
+  ✅ **Both variables are now set on EAS** (`eas env:set --name … --environment development|preview|production --visibility plaintext`) and **both build routes load them** — the build log says so verbatim: *"Environment variables … loaded from the 'preview' environment on EAS: EXPO_PUBLIC_SUPABASE_ANON_KEY, EXPO_PUBLIC_SUPABASE_URL."* ⚠️ **If either is ever deleted, every cloud build silently ships an app that cannot reach the backend.**
+- ✅ **The EAS keystore is reused on both routes** — each prints *"Using remote Android credentials"* and *"Using Keystore from configuration: Build Credentials Mskq6Qlqzm (default)"* — so the signer stays the **EAS** one, the fingerprint stays **`4B:D8:B2:…`**, and §B.4's `pm get-app-links` check still applies. ⚠️ **A hand-rolled `./gradlew assembleRelease` would sign with the *debug* keystore and silently break exactly that.**
+- ⚠️ **Verify the artifact; do not trust the green tick.** Two commands — the first is the one that catches the trap above:
+  ```bash
+  unzip -p app.apk assets/index.android.bundle | grep -c 'yercgevebxvtzkgctfai'   # expect ≥1 · ⚠️ 0 = UNCONFIGURED
+  unzip -l app.apk | grep -ci devlauncher                                         # expect 0 · a standalone build has none
+  ```
+- ⚠️ **`--local` is not free of prerequisites** (measured 2026-10-18): it runs **natively, not in Docker** — EAS CLI's build output contains **no** docker references. It needs a **JDK 17** (the system's **JDK 25 will not do** — Temurin 17 was installed under `~/.local/jdk17`), plus **NDK `27.1.12297006`** (RN 0.86.3's `libs.versions.toml`) and **CMake 3.22.1**, because `expo-sqlite` declares `externalNativeBuild { cmake { … } }`. It also **ignores `eas.json`'s `image`/`ndk` fields** and does not cache.
+- ✅ **Use it when the cloud queue is long.** The cloud route's **Free** plan is a *low-priority* queue with **15 Android builds/month**: one measured build sat **2026-10-11 → 2026-10-18** before finishing, so ⚠️ **the queue, not the code, is the thing that can cost you a demo.**
+- ✅ **The handset, measured 2026-10-18** (`adb`, while producing this build): a **POCO `25128PC17G`** on **Android 16 (SDK 36)**, `arm64-v8a`, **3,822,588 kB RAM (≈3.6 GiB)**, **720×1600 @ 320 dpi**. ⚠️ **That is Android 16 — not the "Android 15 / HyperOS 3" §B.0 still records**, and the floor is met either way. ⚠️ §B.1 asks for the version the unit *actually reports*, so **§B.0 is stale**; correcting it needs a human who can confirm this is the Tier-F handset.
 
 ### B.4 What to grant and check on the device
 
