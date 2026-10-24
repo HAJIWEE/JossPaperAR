@@ -64,6 +64,11 @@ import {
   zoomSteppedFraction,
   zoomTrackOffset,
 } from '@/lib/zoom';
+import {
+  assumedCeiling,
+  readMaxZoomCeiling,
+  type MaxZoomCeiling,
+} from '@/lib/zoom-range';
 import { TOUCH_TARGET, brand, fontSize, onColorCream, radius, space, surface, text } from '@/theme/tokens';
 
 type Phase =
@@ -124,6 +129,19 @@ export default function CaptureScreen() {
    * `src/lib/zoom.ts`, and deliberately not restated here.
    */
   const zoomPlatform = zoomPlatformFor(Platform.OS);
+
+  /**
+   * THE CEILING THE LABELS ARE SOLVED AGAINST (SCRUM-132, option C).
+   *
+   * ⚠️ It STARTS as the assumed constant and is replaced by the device's real maximum
+   * once the camera is ready — the read must happen after the session exists, because
+   * on iOS the value belongs to the device's ACTIVE format. Until it arrives — and in
+   * any build without the native module, **Expo Go included** — `source` stays
+   * `'assumed'` and the labels are the old estimate rather than a measurement.
+   * ⚠️ `source` is carried rather than discarded so the two can never be confused:
+   * see `src/lib/zoom-ceiling.ts`.
+   */
+  const [ceiling, setCeiling] = useState<MaxZoomCeiling>(assumedCeiling);
   const [zoomFraction, setZoomFraction] = useState<number>(
     // The default is the UNZOOMED end — exactly what the camera did before any of
     // this existed. Derived from the default preset rather than written as `0`, so
@@ -132,11 +150,11 @@ export default function CaptureScreen() {
   );
   /** The label's value: what the hardware is at, not what we asked for. */
   const zoomRatio = useMemo(
-    () => zoomRatioForFraction(zoomFraction, zoomPlatform),
-    [zoomFraction, zoomPlatform],
+    () => zoomRatioForFraction(zoomFraction, zoomPlatform, ceiling.max),
+    [zoomFraction, zoomPlatform, ceiling.max],
   );
   /** Which preset (if any) the value is sitting on — see `zoomPresetForFraction`. */
-  const zoomPreset = zoomPresetForFraction(zoomFraction, zoomPlatform);
+  const zoomPreset = zoomPresetForFraction(zoomFraction, zoomPlatform, ceiling.max);
   /** The track's own width, from `onLayout`: the slider cannot be pure without it. */
   const [trackWidth, setTrackWidth] = useState(0);
 
@@ -185,9 +203,28 @@ export default function CaptureScreen() {
    * natives' arithmetic, so a pill can never promise a ratio the track cannot hold.
    */
   const applyPreset = useCallback(
-    (stopId: ZoomStopId) => setZoomFraction(zoomFractionForStop(stopId, zoomPlatform)),
-    [zoomPlatform],
+    (stopId: ZoomStopId) => setZoomFraction(
+      zoomFractionForStop(stopId, zoomPlatform, ceiling.max),
+    ),
+    [zoomPlatform, ceiling.max],
   );
+
+  /**
+   * ⚠️ READ THE REAL CEILING ONCE THE CAMERA IS READY — and re-solve the default stop
+   * against it. Order matters twice over: on iOS the value is only meaningful once the
+   * session has committed its format, and the fraction for a stop DEPENDS on the
+   * ceiling (2× is a different fraction against a 4× ceiling than against an 8× one),
+   * so a preset solved before the read would write the wrong fraction for the ratio it
+   * names. ⚠️ The default stop is 1×, whose fraction is `0` on BOTH platforms for any
+   * ceiling — so today this re-solve is a no-op, and it exists so that changing
+   * `DEFAULT_ZOOM_STOP` cannot silently break the screen.
+   */
+  const handleCameraReady = useCallback(() => {
+    void readMaxZoomCeiling().then((resolved) => {
+      setCeiling(resolved);
+      setZoomFraction(zoomFractionForStop(DEFAULT_ZOOM_STOP, zoomPlatform, resolved.max));
+    });
+  }, [zoomPlatform]);
 
   const shoot = useCallback(async () => {
     const camera = cameraRef.current;
@@ -262,11 +299,15 @@ export default function CaptureScreen() {
 
         ⚠️ AND IT IS `FullBleedCamera`, NOT A BARE `CameraView` (SCRUM-135). A bare
         one can measure itself as a SQUARE and stay one — see that component.
+
+        ⚠️ `onCameraReady` IS WHERE THE REAL ZOOM CEILING IS READ (SCRUM-132). It
+        cannot be read earlier: the ceiling is only knowable once the session exists.
       */}
       <FullBleedCamera
         ref={cameraRef}
         facing="back"
         zoom={zoomFraction}
+        onCameraReady={handleCameraReady}
       />
 
       {/*

@@ -129,6 +129,7 @@ import {
   zoomStopForFraction,
   zoomTrackOffset,
 } from '../zoom.ts';
+import { assumedCeiling, ceilingFromReport } from '../zoom-ceiling.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (rel: string): string => readFileSync(join(ROOT, rel), 'utf8');
@@ -1000,6 +1001,104 @@ check('…and the two screens that need a ref still get one',
   cameraSrc.includes('ref?: Ref<CameraView>') && cameraSrc.includes('ref={ref}'));
 check('guard: the source assertions are not vacuous (the files were really read)',
   cameraSrc.length > 1_500 && scanSrc.includes('ClanScanScreen'));
+// ── ⑦ the zoom ceiling — the real maximum, and what happens without it ────────
+/*
+ * SCRUM-132, answered by the owner as option C: "read the real range natively".
+ *
+ * ⚠️ THE FALLBACK IS HALF THE FEATURE, SO IT IS HALF THE GATE. The native module is a
+ * LOCAL module, so it is ABSENT in Expo Go — the build every glass run in this
+ * project's history has used — and it can fail on a real device too. A silent fallback
+ * would reproduce the exact defect the ticket exists to fix: a number that looks
+ * measured and is not. So these assertions pin BOTH halves: that a good report is
+ * taken, and that every bad report degrades to the documented constant and SAYS SO.
+ */
+section('⑦ the zoom ceiling (SCRUM-132 option C — the real maximum, or an honest fallback)');
+
+check('⚠️ a device report above 1 is taken as the real ceiling',
+  ceilingFromReport(8.3).source === 'device' && near(ceilingFromReport(8.3).max, 8.3));
+
+check('⚠️ …and 0 (the native "I could not read it") falls back instead of becoming a ceiling',
+  ceilingFromReport(0).source === 'assumed'
+    && near(ceilingFromReport(0).max, ASSUMED_MAX_ZOOM_RATIO));
+
+check('⚠️ …and a ratio of 1 or less is NOT a ceiling — it would label every stop 1×',
+  ceilingFromReport(1).source === 'assumed' && ceilingFromReport(0.5).source === 'assumed');
+
+check('⚠️ …and every non-number falls back too (undefined · null · NaN · a string)',
+  ceilingFromReport(undefined).source === 'assumed'
+    && ceilingFromReport(null).source === 'assumed'
+    && ceilingFromReport(Number.NaN).source === 'assumed'
+    && ceilingFromReport('8').source === 'assumed');
+
+check('⚠️ …and the fallback IS the documented constant, not a second opinion',
+  near(assumedCeiling().max, ASSUMED_MAX_ZOOM_RATIO) && assumedCeiling().source === 'assumed');
+
+check('⚠️ …and a real ceiling genuinely CHANGES the label (which is the whole point of C)',
+  !near(zoomRatioForFraction(0.5, 'android', 4), zoomRatioForFraction(0.5, 'android', 8)));
+
+const zoomCeilingSrc = read('src/lib/zoom-ceiling.ts');
+const zoomRangeSrc = read('src/lib/zoom-range.ts');
+const zoomRangeModuleSrc = read('modules/zoom-range/src/ZoomRangeModule.ts');
+const zoomRangeConfig = read('modules/zoom-range/expo-module.config.json');
+const zoomRangeKt = read(
+  'modules/zoom-range/android/src/main/java/expo/modules/zoomrange/ZoomRangeModule.kt',
+);
+const zoomRangeSwift = read('modules/zoom-range/ios/ZoomRangeModule.swift');
+
+check('⚠️ the policy file stays FREE OF `expo` — that is what lets this gate run it at all',
+  !/from 'expo'/.test(zoomCeilingSrc) && !/requireNativeModule/.test(zoomCeilingSrc));
+
+check('⚠️ the screen threads the ceiling into EVERY derivation (no implicit default left)',
+  captureSrc.includes('zoomRatioForFraction(zoomFraction, zoomPlatform, ceiling.max)')
+    && captureSrc.includes('zoomPresetForFraction(zoomFraction, zoomPlatform, ceiling.max)')
+    && captureSrc.includes('zoomFractionForStop(stopId, zoomPlatform, ceiling.max)'));
+
+check('⚠️ …and it READS the ceiling rather than writing the constant',
+  captureSrc.includes('readMaxZoomCeiling()')
+    && captureSrc.includes('useState<MaxZoomCeiling>(assumedCeiling)'));
+
+check("⚠️ …and the read is on CAMERA READY — iOS reads the LIVE session's active format",
+  captureSrc.includes('onCameraReady={handleCameraReady}'));
+
+check('⚠️ the native module is OPTIONAL — `requireNativeModule` would crash Expo Go on launch',
+  zoomRangeModuleSrc.includes('requireOptionalNativeModule')
+    && !/requireNativeModule</.test(zoomRangeModuleSrc));
+
+check('⚠️ …and a MISSING module is tolerated, not dereferenced',
+  zoomRangeSrc.includes('ZoomRange?.maxZoomRatio'));
+
+check('⚠️ …and a THROW from the native side is caught, never propagated to the screen',
+  // ⚠️ `[^}]*` rather than a character window: it proves the fallback sits inside the
+  // SAME catch block, and unlike a length bound it does not break when a diagnostic
+  // line is added to that block.
+  /catch\s*\([^)]*\)\s*\{[^}]*assumedCeiling\(\)/.test(zoomRangeSrc));
+
+check('…and the module declares BOTH platforms',
+  zoomRangeConfig.includes('"apple"') && zoomRangeConfig.includes('"android"'));
+
+check('⚠️ Android reads the SAME characteristic CameraX derives maxZoomRatio from',
+  zoomRangeKt.includes('CONTROL_ZOOM_RATIO_RANGE')
+    && zoomRangeKt.includes('LENS_FACING_BACK'));
+
+check('⚠️ iOS reads the ACTIVE format — the one the live session committed',
+  zoomRangeSwift.includes('activeFormat.videoMaxZoomFactor'));
+
+/*
+ * ⚠️ FOUND ON GLASS, NOT HERE — AND THIS IS THE CHECK THAT WOULD HAVE CAUGHT IT.
+ * The Android module declared `AsyncFunction("maxZoomRatio")` with NO parameter while
+ * iOS declared `(position: String?)`. The JS calls it with `'back'`, so Android answered
+ * `Received 1 arguments, but 0 was expected` — at RUNTIME, on a device, past every gate
+ * this project has. A cross-language signature is exactly the kind of thing `tsc` is
+ * blind to and a source assertion is not.
+ */
+check('⚠️ …and BOTH native modules take the SAME argument (a mismatch fails only at runtime)',
+  /AsyncFunction\("maxZoomRatio"\)\s*\{\s*position: String\?/.test(zoomRangeKt)
+    && /AsyncFunction\("maxZoomRatio"\)\s*\{\s*\(position: String\?\)/.test(zoomRangeSwift));
+
+check('guard: …and those native assertions are not vacuous (the files were really read)',
+  zoomRangeKt.length > 800 && zoomRangeSwift.length > 800 && zoomRangeConfig.length > 50);
+
+
 
 // ── summary ──────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(64)}`);
