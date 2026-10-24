@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android", "web"],
+  "apple": {
+    "modules": ["ZoomRangeModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.zoomrange.ZoomRangeModule"]
+  }
+}
