@@ -32,7 +32,13 @@ class ZoomRangeModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("ZoomRange")
 
-    AsyncFunction("maxZoomRatio") {
+    AsyncFunction("maxZoomRatio") { position: String? ->
+      val wantedFacing = if (position == "front") {
+        CameraCharacteristics.LENS_FACING_FRONT
+      } else {
+        CameraCharacteristics.LENS_FACING_BACK
+      }
+
       val context: Context = appContext.reactContext ?: return@AsyncFunction 0.0
       val manager = context.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
         ?: return@AsyncFunction 0.0
@@ -45,9 +51,7 @@ class ZoomRangeModule : Module() {
           continue
         }
 
-        if (characteristics.get(CameraCharacteristics.LENS_FACING)
-          != CameraCharacteristics.LENS_FACING_BACK
-        ) {
+        if (characteristics.get(CameraCharacteristics.LENS_FACING) != wantedFacing) {
           continue
         }
 

@@ -1065,6 +1065,18 @@ check('⚠️ Android reads the SAME characteristic CameraX derives maxZoomRatio
 check('⚠️ iOS reads the ACTIVE format — the one the live session committed',
   zoomRangeSwift.includes('activeFormat.videoMaxZoomFactor'));
 
+/*
+ * ⚠️ FOUND ON GLASS, NOT HERE — AND THIS IS THE CHECK THAT WOULD HAVE CAUGHT IT.
+ * The Android module declared `AsyncFunction("maxZoomRatio")` with NO parameter while
+ * iOS declared `(position: String?)`. The JS calls it with `'back'`, so Android answered
+ * `Received 1 arguments, but 0 was expected` — at RUNTIME, on a device, past every gate
+ * this project has. A cross-language signature is exactly the kind of thing `tsc` is
+ * blind to and a source assertion is not.
+ */
+check('⚠️ …and BOTH native modules take the SAME argument (a mismatch fails only at runtime)',
+  /AsyncFunction\("maxZoomRatio"\)\s*\{\s*position: String\?/.test(zoomRangeKt)
+    && /AsyncFunction\("maxZoomRatio"\)\s*\{\s*\(position: String\?\)/.test(zoomRangeSwift));
+
 check('guard: …and those native assertions are not vacuous (the files were really read)',
   zoomRangeKt.length > 800 && zoomRangeSwift.length > 800 && zoomRangeConfig.length > 50);
 
