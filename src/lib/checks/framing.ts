@@ -688,6 +688,24 @@ check('the shutter screen hops to /crop, with the id and the size',
 check('⚠️ …and no longer pushes the whole frame straight at /preparing',
   !captureSrc.includes("pathname: '/preparing'"));
 
+/*
+ * ⚠️ THE CLAN SCREEN'S HALF OF SCRUM-123. The card's geometry is asserted in
+ * `check:lib` §17, where the pure spec lives; what cannot be asserted there is the
+ * WIRING — that the screen reaches for the shared card at all. This section is the
+ * project's home for screen-source assertions, which is why it is here and not in the
+ * pure gate.
+ */
+const manageSrc = read('src/app/clan/manage.tsx');
+
+check('⚠️ the clan screen confirms through the SHARED card, not a native Alert (SCRUM-123)',
+  manageSrc.includes('<ConfirmCard') && !/Alert\.alert\(/.test(manageSrc));
+
+check('⚠️ …and mounts it ONCE — one confirm surface, not one dialog per action',
+  (manageSrc.match(/<ConfirmCard/g) ?? []).length === 1);
+
+check('⚠️ …and all THREE destructive clan actions route through that one slot',
+  (manageSrc.match(/setPending\(\{/g) ?? []).length === 3);
+
 check('⚠️ the crop screen loads the photo through the FORM-AGNOSTIC loader re-encode',
   cropSrc.includes('nativeLoaderUriFromAnyForm(uri)'));
 check('…and uses that SAME uri for the picture, the manipulator and the mask',

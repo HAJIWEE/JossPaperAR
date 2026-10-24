@@ -12,6 +12,13 @@
  */
 
 import { isValidClanName } from '../clan-rules.ts';
+import {
+  CONFIRM_SPEC,
+  CONFIRM_TEXT_PAIRS,
+  SCRIM,
+  contrastRatio,
+  scrimRgba,
+} from '../confirm-card.ts';
 import { type UuidFactory, isValidIdempotencyKey, newIdempotencyKey } from '../idempotency.ts';
 import {
   CODE_ALPHABET,
@@ -1176,6 +1183,68 @@ async function main(): Promise<void> {
   await storageChecks();
   await drainChecks();
   serviceChecks();
+  section('17 · The designed confirm dialog — the boards\' geometry (SCRUM-123 · option A)');
+
+  /*
+   * ⚠️ MEASURED FROM THE BOARDS, SO IT IS ASSERTED HERE. `EN · 9b Buy offerings ·
+   * confirm` was read shape by shape through the Penpot plugin; these checks hold those
+   * numbers still, the same way §14 holds the Home pill's signed-off geometry.
+   *
+   * ⚠️ AND THE TWO BOARD-SOURCED COLOURS ARE CHECKED BY ARITHMETIC, NOT BY SNAPSHOT.
+   * `dialog · title`'s `#2b2420` and `dialog · body`'s `#5a5048` are NOT tokens, so
+   * `penpot-pairs.json` cannot cover them — it is a snapshot of what the sweep saw, and
+   * the sweep has no entry for either. Computing the ratio here is the only coverage
+   * they can have.
+   */
+
+  check('⚠️ the card is the boards\' fill and radius, not a guess',
+    CONFIRM_SPEC.card.fill === '#f5f0e8' && CONFIRM_SPEC.card.radius === 16);
+
+  check('⚠️ …and the boards\' paddings — 16 h · 24 top · 20 BOTTOM',
+    CONFIRM_SPEC.card.padH === 16
+      && CONFIRM_SPEC.card.padTop === 24
+      && CONFIRM_SPEC.card.padBottom === 20);
+
+  check('⚠️ …and the 20 px bottom padding is the SCRUM-104 fix — the cancel sits ON the card',
+    CONFIRM_SPEC.card.padBottom >= 20 && CONFIRM_SPEC.gutter === 20);
+
+  check('…the primary button is the board\'s 56 tall, r18, cinnabar',
+    CONFIRM_SPEC.primary.height === 56
+      && CONFIRM_SPEC.primary.radius === 18
+      && CONFIRM_SPEC.primary.fill === '#c23b22');
+
+  check('⚠️ …and the cancel keeps a 44 dp TOUCH target though its label is 20',
+    CONFIRM_SPEC.cancel.touchHeight === 44 && CONFIRM_SPEC.cancel.labelSize === 13);
+
+  check('the scrim is the board\'s colour at 50 % — the #88837d the record names',
+    SCRIM.color === '#1a1512' && SCRIM.opacity === 0.5
+      && scrimRgba() === 'rgba(26, 21, 18, 0.5)');
+
+  check('⚠️ every text pair clears 4.5:1',
+    CONFIRM_TEXT_PAIRS.every((pair) => contrastRatio(pair.fg, pair.bg) >= pair.min),
+    CONFIRM_TEXT_PAIRS.map((p) => `${p.name}=${contrastRatio(p.fg, p.bg).toFixed(2)}`).join(' · '));
+
+  /*
+   * ⚠️ THE INVARIANT IS "AN OPAQUE SURFACE, NEVER THE SCRIM" — not "always the card".
+   * The primary label sits on the cinnabar BUTTON, which is opaque and correct; the
+   * failure `SCRUM-104` shipped was a label on the translucent SCRIM. Asserting the
+   * card specifically would have been a check that fails on a correct design.
+   */
+  const CONFIRM_OPAQUE = [CONFIRM_SPEC.card.fill, CONFIRM_SPEC.primary.fill];
+  check('⚠️ …and every pair sits on an OPAQUE surface — never the scrim (the SCRUM-104 defect)',
+    CONFIRM_TEXT_PAIRS.every((pair) => CONFIRM_OPAQUE.includes(pair.bg)));
+
+  /*
+   * ⚠️ A CHECK THAT CANNOT FAIL IS NOT A CHECK. This reproduces the SCRUM-104 defect —
+   * the cancel label composited onto the scrim — and asserts it WOULD go red. Without
+   * it, the two assertions above could pass on a contrast function that always returned
+   * a large number.
+   */
+  check('guard: …and that contrast check can FAIL (the SCRUM-104 defect, reproduced)',
+    contrastRatio('#4a463f', '#88837d') < 4.5,
+    `#4a463f on the scrim = ${contrastRatio('#4a463f', '#88837d').toFixed(2)}`);
+
+
   clanPillChecks();
   zhScriptChecks();
   screenCopyChecks();
