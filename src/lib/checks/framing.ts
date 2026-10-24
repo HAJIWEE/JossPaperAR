@@ -1050,7 +1050,10 @@ check('⚠️ …and a MISSING module is tolerated, not dereferenced',
   zoomRangeSrc.includes('ZoomRange?.maxZoomRatio'));
 
 check('⚠️ …and a THROW from the native side is caught, never propagated to the screen',
-  /catch\s*\{[\s\S]{0,160}assumedCeiling\(\)/.test(zoomRangeSrc));
+  // ⚠️ `[^}]*` rather than a character window: it proves the fallback sits inside the
+  // SAME catch block, and unlike a length bound it does not break when a diagnostic
+  // line is added to that block.
+  /catch\s*\([^)]*\)\s*\{[^}]*assumedCeiling\(\)/.test(zoomRangeSrc));
 
 check('…and the module declares BOTH platforms',
   zoomRangeConfig.includes('"apple"') && zoomRangeConfig.includes('"android"'));

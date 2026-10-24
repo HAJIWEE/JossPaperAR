@@ -42,8 +42,18 @@ export type { MaxZoomCeiling, MaxZoomSource } from './zoom-ceiling';
 export async function readMaxZoomCeiling(): Promise<MaxZoomCeiling> {
   try {
     const reported = await ZoomRange?.maxZoomRatio('back');
-    return ceilingFromReport(reported);
-  } catch {
+    const ceiling = ceilingFromReport(reported);
+    /*
+     * The project's diagnostic convention (`prepare_offline:` · `sprite_sign_failed:`)
+     * — a stable prefix and the facts, so a run can be explained from the log alone.
+     * ⚠️ `source` is the part that matters: it is the difference between a label that
+     * was measured and one that was estimated, and the screen shows the same numeral
+     * either way.
+     */
+    console.warn(`zoom_ceiling: ${ceiling.source} max=${ceiling.max} (native said ${String(reported)})`);
+    return ceiling;
+  } catch (error) {
+    console.warn('zoom_ceiling_failed:', (error as Error)?.message ?? 'no detail');
     return assumedCeiling();
   }
 }
