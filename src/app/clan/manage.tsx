@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import { router } from 'expo-router';
 
 import {
@@ -14,6 +14,7 @@ import {
   Screen,
   SectionTitle,
 } from '@/components/clan-ui';
+import { ConfirmCard } from '@/components/confirm-card';
 import { InviteCard } from '@/components/invite-qr';
 import {
   type ClanMember,
@@ -42,6 +43,21 @@ import { supabase } from '@/lib/supabase';
 import { text } from '@/theme/tokens';
 
 /**
+ * One confirmation waiting on the player (SCRUM-123, option A).
+ *
+ * ⚠️ `run` is a THUNK, not an action id: the card is presentational and must not know
+ * what it is confirming. The screen decides, and the card only collects the answer —
+ * which is what lets the same component carry the clan actions today and the reward and
+ * store confirms when their copy lands.
+ */
+interface PendingConfirm {
+  readonly title: string;
+  readonly body: string;
+  readonly confirmLabel: string;
+  readonly run: () => void;
+}
+
+/**
  * MANAGE — the clan card, the roster and the role ladder (doc 15 §3 · §5.3).
  *
  * ⚠️ The buttons are not decided here. `actionsFor(role)` returns the list and
@@ -68,6 +84,16 @@ export default function ClanManageScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   /** SCRUM-50 — the invite capability, fetched explicitly and never from a list read. */
   const [inviteCode, setInviteCode] = useState<string | null>(null);
+
+  /**
+   * THE CONFIRM (SCRUM-123, option A) — the ONE pending confirmation, if any.
+   *
+   * ⚠️ A single piece of state, not one flag per action. Two confirmations can never be
+   * open at once, and a per-action flag cannot express that: it makes "two open" a
+   * representable state that the UI simply happens not to reach. One slot makes it
+   * unrepresentable, which is the version a gate can rely on.
+   */
+  const [pending, setPending] = useState<PendingConfirm | null>(null);
 
   const clan: ClanSummary | null = clans[index] ?? null;
 
@@ -127,20 +153,18 @@ export default function ClanManageScreen() {
   const onRemove = useCallback(
     (userId: string, label: string) => {
       if (!clan) return;
-      Alert.alert(t('clan.removeMember'), t('clan.removeConfirm', { name: label }), [
-        { text: t('clan.back'), style: 'cancel' },
-        {
-          text: t('clan.removeMember'),
-          style: 'destructive',
-          onPress: () => {
-            void (async () => {
-              const result = await removeMember(clan.clanId, userId);
-              if (!result.ok) setProblem(result.reason);
-              else await reloadRoster(clan.clanId);
-            })();
-          },
+      setPending({
+        title: t('clan.removeMember'),
+        body: t('clan.removeConfirm', { name: label }),
+        confirmLabel: t('clan.removeMember'),
+        run: () => {
+          void (async () => {
+            const result = await removeMember(clan.clanId, userId);
+            if (!result.ok) setProblem(result.reason);
+            else await reloadRoster(clan.clanId);
+          })();
         },
-      ]);
+      });
     },
     [clan, reloadRoster],
   );
@@ -198,10 +222,12 @@ export default function ClanManageScreen() {
 
     // not the sole head-power holder: nothing to inherit, just go
     if (leavePlan.action === 'leave') {
-      Alert.alert(t('clan.leave'), t('clan.leaveConfirm'), [
-        { text: t('clan.back'), style: 'cancel' },
-        { text: t('clan.leave'), style: 'destructive', onPress: () => void leaveNow(null) },
-      ]);
+      setPending({
+        title: t('clan.leave'),
+        body: t('clan.leaveConfirm'),
+        confirmLabel: t('clan.leave'),
+        run: () => void leaveNow(null),
+      });
       return;
     }
 
@@ -212,23 +238,21 @@ export default function ClanManageScreen() {
 
   const onDelete = useCallback(() => {
     if (!clan) return;
-    Alert.alert(t('clan.deleteClan'), t('clan.deleteConfirm'), [
-      { text: t('clan.back'), style: 'cancel' },
-      {
-        text: t('clan.deleteClan'),
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            const result = await deleteClan(clan.clanId);
-            if (!result.ok) {
-              setProblem(result.reason);
-              return;
-            }
-            router.replace('/');
-          })();
-        },
+    setPending({
+      title: t('clan.deleteClan'),
+      body: t('clan.deleteConfirm'),
+      confirmLabel: t('clan.deleteClan'),
+      run: () => {
+        void (async () => {
+          const result = await deleteClan(clan.clanId);
+          if (!result.ok) {
+            setProblem(result.reason);
+            return;
+          }
+          router.replace('/');
+        })();
       },
-    ]);
+    });
   }, [clan]);
 
   /**
@@ -434,6 +458,30 @@ export default function ClanManageScreen() {
       {problem ? <Text style={styles.problem}>{problem}</Text> : null}
       <Label>{busy ? '…' : ''}</Label>
       <GhostButton label={t('common.done')} onPress={() => router.replace('/')} />
+
+      {/*
+        ⚠️ THE CONFIRM IS MOUNTED ONCE, AT THE SCREEN'S EDGE (SCRUM-123, option A).
+        It replaced three separate `Alert.alert` calls, and the card is the same surface
+        every time — so there is one mount point rather than one per action, and a
+        fourth confirm cannot arrive with a differently-shaped dialog.
+
+        ⚠️ `onConfirm` CLOSES FIRST, THEN RUNS. The work behind each confirm is an async
+        clan RPC; a card left on screen through it reads as a hang. The thunk is read
+        into a local before the state clears, so it still holds its own `clan`.
+      */}
+      <ConfirmCard
+        visible={pending !== null}
+        title={pending?.title ?? ''}
+        body={pending?.body ?? ''}
+        confirmLabel={pending?.confirmLabel ?? ''}
+        cancelLabel={t('clan.back')}
+        onConfirm={() => {
+          const run = pending?.run;
+          setPending(null);
+          run?.();
+        }}
+        onCancel={() => setPending(null)}
+      />
     </Screen>
   );
 }
