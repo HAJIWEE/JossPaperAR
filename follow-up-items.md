@@ -7,6 +7,13 @@
 ## 🎯 Immediate Actions (Next 1–2 Weeks)
 
 ### 🔴 On the critical path
+- 🎯 **S67+6 (2026-10-25) — `SCRUM-107` ANSWERED: THE AD-SDK READ IS DONE, AND IT FOUND A THIRD BLOCKER ON `SCRUM-123` THAT WAS UNTRACKED. ⚠️ US$0.00 — web research only.**
+  - ⚠️ **Neither read said what the ticket expected.** **Unity LevelPlay** has the widest publisher controls, but its rules engine **only notifies** (it does not block) and its Ad Review is **impression-gated**. **Meta Audience Network** has **no publisher controls at all** — ⚠️ the earlier 404 was a **URL move** — so **FAN is a demand source, not an SDK candidate**.
+  - ⚠️ **The deciding factor was not in the ticket's questions:** this app is **Expo/CNG with no native project folders and a rule against hand-editing them**, and **only AdMob ships a config plugin**. ⚠️ **And wiring ads needs a development build — Expo Go cannot run the library.**
+  - ⚠️ **Two dated corrections:** AdMob **removed `Consumer Loans` on 2026-10-23** (so `loans` has no category anywhere — doc 21 §8 item 4 RESOLVED), and **consent no longer separates the candidates** (LevelPlay consumes **Google UMP** too).
+  - ⚠️⚠️ **THE UNTRACKED BLOCKER:** the reward confirm pays **+1 photo for watching an ad**, and that payout has **no server-side path** — deferred to beta citing **`SCRUM-18`, which is `Done`**. ✅ **Filed `SCRUM-141`** (split out, not cut) — the ad credit **must** be a `grant`, never an `award`, or `check:domain`'s invariant goes red.
+  - 📌 **Filed `SCRUM-140`** — 🎯 **Decide: the ad SDK** (recommending **AdMob**, in the sprint). **`SCRUM-107` → `Done`**; **`SCRUM-123` stays `In Review`** with **three** dependencies left, not one string.
+
 - 🎯 **S67+5 (2026-10-25) — `SCRUM-137` IS ANSWERED (OPTION B): THE CONFIRM COPY IS DRAFTED, AND THE COPY WAS NEVER THE ONLY BLOCKER. ⚠️ US$0.00 — no AI call, no device run.**
   - ✅ **The owner chose option B** — a proposed draft the owner edits — so the deliverable is **copy, not code**. The draft is on **`SCRUM-137`**; it was **read off the Penpot boards** (`5b Reward / one more offering` · `9b Buy offerings · confirm`), not invented, and the reward **title** is additionally verbatim in `doc 10`'s UX-copy table.
   - ⚠️ **One slot needs the owner: the store confirm's BODY is a wire annotation** (*"IAP sheet = placeholder in this wire."* / *"（示意：内购表单占位。）"*). The draft proposes the shipping form without it and marks it as a proposal.

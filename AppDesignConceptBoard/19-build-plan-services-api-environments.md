@@ -1312,6 +1312,32 @@ So a first measure pass whose height spec is not EXACT **latches the PreviewView
 
 ---
 
+### 12.42 · S67+6 — SCRUM-107 answered: the SDK read was done, and the answer was not the one the ticket expected (2026-10-25)
+
+**The ask.** `SCRUM-123` was blocked on the ad SDK, which was blocked on `SCRUM-107` — *"read the Unity/LevelPlay + Meta Audience Network publisher ad controls **before any SDK selection**"*. Both halves had been open since **2026-10-05**, when the doc pages **404'd** and the session recorded them *"unverified rather than guessed"*.
+
+**⚠️ Both were read, and neither said what the ticket expected.**
+
+- **Unity (LevelPlay / Unity Ads)** — the **widest** publisher controls of the three (Advertiser Blocking · Category Filters · Age Settings · Ad Review · the **Ad Quality rules engine**, triggered on Title/Developer/package/website/store-content-rating, per app and per country). ⚠️ **But the rule engine only NOTIFIES** — *"you'll be notified by email (once daily)"* — **it does not block**; Ad Review is **impression-gated** (*"not yet eligible for review"*); and Age designation **does not** auto-set the age limits. Unity also ships *"Unblocking Insights"*, which prices the revenue you **lose** by blocking.
+- **Meta Audience Network** — ⚠️ **there is nothing to read.** Its publisher docs cover **app bidding only** — **no category blocking of any kind**. ⚠️ **And the 404 was a URL MOVE**, not an absence: the docs relocated to `developers.facebook.com/documentation/audience-network/…`. **So FAN is a demand source, not an SDK candidate** — a scope correction, not a gap.
+
+**⚠️ Two findings beyond the ticket, both dated:**
+
+1. **AdMob removed three sensitive categories on 2026-10-23** — `Consumer Loans`, `Downloadable Utilities`, `Astrology & Esoteric` — *two days* before this was written. So the `loans` class has **no category on any network**; our own list is the only control. (doc 21 §8 item 4 → **RESOLVED**.)
+2. **Consent no longer separates the candidates** — LevelPlay consumes **Google UMP** too, so doc 21 §4.4's tie-breaker (*"…which points at AdMob"*) is **void**, and was corrected in place.
+
+**⚠️⚠️ AND THE DECIDING FACTOR WAS NOT IN THE TICKET'S QUESTION LIST.** The app is **Expo SDK 57 / RN 0.86.3** with **no `ios/`/`android/` directories** — native behaviour goes through **config plugins**, and the project **forbids hand-editing generated native projects**. Measured against that rule: **AdMob ships a config plugin** (the library calls it *the recommended install for Expo*), while **LevelPlay and AppLovin MAX document no Expo path at all** — which here means **a config plugin we write and then maintain**. ⚠️ AdMob's own prerequisites bind us, and they are **met**: RN ≥ 0.86.0 (we are on **0.86.3**), New Architecture (no Legacy path remains on RN 0.86), iOS ≥ 15.1, minSdk 24. ⚠️ **Expo Go cannot run it — wiring ads needs a development build.**
+
+**No code and no gate, on purpose.** These are **vendor facts**, and doc 21 §8 item 2 already records that a vendor's category list must not be hard-coded because it is per-country and mutable — a rule this session proved by catching a removal **two days old**. `check:ads` stays **policy, not a runtime filter**.
+
+**⚠️⚠️ AND THE RESEARCH FOUND A THIRD BLOCKER ON `SCRUM-123` THAT NOBODY HAD TRACKED.** The reward confirm promises **+1 photo for watching an ad**, and **that payout has no server-side path**: there is no client purchase/grant path at all, no `sign_in_grants` table, and `cartoonize_jobs.funding_source` is a planned column — all deferred to beta, with doc 10 citing **`SCRUM-18`**, which is **`Done`**. So the deferral pointed at a **closed** ticket and the blocker was **untracked**. Filed as **`SCRUM-141`** (split out, not cut) — the schema is already ready (`ledger_type` and `acquired_via` both carry `'grant'`), and the invariant is named: the ad credit **must** be a `grant`, never an `award`.
+
+**Filed:** **`SCRUM-140`** (🎯 Decide — the ad SDK, recommending AdMob, **in the sprint**) · **`SCRUM-141`** (the grant path, **backlog**, ⏸ gated on 140). **`SCRUM-107` → `Done`.** **`SCRUM-123` stays `In Review`** — its remainder is now **three dependencies**, not one string.
+
+**US$0.00 — no AI call, no device run; web research and Penpot reads only.**
+
+---
+
 ### 12.41 · S67+5 — SCRUM-137 answered (option B): the confirm copy drafted from the boards, and the copy was never the only blocker (2026-10-25)
 
 **The ask.** `SCRUM-123` (option A, the designed modal card) was **half built** — the card and the three migrated clan dialogs shipped in PR #69 — and its remainder is **copy, not code**: two of the six designed confirm dialogs have **no string in either locale**. `SCRUM-137` asked the owner for the signed-off bilingual strings; the owner answered **option B** — *"a proposed draft is written and the owner edits it. Faster, and the draft is a starting point rather than a commitment."*
