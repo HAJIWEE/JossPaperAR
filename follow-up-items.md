@@ -11,7 +11,7 @@
   - ✅ **The defect**: the window line rendered **twice** under an **unconditional** section title. ⚠️ **The cause was an ABSENCE** — no empty-state key existed.
   - ✅ **The fix**: `book_empty`, and the section title only with entries. ⚠️ **The rule is now PURE** (`bookView` in `clan-roles.ts`), so both defects are asserted (+7 checks, fault-tested).
   - ⚠️ **AC 3 unmet from the table**: **doc 15 §8 has no empty-state row** → the key ships as a **PROPOSAL**, **`SCRUM-144`** is the **🎯 Decide** ticket, and **`SCRUM-122` stays `In Review`**.
-  - ⏳ **On glass**: EAS `preview` build `13007fa6` → `HN615L005386`.
+  - ✅ **ON GLASS** (APK from `be43d0e`, `adb install -r` → Success, `HN615L005386`): **127 VERIFIED** — `/preparing` shows the new title + body and ⚠️ **neither old string appears**; **122 PARTIAL** — the **list** path renders with the window note **once** and the title **above** its entries, but ⚠️ **the empty state was not seen** (it needs a clan with no offerings; creating a test clan in the hosted DB is residue and was not done).
 
 - 🐞 **S67+10 (2026-10-25) — `SCRUM-127` ANSWERED (OPTION B): the `/preparing` copy is per-phase and the collision is an assertion (`check:slice` 36 → 44). ⚠️ US$0.00.**
   - ✅ **The defect**: one screen showed **three contradictory claims at once** because `spent` and `offline` **shared one body key**.
