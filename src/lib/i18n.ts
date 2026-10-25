@@ -34,6 +34,14 @@ export const MESSAGES = {
     'ritual_preparing': 'The offering is being prepared…',
     'ritual_busy': 'The shrine is receiving many offerings — yours will be prepared shortly.',
     'ritual.cannotPrepare': 'This offering cannot be prepared.',
+    // ── SCRUM-127 — the `/preparing` screen's copy, per phase (option B) ───────
+    // ⚠️ DRAFTED, awaiting the owner's edit. The two failure phases used to share
+    // `ritual.cannotPrepare`, so a photo that never left the phone was told its offering
+    // "cannot be prepared"; and the title was permanently "being prepared…". The mapping
+    // that pairs these keys with a phase is `PREPARING_COPY` in `domain/slice.ts`.
+    'ritual.spentBody': 'This photo cannot be used for an offering — a new one is the only way on.',
+    'ritual.offlineTitle': 'The offering could not reach the shrine.',
+    'ritual.offlineBody': 'Nothing has been used — your offering is safe.',
     'ritual.offeringPrepared': 'Your offering is ready.',
     'ritual.refundReturned': 'The offering could not be prepared — your points have returned.',
     // ⚠️ Two DIFFERENT retries, deliberately. `common.retry` is for a request
@@ -284,6 +292,11 @@ export const MESSAGES = {
     'ritual_preparing': '供品制作中…',
     'ritual_busy': '神龛正繁忙，您的供品稍后即成。',
     'ritual.cannotPrepare': '此供品无法制作。',
+    // ── SCRUM-127 — the `/preparing` screen's copy, per phase (option B) ───────
+    // ⚠️ DRAFTED, awaiting the owner's edit. 词汇沿用既有文案（制作 · 神龛 · 安然无恙）。
+    'ritual.spentBody': '这张照片无法制作供品——只能重新拍摄。',
+    'ritual.offlineTitle': '供品未能送达神龛。',
+    'ritual.offlineBody': '未消耗任何内容——供品安然无恙。',
     'ritual.offeringPrepared': '您的供品已备好。',
     'ritual.refundReturned': '供品未能制成，点数已退回。',
     'common.retry': '再试一次',

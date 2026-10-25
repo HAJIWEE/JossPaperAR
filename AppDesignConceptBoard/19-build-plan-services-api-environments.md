@@ -1312,6 +1312,40 @@ So a first measure pass whose height spec is not EXACT **latches the PreviewView
 
 ---
 
+### 12.45 · S67+10 — SCRUM-127 answered (option B): the `/preparing` copy is per-phase, and the collision is an assertion (2026-10-25)
+
+**The defect, seen on glass.** `/preparing` showed **three contradictory claims at once** — *"The offering is being prepared…"* (a **permanent** title), *"This offering cannot be prepared."*, and a *"Check again"* button. ⚠️ The cause was a **copy collision**: `spent` and `offline` **shared one body key**, so a photo that had never left the phone was told its offering *"cannot be prepared"* — **three different claims about one state, on one screen.**
+
+**Option B, implemented** — a new retriable body key **and** a **phase-aware title**:
+
+| phase | title | body | button |
+|---|---|---|---|
+| `working` | `ritual_preparing` | — | — |
+| `parked` | `ritual_preparing` | `ritual_busy` | `common.retry` |
+| `spent` | `ritual.cannotPrepare` | **NEW** `ritual.spentBody` | `common.recapture` |
+| `offline` | **NEW** `ritual.offlineTitle` | **NEW** `ritual.offlineBody` | `common.retry` |
+
+⚠️ **`working` and `parked` legitimately share the title** — in both, the offering *is* being prepared. **Only the failure phases had to stop saying so.**
+
+**⚠️ THE STRUCTURAL HALF, which is the part worth keeping.** The three contradictions were a fact about the **mapping**, not the render — so the mapping is now **data**: `PREPARING_COPY` in `src/domain/slice.ts`, a pure table (`titleKey · bodyKey · buttonKey · action`) the screen reads. ⚠️ **The ACTION is in the table too**, so the copy and what the button does cannot disagree — *offering a retry on a spent capture is the lie this screen exists to avoid.*
+
+**The gate — `check:slice` §4, 8 new assertions** (`check:slice` **36 → 44**):
+
+- ⚠️ **no two phases share a BODY key** — *the defect itself, as an assertion*;
+- ⚠️ **the failure phases never claim the offering is being prepared** — **option B, asserted**;
+- `working` renders a spinner only · the copy and the ACTION agree · a retriable phase offers a retry, never a recapture;
+- plus a **positive control** (a collision *is* detectable) and the control that `parked` **legitimately** claims the preparing title.
+
+**⚠️ AND THE FAULT TEST CAUGHT ME FIRST.** My first injection made the bodies **distinct** — and the check correctly stayed **green**, because **that is not the defect**. Injecting the real one (**both** phases on `ritual.cannotPrepare`) turned it **RED**: `✗ no two phases share a BODY key — 3 bodies, 2 distinct`. ⚠️ **A fault test that does not reproduce the fault proves nothing**, and this is the second time in two sessions that the *test* was the thing that was wrong.
+
+**Verification:** `npx tsc --noEmit` **0** · `npm run check` **EXIT 0** · `check:lib` **397 → 409** (the six keys × existence + no-Latin-in-中文) · `check:copy` **15**.
+
+⚠️ **`In Review`, not `Done`** — the fix and the gate are complete; **three of the strings are a DRAFT awaiting the owner's wording** (marked as such in `i18n.ts`, and the 中文 reuses the table's existing vocabulary — 制作 · 神龛 · 安然无恙).
+
+**US$0.00 — no AI call, no device run.**
+
+---
+
 ### 12.44 · S67+9 — SCRUM-121: the join preview leaked raw placeholders, and the gate that should have caught it (2026-10-25)
 
 **The defect, seen on glass.** `src/components/clan-join.tsx:129` rendered `<Label>{t('clan_preview')}</Label>` — a **message carrying three placeholders, called with no args** — so a player read `[MISSING "%{NAME}" VALUE] · [MISSING "%{ANCESTORS}" VALUE] ANCESTORS · …` **directly above the correct interpolated line** at `:131`. A reviewer found it on `HN615L005386`; no gate did.

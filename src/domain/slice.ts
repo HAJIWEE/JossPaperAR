@@ -213,3 +213,63 @@ export function nextAction(offering: Offering): 'capture' | 'throw' | 'wait' | '
   if (isWaiting(offering.state)) return 'wait';
   return 'wait';
 }
+
+// ── the `/preparing` screen's copy, AS DATA (SCRUM-127) ──────────────────────
+//
+// ⚠️ WHY THIS LIVES IN `domain/` AND NOT IN THE SCREEN. The defect was a **copy
+// collision**: `spent` and `offline` both rendered `ritual.cannotPrepare`, so a player
+// whose photo had never left the phone was told their offering *"cannot be prepared"* —
+// **three different claims about one state**, on one screen. A collision is a fact about
+// the MAPPING, not about the render, so it is expressed here as a table a gate can read
+// (`checks/slice.ts` §4) instead of four JSX branches nothing can assert.
+//
+// ⚠️ AND THE TITLE IS PER-PHASE (SCRUM-127, option B). It used to be a permanent
+// *"The offering is being prepared…"*, which claimed work was happening in the two phases
+// where it had **stopped** — the clearest of the three contradictions.
+//
+// ⚠️ The keys are plain strings, so this module stays dependency-free (the same shape as
+// `QUOTA_SPENT_COPY` in `domain/quota.ts`). Their EXISTENCE and their 中文 are asserted by
+// `check:lib` §16; their STRUCTURE is asserted by `check:slice` §4.
+
+export const PREPARING_PHASES = ['working', 'parked', 'spent', 'offline'] as const;
+export type PreparingPhase = (typeof PREPARING_PHASES)[number];
+
+export interface PreparingCopy {
+  readonly titleKey: string;
+  /** `null` for `working` — the spinner IS the body. */
+  readonly bodyKey: string | null;
+  readonly buttonKey: string | null;
+  /**
+   * What the button DOES, in the table so the copy and the action cannot disagree.
+   * ⚠️ `recapture` and `common.recapture` are asserted to travel together (§4): offering a
+   * retry on a spent capture is the lie this screen exists to avoid.
+   */
+  readonly action: 'none' | 'retry' | 'recapture';
+}
+
+export const PREPARING_COPY: Record<PreparingPhase, PreparingCopy> = {
+  // `working` and `parked` legitimately share the title — in both, the offering IS being
+  // prepared. Only the failure phases must stop saying so.
+  working: { titleKey: 'ritual_preparing', bodyKey: null, buttonKey: null, action: 'none' },
+  parked: { titleKey: 'ritual_preparing', bodyKey: 'ritual_busy', buttonKey: 'common.retry', action: 'retry' },
+  // The claim MOVED to the title, so the body had to say something the title does not.
+  spent: {
+    titleKey: 'ritual.cannotPrepare',
+    bodyKey: 'ritual.spentBody',
+    buttonKey: 'common.recapture',
+    action: 'recapture',
+  },
+  // ⚠️ NOT `ritual.cannotPrepare`: nothing was spent, so the offering is not a lost cause —
+  // the whole point of the ticket's finding.
+  offline: {
+    titleKey: 'ritual.offlineTitle',
+    bodyKey: 'ritual.offlineBody',
+    buttonKey: 'common.retry',
+    action: 'retry',
+  },
+};
+
+/** The copy the `/preparing` screen renders for a phase. */
+export function preparingCopy(phase: PreparingPhase): PreparingCopy {
+  return PREPARING_COPY[phase];
+}

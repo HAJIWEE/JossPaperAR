@@ -7,6 +7,13 @@
 ## 🎯 Immediate Actions (Next 1–2 Weeks)
 
 ### 🔴 On the critical path
+- 🐞 **S67+10 (2026-10-25) — `SCRUM-127` ANSWERED (OPTION B): the `/preparing` copy is per-phase and the collision is an assertion (`check:slice` 36 → 44). ⚠️ US$0.00.**
+  - ✅ **The defect**: one screen showed **three contradictory claims at once** because `spent` and `offline` **shared one body key**.
+  - ✅ **Option B**: a new retriable body key **and** a **phase-aware title**. ⚠️ `working`/`parked` **legitimately keep** the preparing title — only the **failure** phases had to stop claiming it.
+  - ⚠️ **The mapping is now DATA** (`PREPARING_COPY` in `domain/slice.ts`, incl. the **action**), so the collision is assertable: ⚠️ **no two phases share a body** · ⚠️ **failure phases never claim "being prepared"**.
+  - ⚠️⚠️ **The fault test caught me first** — my injection made the bodies *distinct* and correctly stayed green; the **real** defect injection went red. ⚠️ **A fault test that does not reproduce the fault proves nothing.**
+  - ⏳ **`In Review`, not `Done`** — **three new strings are a DRAFT awaiting your wording** (see the ticket).
+
 - 🐞 **S67+9 (2026-10-25) — `SCRUM-121` FIXED AND GATED: the join preview's raw placeholders, and the `check:copy` rule that should have caught them (7 → 15 checks). ⚠️ US$0.00.**
   - ✅ **The fix**: the stray `<Label>{t('clan_preview')}</Label>` is **removed** — a three-placeholder message called with **no args** — ⚠️ **inventing no copy** (doc 15 §8 owns the words).
   - ⚠️ **The lesson**: `check:copy` rule 2 only asserts copy sits **inside `t()`** — and this string **does**. **A gate that checks the wrapper cannot see a broken call.**

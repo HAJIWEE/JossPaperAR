@@ -1156,6 +1156,12 @@ function screenCopyChecks(): void {
     'burn.aimHint', 'burn.dragHint', 'burn.lostPlace', 'burn.returns', 'burn.capped',
     'burn.exhausted', 'burn.rethrow',
     'reward.safe', 'reward.tributeUnit', 'reward.alreadyRecorded', 'reward.capped', 'reward.balance',
+    // ⚠️ SCRUM-127 — the `/preparing` screen's copy, which is now selected by a PURE table
+    // (`PREPARING_COPY` in `domain/slice.ts`) rather than written into JSX. This asserts each
+    // key EXISTS in both locales and that its 中文 carries no Latin text; ⚠️ that no two
+    // phases COLLIDE is `check:slice` §4, because a collision is a fact about the mapping.
+    'ritual_preparing', 'ritual_busy', 'ritual.cannotPrepare',
+    'ritual.spentBody', 'ritual.offlineTitle', 'ritual.offlineBody',
   ];
   const zh = MESSAGES.zh as unknown as Record<string, string>;
   const en = MESSAGES.en as unknown as Record<string, string>;
