@@ -50,6 +50,7 @@ import {
   canThrow,
   gradeThrow,
   heartPoint,
+  landedAction,
   offsetFromHeart,
   restingPoint,
 } from '@/domain/throw';
@@ -544,7 +545,12 @@ export default function BurnScreen() {
    * derives the band (ADR-005) and is the only writer of the award.
    */
   const confirm = useCallback(() => {
-    if (preview === null || !canThrow(throwNumber)) return;
+    // ⚠️ A MISS is not confirmable (it earns nothing and the offering RETURNS); a HIT always
+    // is, whatever the throw number (SCRUM-145). ⚠️ The old `!canThrow(throwNumber)` guard
+    // refused a hit on the LAST throw — and the render showed "the offering rests" — so the
+    // award would have been LOST. Unreachable until now only because the inert-button defect
+    // blocked the third throw from ever landing.
+    if (preview === null || preview.returns) return;
     // ⚠️ THE FIX (2026-10-06): the capture id used to be dropped right here, so
     // `/reward` refused with `bad_params` and the slice could never show a
     // receipt. It is now a REQUIRED argument of `toRewardParams`, so a future
@@ -566,7 +572,11 @@ export default function BurnScreen() {
    * throw. Animating to 0 then walks the same parameter backwards, home.
    */
   const rethrow = useCallback(() => {
-    if (preview?.returns !== true || !canThrow(throwNumber + 1)) return;
+    // ⚠️ `canThrow(throwNumber)` — NOT `canThrow(throwNumber + 1)` (SCRUM-145). The `+ 1` WAS
+    // the defect: it agreed with the affordance's own gate for the FIRST rethrow only, so
+    // after a **second miss** the button rendered and the handler silently refused it. The
+    // affordance and this guard now read the same predicate (`landedAction`).
+    if (preview?.returns !== true || !canThrow(throwNumber)) return;
     const token = flightToken.current;
     setReturning(true);
     setPlan(arcPlan(rest, plan.to, Math.min(rest.y, plan.to.y) - 30, rest));
@@ -619,7 +629,12 @@ export default function BurnScreen() {
     );
   }
 
-  const exhausted = preview !== null && (preview.spent || preview.returns) && !canThrow(throwNumber);
+  /**
+   * ⚠️ ONE predicate, read by BOTH the affordance and the handlers (SCRUM-145) — see
+   * `landedAction` in `domain/throw.ts`. This screen used to compute the same decision twice,
+   * with different bounds, which is how the "Throw again" button became inert.
+   */
+  const action = preview === null ? null : landedAction({ returns: preview.returns, throwNumber });
 
   return (
     <View style={styles.screen} onLayout={onLayout} {...responder.panHandlers}>
@@ -727,16 +742,29 @@ export default function BurnScreen() {
                 would re-plan the arc underneath a sprite that is still in the
                 air — and the throw is worth watching anyway. */}
             {arrived &&
-              (exhausted ? (
-                <Text style={styles.caption}>{t('burn.exhausted')}</Text>
+              (action === 'rest' ? (
+                <>
+                  <Text style={styles.caption}>{t('burn.exhausted')}</Text>
+                  {/* ⚠️ A WAY ON (SCRUM-145). `rest` used to render TEXT ONLY, so a player
+                      whose offering rested had no way off this screen — and the inert button
+                      at the second miss left them stuck the same way. `/reward` already sends
+                      a final miss to the shrine; this is that destination, with existing copy. */}
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => router.replace('/')}
+                    style={styles.button}
+                  >
+                    <Text style={styles.buttonLabel}>{t('common.done')}</Text>
+                  </Pressable>
+                </>
               ) : (
                 <View style={styles.row}>
-                  {preview.returns && (
+                  {action === 'rethrow' && (
                     <Pressable accessibilityRole="button" onPress={rethrow} style={styles.button}>
                       <Text style={styles.buttonLabel}>{t('burn.rethrow')}</Text>
                     </Pressable>
                   )}
-                  {!preview.returns && (
+                  {action === 'confirm' && (
                     <Pressable accessibilityRole="button" onPress={confirm} style={styles.button}>
                       <Text style={styles.buttonLabel}>{t('common.confirm')}</Text>
                     </Pressable>

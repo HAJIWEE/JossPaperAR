@@ -200,6 +200,49 @@ export function canThrow(throwNumber: number): boolean {
   return Number.isInteger(throwNumber) && throwNumber >= 1 && throwNumber < MAX_THROWS;
 }
 
+/**
+ * WHAT THE BURN SCREEN OFFERS ONCE THE OFFERING HAS LANDED (SCRUM-145).
+ *
+ * ⚠️ WHY THIS IS A FUNCTION AND NOT TWO EXPRESSIONS IN THE SCREEN. `/burn` used to ask **two
+ * different questions about the same throw** — the button rendered on `!canThrow(throwNumber)`
+ * while its handler required `canThrow(throwNumber + 1)` — so after a **second miss** the
+ * affordance was **visible and inert**, and the player was stuck with no way off the screen.
+ * Two individually-correct calls whose **COUPLING** was wrong: the same class as `fireBoxTop`
+ * (§④ of the suite), and equally invisible to `tsc` and to a screenshot.
+ *
+ * So the decision lives here, once, and BOTH the affordance and its handler read it:
+ *
+ *   miss → `rethrow` while `canThrow(throwNumber)` holds, otherwise `rest`
+ *   hit  → `confirm`, **always**
+ *
+ * ⚠️ **A HIT IS ALWAYS CONFIRMABLE, and that is a fix in its own right.** `spent` is
+ * `throwNumber >= MAX_THROWS`, so a hit on the LAST throw rendered *"The offering rests."*
+ * with no confirm button — and `confirm`'s own `canThrow` guard would have refused it anyway.
+ * ⚠️ **The award would have been lost** (no `/reward`, so no `submit_burn`). That path was
+ * unreachable only because the inert-button defect blocked the third throw from ever landing.
+ */
+export type LandedAction = 'rethrow' | 'confirm' | 'rest';
+
+/**
+ * The two fields the decision needs. ⚠️ **A structural type, not `ThrowOutcome`**, because
+ * `/burn` holds its own local `Preview` (offset · band · capped · returns · spent) and keeps
+ * `throwNumber` in separate state — so the screen passes both rather than the outcome alone.
+ * `ThrowOutcome` satisfies this, which is what lets the suite call it with `gradeThrow`'s
+ * result directly.
+ */
+export interface LandedOutcome {
+  readonly returns: boolean;
+  readonly throwNumber: number;
+}
+
+export function landedAction(outcome: LandedOutcome): LandedAction {
+  // A miss RETURNS the offering (S9) — never destroyed — so the action is to throw again,
+  // and only the throw budget can end it.
+  if (outcome.returns) return canThrow(outcome.throwNumber) ? 'rethrow' : 'rest';
+  // A hit consumes the offering; the only honest next step is to claim it.
+  return 'confirm';
+}
+
 /** The band label for display, both locales (doc 15 §8). */
 export function bandLabel(band: BandId): { readonly en: string; readonly zh: string } {
   return getBand(band).label;
