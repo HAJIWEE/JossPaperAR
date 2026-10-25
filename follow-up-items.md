@@ -7,6 +7,12 @@
 ## 🎯 Immediate Actions (Next 1–2 Weeks)
 
 ### 🔴 On the critical path
+- 🐞 **S67+11 (2026-10-25) — `SCRUM-122` FIXED AND GATED (the Book's empty state had no copy) + a `preview` APK built for an on-glass review of it and 127 (`check:lib` 409 → 416). ⚠️ US$0.00 in AI spend; one EAS build.**
+  - ✅ **The defect**: the window line rendered **twice** under an **unconditional** section title. ⚠️ **The cause was an ABSENCE** — no empty-state key existed.
+  - ✅ **The fix**: `book_empty`, and the section title only with entries. ⚠️ **The rule is now PURE** (`bookView` in `clan-roles.ts`), so both defects are asserted (+7 checks, fault-tested).
+  - ⚠️ **AC 3 unmet from the table**: **doc 15 §8 has no empty-state row** → the key ships as a **PROPOSAL**, **`SCRUM-144`** is the **🎯 Decide** ticket, and **`SCRUM-122` stays `In Review`**.
+  - ⏳ **On glass**: EAS `preview` build `13007fa6` → `HN615L005386`.
+
 - 🐞 **S67+10 (2026-10-25) — `SCRUM-127` ANSWERED (OPTION B): the `/preparing` copy is per-phase and the collision is an assertion (`check:slice` 36 → 44). ⚠️ US$0.00.**
   - ✅ **The defect**: one screen showed **three contradictory claims at once** because `spent` and `offline` **shared one body key**.
   - ✅ **Option B**: a new retriable body key **and** a **phase-aware title**. ⚠️ `working`/`parked` **legitimately keep** the preparing title — only the **failure** phases had to stop claiming it.

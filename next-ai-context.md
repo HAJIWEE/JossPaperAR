@@ -9,6 +9,14 @@
 ## 📌 Quick Reference
 
 - **Project** — Joss Paper AR, an AR app that replaces physical joss-paper burning with a digital ritual
+- **Session S67+11 · 2026-10-25 — 🐞 `SCRUM-122` FIXED AND GATED (the Book's empty state had no copy, so it borrowed the window line), and a `preview` APK was built for an on-glass review of it and `SCRUM-127` (`check:lib` **409 → 416**). ⚠️ US$0.00 in AI spend; one EAS build.**
+  - ✅ **The defect**: an empty Book rendered *"Showing the last month."* **twice** (as the Hint *and* the body) under an **unconditional** section title — a heading over nothing. ⚠️ **The cause was an ABSENCE, not a mistake**: the table held exactly three book keys and **no empty-state key existed**.
+  - ✅ **The fix**: a new `book_empty` key, and the section title renders **only when there ARE entries** (above its list).
+  - ⚠️ **THE STRUCTURAL HALF**: `bookView(entryCount, hasProblem)` → `problem | empty | list` in `src/lib/clan-roles.ts`, plus `showsBookSectionTitle(view)` — **pure, so both defects are assertable**. The same move as `SCRUM-127`'s `PREPARING_COPY`, for the same reason: *a defect nothing can read is a defect a gate cannot hold.*
+  - ✅ **Gate — `check:lib` +7**: ⚠️ *an empty Book has its OWN body key — not the window line* · ⚠️ *an empty Book renders NO section title* · plus a positive control and the `with entries` control. **Fault-tested** (reverting to `book_window` → RED).
+  - ⚠️ **AC 3 COULD NOT BE MET FROM THE TABLE — and the ticket predicted it.** It says the copy is **doc 15 §8's** and *"do not invent the ZH string"*; ⚠️ **§8 has no empty-state row** (C14 · C15 · C16 only). So the key ships as a **clearly-marked PROPOSAL**, **`SCRUM-144`** was filed as the **🎯 Decide:** ticket (**in the sprint**), and **`SCRUM-122` stays `In Review`**, as AC 3 requires.
+  - ⏳ **On glass**: EAS `preview` build **`13007fa6`** — ⚠️ **the EAS `preview` environment carries both `EXPO_PUBLIC_SUPABASE_*` vars**, which is what makes a cloud APK work from a worktree that has no `.env`. Installed on `HN615L005386` to review `/clan/book`'s empty state **and** `/preparing`'s new per-phase copy.
+
 - **Session S67+10 · 2026-10-25 — 🐞 `SCRUM-127` ANSWERED (OPTION B): the `/preparing` copy is per-phase, the mapping is now DATA, and the collision is an assertion (`check:slice` **36 → 44**). ⚠️ US$0.00 — no AI call, no device run.**
   - ✅ **The defect**: one screen showed **three contradictory claims at once** — a permanent *"being prepared…"* title, *"This offering cannot be prepared."*, and a *"Check again"* button — because `spent` and `offline` **shared one body key**. ⚠️ A photo that never left the phone was told its offering *"cannot be prepared"*.
   - ✅ **Option B shipped**: a new retriable body key **and** a **phase-aware title**. ⚠️ **`working` and `parked` legitimately KEEP the preparing title** — only the **failure** phases had to stop claiming it.

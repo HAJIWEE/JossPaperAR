@@ -1312,6 +1312,48 @@ So a first measure pass whose height spec is not EXACT **latches the PreviewView
 
 ---
 
+### 12.46 · S67+11 — SCRUM-122: the Book's empty state had no copy, so it borrowed the window line (2026-10-25)
+
+**The defect, seen on glass.** An empty Book of Tributes rendered the window note **twice** and left a **heading over nothing**:
+
+```
+Tan Family
+Showing the last month. (30)      ← the window note, as a Hint
+Showing the last month.          ← ⚠️ THE SAME STRING AGAIN, as the body
+Book of Tributes                 ← ⚠️ section title, with NOTHING under it
+Return to the shrine
+```
+
+⚠️ **The cause was an absence, not a mistake:** `src/lib/i18n.ts` had exactly **three** book keys (`book_header` · `book_outside` · `book_window`) — **no empty-state key existed**, so the empty branch fell back to the window line, and the section title rendered unconditionally.
+
+**The fix.**
+- ✅ **The empty state has its own key** (`book_empty`) — the window line now renders **once**, as the Hint.
+- ✅ **The section title renders only when there ARE entries**, and it sits **above** its list.
+
+**⚠️ THE STRUCTURAL HALF.** Both defects were facts about **which part of the screen is shown**, so that decision is now **pure**: `bookView(entryCount, hasProblem)` in `src/lib/clan-roles.ts` → `problem | empty | list`, plus `showsBookSectionTitle(view)`. The screen renders from it instead of branching in JSX — the same move as `SCRUM-127`'s `PREPARING_COPY`, and for the same reason: *a defect nothing can read is a defect a gate cannot hold.*
+
+**The gate — `check:lib`, 7 new assertions** (`check:lib` **409 → 416**):
+- ⚠️ **an empty Book has its OWN body key — not the window line** (*the defect itself, as an assertion*);
+- ⚠️ **an empty Book renders NO section title** (*the orphaned heading, as an assertion*);
+- …and a Book **with** entries **does** render it · a problem renders no book copy at all · plus a **positive control**.
+
+**Fault-tested:** reverting `bookView`'s empty branch to `'book_window'` turns it **RED**; the restore is byte-identical.
+
+⚠️ **AND THE COPY COULD NOT COME FROM THE TABLE — which the ticket itself predicted.** Its AC 3 says *"The copy is doc 15 §8's — **do not invent the ZH string**"*. ⚠️ **§8 has no empty-state row**: its Book rows are **C14** (header), **C15** (outside view) and **C16** (window note), and nothing else. So:
+- the key ships as a **clearly-marked PROPOSAL** — in `src/lib/i18n.ts` **and** in the gate's own comment;
+- **`SCRUM-144`** was filed as the **🎯 Decide:** ticket for the wording (options A–D, recommending A), **in the sprint**;
+- ⚠️ **`SCRUM-122` stays `In Review`, not `Done`**, exactly as AC 3 requires.
+
+| key | EN (proposed) | 中文 (proposed) |
+|---|---|---|
+| `book_empty` | *No offerings yet. The first one will appear here.* | 尚无供奉。第一笔将显示在这里。 |
+
+⚠️ The 中文 deliberately reuses the table's own words — **供奉** (§8's C15/C17) and **显示** (C16) — rather than inventing vocabulary.
+
+**Verification:** `npx tsc --noEmit` **0** · `npm run check` **EXIT 0** · `check:lib` **409 → 416**.
+
+---
+
 ### 12.45 · S67+10 — SCRUM-127 answered (option B): the `/preparing` copy is per-phase, and the collision is an assertion (2026-10-25)
 
 **The defect, seen on glass.** `/preparing` showed **three contradictory claims at once** — *"The offering is being prepared…"* (a **permanent** title), *"This offering cannot be prepared."*, and a *"Check again"* button. ⚠️ The cause was a **copy collision**: `spent` and `offline` **shared one body key**, so a photo that had never left the phone was told its offering *"cannot be prepared"* — **three different claims about one state, on one screen.**
