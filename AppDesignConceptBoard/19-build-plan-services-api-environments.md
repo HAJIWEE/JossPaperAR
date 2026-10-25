@@ -1312,6 +1312,44 @@ So a first measure pass whose height spec is not EXACT **latches the PreviewView
 
 ---
 
+### 12.47 · S67+12 — SCRUM-145: the "Throw again" button rendered and did nothing, and fixing it exposed two more defects (2026-10-25)
+
+**The report, from the owner on glass.** *"If I missed the throw a second time I can no longer click the 'Throw again' button."*
+
+**The root cause — a bound mismatch between an affordance and its handler.** `/burn` asked **two different questions about the same throw**:
+
+```tsx
+// the RENDER gate
+!canThrow(throwNumber)
+// the HANDLER guard — ⚠️ `+ 1`
+!canThrow(throwNumber + 1)
+```
+
+`canThrow(n)` is `n < MAX_THROWS` — **asserted by `check:throw` §③**, meaning *"is there room for another throw after throw n"*. The two sites therefore **agreed for the FIRST rethrow and disagreed for the SECOND**, so the button was **visible and inert**: the third throw was unreachable and the player had **no way off the screen**.
+
+⚠️ **The same class as `fireBoxTop` (§④): two individually-correct calls whose COUPLING was wrong** — invisible to `tsc` and to a screenshot.
+
+**The fix — one predicate, read by both.** `landedAction(outcome)` in `src/domain/throw.ts` → `'rethrow' | 'confirm' | 'rest'`:
+- **miss** → `rethrow` while `canThrow(throwNumber)`, otherwise `rest`;
+- **hit** → **`confirm`, always**.
+
+⚠️ **AND FIXING IT EXPOSED TWO MORE DEFECTS — both fixed, because leaving them would have made things worse:**
+
+1. ⚠️ **A hit on the last throw could not be claimed.** `exhausted` included `spent` (`throwNumber >= MAX_THROWS`), so at throw 3 a hit rendered *"The offering rests."* with **no confirm button** — and `confirm`'s own `canThrow` guard would have refused it anyway. ⚠️ **The award would have been LOST** (no `/reward` → no `submit_burn`). ⚠️ **Unreachable only because the inert button blocked the third throw** — so fixing the report alone would have *exposed* a worse bug.
+2. ⚠️ **`rest` was a dead end** — text only, no button. ⚠️ **Already live**: the inert button at the second miss left the player stuck. Now `rest` offers `common.done` → the shrine, the same destination `/reward` already uses for a final miss, and **no new copy**.
+
+**The gate — `check:throw` §⑥, 8 assertions** (`check:throw` **47 → 55**): ⚠️ **a SECOND miss also offers a rethrow** (*the report*) · ⚠️ **a HIT on the last throw is confirmable** (*the masked defect*) · ⚠️ **`spent` alone must never decide the action** (*it is true on a last-throw hit*) · ⚠️ **a `rethrow` action IMPLIES `canThrow(throwNumber)`** (*the coupling itself*) · plus the first-miss and last-miss controls.
+
+**Fault-tested:** the original `+ 1` back in place turns **exactly** the reported assertion red, and the restore is byte-identical.
+
+**Verification:** `npx tsc --noEmit` **0** · `npm run check` **EXIT 0**. ⚠️ `tsc` caught a real typing error mid-fix (`/burn`'s `Preview` is not a `ThrowOutcome`), which is why `landedAction` takes a **structural** `LandedOutcome` — the screen keeps `throwNumber` in its own state.
+
+⚠️ **`In Review`, not `Done`** — **not yet re-verified on glass**; a fresh `preview` APK builds from `0c1137a`. The glass pass needs a **real ritual run** (a capture + a Path C generation, ≈ US$0.09) **and two deliberate misses**.
+
+**US$0.00 in AI spend** (one EAS build).
+
+---
+
 ### 12.46 · S67+11 — SCRUM-122: the Book's empty state had no copy, so it borrowed the window line (2026-10-25)
 
 **The defect, seen on glass.** An empty Book of Tributes rendered the window note **twice** and left a **heading over nothing**:

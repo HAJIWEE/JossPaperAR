@@ -7,6 +7,12 @@
 ## 🎯 Immediate Actions (Next 1–2 Weeks)
 
 ### 🔴 On the critical path
+- 🐞 **S67+12 (2026-10-25) — `SCRUM-145` (owner-found on glass): `/burn`'s "Throw again" button rendered but did nothing after a SECOND miss; fixing it exposed TWO more defects (`check:throw` 47 → 55). ⚠️ US$0.00 in AI spend; one EAS build.**
+  - ⚠️ **A COUPLING, not a typo**: the render asked `!canThrow(n)` while the handler required `!canThrow(n + 1)` → the button agreed for the FIRST rethrow and disagreed for the SECOND. ⚠️ Same class as `fireBoxTop`.
+  - ✅ **One predicate now** — `landedAction` → `'rethrow' | 'confirm' | 'rest'`; **a hit is always confirmable**.
+  - ⚠️⚠️ **Exposed and fixed**: (1) a **HIT on the last throw could not be claimed** — the award would have been **LOST**; (2) **`rest` was a dead end** (⚠️ already live). Both now correct, with **no new copy**.
+  - ✅ **Gate +8, fault-tested** (the original `+ 1` turns the reported assertion red). ⏳ **`In Review`** — not yet re-verified on glass.
+
 - 🐞 **S67+11 (2026-10-25) — `SCRUM-122` FIXED AND GATED (the Book's empty state had no copy) + a `preview` APK built for an on-glass review of it and 127 (`check:lib` 409 → 416). ⚠️ US$0.00 in AI spend; one EAS build.**
   - ✅ **The defect**: the window line rendered **twice** under an **unconditional** section title. ⚠️ **The cause was an ABSENCE** — no empty-state key existed.
   - ✅ **The fix**: `book_empty`, and the section title only with entries. ⚠️ **The rule is now PURE** (`bookView` in `clan-roles.ts`), so both defects are asserted (+7 checks, fault-tested).

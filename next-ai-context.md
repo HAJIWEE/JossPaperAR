@@ -9,6 +9,16 @@
 ## 📌 Quick Reference
 
 - **Project** — Joss Paper AR, an AR app that replaces physical joss-paper burning with a digital ritual
+- **Session S67+12 · 2026-10-25 — 🐞 `SCRUM-145` (owner-found on glass): `/burn`'s "Throw again" button rendered but did nothing after a SECOND miss — and fixing it exposed TWO more defects (`check:throw` **47 → 55**). ⚠️ US$0.00 in AI spend; one EAS build.**
+  - ⚠️ **THE ROOT CAUSE WAS A COUPLING, NOT A TYPO**: the **render gate** asked `!canThrow(throwNumber)` while the **handler** required `!canThrow(throwNumber + 1)`. `canThrow(n)` is `n < MAX_THROWS` (⚠️ asserted by `check:throw` §③ = *"is there room for another throw after throw n"*), so the two sites **agreed for the FIRST rethrow and disagreed for the SECOND** — visible, inert, and the player had **no way off the screen**. ⚠️ **The same class as `fireBoxTop` (§④): two correct-looking calls whose COUPLING was wrong.**
+  - ✅ **THE FIX — ONE predicate, read by both**: `landedAction(outcome)` in `src/domain/throw.ts` → `'rethrow' | 'confirm' | 'rest'`. miss → `rethrow` while `canThrow(throwNumber)`; **hit → `confirm`, ALWAYS**.
+  - ⚠️⚠️ **AND IT EXPOSED TWO MORE, BOTH FIXED — because leaving them would have made things WORSE:**
+    1. ⚠️ **A HIT on the LAST throw could not be claimed** — `exhausted` included `spent` (`throwNumber >= MAX_THROWS`), so a third-throw hit rendered *"The offering rests."* with **no confirm**, and `confirm`'s own `canThrow` guard would have refused it anyway. **The award would have been LOST.** ⚠️ Unreachable only because the inert button blocked the third throw.
+    2. ⚠️ **`rest` was a DEAD END** (text only, no button) — ⚠️ **already live** at the second miss. Now offers `common.done` → the shrine, the destination `/reward` already uses, **no new copy**.
+  - ✅ **Gate `check:throw` §⑥, +8**: ⚠️ *a SECOND miss also offers a rethrow* (*the report*) · ⚠️ *a HIT on the last throw is confirmable* (*the masked one*) · ⚠️ *`spent` alone must never decide the action* · ⚠️ *a `rethrow` action IMPLIES `canThrow(throwNumber)`* (*the coupling*). **Fault-tested** — the original `+ 1` turns **exactly** the reported assertion red.
+  - ⚠️ `tsc` caught a real typing error mid-fix (`/burn`'s `Preview` is not a `ThrowOutcome`) → `landedAction` takes a **structural** `LandedOutcome`.
+  - ⏳ **`In Review`** — not yet re-verified on glass; a fresh `preview` APK builds from `0c1137a` (the glass pass needs a real ritual run ≈ US$0.09 and two deliberate misses).
+
 - **Session S67+11 · 2026-10-25 — 🐞 `SCRUM-122` FIXED AND GATED (the Book's empty state had no copy, so it borrowed the window line), and a `preview` APK was built for an on-glass review of it and `SCRUM-127` (`check:lib` **409 → 416**). ⚠️ US$0.00 in AI spend; one EAS build.**
   - ✅ **The defect**: an empty Book rendered *"Showing the last month."* **twice** (as the Hint *and* the body) under an **unconditional** section title — a heading over nothing. ⚠️ **The cause was an ABSENCE, not a mistake**: the table held exactly three book keys and **no empty-state key existed**.
   - ✅ **The fix**: a new `book_empty` key, and the section title renders **only when there ARE entries** (above its list).
