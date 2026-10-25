@@ -7,6 +7,13 @@
 ## 🎯 Immediate Actions (Next 1–2 Weeks)
 
 ### 🔴 On the critical path
+- 🐞 **S67+9 (2026-10-25) — `SCRUM-121` FIXED AND GATED: the join preview's raw placeholders, and the `check:copy` rule that should have caught them (7 → 15 checks). ⚠️ US$0.00.**
+  - ✅ **The fix**: the stray `<Label>{t('clan_preview')}</Label>` is **removed** — a three-placeholder message called with **no args** — ⚠️ **inventing no copy** (doc 15 §8 owns the words).
+  - ⚠️ **The lesson**: `check:copy` rule 2 only asserts copy sits **inside `t()`** — and this string **does**. **A gate that checks the wrapper cannot see a broken call.**
+  - ✅ **New rule 3** — every literal-key `t(key, …)` call must supply its message's declared `%{…}`, **both locales read**, inline objects checked key by key. ⚠️ **Blind spots printed**: 28 dynamic-key sites, plus a check that fails if any `t()` is split across lines.
+  - ✅ **Fault-tested both ways** (before ✗ · reverted ✗ · after ✓) and it found **exactly one** such bug — a single leak, not a pattern.
+  - ⚠️ **Not seen on glass** — the repro needs a **valid clan code**. The gate is the stronger evidence.
+
 - 🧹 **S67+8 (2026-10-25) — THE SPRINT'S To Do COLUMN REVIEWED: ONE CLOSED, FIVE BACK TO THE BACKLOG, ONE PICKED. ⚠️ US$0.00.**
   - ✅ **`SCRUM-13` (AR fire mechanic) → `Done`** — delivered; its **AR framing was superseded by ADR-003**. The one unbuilt line (device AR performance) is `SCRUM-51`/`SCRUM-109`.
   - ⚠️ **`SCRUM-12` (GPS) is stale** — no location code exists, and `new_ground` already ships server-side. **Needs re-scoping, not building.**

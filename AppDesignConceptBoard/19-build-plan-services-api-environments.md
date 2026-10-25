@@ -1312,6 +1312,38 @@ So a first measure pass whose height spec is not EXACT **latches the PreviewView
 
 ---
 
+### 12.44 · S67+9 — SCRUM-121: the join preview leaked raw placeholders, and the gate that should have caught it (2026-10-25)
+
+**The defect, seen on glass.** `src/components/clan-join.tsx:129` rendered `<Label>{t('clan_preview')}</Label>` — a **message carrying three placeholders, called with no args** — so a player read `[MISSING "%{NAME}" VALUE] · [MISSING "%{ANCESTORS}" VALUE] ANCESTORS · …` **directly above the correct interpolated line** at `:131`. A reviewer found it on `HN615L005386`; no gate did.
+
+⚠️ **WHY EVERY GATE STAYED GREEN — and this is the part worth keeping.** `check:copy` rule 2 asserts that user-visible copy sits **inside `t()`**. This string **does**. **The rule was satisfied by the exact thing that was broken — a gate that checks the wrapper cannot see a broken call.**
+
+**The fix.** The stray `<Label>` is **removed**, and the now-unused import with it. ⚠️ **No copy was invented** — doc 15 §8 owns the words, and the interpolated line below already carries the name and both counts. A ⚠️ comment now sits where the label was, so it is not re-added.
+
+**The gate — `check:copy` gains rule 3.** For every **literal-key** `t(key)` / `t(key, …)` call, the message's declared `%{…}` placeholders must be supplied:
+
+- ⚠️ **both locales** are read — the ZH message carries the same placeholders, so an `en`-only guard would pass a key that leaks in 中文;
+- an **inline object literal** is checked **key by key**, so a *partial* object fails too;
+- ⚠️ **what it cannot see is PRINTED, not implied** — **28** call sites use a dynamic key and are listed as *NOT statically checkable*; a helper/identifier arg is checked for *presence* only; and a check **fails if any `t()` call is split across lines**, so the last blind spot is provably empty rather than assumed.
+
+**Fault-tested in BOTH directions, which is the point:**
+
+| Run | Result |
+|---|---|
+| **Before the fix** | ✗ `clan-join.tsx:129  t('clan_preview') declares %{name} · %{ancestors} · %{members} but passes NO args` |
+| **Fix reverted** | ✗ the same line, the same message |
+| **After the fix** | ✓ `(0)` — and the literal-call count drops **153 → 152** |
+
+⚠️ **And it found exactly ONE such bug in the tree** — the other 152 literal-key call sites were already correct. **A single leak, not a pattern**, and the gate now says so on every run.
+
+**Scope: 8 new checks** (`check:copy` **7 → 15**) · `npm run check` **EXIT 0** · `npx tsc --noEmit` **0**. ⚠️ **The gate now imports `i18n.ts`**, so it needs `node_modules` — it already runs in CI's `app-checks` job *after* `npm ci`, and that job's comment now records why.
+
+⚠️ **Not seen on glass:** the repro needs a **valid clan code** (the preview renders only once a code resolves). ⚠️ **The gate is the stronger evidence** — fault-tested both ways, where a screenshot proves one frame of one screen.
+
+**US$0.00 — no AI call, no device run.**
+
+---
+
 ### 12.43 · S67+7 — SCRUM-140 answered (staged): D now, A after B11 — and SCRUM-123 closes with its two confirms split out (2026-10-25)
 
 **The answer, verbatim.** *"for 140 before i get the duns and play console go with option d then A when i get the duns and play console setup"* — a **staged** decision, recorded on `SCRUM-140`.
