@@ -1312,6 +1312,33 @@ So a first measure pass whose height spec is not EXACT **latches the PreviewView
 
 ---
 
+### 12.43 · S67+7 — SCRUM-140 answered (staged): D now, A after B11 — and SCRUM-123 closes with its two confirms split out (2026-10-25)
+
+**The answer, verbatim.** *"for 140 before i get the duns and play console go with option d then A when i get the duns and play console setup"* — a **staged** decision, recorded on `SCRUM-140`.
+
+| Phase | Choice | Consequence |
+|---|---|---|
+| **Now → B11** | **D — defer the SDK; ship no ads** | No SDK integrated; the ad revenue line stays **$0**. ✅ **Nothing is lost** — the MVP has **no ads at all**, so D changes nothing today |
+| **After B11** | **A — AdMob, one network at v1** | Executed by **`SCRUM-142`** |
+
+⚠️ **The gate is the one the owner named: `SCRUM-76` (B11)** — the **D-U-N-S number and the Play Console organization account**. ⚠️ **`SCRUM-110`** (the Play Console listing — the store fallback 404s today) is a **likely co-gate**, because an AdMob app has to be **verifiable on a store**.
+
+**Three tickets carry what the answer defers, each with its own gate — split out, not cut:**
+
+| Ticket | What | Gate |
+|---|---|---|
+| **`SCRUM-142`** | **Integrate AdMob + wire the reward confirm** (the option-A half) | ⏸ **B11** and **`SCRUM-141`** |
+| **`SCRUM-143`** | **Wire the store buy confirm** | ⏸ a **store screen existing** — there is none in the app |
+| **`SCRUM-141`** *(filed earlier, re-gated)* | The **server-side credit grant** | ⏸ **B11 + `SCRUM-142`** — and it is a **prerequisite, not a follow-up**: without it a rewarded ad pays **nothing** |
+
+**`SCRUM-123` → `Done`.** ✅ The card (`src/lib/confirm-card.ts` + `src/components/confirm-card.tsx`, measured off the boards) and ✅ the **three migrated clan `Alert`s** are delivered; the **two confirms** are split out above. ⚠️ **And the record is corrected:** `SCRUM-123` had been described as *"blocked on the ad SDK"*, and that was only ever **half** true — the **store** confirm needs a **screen**, not an SDK, and would not have been wireable even with the SDK chosen.
+
+⚠️ **Two residual facts were carried into the new tickets rather than dropped:** the ad-funded photo has **no server-side grant**, and the store's **points** path has **no confirm on the board at all** — only the cash path does.
+
+**US$0.00 — no AI call, no device run.**
+
+---
+
 ### 12.42 · S67+6 — SCRUM-107 answered: the SDK read was done, and the answer was not the one the ticket expected (2026-10-25)
 
 **The ask.** `SCRUM-123` was blocked on the ad SDK, which was blocked on `SCRUM-107` — *"read the Unity/LevelPlay + Meta Audience Network publisher ad controls **before any SDK selection**"*. Both halves had been open since **2026-10-05**, when the doc pages **404'd** and the session recorded them *"unverified rather than guessed"*.

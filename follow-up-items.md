@@ -7,6 +7,12 @@
 ## 🎯 Immediate Actions (Next 1–2 Weeks)
 
 ### 🔴 On the critical path
+- 🎯 **S67+7 (2026-10-25) — `SCRUM-140` ANSWERED (STAGED): **D NOW, A AFTER B11**. `SCRUM-123` CLOSES; ITS TWO CONFIRMS ARE SPLIT OUT. ⚠️ US$0.00.**
+  - ✅ **Nothing is lost today** — **D** changes nothing, because the **MVP has no ads at all**. The ad revenue line stays **$0** until B11.
+  - ⚠️ **The gate is `SCRUM-76` (B11)** — the D-U-N-S number and the Play Console organization account — with **`SCRUM-110`** (the Play Console listing) as a **likely co-gate**, since an AdMob app must be **verifiable on a store**.
+  - ✅ **Three tickets carry the deferred work, one gate each:** **`SCRUM-142`** (AdMob + the reward confirm) · **`SCRUM-143`** (the store confirm) · **`SCRUM-141`** (the grant — ⚠️ a **prerequisite**, not a follow-up: without it a rewarded ad pays **nothing**).
+  - ✅ **`SCRUM-123` → `Done`** (card + three migrated clan `Alert`s delivered). ⚠️ **Corrected:** it was described as *"blocked on the ad SDK"* — only **half** true; the **store** confirm needs a **screen**, not an SDK.
+
 - 🎯 **S67+6 (2026-10-25) — `SCRUM-107` ANSWERED: THE AD-SDK READ IS DONE, AND IT FOUND A THIRD BLOCKER ON `SCRUM-123` THAT WAS UNTRACKED. ⚠️ US$0.00 — web research only.**
   - ⚠️ **Neither read said what the ticket expected.** **Unity LevelPlay** has the widest publisher controls, but its rules engine **only notifies** (it does not block) and its Ad Review is **impression-gated**. **Meta Audience Network** has **no publisher controls at all** — ⚠️ the earlier 404 was a **URL move** — so **FAN is a demand source, not an SDK candidate**.
   - ⚠️ **The deciding factor was not in the ticket's questions:** this app is **Expo/CNG with no native project folders and a rule against hand-editing them**, and **only AdMob ships a config plugin**. ⚠️ **And wiring ads needs a development build — Expo Go cannot run the library.**
