@@ -1349,6 +1349,14 @@ So a first measure pass whose height spec is not EXACT **latches the PreviewView
 
 **US$0.00 — no AI call, no device run; the Penpot reads are free.** ⚠️ **Three questions went back with the draft:** which wallet the store confirm names (the ticket said "jade"; the board's confirm is the cash path; the board note says cash **or** store points) · whether the `▶` glyph ships (the `zoom` numerals precedent) · and the store's inconsistent wallet vocabulary (the board says 商店积分 / 积分, the shipped table says 功德点, `doc 10` names three wallets).
 
+**✅ THEN THE OWNER APPROVED THE DRAFT, AND THE COPY LANDED (`src/lib/i18n.ts`, BOTH locales).** Eight keys — `reward.oneMoreTitle` · `reward.oneMoreBody` · `reward.oneMoreWatch` · `reward.oneMoreDecline` · `store.buyConfirmTitle` · `store.buyConfirmBody` · `store.buyWithPlay` · `store.buyCancel` — with `%{item}` / `%{price}` on the store pair (`OFFERINGS[].name` through `localized()`, so the five items need no per-item string).
+
+⚠️ **PROVED WITH A REAL CALL, NOT BY READING THE DIFF.** A throwaway script resolved **all 8 keys in BOTH locales**, with interpolation: `store.buyConfirmTitle` → `Confirm — Wealth Bundle` / 确认 — 财富套装. `npm run check` **EXIT 0** (397 lib · 238 framing · 74 pathc · 34 ADR · 7 copy · 9 sprite) and `npx tsc --noEmit` **0**. ⚠️ **And the log carries TWO `✗` lines — they are DELIBERATE negative controls** (*"DELIBERATE WRONG BELIEF — must FAIL"*), which is why the **exit code**, not a `grep` for the glyph, is what proves the suite. The assertions that cover the new keys are `✓ EN and 中文 still define the same key set` (parity) and `✓ every message RESOLVES in both locales` (resolution).
+
+⚠️ **STILL NOT WIRED, DELIBERATELY — AND NOW FOR A SECOND REASON.** The copy was this ticket's blocker, but it was never the *only* one: **both confirms' ACTIONS are missing too.** `grep -rn 'purchase|redeem|spend' src/app src/lib` finds **only prose** — there is **no client purchase path at all** — and `src/app/` has no store route, so the store confirm has nothing to confirm and nothing to mount on. The reward confirm's action is the ad-gated offer, whose SDK is unchosen. Shipping the strings is what makes the wiring *"a few lines once the words exist"*; wiring it today would ship a `▶ Watch` button that cannot watch anything.
+
+✅ **`SCRUM-137` → `Done`** (its ask was the strings, and they exist). **`SCRUM-123` stays `In Review`** — the card and the three clan migrations are delivered; the last two confirms wait on their **surfaces**. ⚠️ **Two questions stay open for whenever the store screen is built:** which wallet that confirm names (the board's confirm is the cash path; the points path has no confirm on the board) and the store's inconsistent wallet vocabulary.
+
 ---
 
 ### 12.40 · S67 — DETECT UP TO THREE, CARTOONIZE ONE: the extra objects were not wanted (2026-10-19)

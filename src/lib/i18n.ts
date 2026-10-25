@@ -98,6 +98,25 @@ export const MESSAGES = {
     'reward.alreadyRecorded': 'Already recorded',
     'reward.capped': 'Capped',
     'reward.balance': 'Balance %{points}',
+    // ── the two MONEY confirms' copy (SCRUM-137, option B — owner-approved 2026-10-25) ──
+    // ⚠️ READ OFF THE BOARDS, not invented: `5b Reward / one more offering` and
+    // `9b Buy offerings · confirm`. ⚠️ The reward TITLE is also verbatim in doc 10's
+    // "UX copy" table (the ad-gated offer row), so it is double-signed-off.
+    // ⚠️ NEITHER confirm is wired yet, and the reason is NOT copy: the store has no
+    // screen in the app, and the reward offer is AD-GATED (SCRUM-107 / ADR-008). The
+    // strings ship now so the wiring is "a few lines once the words exist".
+    'reward.oneMoreTitle': 'Watch to prepare one more offering.',
+    'reward.oneMoreBody':
+      'A short video unlocks one extra photo. Always after the ritual — never during.',
+    'reward.oneMoreWatch': '▶ Watch',
+    'reward.oneMoreDecline': 'No thanks',
+    // ⚠️ `%{item}` is `OFFERINGS[].name` via `localized()`; `%{price}` is the cash price
+    // the board shows. ⚠️ The board's own body is a WIRE ANNOTATION ("IAP sheet =
+    // placeholder in this wire.") and is deliberately NOT what ships here.
+    'store.buyConfirmTitle': 'Confirm — %{item}',
+    'store.buyConfirmBody': '%{item} · %{price}. Google Play will ask you to verify.',
+    'store.buyWithPlay': 'Buy with Google Play',
+    'store.buyCancel': 'Cancel',
     'home.begin': 'Begin an offering',
     'home.clanEntry': 'Clan',
 
@@ -320,6 +339,17 @@ export const MESSAGES = {
     'reward.alreadyRecorded': '已记录',
     'reward.capped': '已达上限',
     'reward.balance': '余额 %{points}',
+    // ── the two MONEY confirms' copy (SCRUM-137, option B — owner-approved 2026-10-25) ──
+    // ⚠️ The same board-sourced strings as the EN block above. `%{item}` / `%{price}` are
+    // placeholders, so the only prose is the fixed part of each string.
+    'reward.oneMoreTitle': '观看以再备一份供品。',
+    'reward.oneMoreBody': '一段短视频，多一次拍照供品。仅在仪式之后 — 绝不在仪式之中。',
+    'reward.oneMoreWatch': '▶ 观看',
+    'reward.oneMoreDecline': '不用了',
+    'store.buyConfirmTitle': '确认 — %{item}',
+    'store.buyConfirmBody': '%{item} · %{price}。Google Play 将请求您验证。',
+    'store.buyWithPlay': '通过 Google Play 购买',
+    'store.buyCancel': '取消',
     'home.begin': '开始供奉',
     'home.clanEntry': '宗族',
 
