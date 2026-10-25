@@ -245,6 +245,11 @@ export const MESSAGES = {
     'book_header': 'Book of Tributes',
     'book_outside': 'A member made this offering.',
     'book_window': 'Showing the last month.',
+    // ⚠️ SCRUM-122 — the Book's EMPTY state. ⚠️ **A PROPOSAL, not signed-off copy.** doc 15 §8
+    // carries no empty-state row (C14–C16 only) and the ticket is explicit that the ZH string
+    // must not be invented, so this is filed for the PM's wording — see the 🎯 Decide ticket on
+    // SCRUM-122. The ticket stays `In Review` until §8 carries the row.
+    'book_empty': 'No offerings yet. The first one will appear here.',
 
     // ── the LEAGUE BOARD (SCRUM-11 step 6 · doc 07 §4.7 · doc 18 E7) ───────
     'league.title': 'League',
@@ -466,6 +471,9 @@ export const MESSAGES = {
     'book_header': '供奉簿',
     'book_outside': '由宗族成员供奉。',
     'book_window': '仅显示最近一个月。',
+    // ⚠️ SCRUM-122 — **提案，未获签核**（doc 15 §8 没有空状态行；见 SCRUM-122 的 🎯 Decide 工单）。
+    // ⚠️ 用词沿用既有文案（供奉 · 显示）。
+    'book_empty': '尚无供奉。第一笔将显示在这里。',
 
     // ── 联赛榜（SCRUM-11 第 6 步 · doc 07 §4.7 · doc 18 E7）────────────────
     'league.title': '联赛',

@@ -4,7 +4,12 @@ import { router, useLocalSearchParams } from 'expo-router';
 
 import { Body, GhostButton, Hint, PageTitle, Row, Screen, SectionTitle } from '@/components/clan-ui';
 import { type BookEntry, clanBook, myClans } from '@/lib/clan-api';
-import { BOOK_WINDOW_DAYS, bookProjection } from '@/lib/clan-roles';
+import {
+  BOOK_WINDOW_DAYS,
+  bookProjection,
+  bookView,
+  showsBookSectionTitle,
+} from '@/lib/clan-roles';
 import { t } from '@/lib/i18n';
 import { text } from '@/theme/tokens';
 
@@ -58,6 +63,12 @@ export default function ClanBookScreen() {
     void load();
   }, [load]);
 
+  /**
+   * ⚠️ SCRUM-122 — which part of the Book renders is decided by a PURE helper, so the two
+   * defects found on glass are asserted rather than merely fixed (see `clan-roles.ts`).
+   */
+  const view = bookView(entries.length, problem !== null);
+
   return (
     <Screen>
       <PageTitle>{clanName ?? t('book_header')}</PageTitle>
@@ -67,32 +78,40 @@ export default function ClanBookScreen() {
 
       {problem ? <Text style={styles.problem}>{problem}</Text> : null}
 
-      {entries.length === 0 && !problem ? <Body>{t('book_window')}</Body> : null}
+      {/* ⚠️ SCRUM-122 — the empty state has its OWN copy, and the section title belongs to
+          the LIST only. It used to reuse `book_window` (so the window line rendered twice
+          in one frame) under an unconditional heading (so a title sat over nothing).
+          `bookView` is pure, so `check:lib` asserts both facts. */}
+      {view.bodyKey === null ? null : <Body>{t(view.bodyKey)}</Body>}
 
-      <SectionTitle>{t('book_header')}</SectionTitle>
-      {entries.map((entry, i) => {
-        // ⚠️ the server decides this; the helper exists so the rule is stated once
-        const projection = bookProjection(entry.member !== null);
-        return (
-          <Row
-            key={`${entry.createdAt}-${i}`}
-            testID={`book-entry-${i}`}
-            left={
-              <>
-                <Text style={styles.points}>{entry.points}</Text>
-                <Text style={styles.meta}>
-                  {entry.offering ?? ''}
-                  {entry.festival ? ` · ${entry.festival}` : ''}
-                </Text>
-                <Text style={styles.meta}>
-                  {projection === 'full' ? (entry.member ?? '') : t('book_outside')}
-                </Text>
-              </>
-            }
-            right={<Text style={styles.meta}>{entry.createdAt.slice(0, 10)}</Text>}
-          />
-        );
-      })}
+      {showsBookSectionTitle(view) ? (
+        <>
+          <SectionTitle>{t('book_header')}</SectionTitle>
+          {entries.map((entry, i) => {
+            // ⚠️ the server decides this; the helper exists so the rule is stated once
+            const projection = bookProjection(entry.member !== null);
+            return (
+              <Row
+                key={`${entry.createdAt}-${i}`}
+                testID={`book-entry-${i}`}
+                left={
+                  <>
+                    <Text style={styles.points}>{entry.points}</Text>
+                    <Text style={styles.meta}>
+                      {entry.offering ?? ''}
+                      {entry.festival ? ` · ${entry.festival}` : ''}
+                    </Text>
+                    <Text style={styles.meta}>
+                      {projection === 'full' ? (entry.member ?? '') : t('book_outside')}
+                    </Text>
+                  </>
+                }
+                right={<Text style={styles.meta}>{entry.createdAt.slice(0, 10)}</Text>}
+              />
+            );
+          })}
+        </>
+      ) : null}
 
       <GhostButton
         testID="book-done"
