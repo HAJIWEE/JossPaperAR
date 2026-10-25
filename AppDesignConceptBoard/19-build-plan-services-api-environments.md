@@ -1312,6 +1312,45 @@ So a first measure pass whose height spec is not EXACT **latches the PreviewView
 
 ---
 
+### 12.41 · S67+5 — SCRUM-137 answered (option B): the confirm copy drafted from the boards, and the copy was never the only blocker (2026-10-25)
+
+**The ask.** `SCRUM-123` (option A, the designed modal card) was **half built** — the card and the three migrated clan dialogs shipped in PR #69 — and its remainder is **copy, not code**: two of the six designed confirm dialogs have **no string in either locale**. `SCRUM-137` asked the owner for the signed-off bilingual strings; the owner answered **option B** — *"a proposed draft is written and the owner edits it. Faster, and the draft is a starting point rather than a commitment."*
+
+**The draft was READ OFF THE BOARDS, not written from scratch.** ⚠️ **This is the part that matters**: the confirm boards already carry the copy, so almost none of it had to be invented. The plugin returned it shape by shape —
+
+| board | slot | EN | 中文 |
+|---|---|---|---|
+| `5b Reward / one more offering` | title | Watch to prepare one more offering. | 观看以再备一份供品。 |
+| | body | A short video unlocks one extra photo. Always after the ritual — never during. | 一段短视频，多一次拍照供品。仅在仪式之后 — 绝不在仪式之中。 |
+| | primary · cancel | ▶ Watch · No thanks | ▶ 观看 · 不用了 |
+| `9b Buy offerings · confirm` | title | Confirm — Wealth Bundle | 确认 — 财富套装 |
+| | body | Wealth Bundle · $2.99. Google Play will ask you to verify. **(IAP sheet = placeholder in this wire.)** | 财富套装 · $2.99。Google Play 将请求您验证。**（示意：内购表单占位。）** |
+| | primary · cancel | Buy with Google Play · Cancel | 通过 Google Play 购买 · 取消 |
+
+✅ **The reward confirm's TITLE is double-signed-off** — it is on the board *and* verbatim in `doc 10`'s "UX copy" table (the ad-gated offer row), the strongest provenance any of these strings has. ✅ The board ZH is **already Simplified**, so it matches the shipped table without a SCRUM-95 pass.
+
+⚠️ **THE BOARD'S STORE BODY IS A WIRE ANNOTATION, AND IT SAYS SO.** *"IAP sheet = placeholder in this wire."* / *"（示意：内购表单占位。）"* — a parenthetical that documents the wireframe to a reviewer and must **never** ship. So exactly **one** of the eight slots needs the owner's words, and the draft marks it.
+
+**Proposed keys** (flat and dotted, matching `clan.leaveConfirm`'s form; the store's title/body take `%{item}` / `%{price}`, because the store sells five items at five prices and `OFFERINGS[].name` already carries the bilingual name through `localized()`):
+
+```ts
+'reward.oneMoreTitle' · 'reward.oneMoreBody' · 'reward.oneMoreWatch' · 'reward.oneMoreDecline'
+'store.buyConfirmTitle': 'Confirm — %{item}'
+'store.buyConfirmBody':  '%{item} · %{price}. Google Play will ask you to verify.'   // ⚠️ proposed: the wire parenthetical dropped
+'store.buyWithPlay' · 'store.buyCancel'
+```
+
+**⚠️⚠️ THE FINDING WORTH MORE THAN THE DRAFT: supplying the words does NOT unblock the wiring.** Two gates sit behind the copy, and **neither is a copy gate** —
+
+1. **The store confirm has no surface.** `src/app/` has **no store route**; the offerings exist only as data (`src/domain/catalogue.ts`). There is nothing to mount the card on. ⚠️ *(The ticket calls this confirm "spend **jade**", but the board's confirm is the **cash** path — `Buy with Google Play` — and the board's own note says the store takes **cash OR store points** (支持现金或商店积分), so the **points** path has no confirm on the board at all. That is one of the three questions sent back.)*
+2. **The reward confirm IS the ad-gated offer.** `doc 10` names it *"Ad-gated offer (opt-in, post-ritual)"* — `+1 photo` for a rewarded ad — and the ad SDK is still unchosen: **`SCRUM-107`** is *"the one unsatisfied SCRUM-63 deliverable (⏸ gated on SDK selection, deferred by ADR-008)"*. Wiring a `▶ Watch` confirm today renders a button that **cannot watch anything**.
+
+⚠️ **So `SCRUM-137` is `In Review`, not `Done`** — option B's own definition makes the owner's edit the last step — and **`SCRUM-123` stays `In Review`** for the same reason: its card and the three clan migrations are delivered; the last two confirms wait on **copy AND their surfaces**.
+
+**US$0.00 — no AI call, no device run; the Penpot reads are free.** ⚠️ **Three questions went back with the draft:** which wallet the store confirm names (the ticket said "jade"; the board's confirm is the cash path; the board note says cash **or** store points) · whether the `▶` glyph ships (the `zoom` numerals precedent) · and the store's inconsistent wallet vocabulary (the board says 商店积分 / 积分, the shipped table says 功德点, `doc 10` names three wallets).
+
+---
+
 ### 12.40 · S67 — DETECT UP TO THREE, CARTOONIZE ONE: the extra objects were not wanted (2026-10-19)
 
 **The ask, verbatim.** *"After demonstrating it a few times, and gathering feedback. I decided that 3 objects generated max is not representative of the user's intent. The users' feedback says that the extra objects aren't wanted. So I decided that we will only have 1 object cartoonized. This means we should still detect if there is more than one object up to 3 objects but we should apply an analysis that assigns a probability factor to the objects and only cartoonize the one object with the highest probability."*
