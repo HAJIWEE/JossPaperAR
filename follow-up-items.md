@@ -7,7 +7,15 @@
 ## 🎯 Immediate Actions (Next 1–2 Weeks)
 
 ### 🔴 On the critical path
-- 🎯 **S67+7 (2026-10-25) — `SCRUM-140` ANSWERED (STAGED): **D NOW, A AFTER B11**. `SCRUM-123` CLOSES; ITS TWO CONFIRMS ARE SPLIT OUT. ⚠️ US$0.00.**
+- 🧹 **S67+8 (2026-10-25) — THE SPRINT'S To Do COLUMN REVIEWED: ONE CLOSED, FIVE BACK TO THE BACKLOG, ONE PICKED. ⚠️ US$0.00.**
+  - ✅ **`SCRUM-13` (AR fire mechanic) → `Done`** — delivered; its **AR framing was superseded by ADR-003**. The one unbuilt line (device AR performance) is `SCRUM-51`/`SCRUM-109`.
+  - ⚠️ **`SCRUM-12` (GPS) is stale** — no location code exists, and `new_ground` already ships server-side. **Needs re-scoping, not building.**
+  - ⚠️ **`SCRUM-51` is UNBLOCKED** (repo+CI ✅ · floor device ✅ `HN615L005386`) and is **the only ticket that can record doc 14's A1–A7 verdicts** — never measured, and a FAIL reopens ADR-003.
+  - ⚠️ **`SCRUM-106`'s subject moved** to the shipped `ConfirmCard`; **`SCRUM-109` is two-thirds done** (AC 4 timings outstanding — take with `SCRUM-51`); **`SCRUM-117`'s blocker cleared** (SCRUM-70), ⚠️ time-sensitive before `SCRUM-110`.
+  - ✅ **PICKED: `SCRUM-121` → `In Progress`** — the join preview leaks `%{name}`; a one-line fix **plus the missing gate** (nothing checks that `t(key, …)` supplies its message's placeholders).
+  - 📌 Sprint open items are now **exactly three**: `121` (In Progress) · `122` · `127`.
+
+- 🧹 **S67+7 (2026-10-25) — `SCRUM-140` ANSWERED (STAGED): **D NOW, A AFTER B11**. `SCRUM-123` CLOSES; ITS TWO CONFIRMS ARE SPLIT OUT. ⚠️ US$0.00.**
   - ✅ **Nothing is lost today** — **D** changes nothing, because the **MVP has no ads at all**. The ad revenue line stays **$0** until B11.
   - ⚠️ **The gate is `SCRUM-76` (B11)** — the D-U-N-S number and the Play Console organization account — with **`SCRUM-110`** (the Play Console listing) as a **likely co-gate**, since an AdMob app must be **verifiable on a store**.
   - ✅ **Three tickets carry the deferred work, one gate each:** **`SCRUM-142`** (AdMob + the reward confirm) · **`SCRUM-143`** (the store confirm) · **`SCRUM-141`** (the grant — ⚠️ a **prerequisite**, not a follow-up: without it a rewarded ad pays **nothing**).
