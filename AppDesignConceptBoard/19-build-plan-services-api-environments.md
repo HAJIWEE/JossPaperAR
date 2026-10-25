@@ -1344,7 +1344,9 @@ So a first measure pass whose height spec is not EXACT **latches the PreviewView
 
 **Verification:** `npx tsc --noEmit` **0** · `npm run check` **EXIT 0**. ⚠️ `tsc` caught a real typing error mid-fix (`/burn`'s `Preview` is not a `ThrowOutcome`), which is why `landedAction` takes a **structural** `LandedOutcome` — the screen keeps `throwNumber` in its own state.
 
-⚠️ **`In Review`, not `Done`** — **not yet re-verified on glass**; a fresh `preview` APK builds from `0c1137a`. The glass pass needs a **real ritual run** (a capture + a Path C generation, ≈ US$0.09) **and two deliberate misses**.
+✅ **The fix is ON THE DEVICE** — EAS `preview` build `b6786875` (from `0c1137a`) is installed on `HN615L005386` (`lastUpdateTime` **15:01 → 17:56**). ⚠️ **The FIRST `adb install` was REJECTED by the phone** — `INSTALL_FAILED_USER_RESTRICTED` — **while the download had already succeeded**, so the log's last line was a failure but the APK was present on disk. ⚠️ **A rejected install is therefore a real failure mode here: confirm it with `adb shell dumpsys package <id> | grep lastUpdateTime`, never with the script's exit code.** The retry went straight through.
+
+⏳ **`In Review`, not `Done`** — installed but **not yet glass-verified**. The glass pass needs a **real ritual run** (a capture + a Path C generation, ≈ US$0.09) **and two deliberate misses** — one to reach the button, a second to hit the reported defect.
 
 **US$0.00 in AI spend** (one EAS build).
 

@@ -11,7 +11,7 @@
   - ⚠️ **A COUPLING, not a typo**: the render asked `!canThrow(n)` while the handler required `!canThrow(n + 1)` → the button agreed for the FIRST rethrow and disagreed for the SECOND. ⚠️ Same class as `fireBoxTop`.
   - ✅ **One predicate now** — `landedAction` → `'rethrow' | 'confirm' | 'rest'`; **a hit is always confirmable**.
   - ⚠️⚠️ **Exposed and fixed**: (1) a **HIT on the last throw could not be claimed** — the award would have been **LOST**; (2) **`rest` was a dead end** (⚠️ already live). Both now correct, with **no new copy**.
-  - ✅ **Gate +8, fault-tested** (the original `+ 1` turns the reported assertion red). ⏳ **`In Review`** — not yet re-verified on glass.
+  - ✅ **Gate +8, fault-tested** (the original `+ 1` turns the reported assertion red). ✅ **The fix is ON the device** (`b6786875`, installed `HN615L005386`) — ⚠️ but the **first install was rejected** (`INSTALL_FAILED_USER_RESTRICTED`) *after* a successful download, so confirm by `dumpsys … lastUpdateTime`, not the script's exit. ⏳ **`In Review`** — installed, **not yet glass-verified** (needs a real ritual run ≈ US$0.09 + two deliberate misses).
 
 - 🐞 **S67+11 (2026-10-25) — `SCRUM-122` FIXED AND GATED (the Book's empty state had no copy) + a `preview` APK built for an on-glass review of it and 127 (`check:lib` 409 → 416). ⚠️ US$0.00 in AI spend; one EAS build.**
   - ✅ **The defect**: the window line rendered **twice** under an **unconditional** section title. ⚠️ **The cause was an ABSENCE** — no empty-state key existed.
