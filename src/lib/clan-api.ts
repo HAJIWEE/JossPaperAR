@@ -474,10 +474,82 @@ export async function clanAncestors(clanId: string): Promise<ApiResult<Ancestor[
     out.push({
       id,
       surname,
-      givenName: str(row.given_name),
-      relationship: str(row.relationship),
-      slot: num(row.slot),
+      givenName: str(row?.given_name),
+      relationship: str(row?.relationship),
+      slot: num(row?.slot),
     });
   }
   return { ok: true, data: out };
+}
+
+/**
+ * Create or edit a tablet — `save_ancestor` (SCRUM-146 · SCRUM-168).
+ *
+ * ⚠️ **The client does not re-implement the ladder or the cap as the AUTHORITY.** The RPC checks
+ * the ladder (`head · co_head · elder`), `ancestors_enforce_cap` checks the cap, and the RLS
+ * policies check both again on a direct write. `canEditTablets()` exists so the app does not
+ * *offer* an action that will be refused — it never decides that the action is allowed.
+ *
+ * ⚠️ `p_slot: null` on a create asks the server for the first free slot 0..9. Guessing a slot
+ * here would collide with `ancestors_live_slot_uniq` the moment two devices add at once.
+ */
+export async function saveAncestor(input: {
+  readonly clanId: string;
+  readonly surname: string;
+  readonly givenName?: string | null;
+  readonly relationship?: string | null;
+  /** Omit to CREATE; pass an id to EDIT. */
+  readonly ancestorId?: string | null;
+}): Promise<ApiResult<Ancestor>> {
+  const { data, error } = await supabase().rpc('save_ancestor', {
+    p_clan_id: input.clanId,
+    p_surname: input.surname,
+    p_given_name: input.givenName ?? null,
+    p_relationship: input.relationship ?? null,
+    p_slot: null,
+    p_ancestor_id: input.ancestorId ?? null,
+  });
+  if (error) return { ok: false, reason: reasonOf(error) };
+
+  const row = asRecord(data);
+  const id = str(row?.ancestor_id);
+  const surname = str(row?.surname);
+  if (!id || !surname) return { ok: false, reason: 'clan_request_failed' };
+  return {
+    ok: true,
+    data: {
+      id,
+      surname,
+      givenName: str(row?.given_name),
+      relationship: str(row?.relationship),
+      slot: num(row?.slot),
+    },
+  };
+}
+
+/**
+ * Archive a tablet — a plain UPDATE, because `ancestors_update_elder` already grants it.
+ *
+ * ⚠️ **An UPDATE that matches NO ROWS is not a success.** RLS *filters* rather than raises, so a
+ * plain member's archive returns zero rows and **no error** — an app that only checked `error`
+ * would show "archived" over a tablet that is still on the altar. The empty result IS the
+ * refusal, and `.select('id')` is what makes it observable.
+ *
+ * ⚠️ Archiving is the ONLY removal path: a hard delete would break the ledger that a burn's
+ * `ancestor_id` points at, and the cap counts live rows (`archived_at is null`).
+ */
+export async function archiveAncestor(
+  clanId: string,
+  ancestorId: string,
+): Promise<ApiResult<null>> {
+  const { data, error } = await supabase()
+    .from('ancestors')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', ancestorId)
+    .eq('clan_id', clanId)
+    .is('archived_at', null)
+    .select('id');
+  if (error) return { ok: false, reason: reasonOf(error) };
+  if ((data ?? []).length === 0) return { ok: false, reason: 'not_permitted' };
+  return { ok: true, data: null };
 }

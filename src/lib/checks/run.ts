@@ -48,6 +48,18 @@ import {
   shouldHoldInvite,
 } from '../invite-flow.ts';
 import { LOCALES, MESSAGES, detectLocale, localized, messageKeys, setLocale, t } from '../i18n.ts';
+import {
+  ANCESTOR_CAP,
+  EDIT_ROLES,
+  GIVEN_NAME_MAX,
+  RELATIONSHIP_MAX,
+  SURNAME_MAX,
+  canEditTablets,
+  capReached,
+  normaliseAncestorForm,
+  sheetProblem,
+  slotsRemaining,
+} from '../ancestor-sheet.ts';
 import { HOME_BANDS, TAB_BAR, bandFits, bandRect, homeFitScale, shrineBleedDp } from '../home-layout.ts';
 import {
   OFFERINGS_VIEWBOX,
@@ -1546,6 +1558,56 @@ function tabBarChecks(): void {
   }
 }
 
+/**
+ * §23 · The tablet sheet's rules (SCRUM-146 · SCRUM-168).
+ *
+ * ⚠️ Every number here is a **MIRROR** of the database, and a mirror that drifts is worse than
+ * none: the client would offer a save the server refuses with a raw Postgres code. So each one is
+ * asserted against the thing that actually decides — the RPC's ladder, the RLS policies, the
+ * `CHECK` constraints and `clans.ancestor_cap`.
+ */
+function ancestorSheetChecks(): void {
+  section('23 · The tablet sheet — the ladder, the cap, and btrim (SCRUM-168)');
+
+  // ── the ladder, exactly as `save_ancestor` and both policies spell it ──────
+  check('the ladder is exactly head · co_head · elder',
+    [...EDIT_ROLES].join(',') === 'head,co_head,elder');
+  for (const r of ['head', 'co_head', 'elder']) check(`  ${r} may edit tablets`, canEditTablets(r));
+  check('⚠️ a plain MEMBER may not (the RPC raises 42501, the policy filters SILENTLY)',
+    !canEditTablets('member'));
+  check('…and not-signed-in is not a role', !canEditTablets(null) && !canEditTablets(undefined));
+
+  // ── the limits, from the CHECK constraints ────────────────────────────────
+  check('surname max is the CHECK cr 20', SURNAME_MAX === 20);
+  check('given name max is the CHECK cr 40', GIVEN_NAME_MAX === 40);
+  check('relationship max is the CHECK cr 20', RELATIONSHIP_MAX === 20);
+
+  // ── ⚠️ btrim FIRST — a surname of spaces is empty on the server too ──────
+  check('a blank surname is refused', sheetProblem({ surname: '', givenName: '', relationship: '' }) === 'surname_required');
+  check('⚠️ and so is a surname of THREE SPACES (the server btrims, so must this)',
+    sheetProblem({ surname: '   ', givenName: '', relationship: '' }) === 'surname_required');
+  check('20 characters is accepted', sheetProblem({ surname: 'x'.repeat(20), givenName: '', relationship: '' }) === null);
+  check('21 is not', sheetProblem({ surname: 'x'.repeat(21), givenName: '', relationship: '' }) === 'surname_too_long');
+  check('a 41-character given name is too long',
+    sheetProblem({ surname: 'Tan', givenName: 'y'.repeat(41), relationship: '' }) === 'given_name_too_long');
+  check('a 21-character relationship is too long',
+    sheetProblem({ surname: 'Tan', givenName: '', relationship: 'z'.repeat(21) }) === 'relationship_too_long');
+
+  // ── normalise mirrors nullif(btrim(...), '') ─────────────────────────────
+  const clean = normaliseAncestorForm({ surname: '  Tan  ', givenName: '  ', relationship: ' Father ' });
+  check('the form is trimmed', clean.surname === 'Tan' && clean.relationship === 'Father', JSON.stringify(clean));
+  check('⚠️ a blank optional field becomes NULL, not an empty string (nullif)', clean.givenName === null);
+
+  // ── the cap, from clans.ancestor_cap ─────────────────────────────────────
+  check('the cap is 10 (clans.ancestor_cap default)', ANCESTOR_CAP === 10);
+  check("⚠️ …and NOT the altar display cap of 4: the board pages, it does not refuse",
+    ANCESTOR_CAP !== 4);
+  check('9 live tablets is not full', !capReached(9));
+  check('⚠️ 10 IS full — `>=`, not `>` (the 11th insert is what the trigger refuses)', capReached(10));
+  check('…and 2 slots remain at 8', slotsRemaining(8) === 2);
+  check('…and a legacy over-cap clan does not underflow', slotsRemaining(14) === 0);
+}
+
 async function main(): Promise<void> {
   await storageChecks();
   await drainChecks();
@@ -1620,6 +1682,7 @@ async function main(): Promise<void> {
   homePanelChecks();
   altarChecks();
   tabBarChecks();
+  ancestorSheetChecks();
 
   check('guard: a 5-character key is NOT valid', !isValidIdempotencyKey('12345'));
   check('guard: junk is NOT a clan code', normaliseClanCode('not-a-code!!') === null);

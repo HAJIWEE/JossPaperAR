@@ -12,6 +12,7 @@ import { ShrineCanvas } from '@/components/home/shrine-canvas';
 import { TabBar } from '@/components/home/tab-bar';
 import { Tablet } from '@/components/home/tablet';
 import { altarView, pageStep } from '@/lib/altar';
+import { canEditTablets } from '@/lib/ancestor-sheet';
 import { clanAncestors, myClans, type Ancestor } from '@/lib/clan-api';
 import { PILL_X_ON_REFERENCE, type PillClan } from '@/lib/clan-pill';
 import { readFirstRun } from '@/lib/first-run';
@@ -75,8 +76,36 @@ export default function HomeShrine() {
   const [ancestors, setAncestors] = useState<readonly Ancestor[]>([]);
   /** Which tablet the carousel shows. `altarView` clamps it, so a removal cannot strand it. */
   const [page, setPage] = useState(0);
+  /**
+   * ⚠️ The ACTIVE clan's id and the caller's role, kept because the sheet needs both: the id to
+   * save against, the role to decide whether to OFFER saving at all. `clans[0]` is the same row
+   * the pill shows, so the shrine and the sheet can never disagree about which clan is open.
+   */
+  const [activeClanId, setActiveClanId] = useState<string | null>(null);
   /** ⚠️ The ONLY place the panel state is decided — `ready` · `loading` · `failed`. */
   const panels = homePanels(summary);
+
+  /**
+   * ⚠️ Whether to **OFFER** editing — not whether it is allowed. `save_ancestor` refuses a plain
+   * member with `42501` and `ancestors_update_elder` filters the write at the table; this only
+   * stops the shrine putting a button in front of someone who would be refused.
+   */
+  const mayEdit = canEditTablets(clans[0]?.role);
+
+  /**
+   * Open the tablet sheet. `ancestorId = null` → ADD.
+   *
+   * ⚠️ The count travels so the sheet can refuse at the cap without a second round-trip, and the
+   * **role** travels so a refusal can be explained instead of surfacing a raw Postgres code.
+   */
+  const openSheet = (ancestorId: string | null) => {
+    if (!activeClanId || !mayEdit) return;
+    router.push({
+      pathname: '/ancestor',
+      // ⚠️ IDs only. The sheet reads its own role and count — see the note in `ancestor.tsx`.
+      params: { clanId: activeClanId, ...(ancestorId ? { ancestorId } : {}) },
+    });
+  };
 
   // The pill must reflect a clan created or joined *after* Home first mounted, so
   // this re-reads on every focus (the `clan/index.tsx` pattern).
@@ -93,6 +122,7 @@ export default function HomeShrine() {
         // ⚠️ The tablets belong to the ACTIVE clan — the same `list[0]` the pill shows, so the
         // two can never disagree about which clan the shrine is scoped to.
         const activeClan = list[0];
+        if (!cancelled) setActiveClanId(activeClan ? activeClan.clanId : null);
         const tablets = activeClan
           ? await clanAncestors(activeClan.clanId)
           : { ok: true as const, data: [] as Ancestor[] };
@@ -237,7 +267,11 @@ export default function HomeShrine() {
                 is un-ported, and the add flow is not built. A tappable ＋ with no destination
                 is the SCRUM-145 defect. It becomes real with the sheet, in this same ticket. */}
             {view.kind === 'empty' ? (
-              <View
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !mayEdit }}
+                disabled={!mayEdit}
+                onPress={() => openSheet(null)}
                 style={[
                   styles.abs,
                   bandRect(slot, s),
@@ -260,15 +294,22 @@ export default function HomeShrine() {
                 >
                   ＋
                 </Text>
-              </View>
+              </Pressable>
             ) : (
-              <View style={[styles.abs, bandRect(slot, s)]} testID="home-tablet">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !mayEdit }}
+                disabled={!mayEdit}
+                onPress={() => openSheet(current ? current.id : null)}
+                style={[styles.abs, bandRect(slot, s)]}
+                testID="home-tablet"
+              >
                 <Tablet
                   name={current ? `${current.surname}${current.givenName ?? ''}` : ''}
                   width={slot.w * s}
                   height={slot.h * s}
                 />
-              </View>
+              </Pressable>
             )}
 
             {/* ⚠️ A carousel, never a "+N more": at the cap of 10 every tablet must be reachable
