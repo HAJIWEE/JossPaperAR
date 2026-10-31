@@ -47,6 +47,7 @@ import {
   shouldHoldInvite,
 } from '../invite-flow.ts';
 import { LOCALES, MESSAGES, detectLocale, localized, messageKeys, setLocale, t } from '../i18n.ts';
+import { HOME_BANDS, bandFits, bandRect, homeFitScale } from '../home-layout.ts';
 import { BULK_PREFIX, createSplitStorage, bulkKey } from '../split-storage.ts';
 import {
   MAX_ATTEMPTS,
@@ -1214,6 +1215,72 @@ function screenCopyChecks(): void {
   setLocale('en');
 }
 
+/**
+ * 18 · The shrine scales PROPORTIONALLY (SCRUM-162 · the owner's ruling, 2026-10-31).
+ *
+ * ⚠️ WHY THIS EXISTS. The shrine's first two defects were **both invisible to every
+ * gate** and both found only by looking at a phone:
+ *
+ *   · the shrine base was rendered with **board px as device px**, so its right edge
+ *     landed at `16 + 358 = 374` on a 360 dp screen — **clipped**;
+ *   · the clan pill kept its fixed 236 while everything else scaled, so it sat at
+ *     **x 50 instead of 74**.
+ *
+ * ⚠️ A geometry gate that only checks the **390 px reference** passes both. So these
+ * assertions run at the sizes a real floor device actually has.
+ *
+ * ⚠️ AND THE RULING ITSELF IS ASSERTED. The owner chose **proportional** on
+ * 2026-10-31 — the whole shrine scales uniformly, and that deliberately includes type,
+ * so a 320 dp screen gets smaller text rather than a reflowed layout. The tempting
+ * "fix" is to hold type at `fluidSize`, which silently breaks every proportion the art
+ * and the aim grader were measured against. `check:copy` §5 forbids that import on the
+ * shrine; this section pins the maths beneath it.
+ */
+function homeShrineScaleChecks(): void {
+  section('18 · The shrine scales PROPORTIONALLY — the owner\'s ruling (SCRUM-162)');
+
+  const phone = homeFitScale(360, 800);
+  const wide = homeFitScale(540, 800);
+  const small = homeFitScale(320, 568);
+
+  check('a 360 × 800 phone is width-limited (360/390)', Math.abs(phone - 360 / 390) < 1e-9,
+    `got ${phone}`);
+  check('a 540 × 800 viewport is HEIGHT-limited (800/844), not width',
+    Math.abs(wide - 800 / 844) < 1e-9, `got ${wide}`);
+  check('…and that is smaller than the width rule would give (the tablet bug: 1732 dp tall)',
+    wide < 540 / 390, `width rule gives ${540 / 390}`);
+  check('a 320 × 568 small phone is height-limited too', Math.abs(small - 568 / 844) < 1e-9,
+    `got ${small}`);
+
+  // ── every band fits the window at every size ────────────────────────────────
+  const VIEWPORTS = [['360 × 800', 360, phone], ['540 × 800', 540, wide], ['320 × 568', 320, small]] as const;
+  const bands = Object.entries(HOME_BANDS);
+  for (const [label, windowWidth, scale] of VIEWPORTS) {
+    const spilled = bands.filter(([, band]) => !bandFits(band, scale, windowWidth)).map(([name]) => name);
+    check(`no band spills off a ${label} viewport (${bands.length} bands)`, spilled.length === 0,
+      `${spilled.join(', ')}`);
+  }
+
+  // ⚠️ POSITIVE CONTROL — the detector must FIRE on the defect that actually shipped.
+  check('…and the fit rule FAILS at scale 1 on a 360 dp screen (the clipped-art defect)',
+    !bandFits(HOME_BANDS.shrineBase, 1, 360),
+    'bandFits says the unscaled base fits a 360 dp screen — it does not (16 + 358 = 374)');
+
+  // ── bandRect is the ONE conversion, and it is absolute ─────────────────────
+  const rect = bandRect(HOME_BANDS.cta, 0.5);
+  check('bandRect scales x/y/w/h from the band', rect.left === 10 && rect.top === 338
+    && rect.width === 175 && rect.height === 33,
+    JSON.stringify(rect));
+  check('…and it is absolutely positioned (a flow child would re-order the shrine)',
+    rect.position === 'absolute');
+  check('…and at scale 1 it is the board\'s own numbers (no silent drift)',
+    bandRect(HOME_BANDS.cta, 1).top === 676 && bandRect(HOME_BANDS.cta, 1).left === 20);
+
+  // ── the canvas keeps the board's aspect ratio ──────────────────────────────
+  check('the canvas ratio is the board\'s 844 : 390 (so nothing can squash it)',
+    Math.abs(844 / 390 - 2.1641) < 0.001);
+}
+
 async function main(): Promise<void> {
   await storageChecks();
   await drainChecks();
@@ -1283,6 +1350,7 @@ async function main(): Promise<void> {
   clanPillChecks();
   zhScriptChecks();
   screenCopyChecks();
+  homeShrineScaleChecks();
 
   check('guard: a 5-character key is NOT valid', !isValidIdempotencyKey('12345'));
   check('guard: junk is NOT a clan code', normaliseClanCode('not-a-code!!') === null);
