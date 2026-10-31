@@ -8,7 +8,8 @@ This is an Expo/React Native mobile application. Prioritize mobile-first pattern
 >
 > ```bash
 > # 1. which tickets are in flight but NOT in the sprint? — THIS must return nothing
-> jql: project = SCRUM AND sprint is EMPTY AND statusCategory = "In Progress"
+> # ⚠️ `AND issuetype != Subtask` is REQUIRED — see the trap under "Anything worked on" below.
+> jql: project = SCRUM AND sprint is EMPTY AND statusCategory = "In Progress" AND issuetype != Subtask
 >
 > # 2. and confirm your own ticket is actually in the sprint
 > jql: key = <ISSUE-KEY>   → field customfield_10020
@@ -66,8 +67,13 @@ editJiraIssue: { "customfield_10020": <id> }
 jql: key = <ISSUE-KEY>   → field customfield_10020
 
 # 4. before ending a session that changed any status, this MUST come back empty
-jql: project = SCRUM AND sprint is EMPTY AND statusCategory = "In Progress"
+# ⚠️ `AND issuetype != Subtask` is REQUIRED — see the trap directly below.
+jql: project = SCRUM AND sprint is EMPTY AND statusCategory = "In Progress" AND issuetype != Subtask
 ```
+
+⚠️⚠️ **THE TRAP: sub-tasks are invisible to the `sprint` predicate.** `sprint is EMPTY` returns a **sub-task even when its sprint field is set**. Measured **2026-10-31**: `SCRUM-162` is a `Subtask`, `customfield_10020 → { id: 67, "SCRUM Sprint 3", active }`, and the **un-scoped** query still returned it. With this project now carrying **47 sub-tasks**, that means the gate **cries wolf on every in-flight sub-task** — the exact failure mode the paragraph below is about.
+
+⚠️ **So scope it with `AND issuetype != Subtask`, and when you need a sub-task's sprint, read the field** — `JIRA_GET_ISSUE → customfield_10020` — **never the JQL.** (Same root cause as the sibling trap: `jql: sprint = "X"` returns **only top-level issues**, so counting a sprint with JQL under-reports by exactly its sub-tasks.)
 
 ⚠️ **Step 4 is the one that matters**, and the `statusCategory = "In Progress"` filter is deliberate. Widening it to `statusCategory != "Done"` returns **the entire backlog** — SCRUM-4, 5, 12, 13, 47, 49, 50, 51 and more — which is a *correct* backlog, not a failure. A gate that cries wolf is worse than no gate: an agent following "this must return nothing" would either drag every `To Do` ticket into the sprint or learn to ignore the check. **Scope the audit to work in flight.**
 
