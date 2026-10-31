@@ -659,3 +659,27 @@ Every one was found by **looking at the phone**, with `tsc` and 515+ checks gree
 4. **`SCRUM-147`** onboarding → **`150`** store → **`149`** item burn → **`155`** seed → **`157`** demo run.
 
 ⚠️ **`SCRUM-12`** is still blocked on the **`SCRUM-159`** decision, and **`SCRUM-208`** is yours.
+
+### 📲 The APK for the off-session review
+⚠️ EAS `preview` builds sit in the queue for **30–40 min** (measured twice). The build was still
+`IN_PROGRESS` when the session ended, so a **watcher is left running** — it polls every 30 s, then
+downloads and installs when the build finishes:
+
+```
+tail -f /tmp/install.log          # the state, one line per poll
+```
+
+If that process died with the session, do it by hand:
+
+```bash
+cd /home/gweejiahan/.cline/worktrees/62e49/JossPaperAR
+eas build:view de4c1df9-5b81-492f-b10a-ccfb22b51271 --json \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['artifacts']['buildUrl'])"
+curl -sL -o /tmp/josspaperar.apk "<that url>"
+adb install -r /tmp/josspaperar.apk
+# ⚠️ confirm from the DEVICE, not from adb's exit code:
+adb shell dumpsys package app.josspaperar | grep -i lastUpdateTime
+```
+
+⚠️ `SCRUM-145`'s lesson: an install can be **rejected** (`INSTALL_FAILED_USER_RESTRICTED`) *after*
+a successful download and still print success. `lastUpdateTime` is the only proof.
