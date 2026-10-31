@@ -592,3 +592,21 @@ policies · `ANCESTOR_CAP` 10 ↔ `clans.ancestor_cap` · 20/40/20 ↔ the `CHEC
 ### ⚠️ Seen on glass and NOT fixed
 A **Latin** surname renders one letter per line in the vertical name slot (`C h e n`) — the board
 is drawn for 中文. Needs an owner decision: rotate for Latin, or keep vertical everywhere.
+
+## 2026-10-31 — Latin names are ROTATED on the tablet (`c168f55`)
+
+A 牌位 is written top-to-bottom, one char per line — right for 陈秀英, and it drew `Chen` as four
+lines of one letter on glass.
+
+**Rule** (`src/lib/tablet-name.ts`): **any** CJK char ⇒ vertical; **none** ⇒ one line, rotated 90°.
+⚠️ `陈 Chen` is **vertical** — a stele does not rotate half a name. An empty name ⇒ vertical.
+
+⚠️ **A rotated view LAYS OUT at its unrotated size**, so rotating in place hangs the name off one
+end. The inner view is the frame with **axes swapped** and centred, so its centre == the frame's
+centre and 90° maps exactly onto it.
+
+⚠️ **Two size limits**: across the frame (`width × 0.62`) and along it (`height × 0.92 / len`).
+Without the second, `Bartholomew` runs out of the plaque's ends. `0.58` em advance is pessimistic
+on purpose — RN cannot measure text without a layout pass.
+
+`check:lib` **515 → 524** (§24), fault-tested (forcing `vertical` turns two checks red).
