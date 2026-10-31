@@ -154,9 +154,39 @@ export const BOARD_ORIGIN_Y = 180;
  * ⚠️ The margin this leaves is **deliberate negative space**, not a bug: on a tablet the
  * composition is centred rather than stretched to two edges it was never drawn for.
  */
-export function homeFitScale(windowWidth: number, windowHeight: number): number {
-  return Math.min(windowWidth / DESIGN_REFERENCE_WIDTH, windowHeight / REFERENCE_HEIGHT);
+/**
+ * The one uniform scale the shrine is drawn at.
+ *
+ * ⚠️ **Feed it the SCREEN, not the window.** `useWindowDimensions()` reports the window RN has
+ * after the system bars (measured **345 × 745** on a 360 × 800 device), so contain-fitting into
+ * that inset window letterboxes the board on **all four sides** — which is what the owner saw as
+ * "extra white space at the sides, top and bottom". The app's own root does span the full screen
+ * (`[0,0][720,1600]` in `uiautomator`), so the composition is sized to the screen and anchored at
+ * its top-left. `Dimensions.get('screen')` is what the canvas and the screen both use.
+ *
+ * Contain-fit is kept: the art, the CTA and the aim grader were measured against these
+ * proportions, and a cover-fit would cut the offering button off the bottom of a short phone.
+ * The residual strip under the bar is handled by `shrineBleedDp`, not by stretching.
+ */
+export function homeFitScale(screenWidth: number, screenHeight: number): number {
+  return Math.min(screenWidth / DESIGN_REFERENCE_WIDTH, screenHeight / REFERENCE_HEIGHT);
 }
+
+/**
+ * ⚠️ How far the tab bar must bleed BEYOND the board to reach the physical bottom edge.
+ *
+ * The board is 844 tall; a screen that is even slightly taller than `844 × scale` leaves a strip
+ * under the bar. ⚠️ That strip is **not** letterboxing the owner asked for — it is the one place
+ * the shrine shows a SECOND colour (the page's `paper` under a `paperDeep` bar), which is exactly
+ * what was visible on glass. So the bar's own background is stretched over it.
+ *
+ * Returns **device dp**, not board px — it is applied to the rendered height, not through
+ * `bandRect`. 0 when the board already reaches the bottom.
+ */
+export function shrineBleedDp(screenHeight: number, scale: number): number {
+  return Math.max(0, screenHeight - REFERENCE_HEIGHT * scale);
+}
+
 
 /**
  * The board's own height. `390 × 844` — the canvas 131 of the 135 Penpot boards

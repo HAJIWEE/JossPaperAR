@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { ClanPill } from '@/components/clan-pill';
@@ -22,6 +22,7 @@ import {
   HOME_REGION_ORDER,
   bandRect,
   homeFitScale,
+  shrineBleedDp,
   type HomeRegion,
 } from '@/lib/home-layout';
 import { t } from '@/lib/i18n';
@@ -56,9 +57,14 @@ import { brand, fontSize, onColorCream, radius, surface, text } from '@/theme/to
 
 export default function HomeShrine() {
   const router = useRouter();
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  /**
+   * ⚠️ `Dimensions.get('screen')`, NOT `useWindowDimensions()`. Measured on glass: the window is
+   * **345 × 745** inside a 360 × 800 screen, and containing the board in that inset window
+   * letterboxes it on all four sides — the "white space at the sides, top and bottom".
+   */
+  const screen = Dimensions.get('screen');
   /** Board px → device dp, contain-fit on BOTH axes. The ONE conversion on this screen. */
-  const s = homeFitScale(windowWidth, windowHeight);
+  const s = homeFitScale(screen.width, screen.height);
   const [clans, setClans] = useState<readonly PillClan[]>([]);
   /**
    * ⚠️ `null` = not asked yet. A failure is kept as a failure, **never** folded into a
@@ -337,8 +343,18 @@ export default function HomeShrine() {
 
       // ── footer · the tab bar (SCRUM-164) ──────────────────────────────────
       case 'footer':
+        // ⚠️ The bar's own `paperDeep` is stretched over the strip BELOW the board so the bar
+        // reaches the physical bottom edge. That strip is the one place the shrine showed a
+        // SECOND colour (paper under a paperDeep bar) — the most obvious gap on glass.
         return (
-          <View style={[styles.abs, bandRect(HOME_BANDS.tabbar, s)]} testID="home-tabbar-band">
+          <View
+            style={[
+              styles.abs,
+              bandRect(HOME_BANDS.tabbar, s),
+              { height: HOME_BANDS.tabbar.h * s + shrineBleedDp(screen.height, s) },
+            ]}
+            testID="home-tabbar-band"
+          >
             {/* ⚠️ Store and Profile are DISABLED inside the bar: their screens are
                 SCRUM-150 / SCRUM-151. A dead link or an inert live-looking tab would both be
                 worse than a visibly unavailable one. */}

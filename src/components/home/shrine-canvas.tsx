@@ -25,21 +25,29 @@
  */
 
 import type { ReactNode } from 'react';
-import { ScrollView, useWindowDimensions, View } from 'react-native';
+import { Dimensions, ScrollView, View } from 'react-native';
 
 import { REFERENCE_HEIGHT, homeFitScale } from '@/lib/home-layout';
 import { DESIGN_REFERENCE_WIDTH } from '@/theme/tokens';
 import { surface } from '@/theme/tokens';
 
+/**
+ * ⚠️ **`Dimensions.get('screen')`, NOT `useWindowDimensions()`.**
+ * On glass the window is **345 × 745** inside a 360 × 800 screen, so containing the board in the
+ * window letterboxes it on all four sides — the "white space at the sides, top and bottom". The
+ * app's root does span the full screen, so the canvas is sized to the screen and pinned to its
+ * top-left corner; nothing is centred in a smaller box.
+ */
 export function ShrineCanvas({ children }: { children: ReactNode }) {
-  const { width, height } = useWindowDimensions();
-  const s = homeFitScale(width, height);
+  const screen = Dimensions.get('screen');
+  const s = homeFitScale(screen.width, screen.height);
 
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: surface.paper }}
       horizontal={false}
-      contentContainerStyle={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}
+      contentContainerStyle={{ flexGrow: 1, alignItems: 'flex-start', justifyContent: 'flex-start' }}
+      scrollEnabled={false}
       showsVerticalScrollIndicator={false}
       testID="shrine-canvas"
     >

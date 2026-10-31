@@ -48,7 +48,7 @@ import {
   shouldHoldInvite,
 } from '../invite-flow.ts';
 import { LOCALES, MESSAGES, detectLocale, localized, messageKeys, setLocale, t } from '../i18n.ts';
-import { HOME_BANDS, TAB_BAR, bandFits, bandRect, homeFitScale } from '../home-layout.ts';
+import { HOME_BANDS, TAB_BAR, bandFits, bandRect, homeFitScale, shrineBleedDp } from '../home-layout.ts';
 import {
   OFFERINGS_VIEWBOX,
   OFFERING_DOTS,
@@ -1293,6 +1293,28 @@ function homeShrineScaleChecks(): void {
     rect.position === 'absolute');
   check('…and at scale 1 it is the board\'s own numbers (no silent drift)',
     bandRect(HOME_BANDS.cta, 1).top === 676 && bandRect(HOME_BANDS.cta, 1).left === 20);
+
+  // ── ⚠️ THE EDGE-TO-EDGE RULING (owner, 2026-10-31) ────────────────────────
+  // The shrine was contain-fitted into the WINDOW RN reports (345 × 745 on a 360 × 800 device),
+  // which letterboxes it on all four sides. It is now fitted to the SCREEN and anchored at its
+  // top-left, so the width rule is exact and there is no side gap when width-limited.
+  const screenScale = homeFitScale(360, 800);
+  check('on a 360 × 800 screen the canvas fills the width EXACTLY (no side letterbox)',
+    Math.abs(390 * screenScale - 360) < 1e-9, `fills ${(390 * screenScale).toFixed(2)} of 360`);
+  // ⚠️ POSITIVE CONTROL — the defect that actually shipped: fitting the WINDOW inset leaves gaps.
+  const windowScale = homeFitScale(345, 745);
+  const windowFill = 390 * windowScale;
+  check('…and fitting the WINDOW instead leaves a visible side gap (the defect that shipped)',
+    windowFill < 360 - 10, `window-fit fills ${windowFill.toFixed(1)} of 360 — ${((360 - windowFill) / 2).toFixed(1)} dp lost per side`);
+
+  // ⚠️ The strip under the bar is a SECOND COLOUR, so the bar must reach the physical edge.
+  check('the tab bar bleeds to the screen bottom (800 − 844×s)',
+    Math.abs(shrineBleedDp(800, screenScale) - (800 - 844 * screenScale)) < 1e-9,
+    `${shrineBleedDp(800, screenScale).toFixed(2)} dp`);
+  check('…and the bleed is POSITIVE on a screen taller than the board',
+    shrineBleedDp(800, screenScale) > 15, `${shrineBleedDp(800, screenScale).toFixed(2)} dp`);
+  check('…and ZERO when the board already reaches the bottom (no phantom strip)',
+    shrineBleedDp(844, 1) === 0);
 
   // ── the canvas keeps the board's aspect ratio ──────────────────────────────
   check('the canvas ratio is the board\'s 844 : 390 (so nothing can squash it)',
