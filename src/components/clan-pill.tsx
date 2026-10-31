@@ -82,10 +82,16 @@ export function ClanPill({ clans, scale = 1 }: { clans: readonly PillClan[]; sca
         {view.name}
       </Text>
 
-      <View style={[styles.chip, dyn.chip]}>
-        <Text style={[styles.chipLabel, dyn.chipLabel]} numberOfLines={1}>
-          {`\u{1F451} ${t(view.roleLabelKey)}`}
-        </Text>
+      {/* ⚠️ A FIXED slot, with the chip CENTRED in it. The board gives the chip 94 in EN and
+          58 in ZH, both at dx 106 — left-anchored, a 2-character 中文 role leaves a 40 px hole
+          before the `›` and the chip looks shoved left. The slot is the widest locale's width,
+          so EN is unchanged and 中文 centres. */}
+      <View style={[styles.chipSlot, { width: PILL_SPEC.chip.slotWidth * scale }]}>
+        <View style={[styles.chip, dyn.chip]}>
+          <Text style={[styles.chipLabel, dyn.chipLabel]} numberOfLines={1}>
+            {`\u{1F451} ${t(view.roleLabelKey)}`}
+          </Text>
+        </View>
       </View>
 
       {/* ⚠️ ONE glyph, TWO states: the 2+ state is the same U+203A ROTATED, never a
@@ -121,7 +127,14 @@ const styles = StyleSheet.create({
     /* Noto Serif SC on the board; RN falls back to the system serif. */
     fontFamily: 'serif',
   },
+  chipSlot: {
+    /* ⚠️ Never shrinks: the slot is what keeps the pill's balance locale-independent. */
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   chip: {
+    maxWidth: '100%',
     height: PILL_SPEC.chip.height,
     borderRadius: PILL_SPEC.chip.radius,
     /* ⚠️ brand.gold is a FILL token — correct here. The label must be text.ink:

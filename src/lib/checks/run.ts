@@ -1197,6 +1197,25 @@ function screenCopyChecks(): void {
     check(`…its 中文 carries no Latin text`, latin.length === 0, `${latin.join(', ')} in "${zh[key]}"`);
   }
 
+  // ── ⚠️ LOCALE-PROOF ALIGNMENT (owner, 2026-10-31) ─────────────────────────────
+  // "族长 is now too far left." The board anchors the role chip at dx 106 in BOTH locales but
+  // draws it 94 wide in EN and 58 in ZH — so a left-anchored chip leaves a 40 px hole in 中文.
+  const chip = PILL_SPEC.chip;
+  check("the role chip slot is the board EN chip width (94)", chip.slotWidth === 94);
+  check('…and the slot still clears the affordance (106 + 94 <= 204)',
+    chip.dx + chip.slotWidth <= PILL_SPEC.affordance.dx,
+    `${chip.dx} + ${chip.slotWidth} vs ${PILL_SPEC.affordance.dx}`);
+  // ⚠️ the defect, as arithmetic: the ZH label is 58, so left-anchored it ends 40 px short.
+  const holePx = PILL_SPEC.affordance.dx - (chip.dx + chip.narrowestLabelWidth);
+  check('⚠️ a left-anchored 中文 chip leaves a visible hole before the ›',
+    holePx >= 30, `${holePx} px of dead space`);
+  // …and centring it in the slot reclaims exactly half of it, in the RIGHT direction.
+  const centredDx = chip.dx + (chip.slotWidth - chip.narrowestLabelWidth) / 2;
+  check('…and the chip CENTRES in the slot, so the narrow locale moves right',
+    centredDx > chip.dx && centredDx === 124, `centred dx ${centredDx}`);
+  check('…while the widest locale is pixel-identical to the board (no shift in EN)',
+    chip.dx + (chip.slotWidth - chip.slotWidth) / 2 === 106);
+
   // the shared picker the four bilingual sites now use
   setLocale('en');
   check('localized() answers EN under the en locale', localized({ en: 'Devout', zh: '虔诚' }) === 'Devout');
