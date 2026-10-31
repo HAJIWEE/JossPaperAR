@@ -1,57 +1,136 @@
-import { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { Fragment, useCallback, useState } from 'react';
+import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ClanPill } from '@/components/clan-pill';
-import { AIM_BANDS } from '@/domain/aim';
-import { OFFERINGS, baseValueOf } from '@/domain/catalogue';
-import { DAILY_PHOTO_BURNS, DAILY_STORE_BURNS } from '@/domain/quota';
-import { myClans } from '@/lib/clan-api';
-import { HEADER_SPEC, type PillClan } from '@/lib/clan-pill';
+import { AltarHalo } from '@/components/home/altar-halo';
+import { AppMark, SettingsGear } from '@/components/home/header-art';
+import { Offerings } from '@/components/home/offerings';
+import { StreakPanel, TributePanel } from '@/components/home/panels';
+import { ShrineBase } from '@/components/home/shrine-base';
+import { ShrineCanvas } from '@/components/home/shrine-canvas';
+import { TabBar } from '@/components/home/tab-bar';
+import { Tablet } from '@/components/home/tablet';
+import { altarView, pageStep } from '@/lib/altar';
+import { canEditTablets } from '@/lib/ancestor-sheet';
+import { clanAncestors, myClans, type Ancestor } from '@/lib/clan-api';
+import { PILL_X_ON_REFERENCE, type PillClan } from '@/lib/clan-pill';
 import { readFirstRun } from '@/lib/first-run';
-import { localized, t } from '@/lib/i18n';
+import { fetchHomeSummary } from '@/lib/home-api';
+import { homePanels, type SummaryResult } from '@/lib/home-panels';
+import {
+  HOME_BANDS,
+  HOME_REGION_ORDER,
+  bandRect,
+  homeFitScale,
+  shrineBleedDp,
+  type HomeRegion,
+} from '@/lib/home-layout';
+import { t } from '@/lib/i18n';
 import { DEMO_PARAM, DEMO_VALUE, needsTutorial } from '@/lib/tutorial';
-import { TOUCH_GAP, TOUCH_TARGET, brand, fontSize, fluidSize, onColorCream, radius, space, surface, text } from '@/theme/tokens';
+import { brand, fontSize, onColorCream, radius, surface, text } from '@/theme/tokens';
 
 /**
- * HOME — a SCAFFOLD, not the shrine.
+ * HOME — the shrine (SCRUM-148 · SCRUM-160 · SCRUM-162).
  *
- * This exists to prove three things are actually wired (SCRUM-57 §Definition of
- * done) and to give the build a place to start from:
+ * ── THE LAYOUT IS ABSOLUTELY PLACED ON A 390 × 844 CANVAS ───────────────────
+ * ⚠️ The first pass stacked these regions as **flow** children with `marginBottom`,
+ * which threw away every y-coordinate the board specifies — that is why the placement
+ * was wrong on glass. The shrine is a fixed-art composition, so it is drawn as one:
+ * `ShrineCanvas` gives us `width × (844 × scale)` and every element is placed from
+ * `HOME_BANDS` through `bandRect`.
  *
- *   1. Expo Router + the `src/app/` tree renders on a device
- *   2. the RN theme bridge carries the real design tokens (not hard-coded hexes)
- *   3. the DOMAIN modules are importable and tell the truth about the numbers
+ * ⚠️ **Responsive means "the same shrine, scaled" — not reflowed.** One uniform scale
+ * (`homeFitScale` = the smaller of `w/390` and `h/844`) keeps the proportions the art and
+ * the aim grader were measured against, and guarantees the whole shrine fits at any size:
+ * a short or small screen **shrinks it**, it never squashes or clips. Every band goes
+ * through `bandRect` — SCRUM-162 shipped one that did not, and the shrine base hung
+ * 14 dp off a 360 dp screen.
  *
- * It deliberately renders the aim bands and the catalogue, because those are the
- * values a reviewer should be able to eyeball against docs 05/10 without opening
- * a test file. The real Home (altar, tablets, terrain) is designed and lands with
- * the slice.
- *
- * ✅ SCRUM-92 (2026-10-10): the **clan pill** has landed in the header — the one
- * element that makes *"Home is clan-scoped"* true, and SCRUM-46's last unmet scope
- * item. It is a real component (`src/components/clan-pill.tsx`) on real
- * `myClans()` data, at the geometry SCRUM-91 measured. Its rules live in
- * `src/lib/clan-pill.ts` so `check:lib` asserts them without a device.
+ * ── WHAT IS STILL A RESERVED BAND ───────────────────────────────────────────
+ * A dashed outline marks a band whose ticket has not landed. They are **correctly
+ * positioned** — the box you see is where the real thing goes:
+ *   settings → SCRUM-151 · tribute + streak → SCRUM-161 · halo + offerings → SCRUM-162
+ *   · tab bar → SCRUM-164
+ * ⚠️ `HOME_REGION_ORDER` is now the **paint order (z)**, which is what the board's own
+ * layer list encodes: the halo is behind the art, the art behind the CTA.
  */
 
-export default function HomeScaffold() {
-  const insets = useSafeAreaInsets();
+export default function HomeShrine() {
   const router = useRouter();
+  /**
+   * ⚠️ `Dimensions.get('screen')`, NOT `useWindowDimensions()`. Measured on glass: the window is
+   * **345 × 745** inside a 360 × 800 screen, and containing the board in that inset window
+   * letterboxes it on all four sides — the "white space at the sides, top and bottom".
+   */
+  const screen = Dimensions.get('screen');
+  /** Board px → device dp, contain-fit on BOTH axes. The ONE conversion on this screen. */
+  const s = homeFitScale(screen.width, screen.height);
   const [clans, setClans] = useState<readonly PillClan[]>([]);
+  /**
+   * ⚠️ `null` = not asked yet. A failure is kept as a failure, **never** folded into a
+   * zero — see `homePanels` (SCRUM-161).
+   */
+  const [summary, setSummary] = useState<SummaryResult | null>(null);
+  /** ⚠️ The live tablets of the active clan — names, so they never leave this screen. */
+  const [ancestors, setAncestors] = useState<readonly Ancestor[]>([]);
+  /** Which tablet the carousel shows. `altarView` clamps it, so a removal cannot strand it. */
+  const [page, setPage] = useState(0);
+  /**
+   * ⚠️ The ACTIVE clan's id and the caller's role, kept because the sheet needs both: the id to
+   * save against, the role to decide whether to OFFER saving at all. `clans[0]` is the same row
+   * the pill shows, so the shrine and the sheet can never disagree about which clan is open.
+   */
+  const [activeClanId, setActiveClanId] = useState<string | null>(null);
+  /** ⚠️ The ONLY place the panel state is decided — `ready` · `loading` · `failed`. */
+  const panels = homePanels(summary);
 
-  // The header pill must reflect a clan created or joined *after* Home first
-  // mounted, so this re-reads on every focus (the `clan/index.tsx` pattern).
+  /**
+   * ⚠️ Whether to **OFFER** editing — not whether it is allowed. `save_ancestor` refuses a plain
+   * member with `42501` and `ancestors_update_elder` filters the write at the table; this only
+   * stops the shrine putting a button in front of someone who would be refused.
+   */
+  const mayEdit = canEditTablets(clans[0]?.role);
+
+  /**
+   * Open the tablet sheet. `ancestorId = null` → ADD.
+   *
+   * ⚠️ The count travels so the sheet can refuse at the cap without a second round-trip, and the
+   * **role** travels so a refusal can be explained instead of surfacing a raw Postgres code.
+   */
+  const openSheet = (ancestorId: string | null) => {
+    if (!activeClanId || !mayEdit) return;
+    router.push({
+      pathname: '/ancestor',
+      // ⚠️ IDs only. The sheet reads its own role and count — see the note in `ancestor.tsx`.
+      params: { clanId: activeClanId, ...(ancestorId ? { ancestorId } : {}) },
+    });
+  };
+
+  // The pill must reflect a clan created or joined *after* Home first mounted, so
+  // this re-reads on every focus (the `clan/index.tsx` pattern).
   // ⚠️ A failed read hides the pill rather than showing a stale clan.
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       void (async () => {
         const mine = await myClans();
+        const list = mine.ok ? mine.data : [];
         if (!cancelled) {
-          setClans(mine.ok ? mine.data.map((c) => ({ name: c.name, role: c.role })) : []);
+          setClans(list.map((c) => ({ name: c.name, role: c.role })));
         }
+        // ⚠️ The tablets belong to the ACTIVE clan — the same `list[0]` the pill shows, so the
+        // two can never disagree about which clan the shrine is scoped to.
+        const activeClan = list[0];
+        if (!cancelled) setActiveClanId(activeClan ? activeClan.clanId : null);
+        const tablets = activeClan
+          ? await clanAncestors(activeClan.clanId)
+          : { ok: true as const, data: [] as Ancestor[] };
+        if (!cancelled) setAncestors(tablets.ok ? tablets.data : []);
+        // ⚠️ Re-read alongside the clan list: a burn awards tribute and moves the streak, so
+        // the shrine comes back from `/reward` showing stale numbers without this.
+        const totals = await fetchHomeSummary();
+        if (!cancelled) setSummary(totals);
       })();
       return () => {
         cancelled = true;
@@ -59,207 +138,319 @@ export default function HomeScaffold() {
     }, []),
   );
 
+  const startOffering = () => {
+    // ── SCRUM-85 · the FIRST burn is a TUTORIAL ─────────────────────────────
+    // ⚠️ Read the first-run record HERE, at the tap, rather than in an effect: the
+    // flag must reflect the device's state at the moment of the decision.
+    void (async () => {
+      const firstRun = await readFirstRun();
+      const params = needsTutorial(firstRun) ? { [DEMO_PARAM]: DEMO_VALUE } : {};
+      router.push({ pathname: '/capture', params });
+    })();
+  };
+
+  const region = (name: HomeRegion) => {
+    switch (name) {
+      // ── header · the app mark, the pill, the settings slot ─────────────────
+      case 'header':
+        return (
+          <>
+            <View style={[styles.abs, bandRect(HOME_BANDS.headerMark, s)]} testID="home-app-mark">
+              <AppMark />
+            </View>
+            {/* ⚠️ The pill's x is board-relative: 390 − 20 − 44 − 10 − 236 = 80. */}
+            <View
+              style={[styles.abs, { left: PILL_X_ON_REFERENCE * s, top: HOME_BANDS.settings.y * s }]}
+              testID="home-pill-slot"
+            >
+              <ClanPill clans={clans} scale={s} />
+            </View>
+            {/*
+              ⚠️ DECORATIVE FOR NOW, and deliberately not a `Pressable`. The board draws
+              this as `btn · settings` and the gear belongs here — but the settings screen
+              arrives with SCRUM-151, and ⚠️ **a control that renders and does nothing is
+              the SCRUM-145 defect** (an inert "Throw again" that passed every per-screen
+              gate). It becomes a button the moment it has a destination, not before.
+
+              ⚠️ The BUTTON SURFACE is part of the board and was missing at first: the
+              owner read the bare gear as misaligned, and it was — `btn · settings` is a
+              `#EAE2D2` fill with a **2.5 px ink stroke and r14**, i.e. exactly the clan
+              pill's treatment (`PILL_SPEC.radius` 14 · `borderWidth` 2.5). Without it the
+              icon had nothing to sit in. ⚠️ RN draws the stroke INSIDE the box, so at
+              scale 1 the 2.5 is the right number here — no `CONTENT_PAD_H` correction,
+              because this surface holds no text to inset.
+            */}
+            <View
+              style={[
+                styles.abs,
+                bandRect(HOME_BANDS.settings, s),
+                styles.settingsBtn,
+                { borderRadius: 14 * s, borderWidth: 2.5 * s },
+              ]}
+              testID="home-settings-slot"
+            >
+              <View style={{ width: 20 * s, height: 20 * s }}>
+                <SettingsGear />
+              </View>
+            </View>
+          </>
+        );
+
+      // ── totals · the tribute and streak panels (SCRUM-161) ────────────────
+      case 'totals':
+        return (
+          <>
+            <View style={[styles.abs, bandRect(HOME_BANDS.tribute, s)]} testID="home-tribute-band">
+              <TributePanel state={panels} scale={s} />
+            </View>
+            <View style={[styles.abs, bandRect(HOME_BANDS.streak, s)]} testID="home-streak-band">
+              <StreakPanel state={panels} scale={s} />
+            </View>
+          </>
+        );
+
+      // ── altar · the halo, the offerings, the shrine base and the tablet ───
+      case 'altar': {
+        const view = altarView(ancestors.length, page);
+        // ⚠️ The board draws the ＋ slot and the CENTRE TABLET on the SAME band
+        // (131,285 129×307) — see `altar.ts`. They swap in place; nothing below moves.
+        const slot = HOME_BANDS.addSlot;
+        const current = view.kind === 'tablet' ? ancestors[view.index] : null;
+        return (
+          <>
+            <View style={[styles.abs, bandRect(HOME_BANDS.halo, s)]} testID="home-halo-band">
+              <AltarHalo />
+            </View>
+            <View style={[styles.abs, bandRect(HOME_BANDS.offerings, s)]} testID="home-offerings-band">
+              <Offerings />
+            </View>
+            <View style={[styles.abs, bandRect(HOME_BANDS.shrineBase, s)]} testID="home-shrine-base">
+              <ShrineBase />
+            </View>
+            {/* ⚠️ The ALTAR-STATE CAPTION — on the board it is `Your altar is empty — tap ＋ to add
+                a tablet.`, i.e. the EMPTY state's own line. The filled board's caption text is not
+                yet read, so nothing renders here when a tablet exists rather than inventing one. */}
+            <View
+              style={[styles.abs, bandRect(HOME_BANDS.caption, s)]}
+              testID="home-caption-band"
+            >
+              {view.kind === 'empty' ? (
+                <Text
+                  numberOfLines={1}
+                  style={{ color: text.inkSoft, fontSize: 12 * s }}
+                >
+                  {t('home.altarEmpty')}
+                </Text>
+              ) : null}
+            </View>
+
+            {/* ⚠️ `hint · cta` — the line the board sets above the offer button. */}
+            <View style={[styles.abs, bandRect(HOME_BANDS.hintCta, s)]} testID="home-hint-band">
+              <Text numberOfLines={1} style={{ color: text.inkSoft, fontSize: 12 * s }}>
+                {t('home.ctaHint')}
+              </Text>
+            </View>
+
+            {/* ⚠️ `zone · customizable temple (label)` — the chip that tells the owner the altar is
+                theirs. ⚠️ Only the LABEL is drawn: the chip's own background fill could not be read
+                from the plugin yet, and a guessed chip is worse than a bare line. */}
+            <View
+              style={[styles.abs, bandRect(HOME_BANDS.templeChip, s), styles.chip]}
+              testID="home-temple-chip"
+            >
+              <Text numberOfLines={1} style={{ color: text.gold, fontSize: 10.5 * s }}>
+                {t('home.templeChip')}
+              </Text>
+            </View>
+
+            {/* ⚠️ EMPTY → the ＋ slot is RESERVED, not drawn: its art (`slot · ＋ add a tablet`)
+                is un-ported, and the add flow is not built. A tappable ＋ with no destination
+                is the SCRUM-145 defect. It becomes real with the sheet, in this same ticket. */}
+            {view.kind === 'empty' ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !mayEdit }}
+                disabled={!mayEdit}
+                onPress={() => openSheet(null)}
+                style={[
+                  styles.abs,
+                  bandRect(slot, s),
+                  styles.reserved,
+                  styles.slotCentre,
+                  // ⚠️ 40 board px down, NOT centred: the slot band's lower half is where the
+                  // burner and its smoke sit, so a centred ＋ reads as a cross floating in the
+                  // smoke. Measured on glass 2026-10-31.
+                  { paddingTop: 40 * s },
+                ]}
+                testID="home-add-slot"
+              >
+                {/* ⚠️ The ＋ ITSELF. Without it the empty altar is a dashed rectangle and the
+                    caption's "tap ＋" has nothing to point at — the gap the owner found against
+                    the board. ⚠️ It is still NOT a Pressable: the sheet lands in this ticket
+                    (`SCRUM-168`), and a control with nowhere to go is the `SCRUM-145` defect. */}
+                <Text
+                  allowFontScaling={false}
+                  style={{ color: text.gold, fontSize: 44 * s, fontWeight: '300' }}
+                >
+                  ＋
+                </Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !mayEdit }}
+                disabled={!mayEdit}
+                onPress={() => openSheet(current ? current.id : null)}
+                style={[styles.abs, bandRect(slot, s)]}
+                testID="home-tablet"
+              >
+                <Tablet
+                  name={current ? `${current.surname}${current.givenName ?? ''}` : ''}
+                  width={slot.w * s}
+                  height={slot.h * s}
+                />
+              </Pressable>
+            )}
+
+            {/* ⚠️ A carousel, never a "+N more": at the cap of 10 every tablet must be reachable
+                (the board draws prev/next at 26,412 and 340,412). The ends are ends — no wrap. */}
+            {view.kind === 'tablet' && view.hasPrev ? (
+              <Pressable
+                accessibilityRole="button"
+                testID="home-tablet-prev"
+                onPress={() => setPage(pageStep(view.index, view.count, -1))}
+                style={[styles.abs, bandRect(HOME_BANDS.carouselPrev, s), styles.carousel]}
+              >
+                <Text style={[styles.carouselGlyph, { fontSize: 28 * s }]}>{'\u2039'}</Text>
+              </Pressable>
+            ) : null}
+            {view.kind === 'tablet' && view.hasNext ? (
+              <Pressable
+                accessibilityRole="button"
+                testID="home-tablet-next"
+                onPress={() => setPage(pageStep(view.index, view.count, 1))}
+                style={[styles.abs, bandRect(HOME_BANDS.carouselNext, s), styles.carousel]}
+              >
+                <Text style={[styles.carouselGlyph, { fontSize: 28 * s }]}>{'\u203A'}</Text>
+              </Pressable>
+            ) : null}
+          </>
+        );
+      }
+
+      // ── cta · the offer is taken AT the altar, never from the chrome ──────
+      case 'cta':
+        // ⚠️ With NO clan the design has no clan control (SCRUM-91 drew only the 1-
+        // and 2+-clan pills) and the fork's Skip can land a user back here. The entry
+        // therefore takes the CTA's band: burning needs a clan (doc 15 §6), so
+        // offering the burn first would be the wrong primary action — and replacing
+        // it *in place* means nothing on the shrine moves.
+        return clans.length === 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            testID="home-clan-entry"
+            onPress={() => router.push('/clan')}
+            style={({ pressed }) => [
+              styles.abs,
+              bandRect(HOME_BANDS.cta, s),
+              styles.cta,
+              styles.clanEntry,
+              { borderRadius: radius.pill * s },
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={[styles.ctaLabel, { fontSize: fontSize.bodyLg.at390 * s }]}>
+              {t('home.clanEntry')}
+            </Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            testID="home-begin"
+            onPress={startOffering}
+            style={({ pressed }) => [
+              styles.abs,
+              bandRect(HOME_BANDS.cta, s),
+              styles.cta,
+              { borderRadius: radius.pill * s },
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={[styles.ctaLabel, { fontSize: fontSize.bodyLg.at390 * s }]}>
+              {t('home.begin')}
+            </Text>
+          </Pressable>
+        );
+
+      // ── footer · the tab bar (SCRUM-164) ──────────────────────────────────
+      case 'footer':
+        // ⚠️ The bar's own `paperDeep` is stretched over the strip BELOW the board so the bar
+        // reaches the physical bottom edge. That strip is the one place the shrine showed a
+        // SECOND colour (paper under a paperDeep bar) — the most obvious gap on glass.
+        return (
+          <View
+            style={[
+              styles.abs,
+              bandRect(HOME_BANDS.tabbar, s),
+              { height: HOME_BANDS.tabbar.h * s + shrineBleedDp(screen.height, s) },
+            ]}
+            testID="home-tabbar-band"
+          >
+            {/* ⚠️ Store and Profile are DISABLED inside the bar: their screens are
+                SCRUM-150 / SCRUM-151. A dead link or an inert live-looking tab would both be
+                worse than a visibly unavailable one. */}
+            <TabBar active="shrine" scale={s} />
+          </View>
+        );
+    }
+  };
+
   return (
-    <View style={styles.screen}>
-      {/* ── the header (SCRUM-92) ────────────────────────────────────────────
-          The pill's x is board-relative, so the row reserves `btn · settings`
-          (44×44) to its right: 390 − 20 − 44 − 10 − 236 puts the pill at **x 80 … 316**,
-          the ONLY empty rectangle on the signed-off Home (SCRUM-91 measured it).
-          ⚠️ Neither neighbour is built yet — the app mark is art and the settings
-          screen does not exist (both belong to the shrine, SCRUM-53) — so the slot
-          is left EMPTY but reserved, which is what keeps the pill from having to
-          move when they land. */}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <View style={styles.headerSpacer} />
-        <ClanPill clans={clans} />
-        <View style={styles.settingsSlot} />
-      </View>
-
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[
-          styles.content,
-          // safe-area, stacked (design-system/responsive.css pattern)
-          { paddingBottom: insets.bottom + space.lg },
-        ]}
-      >
-      <Text style={styles.eyebrow}>Joss Paper AR · scaffold</Text>
-      <Text style={styles.title}>The shell is alive</Text>
-      <Text style={styles.body}>
-        Expo Router renders this from <Text style={styles.code}>src/app/index.tsx</Text>. The theme
-        bridge, the domain modules and the CI checks are wired. The ritual screens land with the
-        slice (SCRUM-53).
-      </Text>
-
-      <Text style={styles.sectionTitle}>The four bands — the acceptance test</Text>
-      <Text style={styles.caption}>
-        Measured off the fire's own artwork (doc 05 §2). These grade the throw; fps does not.
-      </Text>
-      {AIM_BANDS.map((band) => (
-        <View key={band.id} style={styles.row}>
-          <View style={[styles.swatch, { backgroundColor: brand.gold }]} />
-          <Text style={styles.rowLabel}>
-            {localized(band.label)}
-          </Text>
-          <Text style={styles.rowValue}>
-            ±{band.maxOffsetPx} ×{band.multiplier.toFixed(1)}
-          </Text>
-        </View>
+    <ShrineCanvas>
+      {HOME_REGION_ORDER.map((name) => (
+        // ⚠️ The Fragment carries the key, not the region: `region()` returns either one
+        // element or SEVERAL (title panels, the altar group), so without this the array's
+        // items have no key and React warns "Each child in a list should have a unique key".
+        <Fragment key={name}>{region(name)}</Fragment>
       ))}
-      <View style={styles.row}>
-        <View style={[styles.swatch, { backgroundColor: text.muted }]} />
-        <Text style={styles.rowLabel}>{t('band_miss')}</Text>
-        <Text style={styles.rowValue}>— ×0 · returns</Text>
-      </View>
-
-      <Text style={styles.sectionTitle}>Store catalogue — base = 1.2 × price</Text>
-      <Text style={styles.caption}>doc 10 §1 · S13d. The 20% accrual keeps the store a sink.</Text>
-      {OFFERINGS.map((o) => (
-        <View key={o.code} style={styles.row}>
-          <Text style={styles.rowLabel}>{localized(o.name)}</Text>
-          <Text style={styles.rowValue}>
-            {o.price} / {baseValueOf(o.price)}
-            {o.priceSource === 'derived' ? ' *' : ''}
-          </Text>
-        </View>
-      ))}
-      <Text style={styles.caption}>* the House price is DERIVED from its base — PM to confirm.</Text>
-
-      <Text style={styles.sectionTitle}>Burn limits — the AI-cost control</Text>
-      <View style={styles.row}>
-        <Text style={styles.rowLabel}>Photo burns / day</Text>
-        <Text style={styles.rowValue}>{DAILY_PHOTO_BURNS}</Text>
-      </View>
-      <View style={styles.row}>
-        <Text style={styles.rowLabel}>Store burns / day</Text>
-        <Text style={styles.rowValue}>{DAILY_STORE_BURNS}</Text>
-      </View>
-
-      <Text style={styles.caption}>
-        Touch targets are {TOUCH_TARGET} px; type scales fluidly (hero renders at{' '}
-        {Math.round(fluidSize(fontSize.hero, 390))} px on the 390 px reference).
-      </Text>
-
-      {/* ── the slice begins here (SCRUM-53 / PR-4) ────────────────────────── */}
-      <Pressable
-        accessibilityRole="button"
-        testID="home-begin"
-        onPress={() => {
-          // ── SCRUM-85 · the FIRST burn is a TUTORIAL ────────────────────────
-          // ⚠️ Read the first-run record HERE, at the tap, rather than in an
-          // effect: the flag must reflect the device's state at the moment of
-          // the decision, and a stale render must not send an already-tutored
-          // user back through a demo.
-          void (async () => {
-            const firstRun = await readFirstRun();
-            const params = needsTutorial(firstRun)
-              ? { [DEMO_PARAM]: DEMO_VALUE }
-              : {};
-            router.push({ pathname: '/capture', params });
-          })();
-        }}
-        style={({ pressed }) => [styles.begin, pressed && { opacity: 0.8 }]}
-      >
-        <Text style={styles.beginLabel}>{t('home.begin')}</Text>
-      </Pressable>
-
-      {/* ── the clan surface, for a user with NO clan (SCRUM-92) ─────────────
-          ⚠️ The header PILL above replaced this always-on scaffold entry. This
-          fallback survives for the one state the design does NOT cover: SCRUM-91
-          drew only the 1-clan and 2+-clan pills, so with zero clans Home has no
-          designed clan control — and while `AFTER_TUTORIAL_ROUTE` sends a new user
-          to the fork, the fork's Skip can return them here. Deleting this would
-          leave a clan-less user with no route from Home, so it stays, un-designed
-          and explicitly labelled as a GAP rather than dressed up as the pill. */}
-      {clans.length === 0 ? (
-        <Pressable
-          accessibilityRole="button"
-          testID="home-clan-entry"
-          onPress={() => {
-            router.push('/clan');
-          }}
-          style={({ pressed }) => [styles.clanEntry, pressed && { opacity: 0.8 }]}
-        >
-          <Text style={styles.clanEntryLabel}>{t('home.clanEntry')}</Text>
-        </Pressable>
-      ) : null}
-      </ScrollView>
-    </View>
+    </ShrineCanvas>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: surface.paper },
-  scroll: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    /* 20 = the board's outer margin (HEADER_SPEC.rightPad). */
-    paddingHorizontal: HEADER_SPEC.rightPad,
-    paddingBottom: space.sm,
-  },
-  headerSpacer: { flex: 1 },
-  /* ⚠️ RESERVED but EMPTY: `btn · settings` (44×44) is not built yet, and its SPACE
-     is what puts the pill at x 80 of the 390 px reference. Do not collapse it — the
-     pill would slide 54 px right of where the board signed it off. */
-  settingsSlot: {
-    width: HEADER_SPEC.settingsSlot,
-    height: HEADER_SPEC.settingsSlot,
-    marginLeft: HEADER_SPEC.settingsGap,
-  },
-  content: { paddingHorizontal: space.lg },
-  eyebrow: {
-    color: text.muted,
-    fontSize: fontSize.caption.at390,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: space.xs,
-  },
-  title: {
-    color: text.ink,
-    fontSize: fontSize.titlePage.at390,
-    fontWeight: '700',
-    marginBottom: space.sm,
-  },
-  body: { color: text.inkSoft, fontSize: fontSize.body.at390, lineHeight: 22, marginBottom: space.lg },
-  code: { color: text.azurite, fontFamily: 'monospace' },
-  sectionTitle: {
-    color: text.cinnabar,
-    fontSize: fontSize.titleRow.at390,
-    fontWeight: '700',
-    marginTop: space.lg,
-    marginBottom: space.xs,
-  },
-  caption: { color: text.muted, fontSize: fontSize.caption.at390, marginBottom: space.sm },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: TOUCH_TARGET,
-    backgroundColor: surface.row,
+  abs: { position: 'absolute' },
+  /** A band whose ticket has not landed — correctly positioned, visibly not built. */
+  reserved: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: surface.paperEdge,
     borderRadius: radius.md,
-    paddingHorizontal: space.md,
-    marginBottom: TOUCH_GAP,
   },
-  rowLabel: { flex: 1, color: text.ink, fontSize: fontSize.body.at390 },
-  rowValue: { color: text.gold, fontSize: fontSize.body.at390, fontWeight: '600' },
-  swatch: { width: 12, height: 12, borderRadius: 3, marginRight: space.sm },
-  begin: {
-    marginTop: space.xl,
-    minHeight: TOUCH_TARGET,
-    backgroundColor: brand.cinnabar,
-    borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  beginLabel: { color: onColorCream, fontSize: fontSize.bodyLg.at390, fontWeight: '600' },
-  clanEntry: {
-    marginTop: space.md,
-    minHeight: TOUCH_TARGET,
-    borderRadius: radius.pill,
+  /** The temple chip's own pill — the board's `(chip)` surface, so the line is not bare. */
+  chip: {
     borderWidth: 1,
     borderColor: surface.paperEdge,
+    borderRadius: radius.md,
+    paddingHorizontal: 8,
+    justifyContent: 'center',
+  },
+  /** ⚠️ A child of a band positions itself in the BAND's space — the trap that hid the tabs. */
+  slotCentre: { alignItems: 'center', justifyContent: 'flex-start' },
+  cta: {
+    backgroundColor: brand.cinnabar,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  clanEntryLabel: { color: text.ink, fontSize: fontSize.body.at390, fontWeight: '600' },
+  ctaLabel: { color: onColorCream, fontWeight: '600' },
+  clanEntry: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  carousel: { alignItems: 'center', justifyContent: 'center' },
+  carouselGlyph: { color: text.inkSoft, fontWeight: '700' },
+  /** `btn · settings` — paperDeep fill, ink stroke; radius + width are scaled inline. */
+  settingsBtn: {
+    backgroundColor: surface.paperDeep,
+    borderColor: brand.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pressed: { opacity: 0.8 },
 });

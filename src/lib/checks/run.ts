@@ -11,6 +11,7 @@
  * ⚠️ FAULT-TEST IT: change an expected string and confirm it goes RED.
  */
 
+import { existsSync } from 'node:fs';
 import { isValidClanName } from '../clan-rules.ts';
 import { bookView, showsBookSectionTitle } from '../clan-roles.ts';
 import {
@@ -47,6 +48,29 @@ import {
   shouldHoldInvite,
 } from '../invite-flow.ts';
 import { LOCALES, MESSAGES, detectLocale, localized, messageKeys, setLocale, t } from '../i18n.ts';
+import { nameOrientation, rotatedNameSize } from '../tablet-name.ts';
+import {
+  ANCESTOR_CAP,
+  EDIT_ROLES,
+  GIVEN_NAME_MAX,
+  RELATIONSHIP_MAX,
+  SURNAME_MAX,
+  canEditTablets,
+  capReached,
+  normaliseAncestorForm,
+  sheetProblem,
+  slotsRemaining,
+} from '../ancestor-sheet.ts';
+import { HOME_BANDS, TAB_BAR, bandFits, bandRect, homeFitScale, shrineBleedDp } from '../home-layout.ts';
+import {
+  OFFERINGS_VIEWBOX,
+  OFFERING_DOTS,
+  OFFERING_DOT_RADIUS,
+  OFFERING_TRAYS,
+  dotSitsOnTray,
+} from '../offerings-layout.ts';
+import { formatPoints, homePanels } from '../home-panels.ts';
+import { altarView, pageStep } from '../altar.ts';
 import { BULK_PREFIX, createSplitStorage, bulkKey } from '../split-storage.ts';
 import {
   MAX_ATTEMPTS,
@@ -1166,6 +1190,14 @@ function screenCopyChecks(): void {
     // ⚠️ SCRUM-122 — the Book's empty state. ⚠️ **A PROPOSAL, not signed-off copy**: doc 15
     // §8 carries no empty-state row (C14–C16 only). See the `🎯 Decide:` ticket on SCRUM-122.
     'book_empty',
+    // ⚠️ SCRUM-161 — the shrine's two panels. Both strings are the BOARD's copy
+    // (`EN · 1 Home / Shrine`, `ZH · 1 Home / 首页`), so they are held to the same
+    // both-locales + no-Latin-in-中文 rule as everything else here.
+    'home.tributeLabel', 'home.streakLabel',
+    // ⚠️ SCRUM-164 — the tab bar's four labels and the three Home lines the owner found
+    // MISSING against the board (`EN · 1 Home / Shrine`).
+    'nav.shrine', 'nav.league', 'nav.store', 'nav.profile',
+    'home.altarEmpty', 'home.ctaHint', 'home.templeChip',
   ];
   const zh = MESSAGES.zh as unknown as Record<string, string>;
   const en = MESSAGES.en as unknown as Record<string, string>;
@@ -1177,6 +1209,25 @@ function screenCopyChecks(): void {
     const latin = latinIn(zh[key] ?? '');
     check(`…its 中文 carries no Latin text`, latin.length === 0, `${latin.join(', ')} in "${zh[key]}"`);
   }
+
+  // ── ⚠️ LOCALE-PROOF ALIGNMENT (owner, 2026-10-31) ─────────────────────────────
+  // "族长 is now too far left." The board anchors the role chip at dx 106 in BOTH locales but
+  // draws it 94 wide in EN and 58 in ZH — so a left-anchored chip leaves a 40 px hole in 中文.
+  const chip = PILL_SPEC.chip;
+  check("the role chip slot is the board EN chip width (94)", chip.slotWidth === 94);
+  check('…and the slot still clears the affordance (106 + 94 <= 204)',
+    chip.dx + chip.slotWidth <= PILL_SPEC.affordance.dx,
+    `${chip.dx} + ${chip.slotWidth} vs ${PILL_SPEC.affordance.dx}`);
+  // ⚠️ the defect, as arithmetic: the ZH label is 58, so left-anchored it ends 40 px short.
+  const holePx = PILL_SPEC.affordance.dx - (chip.dx + chip.narrowestLabelWidth);
+  check('⚠️ a left-anchored 中文 chip leaves a visible hole before the ›',
+    holePx >= 30, `${holePx} px of dead space`);
+  // …and centring it in the slot reclaims exactly half of it, in the RIGHT direction.
+  const centredDx = chip.dx + (chip.slotWidth - chip.narrowestLabelWidth) / 2;
+  check('…and the chip CENTRES in the slot, so the narrow locale moves right',
+    centredDx > chip.dx && centredDx === 124, `centred dx ${centredDx}`);
+  check('…while the widest locale is pixel-identical to the board (no shift in EN)',
+    chip.dx + (chip.slotWidth - chip.slotWidth) / 2 === 106);
 
   // the shared picker the four bilingual sites now use
   setLocale('en');
@@ -1212,6 +1263,383 @@ function screenCopyChecks(): void {
   );
 
   setLocale('en');
+}
+
+/**
+ * 18 · The shrine scales PROPORTIONALLY (SCRUM-162 · the owner's ruling, 2026-10-31).
+ *
+ * ⚠️ WHY THIS EXISTS. The shrine's first two defects were **both invisible to every
+ * gate** and both found only by looking at a phone:
+ *
+ *   · the shrine base was rendered with **board px as device px**, so its right edge
+ *     landed at `16 + 358 = 374` on a 360 dp screen — **clipped**;
+ *   · the clan pill kept its fixed 236 while everything else scaled, so it sat at
+ *     **x 50 instead of 74**.
+ *
+ * ⚠️ A geometry gate that only checks the **390 px reference** passes both. So these
+ * assertions run at the sizes a real floor device actually has.
+ *
+ * ⚠️ AND THE RULING ITSELF IS ASSERTED. The owner chose **proportional** on
+ * 2026-10-31 — the whole shrine scales uniformly, and that deliberately includes type,
+ * so a 320 dp screen gets smaller text rather than a reflowed layout. The tempting
+ * "fix" is to hold type at `fluidSize`, which silently breaks every proportion the art
+ * and the aim grader were measured against. `check:copy` §5 forbids that import on the
+ * shrine; this section pins the maths beneath it.
+ */
+function homeShrineScaleChecks(): void {
+  section('18 · The shrine scales PROPORTIONALLY — the owner\'s ruling (SCRUM-162)');
+
+  const phone = homeFitScale(360, 800);
+  const wide = homeFitScale(540, 800);
+  const small = homeFitScale(320, 568);
+
+  check('a 360 × 800 phone is width-limited (360/390)', Math.abs(phone - 360 / 390) < 1e-9,
+    `got ${phone}`);
+  check('a 540 × 800 viewport is HEIGHT-limited (800/844), not width',
+    Math.abs(wide - 800 / 844) < 1e-9, `got ${wide}`);
+  check('…and that is smaller than the width rule would give (the tablet bug: 1732 dp tall)',
+    wide < 540 / 390, `width rule gives ${540 / 390}`);
+  check('a 320 × 568 small phone is height-limited too', Math.abs(small - 568 / 844) < 1e-9,
+    `got ${small}`);
+
+  // ── every band fits the window at every size ────────────────────────────────
+  const VIEWPORTS = [['360 × 800', 360, phone], ['540 × 800', 540, wide], ['320 × 568', 320, small]] as const;
+  const bands = Object.entries(HOME_BANDS);
+  for (const [label, windowWidth, scale] of VIEWPORTS) {
+    const spilled = bands.filter(([, band]) => !bandFits(band, scale, windowWidth)).map(([name]) => name);
+    check(`no band spills off a ${label} viewport (${bands.length} bands)`, spilled.length === 0,
+      `${spilled.join(', ')}`);
+  }
+
+  // ⚠️ POSITIVE CONTROL — the detector must FIRE on the defect that actually shipped.
+  check('…and the fit rule FAILS at scale 1 on a 360 dp screen (the clipped-art defect)',
+    !bandFits(HOME_BANDS.shrineBase, 1, 360),
+    'bandFits says the unscaled base fits a 360 dp screen — it does not (16 + 358 = 374)');
+
+  // ── bandRect is the ONE conversion, and it is absolute ─────────────────────
+  const rect = bandRect(HOME_BANDS.cta, 0.5);
+  check('bandRect scales x/y/w/h from the band', rect.left === 10 && rect.top === 338
+    && rect.width === 175 && rect.height === 33,
+    JSON.stringify(rect));
+  check('…and it is absolutely positioned (a flow child would re-order the shrine)',
+    rect.position === 'absolute');
+  check('…and at scale 1 it is the board\'s own numbers (no silent drift)',
+    bandRect(HOME_BANDS.cta, 1).top === 676 && bandRect(HOME_BANDS.cta, 1).left === 20);
+
+  // ── ⚠️ THE EDGE-TO-EDGE RULING (owner, 2026-10-31) ────────────────────────
+  // The shrine was contain-fitted into the WINDOW RN reports (345 × 745 on a 360 × 800 device),
+  // which letterboxes it on all four sides. It is now fitted to the SCREEN and anchored at its
+  // top-left, so the width rule is exact and there is no side gap when width-limited.
+  const screenScale = homeFitScale(360, 800);
+  check('on a 360 × 800 screen the canvas fills the width EXACTLY (no side letterbox)',
+    Math.abs(390 * screenScale - 360) < 1e-9, `fills ${(390 * screenScale).toFixed(2)} of 360`);
+  // ⚠️ POSITIVE CONTROL — the defect that actually shipped: fitting the WINDOW inset leaves gaps.
+  const windowScale = homeFitScale(345, 745);
+  const windowFill = 390 * windowScale;
+  check('…and fitting the WINDOW instead leaves a visible side gap (the defect that shipped)',
+    windowFill < 360 - 10, `window-fit fills ${windowFill.toFixed(1)} of 360 — ${((360 - windowFill) / 2).toFixed(1)} dp lost per side`);
+
+  // ⚠️ The strip under the bar is a SECOND COLOUR, so the bar must reach the physical edge.
+  check('the tab bar bleeds to the screen bottom (800 − 844×s)',
+    Math.abs(shrineBleedDp(800, screenScale) - (800 - 844 * screenScale)) < 1e-9,
+    `${shrineBleedDp(800, screenScale).toFixed(2)} dp`);
+  check('…and the bleed is POSITIVE on a screen taller than the board',
+    shrineBleedDp(800, screenScale) > 15, `${shrineBleedDp(800, screenScale).toFixed(2)} dp`);
+  check('…and ZERO when the board already reaches the bottom (no phantom strip)',
+    shrineBleedDp(844, 1) === 0);
+
+  // ── the canvas keeps the board's aspect ratio ──────────────────────────────
+  check('the canvas ratio is the board\'s 844 : 390 (so nothing can squash it)',
+    Math.abs(844 / 390 - 2.1641) < 0.001);
+}
+
+/**
+ * 19 · The altar's offerings sit on their trays (SCRUM-162).
+ *
+ * ⚠️ WHY THIS EXISTS, in the owner's words: *"the placement of the decorations on the
+ * altar is misaligned."* The four offering dots had kept the **group-space** y (76 / 78)
+ * while every path beside them had the inner group's `+68` folded in — so they floated
+ * **68 units above their trays**.
+ *
+ * ⚠️NOTHING EXISTING COULD SEE IT. `tsc` cannot read SVG coordinates; a **bounds** check
+ * passes because 76 and 144 are both legal inside a 170-tall viewBox; and a snapshot would
+ * only have made the mistake look approved. ⚠️ **The only catchable form is the
+ * RELATIONSHIP**: a dot rests on a tray. That is what this asserts.
+ */
+function offeringsPlacementChecks(): void {
+  section('19 · The altar\'s offerings sit on their trays (SCRUM-162)');
+
+  const detached = OFFERING_DOTS.filter((dot) => !dotSitsOnTray(dot));
+  check(`every offering dot rests on a tray (${OFFERING_DOTS.length} dots · ${OFFERING_TRAYS.length} trays)`,
+    detached.length === 0,
+    `detached: ${detached.map((d) => `(${d.cx},${d.cy})`).join(', ')}`);
+
+  // ⚠️ POSITIVE CONTROL — the detector must FIRE on the exact defect that shipped.
+  check('…and the rule REJECTS a group-space dot, which is the bug that shipped',
+    !dotSitsOnTray({ cx: 10, cy: 76 }),
+    'dotSitsOnTray accepted cy 76 — the offset bug would pass this gate');
+
+  // A dot must be inside the viewBox, dot and all.
+  const outOfBox = OFFERING_DOTS.filter(
+    (dot) =>
+      dot.cx - OFFERING_DOT_RADIUS < 0 ||
+      dot.cx + OFFERING_DOT_RADIUS > OFFERINGS_VIEWBOX.w ||
+      dot.cy - OFFERING_DOT_RADIUS < 0 ||
+      dot.cy + OFFERING_DOT_RADIUS > OFFERINGS_VIEWBOX.h,
+  );
+  check('…and every dot is whole inside the 330 × 170 viewBox', outOfBox.length === 0,
+    outOfBox.map((d) => `(${d.cx},${d.cy})`).join(', '));
+
+  const traysOut = OFFERING_TRAYS.filter(
+    (t) => t.x < 0 || t.y < 0 || t.x + t.w > OFFERINGS_VIEWBOX.w || t.y + t.h > OFFERINGS_VIEWBOX.h,
+  );
+  check('…and every tray is inside it too', traysOut.length === 0, JSON.stringify(traysOut));
+
+  // ⚠️ The pairs are drawn at slightly different heights on the board (144 / 146) — if a
+  // future edit "tidies" them onto one line, say so rather than silently accepting it.
+  const heights = new Set(OFFERING_DOTS.map((d) => d.cy));
+  check('…and the board\'s deliberate 2-unit stagger is preserved (144 / 146, not one line)',
+    heights.size === 2, `heights: ${[...heights].join(', ')}`);
+}
+
+/**
+ * 20 · The shrine's panels never lie (SCRUM-161).
+ *
+ * ⚠️ THE RULE: **a failed read must never render as `0`.** "0 tribute points" is a claim
+ * about the user's history; a failed read is a claim about the network. Showing the second
+ * as the first is a lie the user cannot detect — the same class as `bookView` showing an
+ * empty Book when the server had a problem.
+ *
+ * ⚠️ And a second, smaller one: the panels ink `brand.cinnabarDeep` as TEXT, which the
+ * token role rule forbids (`brand.*` is decorative). That exception is taken because the
+ * board does it — so the ratio is asserted here rather than trusted.
+ */
+function homePanelChecks(): void {
+  section('20 · The shrine\'s panels — a failure is never a zero (SCRUM-161)');
+
+  check('before the read, the state is `loading` — not `ready` with zeros',
+    homePanels(null).kind === 'loading');
+
+  const failed = homePanels({ ok: false, reason: 'network_error' });
+  check('a failed read is `failed` and carries its reason',
+    failed.kind === 'failed' && failed.reason === 'network_error');
+  // ⚠️ POSITIVE CONTROL — the shape that would be a lie.
+  check('…and it is NOT `ready` (a zero here would claim the user earned nothing)',
+    failed.kind !== 'ready');
+
+  const ready = homePanels({ ok: true, data: { tribute: 12480, streakDays: 12 } });
+  check('a successful read formats the total the way the board inks it (12,480)',
+    ready.kind === 'ready' && ready.tribute === '12,480', JSON.stringify(ready));
+  check('…and keeps the streak as the server gave it', ready.kind === 'ready' && ready.streakDays === 12);
+
+  check('a non-finite total is a broken payload, not a zero',
+    homePanels({ ok: true, data: { tribute: Number.NaN, streakDays: 1 } }).kind === 'failed');
+  check('…and so is a non-finite streak',
+    homePanels({ ok: true, data: { tribute: 1, streakDays: Number.POSITIVE_INFINITY } }).kind === 'failed');
+
+  const negative = homePanels({ ok: true, data: { tribute: -5, streakDays: -2 } });
+  check('a negative is clamped to 0 rather than printed with a minus',
+    negative.kind === 'ready' && negative.tribute === '0' && negative.streakDays === 0);
+
+  check('formatPoints groups thousands by hand (not toLocaleString)',
+    formatPoints(0) === '0' && formatPoints(999) === '999'
+      && formatPoints(1000) === '1,000' && formatPoints(1234567) === '1,234,567');
+  check('…and truncates a fractional total', formatPoints(12.9) === '12');
+
+  // ⚠️ The token-role exception, measured.
+  const ink = contrastRatio('#9A2B18', '#F5F0E8');
+  check(`the streak's cinnabarDeep ink on paper passes AA (${ink.toFixed(2)}:1)`, ink >= 4.5,
+    `${ink.toFixed(2)}:1 — use text.cinnabar instead`);
+}
+
+/**
+ * 21 · The altar's carousel (SCRUM-146).
+ *
+ * ⚠️ TWO FAILURES THIS PREVENTS, both silent:
+ *   · **the index is clamped.** Archiving the tablet the carousel is sitting on would leave the
+ *     index past the end of the list and the altar rendering nothing — with `count` still > 0,
+ *     so nothing looks empty, it just vanishes;
+ *   · **the ends are ends.** `pageStep` does not wrap, because a carousel that silently loops is
+ *     a carousel a user cannot tell they have finished.
+ *
+ * ⚠️ And the band is shared: `slot · ＋ add a tablet` and the centre tablet are BOTH
+ * 131,285 129×307 on the board, so the ＋ and the first tablet swap in place. If they ever stop
+ * sharing a band, the whole shrine shifts when the first tablet is added — that is asserted by
+ * `HOME_BANDS.addSlot` being the band both branches use, and §18's fit check covering it.
+ */
+function altarChecks(): void {
+  section('21 · The altar\'s carousel — clamped, and the ends are ends (SCRUM-146)');
+
+  check('no tablets → the altar offers the ＋ slot', altarView(0, 0).kind === 'empty');
+  check('…and a stale page index cannot resurrect one', altarView(0, 7).kind === 'empty');
+
+  const first = altarView(3, 0);
+  check('the first of three has no prev, only next',
+    first.kind === 'tablet' && !first.hasPrev && first.hasNext && first.index === 0);
+  const last = altarView(3, 2);
+  check('the last of three has no next, only prev',
+    last.kind === 'tablet' && last.hasPrev && !last.hasNext && last.index === 2);
+  check('one tablet shows no arrows at all',
+    altarView(1, 0).kind === 'tablet' && !altarView(1, 0).hasPrev && !altarView(1, 0).hasNext);
+
+  // ⚠️ THE CLAMP — the archived-tablet case.
+  const stranded = altarView(3, 9);
+  check('an index past the end is CLAMPED to the last tablet, never "nothing"',
+    stranded.kind === 'tablet' && stranded.index === 2, JSON.stringify(stranded));
+
+  check('pageStep does not wrap at the start', pageStep(0, 3, -1) === 0);
+  check('pageStep does not wrap at the end', pageStep(2, 3, 1) === 2);
+  check('pageStep moves one', pageStep(1, 3, -1) === 0 && pageStep(1, 3, 1) === 2);
+  check('pageStep on an empty altar stays at 0', pageStep(0, 0, 1) === 0);
+}
+
+/**
+ * §22 · The tab bar (SCRUM-164).
+ *
+ * ⚠️ This section exists because the bar is the first surface whose **board itself is wrong**:
+ * `nav · tab Shrine` inks `#9A2B18` on a `#C23B22` pill. That is **1.44:1** — the text is barely
+ * distinguishable from its own background, and no amount of careful porting would have fixed it.
+ * The build renders `onColorCream` (**4.90:1**) instead, and the assertion below pins BOTH numbers
+ * so that neither "copy the board" nor "nudge it back" can pass silently.
+ */
+function tabBarChecks(): void {
+  section('22 · The tab bar — geometry, dead links, and the board\'s contrast defect (SCRUM-164)');
+
+  check('tabs start at x = 12 (board)', TAB_BAR.xs[0] === 12);
+  check('there are four tabs, each 86 wide', TAB_BAR.xs.length === 4 && TAB_BAR.tab.w === 86);
+
+  const lastRight = TAB_BAR.xs[3] + TAB_BAR.tab.w;
+  check('the last tab ends inside the 390 canvas', lastRight === 379 && lastRight <= 390, `${lastRight}`);
+
+  // ⚠️ The board's spacing is NOT even (94 · 93 · 94), so "four 86-wide tabs fit in 390" does not
+  // imply "they do not overlap". Assert the relationship, not the bound.
+  let overlapping = '';
+  for (let i = 0; i < TAB_BAR.xs.length - 1; i += 1) {
+    if (TAB_BAR.xs[i] + TAB_BAR.tab.w > TAB_BAR.xs[i + 1]) {
+      overlapping = `${TAB_BAR.xs[i]} runs into ${TAB_BAR.xs[i + 1]}`;
+    }
+  }
+  check('…and no two tabs overlap', overlapping === '', overlapping);
+
+  const bar = HOME_BANDS.tabbar;
+  // ⚠️ The relationship that failed on glass: a child of the band applies topInBar, and it must
+  // be the tab's board y MINUS the band's.
+  check(
+    "topInBar is the tab board-y minus the band y (the glass bug)",
+    TAB_BAR.tab.topInBar === TAB_BAR.tab.y - bar.y,
+    `${TAB_BAR.tab.topInBar} vs ${TAB_BAR.tab.y - bar.y}`,
+  );
+  check(
+    'the tab row sits inside the bar band',
+    TAB_BAR.tab.y >= bar.y && TAB_BAR.tab.y + TAB_BAR.tab.h <= bar.y + bar.h,
+  );
+
+  // ⚠️ THE DEFECT, pinned. Both numbers, so a future "fix" to the board has to change this.
+  const boardInk = contrastRatio('#9a2b18', '#c23b22');
+  check(
+    "⚠️ the board's active-tab ink FAILS AA — this is WHY the build deviates",
+    boardInk < 4.5,
+    `${boardInk.toFixed(2)}:1`,
+  );
+  const builtInk = contrastRatio('#fff8e8', '#c23b22');
+  check('…and the ink the build actually uses passes AA', builtInk >= 4.5, `${builtInk.toFixed(2)}:1`);
+
+  // ⚠️ DEAD LINKS. A tab may only point at a route whose screen file exists: `Store` and
+  // `Profile` are disabled for exactly this reason (`SCRUM-150` / `SCRUM-151`), and this check is
+  // what stops a future tab being wired to a screen someone assumed was there.
+  const ROUTES: ReadonlyArray<readonly [string, string]> = [
+    ['/', 'index.tsx'],
+    ['/league', 'league.tsx'],
+  ];
+  for (const [route, file] of ROUTES) {
+    check(
+      `the "${route}" tab points at a screen that exists (${file})`,
+      existsSync(new URL(`../../app/${file}`, import.meta.url)),
+    );
+  }
+}
+
+/**
+ * §23 · The tablet sheet's rules (SCRUM-146 · SCRUM-168).
+ *
+ * ⚠️ Every number here is a **MIRROR** of the database, and a mirror that drifts is worse than
+ * none: the client would offer a save the server refuses with a raw Postgres code. So each one is
+ * asserted against the thing that actually decides — the RPC's ladder, the RLS policies, the
+ * `CHECK` constraints and `clans.ancestor_cap`.
+ */
+function ancestorSheetChecks(): void {
+  section('23 · The tablet sheet — the ladder, the cap, and btrim (SCRUM-168)');
+
+  // ── the ladder, exactly as `save_ancestor` and both policies spell it ──────
+  check('the ladder is exactly head · co_head · elder',
+    [...EDIT_ROLES].join(',') === 'head,co_head,elder');
+  for (const r of ['head', 'co_head', 'elder']) check(`  ${r} may edit tablets`, canEditTablets(r));
+  check('⚠️ a plain MEMBER may not (the RPC raises 42501, the policy filters SILENTLY)',
+    !canEditTablets('member'));
+  check('…and not-signed-in is not a role', !canEditTablets(null) && !canEditTablets(undefined));
+
+  // ── the limits, from the CHECK constraints ────────────────────────────────
+  check('surname max is the CHECK cr 20', SURNAME_MAX === 20);
+  check('given name max is the CHECK cr 40', GIVEN_NAME_MAX === 40);
+  check('relationship max is the CHECK cr 20', RELATIONSHIP_MAX === 20);
+
+  // ── ⚠️ btrim FIRST — a surname of spaces is empty on the server too ──────
+  check('a blank surname is refused', sheetProblem({ surname: '', givenName: '', relationship: '' }) === 'surname_required');
+  check('⚠️ and so is a surname of THREE SPACES (the server btrims, so must this)',
+    sheetProblem({ surname: '   ', givenName: '', relationship: '' }) === 'surname_required');
+  check('20 characters is accepted', sheetProblem({ surname: 'x'.repeat(20), givenName: '', relationship: '' }) === null);
+  check('21 is not', sheetProblem({ surname: 'x'.repeat(21), givenName: '', relationship: '' }) === 'surname_too_long');
+  check('a 41-character given name is too long',
+    sheetProblem({ surname: 'Tan', givenName: 'y'.repeat(41), relationship: '' }) === 'given_name_too_long');
+  check('a 21-character relationship is too long',
+    sheetProblem({ surname: 'Tan', givenName: '', relationship: 'z'.repeat(21) }) === 'relationship_too_long');
+
+  // ── normalise mirrors nullif(btrim(...), '') ─────────────────────────────
+  const clean = normaliseAncestorForm({ surname: '  Tan  ', givenName: '  ', relationship: ' Father ' });
+  check('the form is trimmed', clean.surname === 'Tan' && clean.relationship === 'Father', JSON.stringify(clean));
+  check('⚠️ a blank optional field becomes NULL, not an empty string (nullif)', clean.givenName === null);
+
+  // ── the cap, from clans.ancestor_cap ─────────────────────────────────────
+  check('the cap is 10 (clans.ancestor_cap default)', ANCESTOR_CAP === 10);
+  check("⚠️ …and NOT the altar display cap of 4: the board pages, it does not refuse",
+    ANCESTOR_CAP !== 4);
+  check('9 live tablets is not full', !capReached(9));
+  check('⚠️ 10 IS full — `>=`, not `>` (the 11th insert is what the trigger refuses)', capReached(10));
+  check('…and 2 slots remain at 8', slotsRemaining(8) === 2);
+  check('…and a legacy over-cap clan does not underflow', slotsRemaining(14) === 0);
+}
+
+/**
+ * §24 · How a name is set on a tablet (SCRUM-146).
+ *
+ * ⚠️ A 牌位 is written top-to-bottom — correct for 陈秀英, wrong for `Chen`, which stacked gives
+ * four lines of one letter on a plaque. Seen on glass 2026-10-31.
+ */
+function tabletNameChecks(): void {
+  section("24 · Tablet names — vertical for CJK, rotated for Latin (SCRUM-146)");
+
+  check('陈秀英 is set vertically (the column IS the convention)',
+    nameOrientation('陈秀英') === 'vertical');
+  check('⚠️ Chen is NOT — stacked it is four lines of one letter',
+    nameOrientation('Chen') === 'rotated');
+  check('Tan Wei is rotated on ONE line (a space does not make it a column)',
+    nameOrientation('Tan Wei') === 'rotated');
+  check('⚠️ a MIXED name is vertical — a stele does not rotate half a name',
+    nameOrientation('陈 Chen') === 'vertical');
+  check('and 陳 (traditional) is vertical too', nameOrientation('陳') === 'vertical');
+  check('an empty name falls to vertical, so nothing rotates a zero-length line',
+    nameOrientation('') === 'vertical' && nameOrientation('   ') === 'vertical');
+
+  // ⚠️ The size shrinks as the name grows: the line must fit ALONG the frame, not just across it.
+  const box = { width: 71.4, height: 235.8 };
+  const short = rotatedNameSize(box, 4);
+  const long = rotatedNameSize(box, 11);
+  check('a short Latin name is bounded by the frame WIDTH, not the length',
+    Math.abs(short - box.width * 0.62) < 1e-9, `${short.toFixed(2)}`);
+  check('⚠️ a long one shrinks so it cannot run out of the frame ends',
+    long < short, `11 chars ${long.toFixed(2)} < 4 chars ${short.toFixed(2)}`);
+  check('…and never below zero for a degenerate length',
+    rotatedNameSize(box, 0) > 0 && Number.isFinite(rotatedNameSize(box, 400)));
 }
 
 async function main(): Promise<void> {
@@ -1283,6 +1711,13 @@ async function main(): Promise<void> {
   clanPillChecks();
   zhScriptChecks();
   screenCopyChecks();
+  homeShrineScaleChecks();
+  offeringsPlacementChecks();
+  homePanelChecks();
+  altarChecks();
+  tabBarChecks();
+  ancestorSheetChecks();
+  tabletNameChecks();
 
   check('guard: a 5-character key is NOT valid', !isValidIdempotencyKey('12345'));
   check('guard: junk is NOT a clan code', normaliseClanCode('not-a-code!!') === null);

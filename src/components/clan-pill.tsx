@@ -11,6 +11,7 @@
  * second switcher here.**
  */
 
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -25,9 +26,43 @@ import {
 import { t } from '@/lib/i18n';
 import { brand, surface, text } from '@/theme/tokens';
 
-export function ClanPill({ clans }: { clans: readonly PillClan[] }) {
+/**
+ * ⚠️ `scale` exists because the shrine is a **390×844 canvas** rendered at whatever
+ * width the device has (SCRUM-162). Without it the pill kept its 236 while everything
+ * around it scaled, so on a 360 dp phone it sat at **x 50 dp instead of the signed-off
+ * 74** — measured on glass, not caught by any gate.
+ *
+ * ⚠️ `PILL_SPEC` stays the signed-off number and `check:lib` §14 keeps asserting it;
+ * this prop only multiplies it at render time. Do not bake a scale into the constants.
+ */
+export function ClanPill({ clans, scale = 1 }: { clans: readonly PillClan[]; scale?: number }) {
   const router = useRouter();
   const view = pillView(clans);
+
+  /** The board's numbers × the canvas scale. At `scale = 1` this is a no-op. */
+  const dyn = useMemo(
+    () => ({
+      pill: {
+        width: PILL_SPEC.width * scale,
+        height: PILL_SPEC.height * scale,
+        paddingHorizontal: CONTENT_PAD_H * scale,
+        borderRadius: PILL_SPEC.radius * scale,
+        borderWidth: PILL_SPEC.borderWidth * scale,
+      },
+      name: { width: NAME_WIDTH * scale, fontSize: PILL_SPEC.name.fontSize * scale },
+      chip: {
+        height: PILL_SPEC.chip.height * scale,
+        borderRadius: PILL_SPEC.chip.radius * scale,
+        paddingHorizontal: 8 * scale,
+      },
+      chipLabel: { fontSize: PILL_SPEC.chip.fontSize * scale },
+      affordance: {
+        width: PILL_SPEC.affordance.size * scale,
+        fontSize: PILL_SPEC.affordance.fontSize * scale,
+      },
+    }),
+    [scale],
+  );
 
   /* ⚠️ The design has NO clan-less pill (SCRUM-91 drew only the 1-clan and 2+-clan
      states), so Home renders nothing here rather than inventing a third state. */
@@ -39,23 +74,29 @@ export function ClanPill({ clans }: { clans: readonly PillClan[] }) {
       accessibilityLabel={t('clan.pillA11y', { name: view.name })}
       testID="home-clan-pill"
       onPress={() => router.push(pillRoute(view.target))}
-      style={({ pressed }) => [styles.pill, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.pill, dyn.pill, pressed && styles.pressed]}
     >
       {/* The name flexes and ellipsises — the board fixed it at 92 px for a sample
           that inks 84.2, but real names run 2..20 characters (`isValidClanName`). */}
-      <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail">
+      <Text style={[styles.name, dyn.name]} numberOfLines={1} ellipsizeMode="tail">
         {view.name}
       </Text>
 
-      <View style={styles.chip}>
-        <Text style={styles.chipLabel} numberOfLines={1}>
-          {`\u{1F451} ${t(view.roleLabelKey)}`}
-        </Text>
+      {/* ⚠️ A FIXED slot, with the chip CENTRED in it. The board gives the chip 94 in EN and
+          58 in ZH, both at dx 106 — left-anchored, a 2-character 中文 role leaves a 40 px hole
+          before the `›` and the chip looks shoved left. The slot is the widest locale's width,
+          so EN is unchanged and 中文 centres. */}
+      <View style={[styles.chipSlot, { width: PILL_SPEC.chip.slotWidth * scale }]}>
+        <View style={[styles.chip, dyn.chip]}>
+          <Text style={[styles.chipLabel, dyn.chipLabel]} numberOfLines={1}>
+            {`\u{1F451} ${t(view.roleLabelKey)}`}
+          </Text>
+        </View>
       </View>
 
       {/* ⚠️ ONE glyph, TWO states: the 2+ state is the same U+203A ROTATED, never a
           second character — a mixed-family glyph reads as inconsistent weight. */}
-      <Text style={[styles.affordance, view.glyphRotated && styles.affordanceOpen]}>
+      <Text style={[styles.affordance, dyn.affordance, view.glyphRotated && styles.affordanceOpen]}>
         {view.glyph}
       </Text>
     </Pressable>
@@ -86,7 +127,14 @@ const styles = StyleSheet.create({
     /* Noto Serif SC on the board; RN falls back to the system serif. */
     fontFamily: 'serif',
   },
+  chipSlot: {
+    /* ⚠️ Never shrinks: the slot is what keeps the pill's balance locale-independent. */
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   chip: {
+    maxWidth: '100%',
     height: PILL_SPEC.chip.height,
     borderRadius: PILL_SPEC.chip.radius,
     /* ⚠️ brand.gold is a FILL token — correct here. The label must be text.ink:

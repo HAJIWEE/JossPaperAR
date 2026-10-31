@@ -55,9 +55,8 @@ const PROJ = path.join(import.meta.dirname, '..', '..', '..');
 const ROOTS = ['src/app', 'src/components'];
 
 /** The only exemption, and the reason is printed so it cannot pass unnoticed. */
-const EXEMPT = new Map([
-  ['src/app/index.tsx', 'the SCRUM-53 scaffold — its prose documents the numbers for a reviewer'],
-]);
+/** ⚠️ EMPTY on purpose — and it is now a real assertion, not a formality. */
+const EXEMPT = new Map<string, string>([]);
 
 /** Renders BOTH languages in every locale. Matched exactly, because it is unambiguous. */
 const BILINGUAL = [/\.zh\s*\}\s*\{[^}]*\.en/, /\.en\s*\}\s*\{[^}]*\.zh/];
@@ -267,6 +266,32 @@ check(`no t(key) call leaves a declared placeholder unsubstituted (${placeholder
 if (dynamicKeys > 0) {
   console.log(`  – ${dynamicKeys} call site(s) use a dynamic key — NOT statically checkable`);
 }
+
+// ── 5 · the shrine's type scales WITH the canvas, not with `fluidSize` ──────
+//
+// ⚠️ THE OWNER'S RULING, 2026-10-31 (SCRUM-162). The shrine is a **proportional**
+// composition: the whole 390×844 board scales uniformly, and that deliberately includes
+// type — on a 320 dp screen the labels render at ~62%. That was weighed against the
+// alternative and accepted, because preserving the proportions the art and the aim
+// grader were measured against is worth more than a bigger label.
+//
+// ⚠️ The tempting "fix" is to import `fluidSize` and hold type at a legible size. It
+// breaks the ruling silently and it is a one-line change no other gate can see. So it
+// is asserted here, with a positive control that proves the reader actually loaded the
+// screen.
+const shrineSrc = fs.readFileSync(path.join(PROJ, 'src/app/index.tsx'), 'utf8');
+/**
+ * ⚠️ Matches an **import or a call**, not the word — the shrine's own comments name
+ * `fluidSize` while explaining why it is not used, and a rule that fires on its own
+ * documentation is a rule people learn to ignore.
+ */
+const FLUID_SIZE_USE = /(import[^;]*\bfluidSize\b)|(\bfluidSize\s*\()/;
+check('the shrine scales type with the canvas — `fluidSize` is NOT imported (the owner\'s ruling)',
+  !FLUID_SIZE_USE.test(shrineSrc),
+  'src/app/index.tsx imports or calls fluidSize — the shrine must stay proportional');
+check('…and the reader really read the shrine (positive control)',
+  shrineSrc.includes('homeFitScale'),
+  'the shrine source did not load, or it no longer uses the canvas scale — this rule is blind');
 
 for (const [file, reason] of EXEMPT) {
   if (exempted.includes(file)) {

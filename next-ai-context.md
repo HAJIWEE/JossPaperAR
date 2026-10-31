@@ -454,3 +454,232 @@ Software developer (not a mobile specialist) · AI vibe-coding · no timeline pr
 *Updated 2026-10-05 (**S29 wrap**) — **`SCRUM-55` built and merged (PR #16)**: the three decided-but-unwritten ADRs are now recorded — **ADR-004** ✅ · **ADR-006** ✅ · **ADR-008** ✅ **Accepted** after the PM answered A–D on **SCRUM-62** (A3 · caps 2/3 · SG-for-now · D strong NO → **SCRUM-63**). **All nine §6 decisions recorded, all eight ADRs Accepted**, guarded by `npm run check:adrs` (fault-tested red on four cases). **`SCRUM-41` closed** — Mastercard **1.2808**, ≈ **S$6.38 / US$4.98** of the approved US$10–20, **no overrun**. New standing rule in `AGENTS.md`: a decision needing the PM goes to **Jira + the active sprint**. Hosted project **11/11 migrations, no drift**. Cost this session: **S$0.00**.*
 *Previous (2026-10-04, S28b) — `SCRUM-59` built: the AI-budget stop-rule is LIVE (migration `0011`; queue, never fail; the spec's $0.10 floor kept) with its own fault-tested test and a live proof (0.5 s / `cost_micros` NULL) → [[AppDesignConceptBoard/19-build-plan-services-api-environments|doc 19]] §12.5. Unsigned AI-session commits accepted ([[CONTRIBUTING]] § Commits).*
 *Purpose: context hand-off for the next AI session. Session history, superseded review queues and the dated change log moved to [[completed-work-archive]] (2026-10-02, S26); open work lives in [[follow-up-items]].*
+
+## 2026-10-31 (later) — the tab bar, and 4 defects the board comparison found
+
+**`SCRUM-164`** (a **subtask** — it takes its parent's sprint; ⚠️ `customfield_10020` cannot be
+set on it, and a JQL `sprint = X` will never list it). Committed `7d6479c`.
+
+### Shipped
+- **Tab bar** `nav · …` → `src/components/home/tab-bar.tsx`: 390×80 `paperDeep`, 3 px `ink` top
+  rule, tabs at **12 · 106 · 199 · 293** (86×62, r12 active). Wired **Shrine → /**, **League →
+  /league**. **Store / Profile render DISABLED** — their screens are `SCRUM-150` / `SCRUM-151`, and
+  a dead link or an inert live-looking tab are both worse.
+- **The three Home lines the owner found missing against `EN · 1`**: `caption · altar state`,
+  `hint · cta`, `zone · customizable temple (label)` — all now keyed (`home.altarEmpty`,
+  `home.ctaHint`, `home.templeChip`) in EN + 中文.
+- **The `＋` in the empty slot** (44 pt, `text.gold`) — drawn, still **not** a `Pressable`.
+
+### ⚠️ Four things worth remembering
+1. **The board's active tab is 1.44 : 1** — `#9A2B18` on `#C23B22`. Unreadable. The build ships
+   `#FFF8E8` (**4.90 : 1**) and §22 pins **both** ratios. Filed **`SCRUM-208`**.
+2. **The coordinate trap, again — in new code.** Tabs at board `top: 774` inside a band already at
+   764 → **the bar drew with no tabs at all**. §22 now asserts `topInBar === tab.y − band.y` —
+   *the relationship, not the bound*.
+3. **A centred `＋` landed on the incense smoke** and read as a cross in it. It sits **40 board px
+   down**. Only glass showed this.
+4. **A route's existence is now a gate**: §22 `existsSync`s every tab route against `src/app/`.
+
+### 中文 verified on glass
+神龛 · 联赛 · 商店 · 我的 · 功德点 600 · 连续 1 天 · 尚未安奉牌位 — 轻点 ＋ 安放 ·
+每日供奉一件有意义之物 · 此处一切皆可自定义 · 开始供奉 · 族长 — one baseline per row, no clipped
+glyph, no Latin. ⚠️ Glyphs render in the **system** sans; the boards' serif is not applied.
+
+### Still open on 164
+**A Book entry from the shrine** and **a way back from each destination** — the ticket asks for
+both, the tab bar supplies neither. Do not read "164 done" into the commit.
+
+`check:lib` **482** · `npm run check` EXIT 0 · `tsc` 0.
+
+## 2026-10-31 (later still) — the shrine now FILLS the screen (`4aebbd0`)
+
+**Owner feedback on glass:** the shrine floated as a 390 × 844 rectangle with a strip of paper on
+all four sides, worst under the tab bar where a `paperDeep` bar sat on a `paper` page.
+
+### ⚠️ The measurement — this is the one to remember
+`uiautomator` on the POCO C81 Pro (**720 × 1600 px = 360 × 800 dp**):
+
+| node | bounds | meaning |
+|---|---|---|
+| app root | `[0,0][720,1600]` | the app **does** span the full screen |
+| shrine canvas | `[15,53][705,1547]` | **345 × 745 dp** — a window inside the screen |
+
+⚠️ **`useWindowDimensions()` answers 345 × 745 on this device, not 360 × 800.** Sizing to it is
+what produced the letterbox. **Size compositions to `Dimensions.get('screen')`.**
+
+### Fixed
+- canvas + screen both take `Dimensions.get('screen')` → `min(0.923, 0.948) = 0.923` → board
+  **exactly 360 dp wide**, no side gap;
+- canvas anchored **top-left**, not centred;
+- `shrineBleedDp()` stretches the tab bar's own `paperDeep` over the 21 dp strip below the board —
+  bar now `[0,1410][720,1600]`, to the physical edge.
+
+### ⚠️ Contain-fit is KEPT — cover would clip the CTA
+At cover the board is 800 dp tall against 746 dp above the bar, which cuts the **offering button**
+off the bottom. Full width **and** nothing clipped beats obeying "cut it off" literally. A shorter
+screen that forces the choice is a **design decision**, not a silent one.
+
+### §18 now pins the defect
+`check:lib` **482 → 487**: the width rule fills exactly, plus a **positive control** that
+window-fit loses >10 dp per side, plus `shrineBleedDp(844, 1) === 0` so a correct screen shows no
+phantom strip.
+
+⚠️ 中文 re-checked at the ~4 % larger scale — that is where `numberOfLines={1}` would ellipsize:
+none of the seven strings truncated.
+
+## 2026-10-31 — the locale-length alignment bug class (`b5ba052`)
+
+**Owner:** *"in Chinese the 族長 is now too far left. Make sure to check all these alignment
+issues that arise due to different character lengths."*
+
+### ⚠️ The shape of the bug — recognise it on the next badge
+**An element whose LEFT EDGE is pinned to a fixed x while its WIDTH comes from the label.**
+
+`clan · pill` on the boards: the role chip is at **dx 106 in both locales**, but **94 wide in EN**
+and **58 in ZH**. Left-anchored, 中文 therefore ends at 164 and leaves a **40 px hole** before the
+`›` at 204. ⚠️ **EN was correct BY LUCK** — its label is exactly 94 wide, the space available — so
+the bug is invisible in the language you build in. Faithfully porting the board reproduced it.
+
+### Fixed
+`PILL_SPEC.chip.slotWidth = 94` (the board's EN width) + the chip **centres** in the slot.
+EN is pixel-identical; 中文 shifts **18 px right**.
+
+| | chip | centre | `›` |
+|---|---|---|---|
+| EN `👑 Clan Head` | 346 – 516 | **431** | 524 |
+| 中文 `👑 族长` | **376** – 486 | **431** | 524 |
+
+**Assert the CENTRE, not the edge.** The centres agree; the left edges must not.
+
+### Audit — every other bilingual surface is clean
+· tab labels centred in a fixed 86 tab · panel labels both at x **57** · `1-day streak` and
+`连续 1 天` both centre at **579** · CTA/caption/hint/temple chip centred or left-aligned.
+Only the chip pinned a left edge to a fixed x with a variable width.
+
+`check:lib` **487 → 492** — the defect is asserted as arithmetic (58-wide label ⇒ 40 px hole).
+
+## 2026-10-31 — the tablet sheet: the altar can hold someone (`8e560b5`)
+
+`SCRUM-146` **Done** (+ children 165 cap · 168 sheet · 166 read · 167 display). `SCRUM-148` stays
+**In Progress** — `163` (geometry gate) and `164` (Book entry + way back) are still open.
+
+### ⚠️⚠️ TWO TRAPS, both invisible to every gate
+**1 · A `<Stack.Screen>` declaration can become the INITIAL ROUTE.**
+`<Stack.Screen name="ancestor" options={{presentation:'modal'}} />` made the app boot **straight
+onto the sheet**, Home never mounted, and `router.back()` said *"the action GO_BACK was not
+handled by any navigator"*. ⚠️ **Do not declare screens in `_layout` to set presentation.** A
+route file is enough. (If a modal is ever needed, verify the boot path on glass.)
+
+**2 · A ROUTE PARAM IS A COPY OF A FACT, AND A COPY CAN ARRIVE EMPTY.**
+`role` and `count` travelled as params for one build; with no push they arrived `null`, and the
+sheet told a **clan HEAD** that only a head may edit. It now reads `myClans()` +
+`clanAncestors()` itself, and renders **nothing** until they land (no refusal flash).
+
+### ⚠️ The RLS failure mode that matters
+`ancestors_update_elder` **filters** rather than raises: a member's archive returns **zero rows
+and no error**. So `archiveAncestor()` ends in `.select('id')` and treats an empty result as a
+refusal. ⚠️ Any new write path needs the same treatment, or the app will report success over a
+row it never touched.
+
+### Rules module (pure, gateable)
+`src/lib/ancestor-sheet.ts` — every constant is a **MIRROR** of the DB (`EDIT_ROLES` ↔ RPC +
+policies · `ANCESTOR_CAP` 10 ↔ `clans.ancestor_cap` · 20/40/20 ↔ the `CHECK`s). §23 asserts
+**`btrim` first** (three spaces ⇒ `surname_required`), `nullif` (blank ⇒ `NULL`), that the cap is
+**not** the display cap of 4, and `capReached` uses `>=` (fault-tested).
+
+`check:lib` **515** · `npm run check` EXIT 0 · `tsc` 0.
+
+### ⚠️ Seen on glass and NOT fixed
+A **Latin** surname renders one letter per line in the vertical name slot (`C h e n`) — the board
+is drawn for 中文. Needs an owner decision: rotate for Latin, or keep vertical everywhere.
+
+## 2026-10-31 — Latin names are ROTATED on the tablet (`c168f55`)
+
+A 牌位 is written top-to-bottom, one char per line — right for 陈秀英, and it drew `Chen` as four
+lines of one letter on glass.
+
+**Rule** (`src/lib/tablet-name.ts`): **any** CJK char ⇒ vertical; **none** ⇒ one line, rotated 90°.
+⚠️ `陈 Chen` is **vertical** — a stele does not rotate half a name. An empty name ⇒ vertical.
+
+⚠️ **A rotated view LAYS OUT at its unrotated size**, so rotating in place hangs the name off one
+end. The inner view is the frame with **axes swapped** and centred, so its centre == the frame's
+centre and 90° maps exactly onto it.
+
+⚠️ **Two size limits**: across the frame (`width × 0.62`) and along it (`height × 0.92 / len`).
+Without the second, `Bartholomew` runs out of the plaque's ends. `0.58` em advance is pessimistic
+on purpose — RN cannot measure text without a layout pass.
+
+`check:lib` **515 → 524** (§24), fault-tested (forcing `vertical` turns two checks red).
+
+---
+
+# 📍 SESSION WRAP — 2026-10-31 (S71)
+
+## Where the build is
+**Step 1 of the full-app plan is built.** Home is no longer a scaffold: shrine base, app mark,
+settings gear, halo, offerings, the tablet, the tribute/streak panels and the tab bar are all
+ported from the boards and on glass — and the altar can finally **hold a tablet**.
+
+```
+`SCRUM-146` ✅ Done   (+ 165 cap · 166 read · 167 display · 168 sheet)
+`SCRUM-161` ✅ Done   tribute + streak panels live
+`SCRUM-162` ✅ Done   the Penpot port
+`SCRUM-164` 🔄 In Progress   tab bar built · **Book entry + way back still missing**
+`SCRUM-148` 🔄 In Progress   ⚠️ NOT done — 163 + 164 remain
+`SCRUM-163` ⏳ To Do        the geometry gate (360 dp assertions)
+`SCRUM-208` ⏳ To Do        ⚠️ yours: the board's active tab is 1.44:1
+```
+
+**Pushed to glass:** EAS `preview` build **`de4c1df9`**, commit **`89d15cd`**, project
+`josspaperar/joss-paper-ar`. ⚠️ Verify the install off `dumpsys package app.josspaperar | grep
+lastUpdateTime`, not off `adb`'s exit code — a rejected install reports success (`SCRUM-145`).
+
+## ⚠️ THE FOUR DEFECTS THAT NO GATE CAUGHT
+Every one was found by **looking at the phone**, with `tsc` and 515+ checks green:
+
+1. **A `<Stack.Screen>` declaration became the stack's INITIAL route** — the app booted onto the
+   tablet sheet, Home never mounted, `router.back()` answered *"GO_BACK was not handled"*.
+   ⚠️ Do not declare screens in `_layout` to set `presentation`.
+2. **A route param arrived EMPTY** — `role`/`count` as params meant a **clan HEAD** was told only
+   a head may edit. ⚠️ **A param is a copy of a fact.** Read the fact.
+3. **Tabs positioned at board `top: 774` inside a band already at 764** — the bar drew **no tabs
+   at all**. The fourth time this class has shipped.
+4. **`useWindowDimensions()` answers 345 × 745 on a 360 × 800 device** — sizing to it letterboxed
+   the whole shrine. ⚠️ **Size compositions to `Dimensions.get('screen')`.**
+
+## ⚠️ Two rules that keep paying
+· **Assert the RELATIONSHIP, not the bound** — `topInBar === tab.y − band.y`, not `topInBar === 10`.
+· **Pin both numbers when the board is wrong** — §22 asserts the board's 1.44:1 *and* the build's
+  4.90:1, so neither "copy the board" nor "nudge it back" passes silently.
+
+## Next, in order
+1. **`SCRUM-163`** — geometry gate, 360 dp. Cheap, and it guards the class above.
+2. **`SCRUM-164`** — the Book entry + a way back (the tab bar is not the whole ticket).
+3. **`SCRUM-151`** — Profile & Settings, **including the language switcher** the app still lacks.
+4. **`SCRUM-147`** onboarding → **`150`** store → **`149`** item burn → **`155`** seed → **`157`** demo run.
+
+⚠️ **`SCRUM-12`** is still blocked on the **`SCRUM-159`** decision, and **`SCRUM-208`** is yours.
+
+### 📲 The APK for the off-session review
+⚠️ EAS `preview` builds sit in the queue for **30–40 min** (measured twice). The build was still
+`IN_PROGRESS` when the session ended, so a **watcher is left running** — it polls every 30 s, then
+downloads and installs when the build finishes:
+
+```
+tail -f /tmp/install.log          # the state, one line per poll
+```
+
+If that process died with the session, do it by hand:
+
+```bash
+cd /home/gweejiahan/.cline/worktrees/62e49/JossPaperAR
+eas build:view de4c1df9-5b81-492f-b10a-ccfb22b51271 --json \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['artifacts']['buildUrl'])"
+curl -sL -o /tmp/josspaperar.apk "<that url>"
+adb install -r /tmp/josspaperar.apk
+# ⚠️ confirm from the DEVICE, not from adb's exit code:
+adb shell dumpsys package app.josspaperar | grep -i lastUpdateTime
+```
+
+⚠️ `SCRUM-145`'s lesson: an install can be **rejected** (`INSTALL_FAILED_USER_RESTRICTED`) *after*
+a successful download and still print success. `lastUpdateTime` is the only proof.

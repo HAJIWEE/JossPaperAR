@@ -41,6 +41,16 @@ export default function RootLayout() {
     <SafeAreaProvider>
       {/* light artwork on cream paper → dark icons (doc 19 §4.4) */}
       <StatusBar style="dark" />
+      {/*
+        ⚠️ NO explicit `<Stack.Screen>` children here, deliberately.
+        `ancestor` was declared with `options={{ presentation: 'modal' }}` and that made it the
+        stack's INITIAL route on glass: the app booted straight onto the tablet sheet, `router.back()`
+        answered *"the action GO_BACK was not handled by any navigator"*, and Home never mounted.
+        The sheet reads `clanId` from its params, so with no push it saw `null` — and told a clan
+        HEAD that only a head may edit the altar.
+        ⚠️ A route file is enough. Options belong in the layout only when they cannot change routing,
+        and this one did.
+      */}
       <Stack
         screenOptions={{
           headerShown: false,
