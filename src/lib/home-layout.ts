@@ -125,9 +125,81 @@ export const BOARD_ORIGIN_Y = 180;
  * ⚠️ So bands are **board px** and every consumer multiplies by this. A band must
  * never be pasted into a style as a raw number.
  */
-export function homeScale(windowWidth: number): number {
-  return windowWidth / DESIGN_REFERENCE_WIDTH;
+/**
+ * The scale the shrine is actually drawn at: **contain-fit, both axes**.
+ *
+ * ── WHY NOT WIDTH ALONE ─────────────────────────────────────────────────────
+ * ⚠️ `homeScale(width)` was the first rule and it is **wrong for a tablet**. The
+ * shrine is a portrait composition (390 × 844, ratio 2.16). Scale it by width alone on
+ * an 800 × 1280 tablet and the canvas becomes **1732 tall** — the altar runs off the
+ * bottom and the user must scroll a shrine that plainly fits. On a short screen it does
+ * the opposite and overflows.
+ *
+ * ✅ **Contain-fit** takes the smaller of the two ratios, so the whole shrine is always
+ * visible with no scrolling and nothing clipped:
+ *   · phone 360 × 800  → `min(0.923, 0.948)` = **0.923** (width-limited, as before);
+ *   · tablet 800 × 1280 → `min(2.051, 1.517)` = **1.517** (height-limited, centred);
+ *   · small 320 × 568 → `min(0.821, 0.673)` = **0.673** (height-limited — the whole
+ *     shrine still fits, everything smaller).
+ *
+ * ⚠️ **Never squash.** The art, the CTA and the aim grader were all measured against
+ * these proportions, so the shrine scales uniformly or it lies.
+ *
+ * ⚠️ The margin this leaves is **deliberate negative space**, not a bug: on a tablet the
+ * composition is centred rather than stretched to two edges it was never drawn for.
+ */
+export function homeFitScale(windowWidth: number, windowHeight: number): number {
+  return Math.min(windowWidth / DESIGN_REFERENCE_WIDTH, windowHeight / REFERENCE_HEIGHT);
 }
+
+/**
+ * The board's own height. `390 × 844` — the canvas 131 of the 135 Penpot boards
+ * are drawn on (`design-system/responsive.css`).
+ */
+export const REFERENCE_HEIGHT = 844;
+
+/** A band, in board px. */
+export interface Band {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+}
+
+/**
+ * A band → an absolutely-positioned style, in device dp.
+ *
+ * ⚠️ **THIS IS THE ONLY PLACE A BAND BECOMES A STYLE.** SCRUM-162 shipped bands that
+ * were pasted straight into `paddingLeft`, which put the shrine base's right edge at
+ * `16 + 358 = 374` dp on a 360 dp screen — the art was clipped and no gate could see
+ * it, because each number was right in its own frame.
+ *
+ * ⚠️ And the layout must be **absolute, not a flow**. The shrine is a fixed-art
+ * composition on a 390×844 canvas: stacking its regions with `marginBottom` throws
+ * away the y-coordinates the board actually specifies, which is what made the first
+ * pass place things wrongly. Proportions are locked by the canvas; nothing reflows.
+ */
+export function bandRect(band: Band, scale: number) {
+  return {
+    position: 'absolute' as const,
+    left: band.x * scale,
+    top: band.y * scale,
+    width: band.w * scale,
+    height: band.h * scale,
+  };
+}
+
+/**
+ * Does this band fit inside the canvas at this scale?
+ *
+ * ⚠️ Exported so `SCRUM-163` can assert the layout is valid at a **360 dp** device
+ * and not only on the 390 px reference — the exact blind spot that let the clipped
+ * art through. Pure arithmetic, no device.
+ */
+export function bandFits(band: Band, scale: number, canvasWidth: number): boolean {
+  return (band.x + band.w) * scale <= canvasWidth + 0.01;
+}
+
 
 
 

@@ -27,7 +27,7 @@
 import { useWindowDimensions } from 'react-native';
 import Svg, { G, Path } from 'react-native-svg';
 
-import { HOME_BANDS, homeScale } from '@/lib/home-layout';
+import { HOME_BANDS, homeFitScale } from '@/lib/home-layout';
 
 /** The board's own fills — `art · shrine base (table)`, read 2026-10-31. */
 const ART = {
@@ -46,8 +46,8 @@ const ART = {
 } as const;
 
 export function ShrineBase() {
-  const { width } = useWindowDimensions();
-  const scale = homeScale(width);
+  const { width, height } = useWindowDimensions();
+  const scale = homeFitScale(width, height);
   return (
     <Svg
       width={HOME_BANDS.shrineBase.w * scale}
