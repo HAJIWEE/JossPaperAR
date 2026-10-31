@@ -19,10 +19,12 @@
 import {
   INITIAL_OFFERING,
   MAX_THROWS,
+  PREPARING_PHASES,
   applyAll,
   canCapture,
   isWaiting,
   nextAction,
+  preparingCopy,
   transition,
   type Offering,
   type SliceEvent,
@@ -212,6 +214,58 @@ check(
 );
 
 /* ── GUARD: the harness must be able to FAIL ─────────────────────────────── */
+section('④ The `/preparing` screen cannot render contradictory copy (SCRUM-127)');
+
+/**
+ * ⚠️ THE DEFECT, EXPRESSED AS AN ASSERTION. On glass the screen showed **three
+ * contradictory claims at once** — *"The offering is being prepared…"* (a permanent title),
+ * *"This offering cannot be prepared."*, and a *"Check again"* button — because `spent` and
+ * `offline` **shared one body key** and the title never changed.
+ *
+ * ⚠️ The mapping is now data (`PREPARING_COPY`), so a collision is checkable rather than
+ * visible only to a reviewer's eye. These four assertions are the fix's durable half.
+ */
+const BODY_KEYS = PREPARING_PHASES.map((p) => preparingCopy(p).bodyKey).filter(
+  (k): k is string => k !== null,
+);
+check(
+  'every phase has a title',
+  PREPARING_PHASES.every((p) => Boolean(preparingCopy(p).titleKey)),
+);
+check(
+  '⚠️ no two phases share a BODY key — a shared body IS the SCRUM-127 defect',
+  new Set(BODY_KEYS).size === BODY_KEYS.length,
+  `${BODY_KEYS.length} bodies, ${new Set(BODY_KEYS).size} distinct`,
+);
+check(
+  '…and the check can fail: a collision is detectable (positive control)',
+  new Set(['ritual.cannotPrepare', 'ritual.cannotPrepare']).size === 1,
+);
+check(
+  '⚠️ the FAILURE phases never claim the offering is being prepared (option B)',
+  !(['spent', 'offline'] as const).some((p) => preparingCopy(p).titleKey === 'ritual_preparing'),
+);
+check(
+  '…and the positive control: `parked` LEGITIMATELY does claim it — it is being prepared',
+  preparingCopy('parked').titleKey === 'ritual_preparing',
+);
+check(
+  '`working` renders a spinner only — no body, no button',
+  preparingCopy('working').bodyKey === null && preparingCopy('working').buttonKey === null,
+);
+check(
+  'the copy and the ACTION agree: only a spent capture offers a NEW photo',
+  PREPARING_PHASES.every(
+    (p) =>
+      (preparingCopy(p).action === 'recapture') ===
+      (preparingCopy(p).buttonKey === 'common.recapture'),
+  ),
+);
+check(
+  'a retriable phase offers a retry, never a recapture',
+  preparingCopy('offline').action === 'retry' && preparingCopy('parked').action === 'retry',
+);
+
 section('Guard — a dead harness must not read as a pass (the prototype habit)');
 
 check('the module actually loads (a missing export would throw, not pass)', typeof transition === 'function');

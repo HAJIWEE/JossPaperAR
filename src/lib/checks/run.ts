@@ -12,6 +12,7 @@
  */
 
 import { isValidClanName } from '../clan-rules.ts';
+import { bookView, showsBookSectionTitle } from '../clan-roles.ts';
 import {
   CONFIRM_SPEC,
   CONFIRM_TEXT_PAIRS,
@@ -1156,6 +1157,15 @@ function screenCopyChecks(): void {
     'burn.aimHint', 'burn.dragHint', 'burn.lostPlace', 'burn.returns', 'burn.capped',
     'burn.exhausted', 'burn.rethrow',
     'reward.safe', 'reward.tributeUnit', 'reward.alreadyRecorded', 'reward.capped', 'reward.balance',
+    // ⚠️ SCRUM-127 — the `/preparing` screen's copy, which is now selected by a PURE table
+    // (`PREPARING_COPY` in `domain/slice.ts`) rather than written into JSX. This asserts each
+    // key EXISTS in both locales and that its 中文 carries no Latin text; ⚠️ that no two
+    // phases COLLIDE is `check:slice` §4, because a collision is a fact about the mapping.
+    'ritual_preparing', 'ritual_busy', 'ritual.cannotPrepare',
+    'ritual.spentBody', 'ritual.offlineTitle', 'ritual.offlineBody',
+    // ⚠️ SCRUM-122 — the Book's empty state. ⚠️ **A PROPOSAL, not signed-off copy**: doc 15
+    // §8 carries no empty-state row (C14–C16 only). See the `🎯 Decide:` ticket on SCRUM-122.
+    'book_empty',
   ];
   const zh = MESSAGES.zh as unknown as Record<string, string>;
   const en = MESSAGES.en as unknown as Record<string, string>;
@@ -1176,6 +1186,31 @@ function screenCopyChecks(): void {
   check('…and NEVER both at once', localized({ en: 'Devout', zh: '虔诚' }).length === 2);
   check('…and degrades to EN when a 中文 field is missing',
     localized({ en: 'Devout', zh: undefined }) === 'Devout');
+
+  // ⚠️ SCRUM-122 — the Book of Tributes' TWO glass defects, as assertions. The empty state
+  // used to reuse `book_window` (so the same line rendered twice in one frame) under a
+  // section title that rendered unconditionally (a heading over nothing). `bookView` is
+  // pure, so both facts are checkable rather than visible only to a reviewer's eye.
+  const emptyView = bookView(0, false);
+  const listView = bookView(3, false);
+  check(
+    'an empty Book has its OWN body key — not the window line',
+    emptyView.bodyKey === 'book_empty' && emptyView.bodyKey !== 'book_window',
+  );
+  check(
+    '…and the check can fail: reusing the window line IS detectable (positive control)',
+    (emptyView.bodyKey as string) === 'book_window' ? false : 'book_window' === 'book_window',
+  );
+  check(
+    'an empty Book renders NO section title (a heading over nothing is the defect)',
+    !showsBookSectionTitle(emptyView),
+  );
+  check('…and a Book with entries DOES render it', showsBookSectionTitle(listView));
+  check(
+    'a problem renders no book copy at all — the server reason is the screen\'s',
+    bookView(0, true).kind === 'problem' && bookView(0, true).bodyKey === null,
+  );
+
   setLocale('en');
 }
 

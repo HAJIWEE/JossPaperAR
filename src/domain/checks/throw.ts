@@ -17,6 +17,7 @@ import {
   fireBoxTop,
   gradeThrow,
   heartPoint,
+  landedAction,
   offsetFromHeart,
   restingPoint,
   type ThrowOutcome,
@@ -124,6 +125,51 @@ check(
   offsetFromHeart({ x: 100, y: 300 }, heart) === offsetFromHeart({ x: 100, y: 100 }, heart),
 );
 check('a 3-4-5 triangle gives exactly 5', Math.abs(offsetFromHeart({ x: 103, y: 204 }, heart) - 5) < 1e-9);
+
+/* ── SCRUM-145: what the landed offering offers ───────────────────────────── */
+section('⑥ The landed offering always has an action (SCRUM-145)');
+
+// ⚠️ THE REPORTED DEFECT, AS AN ASSERTION. On glass, after a SECOND miss, "Throw again"
+// rendered but did nothing: the render gate asked `canThrow(throwNumber)` while the handler
+// required `canThrow(throwNumber + 1)`. The first rethrow worked; the second was inert.
+check('a first miss offers a rethrow', landedAction(grade(500, 1)) === 'rethrow');
+check(
+  '⚠️ …and a SECOND miss ALSO offers one — the inert-button defect',
+  landedAction(grade(500, 2)) === 'rethrow',
+);
+check(
+  `a miss on the LAST throw (${MAX_THROWS}) rests — there is no throw left`,
+  landedAction(grade(500, MAX_THROWS)) === 'rest',
+);
+check(
+  '⚠️ a HIT on the LAST throw is CONFIRMABLE — the award must never be unreachable',
+  landedAction(grade(0, MAX_THROWS)) === 'confirm' && landedAction(grade(10, MAX_THROWS)) === 'confirm',
+);
+check(
+  'a hit on any throw is confirmable, and only a hit is',
+  [1, 2, MAX_THROWS].every(
+    (n) =>
+      landedAction(grade(0, n)) === 'confirm' &&
+      landedAction(grade(500, n)) !== 'confirm',
+  ),
+);
+// ⚠️ THE COUPLING, asserted — the thing that was wrong. A `rethrow` action must always be
+// permitted by the SAME predicate its handler uses, at every throw number.
+check(
+  '⚠️ a rethrow action IMPLIES canThrow(throwNumber) — the coupling that was wrong',
+  [1, 2, MAX_THROWS].every((n) => {
+    const a = landedAction(grade(500, n));
+    return a !== 'rethrow' || canThrow(n) === true;
+  }),
+);
+check(
+  '…and the positive control: at the last throw that predicate is FALSE, so it must rest',
+  canThrow(MAX_THROWS) === false && landedAction(grade(500, MAX_THROWS)) === 'rest',
+);
+check(
+  '⚠️ `spent` alone must never decide the action — it is true on a last-throw HIT',
+  grade(0, MAX_THROWS).spent === true && landedAction(grade(0, MAX_THROWS)) === 'confirm',
+);
 
 /* ── GUARD ────────────────────────────────────────────────────────────────── */
 section('Guard — a dead harness must not read as a pass');

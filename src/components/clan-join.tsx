@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 
-import { Body, Field, GhostButton, Hint, Label, PageTitle, PrimaryButton, Screen } from '@/components/clan-ui';
+import { Body, Field, GhostButton, Hint, PageTitle, PrimaryButton, Screen } from '@/components/clan-ui';
 import { type ClanPreview, joinClan, previewClan } from '@/lib/clan-api';
 import { PREVIEW_MESSAGE_KEY, previewArgs } from '@/lib/clan-flow';
 import { RESOLVE_MESSAGE_KEY, canJoin, resolveState } from '@/lib/invite-flow';
@@ -126,7 +126,11 @@ export default function ClanJoin({ initialCode = null }: { initialCode?: string 
 
       {preview ? (
         <View style={styles.preview}>
-          <Label>{t('clan_preview')}</Label>
+          {/* ⚠️ NO `<Label>` HERE (SCRUM-121). `clan_preview` is a MESSAGE with three
+              placeholders, not a static label — calling `t()` on it with NO args leaked
+              `[MISSING "%{NAME}" VALUE] · …` directly above this line on glass. The
+              interpolated line below already carries the name and both counts.
+              `check:copy` §3 now asserts this, so re-adding it goes red. */}
           <Text style={styles.previewLine}>
             {t(PREVIEW_MESSAGE_KEY, previewArgs(preview.name, preview.ancestorCount, preview.memberCount))}
           </Text>

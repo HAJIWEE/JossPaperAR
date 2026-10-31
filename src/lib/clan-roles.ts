@@ -320,3 +320,33 @@ export function bookProjection(isMember: boolean): BookProjection {
   return isMember ? 'full' : 'anonymous';
 }
 
+/**
+ * WHICH PART OF THE BOOK RENDERS (SCRUM-122).
+ *
+ * ⚠️ PURE SO THE TWO DEFECTS FOUND ON GLASS ARE ASSERTABLE. The empty state used to render
+ * `book_window` **again** — so *"Showing the last month."* appeared twice in one frame, once
+ * as the Hint and once as the body — and the *"Book of Tributes"* section title rendered
+ * **unconditionally**, leaving a heading over nothing. Both are facts about **which part of
+ * the screen is shown**, so they live here, where `check:lib` can read them, instead of in
+ * JSX that nothing can assert.
+ *
+ * ⚠️ `bodyKey` is `null` for `list` because the list's body IS the rows; and `problem`
+ * renders **no book copy at all** — the server's reason is shown by the screen.
+ */
+export type BookView =
+  | { readonly kind: 'problem'; readonly bodyKey: null }
+  | { readonly kind: 'empty'; readonly bodyKey: 'book_empty' }
+  | { readonly kind: 'list'; readonly bodyKey: null };
+
+export function bookView(entryCount: number, hasProblem: boolean): BookView {
+  if (hasProblem) return { kind: 'problem', bodyKey: null };
+  return entryCount === 0
+    ? { kind: 'empty', bodyKey: 'book_empty' }
+    : { kind: 'list', bodyKey: null };
+}
+
+/** ⚠️ The section title belongs to the LIST only — a heading over nothing IS the defect. */
+export function showsBookSectionTitle(view: BookView): boolean {
+  return view.kind === 'list';
+}
+

@@ -1312,6 +1312,254 @@ So a first measure pass whose height spec is not EXACT **latches the PreviewView
 
 ---
 
+### 12.47 · S67+12 — SCRUM-145: the "Throw again" button rendered and did nothing, and fixing it exposed two more defects (2026-10-25)
+
+**The report, from the owner on glass.** *"If I missed the throw a second time I can no longer click the 'Throw again' button."*
+
+**The root cause — a bound mismatch between an affordance and its handler.** `/burn` asked **two different questions about the same throw**:
+
+```tsx
+// the RENDER gate
+!canThrow(throwNumber)
+// the HANDLER guard — ⚠️ `+ 1`
+!canThrow(throwNumber + 1)
+```
+
+`canThrow(n)` is `n < MAX_THROWS` — **asserted by `check:throw` §③**, meaning *"is there room for another throw after throw n"*. The two sites therefore **agreed for the FIRST rethrow and disagreed for the SECOND**, so the button was **visible and inert**: the third throw was unreachable and the player had **no way off the screen**.
+
+⚠️ **The same class as `fireBoxTop` (§④): two individually-correct calls whose COUPLING was wrong** — invisible to `tsc` and to a screenshot.
+
+**The fix — one predicate, read by both.** `landedAction(outcome)` in `src/domain/throw.ts` → `'rethrow' | 'confirm' | 'rest'`:
+- **miss** → `rethrow` while `canThrow(throwNumber)`, otherwise `rest`;
+- **hit** → **`confirm`, always**.
+
+⚠️ **AND FIXING IT EXPOSED TWO MORE DEFECTS — both fixed, because leaving them would have made things worse:**
+
+1. ⚠️ **A hit on the last throw could not be claimed.** `exhausted` included `spent` (`throwNumber >= MAX_THROWS`), so at throw 3 a hit rendered *"The offering rests."* with **no confirm button** — and `confirm`'s own `canThrow` guard would have refused it anyway. ⚠️ **The award would have been LOST** (no `/reward` → no `submit_burn`). ⚠️ **Unreachable only because the inert button blocked the third throw** — so fixing the report alone would have *exposed* a worse bug.
+2. ⚠️ **`rest` was a dead end** — text only, no button. ⚠️ **Already live**: the inert button at the second miss left the player stuck. Now `rest` offers `common.done` → the shrine, the same destination `/reward` already uses for a final miss, and **no new copy**.
+
+**The gate — `check:throw` §⑥, 8 assertions** (`check:throw` **47 → 55**): ⚠️ **a SECOND miss also offers a rethrow** (*the report*) · ⚠️ **a HIT on the last throw is confirmable** (*the masked defect*) · ⚠️ **`spent` alone must never decide the action** (*it is true on a last-throw hit*) · ⚠️ **a `rethrow` action IMPLIES `canThrow(throwNumber)`** (*the coupling itself*) · plus the first-miss and last-miss controls.
+
+**Fault-tested:** the original `+ 1` back in place turns **exactly** the reported assertion red, and the restore is byte-identical.
+
+**Verification:** `npx tsc --noEmit` **0** · `npm run check` **EXIT 0**. ⚠️ `tsc` caught a real typing error mid-fix (`/burn`'s `Preview` is not a `ThrowOutcome`), which is why `landedAction` takes a **structural** `LandedOutcome` — the screen keeps `throwNumber` in its own state.
+
+✅ **The fix is ON THE DEVICE** — EAS `preview` build `b6786875` (from `0c1137a`) is installed on `HN615L005386` (`lastUpdateTime` **15:01 → 17:56**). ⚠️ **The FIRST `adb install` was REJECTED by the phone** — `INSTALL_FAILED_USER_RESTRICTED` — **while the download had already succeeded**, so the log's last line was a failure but the APK was present on disk. ⚠️ **A rejected install is therefore a real failure mode here: confirm it with `adb shell dumpsys package <id> | grep lastUpdateTime`, never with the script's exit code.** The retry went straight through.
+
+⏳ **`In Review`, not `Done`** — installed but **not yet glass-verified**. The glass pass needs a **real ritual run** (a capture + a Path C generation, ≈ US$0.09) **and two deliberate misses** — one to reach the button, a second to hit the reported defect.
+
+**US$0.00 in AI spend** (one EAS build).
+
+---
+
+### 12.46 · S67+11 — SCRUM-122: the Book's empty state had no copy, so it borrowed the window line (2026-10-25)
+
+**The defect, seen on glass.** An empty Book of Tributes rendered the window note **twice** and left a **heading over nothing**:
+
+```
+Tan Family
+Showing the last month. (30)      ← the window note, as a Hint
+Showing the last month.          ← ⚠️ THE SAME STRING AGAIN, as the body
+Book of Tributes                 ← ⚠️ section title, with NOTHING under it
+Return to the shrine
+```
+
+⚠️ **The cause was an absence, not a mistake:** `src/lib/i18n.ts` had exactly **three** book keys (`book_header` · `book_outside` · `book_window`) — **no empty-state key existed**, so the empty branch fell back to the window line, and the section title rendered unconditionally.
+
+**The fix.**
+- ✅ **The empty state has its own key** (`book_empty`) — the window line now renders **once**, as the Hint.
+- ✅ **The section title renders only when there ARE entries**, and it sits **above** its list.
+
+**⚠️ THE STRUCTURAL HALF.** Both defects were facts about **which part of the screen is shown**, so that decision is now **pure**: `bookView(entryCount, hasProblem)` in `src/lib/clan-roles.ts` → `problem | empty | list`, plus `showsBookSectionTitle(view)`. The screen renders from it instead of branching in JSX — the same move as `SCRUM-127`'s `PREPARING_COPY`, and for the same reason: *a defect nothing can read is a defect a gate cannot hold.*
+
+**The gate — `check:lib`, 7 new assertions** (`check:lib` **409 → 416**):
+- ⚠️ **an empty Book has its OWN body key — not the window line** (*the defect itself, as an assertion*);
+- ⚠️ **an empty Book renders NO section title** (*the orphaned heading, as an assertion*);
+- …and a Book **with** entries **does** render it · a problem renders no book copy at all · plus a **positive control**.
+
+**Fault-tested:** reverting `bookView`'s empty branch to `'book_window'` turns it **RED**; the restore is byte-identical.
+
+⚠️ **AND THE COPY COULD NOT COME FROM THE TABLE — which the ticket itself predicted.** Its AC 3 says *"The copy is doc 15 §8's — **do not invent the ZH string**"*. ⚠️ **§8 has no empty-state row**: its Book rows are **C14** (header), **C15** (outside view) and **C16** (window note), and nothing else. So:
+- the key ships as a **clearly-marked PROPOSAL** — in `src/lib/i18n.ts` **and** in the gate's own comment;
+- **`SCRUM-144`** was filed as the **🎯 Decide:** ticket for the wording (options A–D, recommending A), **in the sprint**;
+- ⚠️ **`SCRUM-122` stays `In Review`, not `Done`**, exactly as AC 3 requires.
+
+| key | EN (proposed) | 中文 (proposed) |
+|---|---|---|
+| `book_empty` | *No offerings yet. The first one will appear here.* | 尚无供奉。第一笔将显示在这里。 |
+
+⚠️ The 中文 deliberately reuses the table's own words — **供奉** (§8's C15/C17) and **显示** (C16) — rather than inventing vocabulary.
+
+**Verification:** `npx tsc --noEmit` **0** · `npm run check` **EXIT 0** · `check:lib` **409 → 416**.
+
+---
+
+### 12.45 · S67+10 — SCRUM-127 answered (option B): the `/preparing` copy is per-phase, and the collision is an assertion (2026-10-25)
+
+**The defect, seen on glass.** `/preparing` showed **three contradictory claims at once** — *"The offering is being prepared…"* (a **permanent** title), *"This offering cannot be prepared."*, and a *"Check again"* button. ⚠️ The cause was a **copy collision**: `spent` and `offline` **shared one body key**, so a photo that had never left the phone was told its offering *"cannot be prepared"* — **three different claims about one state, on one screen.**
+
+**Option B, implemented** — a new retriable body key **and** a **phase-aware title**:
+
+| phase | title | body | button |
+|---|---|---|---|
+| `working` | `ritual_preparing` | — | — |
+| `parked` | `ritual_preparing` | `ritual_busy` | `common.retry` |
+| `spent` | `ritual.cannotPrepare` | **NEW** `ritual.spentBody` | `common.recapture` |
+| `offline` | **NEW** `ritual.offlineTitle` | **NEW** `ritual.offlineBody` | `common.retry` |
+
+⚠️ **`working` and `parked` legitimately share the title** — in both, the offering *is* being prepared. **Only the failure phases had to stop saying so.**
+
+**⚠️ THE STRUCTURAL HALF, which is the part worth keeping.** The three contradictions were a fact about the **mapping**, not the render — so the mapping is now **data**: `PREPARING_COPY` in `src/domain/slice.ts`, a pure table (`titleKey · bodyKey · buttonKey · action`) the screen reads. ⚠️ **The ACTION is in the table too**, so the copy and what the button does cannot disagree — *offering a retry on a spent capture is the lie this screen exists to avoid.*
+
+**The gate — `check:slice` §4, 8 new assertions** (`check:slice` **36 → 44**):
+
+- ⚠️ **no two phases share a BODY key** — *the defect itself, as an assertion*;
+- ⚠️ **the failure phases never claim the offering is being prepared** — **option B, asserted**;
+- `working` renders a spinner only · the copy and the ACTION agree · a retriable phase offers a retry, never a recapture;
+- plus a **positive control** (a collision *is* detectable) and the control that `parked` **legitimately** claims the preparing title.
+
+**⚠️ AND THE FAULT TEST CAUGHT ME FIRST.** My first injection made the bodies **distinct** — and the check correctly stayed **green**, because **that is not the defect**. Injecting the real one (**both** phases on `ritual.cannotPrepare`) turned it **RED**: `✗ no two phases share a BODY key — 3 bodies, 2 distinct`. ⚠️ **A fault test that does not reproduce the fault proves nothing**, and this is the second time in two sessions that the *test* was the thing that was wrong.
+
+**Verification:** `npx tsc --noEmit` **0** · `npm run check` **EXIT 0** · `check:lib` **397 → 409** (the six keys × existence + no-Latin-in-中文) · `check:copy` **15**.
+
+⚠️ **`In Review`, not `Done`** — the fix and the gate are complete; **three of the strings are a DRAFT awaiting the owner's wording** (marked as such in `i18n.ts`, and the 中文 reuses the table's existing vocabulary — 制作 · 神龛 · 安然无恙).
+
+**US$0.00 — no AI call, no device run.**
+
+---
+
+### 12.44 · S67+9 — SCRUM-121: the join preview leaked raw placeholders, and the gate that should have caught it (2026-10-25)
+
+**The defect, seen on glass.** `src/components/clan-join.tsx:129` rendered `<Label>{t('clan_preview')}</Label>` — a **message carrying three placeholders, called with no args** — so a player read `[MISSING "%{NAME}" VALUE] · [MISSING "%{ANCESTORS}" VALUE] ANCESTORS · …` **directly above the correct interpolated line** at `:131`. A reviewer found it on `HN615L005386`; no gate did.
+
+⚠️ **WHY EVERY GATE STAYED GREEN — and this is the part worth keeping.** `check:copy` rule 2 asserts that user-visible copy sits **inside `t()`**. This string **does**. **The rule was satisfied by the exact thing that was broken — a gate that checks the wrapper cannot see a broken call.**
+
+**The fix.** The stray `<Label>` is **removed**, and the now-unused import with it. ⚠️ **No copy was invented** — doc 15 §8 owns the words, and the interpolated line below already carries the name and both counts. A ⚠️ comment now sits where the label was, so it is not re-added.
+
+**The gate — `check:copy` gains rule 3.** For every **literal-key** `t(key)` / `t(key, …)` call, the message's declared `%{…}` placeholders must be supplied:
+
+- ⚠️ **both locales** are read — the ZH message carries the same placeholders, so an `en`-only guard would pass a key that leaks in 中文;
+- an **inline object literal** is checked **key by key**, so a *partial* object fails too;
+- ⚠️ **what it cannot see is PRINTED, not implied** — **28** call sites use a dynamic key and are listed as *NOT statically checkable*; a helper/identifier arg is checked for *presence* only; and a check **fails if any `t()` call is split across lines**, so the last blind spot is provably empty rather than assumed.
+
+**Fault-tested in BOTH directions, which is the point:**
+
+| Run | Result |
+|---|---|
+| **Before the fix** | ✗ `clan-join.tsx:129  t('clan_preview') declares %{name} · %{ancestors} · %{members} but passes NO args` |
+| **Fix reverted** | ✗ the same line, the same message |
+| **After the fix** | ✓ `(0)` — and the literal-call count drops **153 → 152** |
+
+⚠️ **And it found exactly ONE such bug in the tree** — the other 152 literal-key call sites were already correct. **A single leak, not a pattern**, and the gate now says so on every run.
+
+**Scope: 8 new checks** (`check:copy` **7 → 15**) · `npm run check` **EXIT 0** · `npx tsc --noEmit` **0**. ⚠️ **The gate now imports `i18n.ts`**, so it needs `node_modules` — it already runs in CI's `app-checks` job *after* `npm ci`, and that job's comment now records why.
+
+⚠️ **Not seen on glass:** the repro needs a **valid clan code** (the preview renders only once a code resolves). ⚠️ **The gate is the stronger evidence** — fault-tested both ways, where a screenshot proves one frame of one screen.
+
+**US$0.00 — no AI call, no device run.**
+
+---
+
+### 12.43 · S67+7 — SCRUM-140 answered (staged): D now, A after B11 — and SCRUM-123 closes with its two confirms split out (2026-10-25)
+
+**The answer, verbatim.** *"for 140 before i get the duns and play console go with option d then A when i get the duns and play console setup"* — a **staged** decision, recorded on `SCRUM-140`.
+
+| Phase | Choice | Consequence |
+|---|---|---|
+| **Now → B11** | **D — defer the SDK; ship no ads** | No SDK integrated; the ad revenue line stays **$0**. ✅ **Nothing is lost** — the MVP has **no ads at all**, so D changes nothing today |
+| **After B11** | **A — AdMob, one network at v1** | Executed by **`SCRUM-142`** |
+
+⚠️ **The gate is the one the owner named: `SCRUM-76` (B11)** — the **D-U-N-S number and the Play Console organization account**. ⚠️ **`SCRUM-110`** (the Play Console listing — the store fallback 404s today) is a **likely co-gate**, because an AdMob app has to be **verifiable on a store**.
+
+**Three tickets carry what the answer defers, each with its own gate — split out, not cut:**
+
+| Ticket | What | Gate |
+|---|---|---|
+| **`SCRUM-142`** | **Integrate AdMob + wire the reward confirm** (the option-A half) | ⏸ **B11** and **`SCRUM-141`** |
+| **`SCRUM-143`** | **Wire the store buy confirm** | ⏸ a **store screen existing** — there is none in the app |
+| **`SCRUM-141`** *(filed earlier, re-gated)* | The **server-side credit grant** | ⏸ **B11 + `SCRUM-142`** — and it is a **prerequisite, not a follow-up**: without it a rewarded ad pays **nothing** |
+
+**`SCRUM-123` → `Done`.** ✅ The card (`src/lib/confirm-card.ts` + `src/components/confirm-card.tsx`, measured off the boards) and ✅ the **three migrated clan `Alert`s** are delivered; the **two confirms** are split out above. ⚠️ **And the record is corrected:** `SCRUM-123` had been described as *"blocked on the ad SDK"*, and that was only ever **half** true — the **store** confirm needs a **screen**, not an SDK, and would not have been wireable even with the SDK chosen.
+
+⚠️ **Two residual facts were carried into the new tickets rather than dropped:** the ad-funded photo has **no server-side grant**, and the store's **points** path has **no confirm on the board at all** — only the cash path does.
+
+**US$0.00 — no AI call, no device run.**
+
+---
+
+### 12.42 · S67+6 — SCRUM-107 answered: the SDK read was done, and the answer was not the one the ticket expected (2026-10-25)
+
+**The ask.** `SCRUM-123` was blocked on the ad SDK, which was blocked on `SCRUM-107` — *"read the Unity/LevelPlay + Meta Audience Network publisher ad controls **before any SDK selection**"*. Both halves had been open since **2026-10-05**, when the doc pages **404'd** and the session recorded them *"unverified rather than guessed"*.
+
+**⚠️ Both were read, and neither said what the ticket expected.**
+
+- **Unity (LevelPlay / Unity Ads)** — the **widest** publisher controls of the three (Advertiser Blocking · Category Filters · Age Settings · Ad Review · the **Ad Quality rules engine**, triggered on Title/Developer/package/website/store-content-rating, per app and per country). ⚠️ **But the rule engine only NOTIFIES** — *"you'll be notified by email (once daily)"* — **it does not block**; Ad Review is **impression-gated** (*"not yet eligible for review"*); and Age designation **does not** auto-set the age limits. Unity also ships *"Unblocking Insights"*, which prices the revenue you **lose** by blocking.
+- **Meta Audience Network** — ⚠️ **there is nothing to read.** Its publisher docs cover **app bidding only** — **no category blocking of any kind**. ⚠️ **And the 404 was a URL MOVE**, not an absence: the docs relocated to `developers.facebook.com/documentation/audience-network/…`. **So FAN is a demand source, not an SDK candidate** — a scope correction, not a gap.
+
+**⚠️ Two findings beyond the ticket, both dated:**
+
+1. **AdMob removed three sensitive categories on 2026-10-23** — `Consumer Loans`, `Downloadable Utilities`, `Astrology & Esoteric` — *two days* before this was written. So the `loans` class has **no category on any network**; our own list is the only control. (doc 21 §8 item 4 → **RESOLVED**.)
+2. **Consent no longer separates the candidates** — LevelPlay consumes **Google UMP** too, so doc 21 §4.4's tie-breaker (*"…which points at AdMob"*) is **void**, and was corrected in place.
+
+**⚠️⚠️ AND THE DECIDING FACTOR WAS NOT IN THE TICKET'S QUESTION LIST.** The app is **Expo SDK 57 / RN 0.86.3** with **no `ios/`/`android/` directories** — native behaviour goes through **config plugins**, and the project **forbids hand-editing generated native projects**. Measured against that rule: **AdMob ships a config plugin** (the library calls it *the recommended install for Expo*), while **LevelPlay and AppLovin MAX document no Expo path at all** — which here means **a config plugin we write and then maintain**. ⚠️ AdMob's own prerequisites bind us, and they are **met**: RN ≥ 0.86.0 (we are on **0.86.3**), New Architecture (no Legacy path remains on RN 0.86), iOS ≥ 15.1, minSdk 24. ⚠️ **Expo Go cannot run it — wiring ads needs a development build.**
+
+**No code and no gate, on purpose.** These are **vendor facts**, and doc 21 §8 item 2 already records that a vendor's category list must not be hard-coded because it is per-country and mutable — a rule this session proved by catching a removal **two days old**. `check:ads` stays **policy, not a runtime filter**.
+
+**⚠️⚠️ AND THE RESEARCH FOUND A THIRD BLOCKER ON `SCRUM-123` THAT NOBODY HAD TRACKED.** The reward confirm promises **+1 photo for watching an ad**, and **that payout has no server-side path**: there is no client purchase/grant path at all, no `sign_in_grants` table, and `cartoonize_jobs.funding_source` is a planned column — all deferred to beta, with doc 10 citing **`SCRUM-18`**, which is **`Done`**. So the deferral pointed at a **closed** ticket and the blocker was **untracked**. Filed as **`SCRUM-141`** (split out, not cut) — the schema is already ready (`ledger_type` and `acquired_via` both carry `'grant'`), and the invariant is named: the ad credit **must** be a `grant`, never an `award`.
+
+**Filed:** **`SCRUM-140`** (🎯 Decide — the ad SDK, recommending AdMob, **in the sprint**) · **`SCRUM-141`** (the grant path, **backlog**, ⏸ gated on 140). **`SCRUM-107` → `Done`.** **`SCRUM-123` stays `In Review`** — its remainder is now **three dependencies**, not one string.
+
+**US$0.00 — no AI call, no device run; web research and Penpot reads only.**
+
+---
+
+### 12.41 · S67+5 — SCRUM-137 answered (option B): the confirm copy drafted from the boards, and the copy was never the only blocker (2026-10-25)
+
+**The ask.** `SCRUM-123` (option A, the designed modal card) was **half built** — the card and the three migrated clan dialogs shipped in PR #69 — and its remainder is **copy, not code**: two of the six designed confirm dialogs have **no string in either locale**. `SCRUM-137` asked the owner for the signed-off bilingual strings; the owner answered **option B** — *"a proposed draft is written and the owner edits it. Faster, and the draft is a starting point rather than a commitment."*
+
+**The draft was READ OFF THE BOARDS, not written from scratch.** ⚠️ **This is the part that matters**: the confirm boards already carry the copy, so almost none of it had to be invented. The plugin returned it shape by shape —
+
+| board | slot | EN | 中文 |
+|---|---|---|---|
+| `5b Reward / one more offering` | title | Watch to prepare one more offering. | 观看以再备一份供品。 |
+| | body | A short video unlocks one extra photo. Always after the ritual — never during. | 一段短视频，多一次拍照供品。仅在仪式之后 — 绝不在仪式之中。 |
+| | primary · cancel | ▶ Watch · No thanks | ▶ 观看 · 不用了 |
+| `9b Buy offerings · confirm` | title | Confirm — Wealth Bundle | 确认 — 财富套装 |
+| | body | Wealth Bundle · $2.99. Google Play will ask you to verify. **(IAP sheet = placeholder in this wire.)** | 财富套装 · $2.99。Google Play 将请求您验证。**（示意：内购表单占位。）** |
+| | primary · cancel | Buy with Google Play · Cancel | 通过 Google Play 购买 · 取消 |
+
+✅ **The reward confirm's TITLE is double-signed-off** — it is on the board *and* verbatim in `doc 10`'s "UX copy" table (the ad-gated offer row), the strongest provenance any of these strings has. ✅ The board ZH is **already Simplified**, so it matches the shipped table without a SCRUM-95 pass.
+
+⚠️ **THE BOARD'S STORE BODY IS A WIRE ANNOTATION, AND IT SAYS SO.** *"IAP sheet = placeholder in this wire."* / *"（示意：内购表单占位。）"* — a parenthetical that documents the wireframe to a reviewer and must **never** ship. So exactly **one** of the eight slots needs the owner's words, and the draft marks it.
+
+**Proposed keys** (flat and dotted, matching `clan.leaveConfirm`'s form; the store's title/body take `%{item}` / `%{price}`, because the store sells five items at five prices and `OFFERINGS[].name` already carries the bilingual name through `localized()`):
+
+```ts
+'reward.oneMoreTitle' · 'reward.oneMoreBody' · 'reward.oneMoreWatch' · 'reward.oneMoreDecline'
+'store.buyConfirmTitle': 'Confirm — %{item}'
+'store.buyConfirmBody':  '%{item} · %{price}. Google Play will ask you to verify.'   // ⚠️ proposed: the wire parenthetical dropped
+'store.buyWithPlay' · 'store.buyCancel'
+```
+
+**⚠️⚠️ THE FINDING WORTH MORE THAN THE DRAFT: supplying the words does NOT unblock the wiring.** Two gates sit behind the copy, and **neither is a copy gate** —
+
+1. **The store confirm has no surface.** `src/app/` has **no store route**; the offerings exist only as data (`src/domain/catalogue.ts`). There is nothing to mount the card on. ⚠️ *(The ticket calls this confirm "spend **jade**", but the board's confirm is the **cash** path — `Buy with Google Play` — and the board's own note says the store takes **cash OR store points** (支持现金或商店积分), so the **points** path has no confirm on the board at all. That is one of the three questions sent back.)*
+2. **The reward confirm IS the ad-gated offer.** `doc 10` names it *"Ad-gated offer (opt-in, post-ritual)"* — `+1 photo` for a rewarded ad — and the ad SDK is still unchosen: **`SCRUM-107`** is *"the one unsatisfied SCRUM-63 deliverable (⏸ gated on SDK selection, deferred by ADR-008)"*. Wiring a `▶ Watch` confirm today renders a button that **cannot watch anything**.
+
+⚠️ **So `SCRUM-137` is `In Review`, not `Done`** — option B's own definition makes the owner's edit the last step — and **`SCRUM-123` stays `In Review`** for the same reason: its card and the three clan migrations are delivered; the last two confirms wait on **copy AND their surfaces**.
+
+**US$0.00 — no AI call, no device run; the Penpot reads are free.** ⚠️ **Three questions went back with the draft:** which wallet the store confirm names (the ticket said "jade"; the board's confirm is the cash path; the board note says cash **or** store points) · whether the `▶` glyph ships (the `zoom` numerals precedent) · and the store's inconsistent wallet vocabulary (the board says 商店积分 / 积分, the shipped table says 功德点, `doc 10` names three wallets).
+
+**✅ THEN THE OWNER APPROVED THE DRAFT, AND THE COPY LANDED (`src/lib/i18n.ts`, BOTH locales).** Eight keys — `reward.oneMoreTitle` · `reward.oneMoreBody` · `reward.oneMoreWatch` · `reward.oneMoreDecline` · `store.buyConfirmTitle` · `store.buyConfirmBody` · `store.buyWithPlay` · `store.buyCancel` — with `%{item}` / `%{price}` on the store pair (`OFFERINGS[].name` through `localized()`, so the five items need no per-item string).
+
+⚠️ **PROVED WITH A REAL CALL, NOT BY READING THE DIFF.** A throwaway script resolved **all 8 keys in BOTH locales**, with interpolation: `store.buyConfirmTitle` → `Confirm — Wealth Bundle` / 确认 — 财富套装. `npm run check` **EXIT 0** (397 lib · 238 framing · 74 pathc · 34 ADR · 7 copy · 9 sprite) and `npx tsc --noEmit` **0**. ⚠️ **And the log carries TWO `✗` lines — they are DELIBERATE negative controls** (*"DELIBERATE WRONG BELIEF — must FAIL"*), which is why the **exit code**, not a `grep` for the glyph, is what proves the suite. The assertions that cover the new keys are `✓ EN and 中文 still define the same key set` (parity) and `✓ every message RESOLVES in both locales` (resolution).
+
+⚠️ **STILL NOT WIRED, DELIBERATELY — AND NOW FOR A SECOND REASON.** The copy was this ticket's blocker, but it was never the *only* one: **both confirms' ACTIONS are missing too.** `grep -rn 'purchase|redeem|spend' src/app src/lib` finds **only prose** — there is **no client purchase path at all** — and `src/app/` has no store route, so the store confirm has nothing to confirm and nothing to mount on. The reward confirm's action is the ad-gated offer, whose SDK is unchosen. Shipping the strings is what makes the wiring *"a few lines once the words exist"*; wiring it today would ship a `▶ Watch` button that cannot watch anything.
+
+✅ **`SCRUM-137` → `Done`** (its ask was the strings, and they exist). **`SCRUM-123` stays `In Review`** — the card and the three clan migrations are delivered; the last two confirms wait on their **surfaces**. ⚠️ **Two questions stay open for whenever the store screen is built:** which wallet that confirm names (the board's confirm is the cash path; the points path has no confirm on the board) and the store's inconsistent wallet vocabulary.
+
+---
+
 ### 12.40 · S67 — DETECT UP TO THREE, CARTOONIZE ONE: the extra objects were not wanted (2026-10-19)
 
 **The ask, verbatim.** *"After demonstrating it a few times, and gathering feedback. I decided that 3 objects generated max is not representative of the user's intent. The users' feedback says that the extra objects aren't wanted. So I decided that we will only have 1 object cartoonized. This means we should still detect if there is more than one object up to 3 objects but we should apply an analysis that assigns a probability factor to the objects and only cartoonize the one object with the highest probability."*

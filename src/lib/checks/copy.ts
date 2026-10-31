@@ -23,6 +23,10 @@
  *   1. no `{x.zh} {x.en}` — the both-languages bug, matched exactly
  *   2. no user-visible literal in a JSX text node or a `label`/`title`/
  *      `accessibilityLabel` prop, unless it is routed through `t()` / `localized()`
+ *   3. **SCRUM-121** — no `t(key)` call leaves a placeholder its message declares
+ *      unsubstituted. ⚠️ **Rule 2 is structurally blind to this**: the string IS inside
+ *      `t()`, which is exactly how `t('clan_preview')` shipped `[MISSING "%{NAME}" VALUE]`
+ *      to a real player on glass while every gate stayed green.
  *
  * ⚠️ Deliberately NOT flagged: `testID`/`style` values (not user-visible), `placeholder`
  * example text (`ABCDEFGH` is a code example, not copy), `accessibilityRole="button"`
@@ -38,6 +42,14 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+
+/**
+ * ⚠️ **The message table is IMPORTED, and that is why this gate runs in CI's `app-checks`
+ * job (after `npm ci`) rather than the dependency-free one.** It needs `i18n-js` to load
+ * `i18n.ts`. The alternative — parsing the table out of the file as text — would have kept
+ * the gate dependency-free and made it *wrong* the first time the table's formatting moved.
+ */
+import { MESSAGES } from '../i18n.ts';
 
 const PROJ = path.join(import.meta.dirname, '..', '..', '..');
 const ROOTS = ['src/app', 'src/components'];
@@ -99,7 +111,8 @@ const walk = (dir: string): string[] =>
 
 console.log('copy-check · every user-visible string is localised');
 console.log('\n1 · no site renders BOTH languages at once');
-console.log('2 · no user-visible literal outside t() / localized()\n');
+console.log('2 · no user-visible literal outside t() / localized()');
+console.log('3 · no t(key) call leaves a declared placeholder unsubstituted\n');
 
 const bilingualHits: string[] = [];
 const literalHits: string[] = [];
@@ -141,6 +154,119 @@ check(`no site renders both languages at once (${bilingualHits.length})`,
   bilingualHits.length === 0, bilingualHits.slice(0, 6).join('\n      '));
 check(`no user-visible literal outside t()/localized() (${literalHits.length})`,
   literalHits.length === 0, literalHits.slice(0, 8).join('\n      '));
+
+// ── 3 · a t(key) call must supply the placeholders its message declares ─────
+//
+// ⚠️ SCRUM-121 — FOUND ON GLASS, NOT BY A GATE. `clan-join.tsx` rendered
+// `<Label>{t('clan_preview')}</Label>`: a message carrying three placeholders, called
+// with NO args, so a player read `[MISSING "%{NAME}" VALUE] · …` directly above the
+// correct interpolated line. ⚠️ Rule 2 cannot see it — the string IS inside `t()`.
+//
+// WHAT IT CANNOT SEE, stated rather than implied:
+//   · a DYNAMIC key (`t(messageKey)`, `t(KEYS[i])`) — not resolvable statically, and the
+//     count is PRINTED below so the blind spot is visible rather than silent;
+//   · an arg object it cannot read (a helper call, an identifier, a spread) — for those
+//     only the PRESENCE of a second argument is provable;
+//   · a call split across lines — there are none in this tree today (asserted below).
+const en = MESSAGES.en as unknown as Record<string, string>;
+const zh = MESSAGES.zh as unknown as Record<string, string>;
+
+/** `t('key'` / `t("key"` — a LITERAL key, plus whether a second argument follows. */
+const T_CALL = /(?:^|[^\w.])t\(\s*(['"])([A-Za-z0-9_.]+)\1\s*(,|\))/g;
+/** `%{name}` — the interpolation form this table actually uses. ⚠️ NOT `PLACEHOLDER`,
+ *  which this file already uses for the `placeholder=` JSX prop. */
+const INTERP = /%\{([A-Za-z0-9_]+)\}/g;
+
+const placeholdersIn = (message: string | undefined): string[] =>
+  message === undefined ? [] : [...message.matchAll(INTERP)].map((m) => m[1]);
+
+/** The keys of an inline object-literal argument, or `null` when it is not readable. */
+function literalArgKeys(rest: string): string[] | null {
+  const m = /^\s*\{\s*([^}]*)\}\s*\)/.exec(rest);
+  if (m === null || m[1].includes('...')) return null; // not an object literal / a spread
+  return [...m[1].matchAll(/(?:^|,)\s*([A-Za-z0-9_]+)\s*:/g)].map((k) => k[1]);
+}
+
+/**
+ * The `t(literalKey)` calls on ONE line that leave a declared placeholder unsubstituted.
+ * Exported so the controls can fire it at synthetic lines — the same shape as `literalsIn`
+ * / `bilingualIn`, so the detector itself is testable.
+ */
+export function unsubstitutedIn(line: string): string[] {
+  const out: string[] = [];
+  for (const m of line.matchAll(T_CALL)) {
+    const key = m[2];
+    // ⚠️ Not every `t(` is THIS module's `t` — a local helper may share the name. Only a key
+    // the table actually defines is a message, and only a message can have a gap.
+    if (en[key] === undefined && zh[key] === undefined) continue;
+    // ⚠️ BOTH locales: the ZH message carries the same placeholders, so a guard reading only
+    // `en` would pass a key that leaks in 中文.
+    const declared = [...new Set([...placeholdersIn(en[key]), ...placeholdersIn(zh[key])])];
+    if (declared.length === 0) continue;
+    const shown = declared.map((n) => `%{${n}}`).join(' · ');
+    if (m[3] === ')') {
+      out.push(`t('${key}') declares ${shown} but passes NO args`);
+      continue;
+    }
+    const supplied = literalArgKeys(line.slice(m.index + m[0].length));
+    if (supplied === null) continue; // a helper/identifier: only presence is provable
+    const missing = declared.filter((n) => !supplied.includes(n));
+    if (missing.length > 0) {
+      out.push(`t('${key}') is missing ${missing.map((n) => `%{${n}}`).join(' · ')}`);
+    }
+  }
+  return out;
+}
+
+let literalCallSites = 0;
+let dynamicKeys = 0;
+let splitCalls = 0;
+const placeholderHits: string[] = [];
+
+for (const file of walk(path.join(PROJ, 'src'))) {
+  if (!/\.tsx?$/.test(file)) continue;
+  const rel = path.relative(PROJ, file);
+  // ⚠️ The gates' own sources quote `t('…')` inside controls and comments — not call sites.
+  if (rel.includes('/checks/')) continue;
+  fs.readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+    if (/^\s*(\/\/|\*|\/\*)/.test(line)) return; // a comment, not copy
+    // a `t(` whose key is not a literal — counted, never guessed at
+    if (/\bt\(\s*[^'"]/.test(line)) dynamicKeys += 1;
+    // a `t(` that opens on this line and does not close on it — the stated blind spot
+    if (/\bt\(\s*['"]/.test(line) && !/\)/.test(line)) splitCalls += 1;
+    for (const m of line.matchAll(T_CALL)) {
+      if (en[m[2]] !== undefined || zh[m[2]] !== undefined) literalCallSites += 1;
+    }
+    for (const hit of unsubstitutedIn(line)) placeholderHits.push(`${rel}:${i + 1}  ${hit}`);
+  });
+}
+
+check(`the placeholder scanner reached the call sites (${literalCallSites} literal-key calls · ${Object.keys(en).length} messages)`,
+  literalCallSites > 100 && Object.keys(en).length > 100 && Object.keys(zh).length > 100,
+  'the scan or the message table did not load — this gate is blind');
+check('no t() call is split across lines (the stated blind spot is empty)',
+  splitCalls === 0, `${splitCalls} line(s) open a t() call without closing it on the same line`);
+
+// ⚠️ POSITIVE CONTROLS — the same discipline as rules 1–2: a detector that cannot fire is
+// not a detector. `clan_preview` MUST declare placeholders for the first control to bite.
+check('the detector fires on a no-arg call whose message HAS placeholders (positive control)',
+  unsubstitutedIn("const x = t('clan_preview');").length > 0,
+  'the placeholder rule is blind — check T_CALL');
+check('…and on an inline object that omits one',
+  unsubstitutedIn("const x = t('clan_preview', { name: 'Tan', ancestors: 0 });").length > 0,
+  'the object-key reader is blind');
+check('…and stays quiet on a fully-supplied inline object',
+  unsubstitutedIn("const x = t('clan_preview', { name: 'Tan', ancestors: 0, members: 1 });").length === 0);
+check('…and quiet on a no-arg call whose message declares NOTHING',
+  unsubstitutedIn("const x = t('clan.back');").length === 0);
+check('…and quiet on a dynamic key it cannot resolve',
+  unsubstitutedIn('const x = t(messageKey);').length === 0);
+
+check(`no t(key) call leaves a declared placeholder unsubstituted (${placeholderHits.length})`,
+  placeholderHits.length === 0, placeholderHits.slice(0, 8).join('\n      '));
+if (dynamicKeys > 0) {
+  console.log(`  – ${dynamicKeys} call site(s) use a dynamic key — NOT statically checkable`);
+}
 
 for (const [file, reason] of EXEMPT) {
   if (exempted.includes(file)) {

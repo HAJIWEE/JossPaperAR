@@ -159,7 +159,12 @@ jobs:
       # SCRUM-97 — the COPY gate. A 中文 screen shipped English button labels because copy
       # that never went through `t()` is invisible to `tsc` and to check:lib (which only
       # sees the message table). A reviewer's screenshot caught it, not a gate.
-      - name: Copy checks (no user-visible literal outside t() / localized())
+      # ⚠️ SCRUM-121 added rule 3 — a `t(key)` call must SUPPLY the placeholders its message
+      # declares — which is the rule that catches the OTHER direction: `t('clan_preview')`
+      # shipped `[MISSING "%{NAME}" VALUE]` to a player because the string WAS inside `t()`.
+      # ⚠️ That rule imports `i18n.ts` to read the table, so this gate now needs
+      # node_modules — which is why it belongs HERE and not in the dependency-free job.
+      - name: Copy checks (no literal outside t() · no unsubstituted placeholder)
         run: npm run check:copy
 
       - name: Expo doctor

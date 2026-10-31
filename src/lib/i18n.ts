@@ -34,6 +34,14 @@ export const MESSAGES = {
     'ritual_preparing': 'The offering is being prepared…',
     'ritual_busy': 'The shrine is receiving many offerings — yours will be prepared shortly.',
     'ritual.cannotPrepare': 'This offering cannot be prepared.',
+    // ── SCRUM-127 — the `/preparing` screen's copy, per phase (option B) ───────
+    // ⚠️ DRAFTED, awaiting the owner's edit. The two failure phases used to share
+    // `ritual.cannotPrepare`, so a photo that never left the phone was told its offering
+    // "cannot be prepared"; and the title was permanently "being prepared…". The mapping
+    // that pairs these keys with a phase is `PREPARING_COPY` in `domain/slice.ts`.
+    'ritual.spentBody': 'This photo cannot be used for an offering — a new one is the only way on.',
+    'ritual.offlineTitle': 'The offering could not reach the shrine.',
+    'ritual.offlineBody': 'Nothing has been used — your offering is safe.',
     'ritual.offeringPrepared': 'Your offering is ready.',
     'ritual.refundReturned': 'The offering could not be prepared — your points have returned.',
     // ⚠️ Two DIFFERENT retries, deliberately. `common.retry` is for a request
@@ -98,6 +106,25 @@ export const MESSAGES = {
     'reward.alreadyRecorded': 'Already recorded',
     'reward.capped': 'Capped',
     'reward.balance': 'Balance %{points}',
+    // ── the two MONEY confirms' copy (SCRUM-137, option B — owner-approved 2026-10-25) ──
+    // ⚠️ READ OFF THE BOARDS, not invented: `5b Reward / one more offering` and
+    // `9b Buy offerings · confirm`. ⚠️ The reward TITLE is also verbatim in doc 10's
+    // "UX copy" table (the ad-gated offer row), so it is double-signed-off.
+    // ⚠️ NEITHER confirm is wired yet, and the reason is NOT copy: the store has no
+    // screen in the app, and the reward offer is AD-GATED (SCRUM-107 / ADR-008). The
+    // strings ship now so the wiring is "a few lines once the words exist".
+    'reward.oneMoreTitle': 'Watch to prepare one more offering.',
+    'reward.oneMoreBody':
+      'A short video unlocks one extra photo. Always after the ritual — never during.',
+    'reward.oneMoreWatch': '▶ Watch',
+    'reward.oneMoreDecline': 'No thanks',
+    // ⚠️ `%{item}` is `OFFERINGS[].name` via `localized()`; `%{price}` is the cash price
+    // the board shows. ⚠️ The board's own body is a WIRE ANNOTATION ("IAP sheet =
+    // placeholder in this wire.") and is deliberately NOT what ships here.
+    'store.buyConfirmTitle': 'Confirm — %{item}',
+    'store.buyConfirmBody': '%{item} · %{price}. Google Play will ask you to verify.',
+    'store.buyWithPlay': 'Buy with Google Play',
+    'store.buyCancel': 'Cancel',
     'home.begin': 'Begin an offering',
     'home.clanEntry': 'Clan',
 
@@ -218,6 +245,11 @@ export const MESSAGES = {
     'book_header': 'Book of Tributes',
     'book_outside': 'A member made this offering.',
     'book_window': 'Showing the last month.',
+    // ⚠️ SCRUM-122 — the Book's EMPTY state. ⚠️ **A PROPOSAL, not signed-off copy.** doc 15 §8
+    // carries no empty-state row (C14–C16 only) and the ticket is explicit that the ZH string
+    // must not be invented, so this is filed for the PM's wording — see the 🎯 Decide ticket on
+    // SCRUM-122. The ticket stays `In Review` until §8 carries the row.
+    'book_empty': 'No offerings yet. The first one will appear here.',
 
     // ── the LEAGUE BOARD (SCRUM-11 step 6 · doc 07 §4.7 · doc 18 E7) ───────
     'league.title': 'League',
@@ -265,6 +297,11 @@ export const MESSAGES = {
     'ritual_preparing': '供品制作中…',
     'ritual_busy': '神龛正繁忙，您的供品稍后即成。',
     'ritual.cannotPrepare': '此供品无法制作。',
+    // ── SCRUM-127 — the `/preparing` screen's copy, per phase (option B) ───────
+    // ⚠️ DRAFTED, awaiting the owner's edit. 词汇沿用既有文案（制作 · 神龛 · 安然无恙）。
+    'ritual.spentBody': '这张照片无法制作供品——只能重新拍摄。',
+    'ritual.offlineTitle': '供品未能送达神龛。',
+    'ritual.offlineBody': '未消耗任何内容——供品安然无恙。',
     'ritual.offeringPrepared': '您的供品已备好。',
     'ritual.refundReturned': '供品未能制成，点数已退回。',
     'common.retry': '再试一次',
@@ -320,6 +357,17 @@ export const MESSAGES = {
     'reward.alreadyRecorded': '已记录',
     'reward.capped': '已达上限',
     'reward.balance': '余额 %{points}',
+    // ── the two MONEY confirms' copy (SCRUM-137, option B — owner-approved 2026-10-25) ──
+    // ⚠️ The same board-sourced strings as the EN block above. `%{item}` / `%{price}` are
+    // placeholders, so the only prose is the fixed part of each string.
+    'reward.oneMoreTitle': '观看以再备一份供品。',
+    'reward.oneMoreBody': '一段短视频，多一次拍照供品。仅在仪式之后 — 绝不在仪式之中。',
+    'reward.oneMoreWatch': '▶ 观看',
+    'reward.oneMoreDecline': '不用了',
+    'store.buyConfirmTitle': '确认 — %{item}',
+    'store.buyConfirmBody': '%{item} · %{price}。Google Play 将请求您验证。',
+    'store.buyWithPlay': '通过 Google Play 购买',
+    'store.buyCancel': '取消',
     'home.begin': '开始供奉',
     'home.clanEntry': '宗族',
 
@@ -423,6 +471,9 @@ export const MESSAGES = {
     'book_header': '供奉簿',
     'book_outside': '由宗族成员供奉。',
     'book_window': '仅显示最近一个月。',
+    // ⚠️ SCRUM-122 — **提案，未获签核**（doc 15 §8 没有空状态行；见 SCRUM-122 的 🎯 Decide 工单）。
+    // ⚠️ 用词沿用既有文案（供奉 · 显示）。
+    'book_empty': '尚无供奉。第一笔将显示在这里。',
 
     // ── 联赛榜（SCRUM-11 第 6 步 · doc 07 §4.7 · doc 18 E7）────────────────
     'league.title': '联赛',

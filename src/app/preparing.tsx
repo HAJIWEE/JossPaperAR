@@ -36,6 +36,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { preparingCopy } from '@/domain/slice';
 import { t } from '@/lib/i18n';
 import { toBurnParams } from '@/lib/route-params';
 import {
@@ -275,49 +276,45 @@ export default function Preparing(): React.JSX.Element {
     void run();
   }, [run]);
 
+  /**
+   * ⚠️ THE COPY IS CHOSEN BY THE PURE TABLE (SCRUM-127), not by four JSX branches.
+   * `spent` and `offline` used to share `ritual.cannotPrepare` — a fact about the MAPPING,
+   * which is why the mapping now lives in `domain/slice.ts`, where `check:slice` §4 asserts
+   * that no two phases collide. `done` routes away immediately, so it renders nothing.
+   */
+  const copy = phase.kind === 'done' ? null : preparingCopy(phase.kind);
+
   return (
     <View style={[styles.root, { paddingTop: insets.top + space.xl }]}>
-      <Text style={styles.title}>{t('ritual_preparing')}</Text>
-
-      {phase.kind === 'working' ? <ActivityIndicator color={onColorCream} style={styles.spinner} /> : null}
-
-      {/*
-        The park copy is `ritual_busy`, NOT an error string. The difference is
-        the whole rule: the shrine is healthy and busy, the offering is intact,
-        and pressing the button costs nothing. Showing `ritual.cannotPrepare`
-        here would tell the player their offering is broken when it is queued.
-      */}
-      {phase.kind === 'parked' ? (
+      {copy === null ? null : (
         <>
-          <Text style={styles.body}>{t('ritual_busy')}</Text>
-          <Pressable style={styles.button} onPress={() => void run()} accessibilityRole="button">
-            <Text style={styles.buttonText}>{t('common.retry')}</Text>
-          </Pressable>
-        </>
-      ) : null}
+          {/* ⚠️ PER-PHASE TITLE (SCRUM-127 option B). A permanent "being prepared…" claimed
+              work was happening in the two phases where it had STOPPED. */}
+          <Text style={styles.title}>{t(copy.titleKey)}</Text>
 
-      {/* Rule ② — the capture is spent. Offering a retry would be a lie. */}
-      {phase.kind === 'spent' ? (
-        <>
-          <Text style={styles.body}>{t('ritual.cannotPrepare')}</Text>
-          <Pressable
-            style={styles.button}
-            onPress={() => router.replace('/capture')}
-            accessibilityRole="button"
-          >
-            <Text style={styles.buttonText}>{t('common.recapture')}</Text>
-          </Pressable>
-        </>
-      ) : null}
+          {phase.kind === 'working' ? (
+            <ActivityIndicator color={onColorCream} style={styles.spinner} />
+          ) : null}
 
-      {phase.kind === 'offline' ? (
-        <>
-          <Text style={styles.body}>{t('ritual.cannotPrepare')}</Text>
-          <Pressable style={styles.button} onPress={() => void run()} accessibilityRole="button">
-            <Text style={styles.buttonText}>{t('common.retry')}</Text>
-          </Pressable>
+          {/* ⚠️ The park copy is `ritual_busy`, NOT an error string: the shrine is healthy and
+              busy, the offering is intact, and pressing the button costs nothing. The table
+              keeps that distinction from being re-derived in JSX. */}
+          {copy.bodyKey === null ? null : <Text style={styles.body}>{t(copy.bodyKey)}</Text>}
+
+          {copy.buttonKey === null ? null : (
+            <Pressable
+              style={styles.button}
+              // ⚠️ The ACTION rides in the table too, so the copy and the action cannot
+              // disagree: a spent capture can only go back to the camera, everything else
+              // re-runs this screen. Offering a retry on a spent capture would be a lie.
+              onPress={() => (copy.action === 'recapture' ? router.replace('/capture') : void run())}
+              accessibilityRole="button"
+            >
+              <Text style={styles.buttonText}>{t(copy.buttonKey)}</Text>
+            </Pressable>
+          )}
         </>
-      ) : null}
+      )}
     </View>
   );
 }
