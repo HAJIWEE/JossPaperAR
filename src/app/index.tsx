@@ -1,42 +1,62 @@
 import { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ClanPill } from '@/components/clan-pill';
-import { AIM_BANDS } from '@/domain/aim';
-import { OFFERINGS, baseValueOf } from '@/domain/catalogue';
-import { DAILY_PHOTO_BURNS, DAILY_STORE_BURNS } from '@/domain/quota';
 import { myClans } from '@/lib/clan-api';
 import { HEADER_SPEC, type PillClan } from '@/lib/clan-pill';
 import { readFirstRun } from '@/lib/first-run';
-import { localized, t } from '@/lib/i18n';
+import { HOME_REGION_ORDER, type HomeRegion } from '@/lib/home-layout';
+import { t } from '@/lib/i18n';
 import { DEMO_PARAM, DEMO_VALUE, needsTutorial } from '@/lib/tutorial';
-import { TOUCH_GAP, TOUCH_TARGET, brand, fontSize, fluidSize, onColorCream, radius, space, surface, text } from '@/theme/tokens';
+import { TOUCH_TARGET, brand, fontSize, onColorCream, radius, space, surface, text } from '@/theme/tokens';
 
 /**
- * HOME — a SCAFFOLD, not the shrine.
+ * HOME — the shrine's structure (SCRUM-148 · SCRUM-160).
  *
- * This exists to prove three things are actually wired (SCRUM-57 §Definition of
- * done) and to give the build a place to start from:
+ * ── WHAT CHANGED, AND WHY ────────────────────────────────────────────────────
+ * This file used to describe itself as *"a SCAFFOLD, not the shrine"* and render a
+ * reviewer's diagnostic page: the four aim bands, the store catalogue and the burn
+ * limits. That was right for SCRUM-57, whose job was proving the theme bridge and
+ * the domain modules were live. ⚠️ **It is wrong for a product.** A player opening
+ * the app should see an altar, not its calibration numbers.
  *
- *   1. Expo Router + the `src/app/` tree renders on a device
- *   2. the RN theme bridge carries the real design tokens (not hard-coded hexes)
- *   3. the DOMAIN modules are importable and tell the truth about the numbers
+ * So the diagnostics are gone and the shrine's **regions** are here, in the order
+ * `home-layout.ts` owns — `header · totals · altar · cta · footer`. Three of the
+ * five are reserved for tickets already filed (`totals` → SCRUM-161, `altar` +
+ * `cta` → SCRUM-162, `footer` entries → SCRUM-164). A reserved region is drawn as
+ * a **visible dashed band**, not an invisible `View`: a structure PR has to be
+ * reviewable on glass, and an empty `View` has no frame to look at.
  *
- * It deliberately renders the aim bands and the catalogue, because those are the
- * values a reviewer should be able to eyeball against docs 05/10 without opening
- * a test file. The real Home (altar, tablets, terrain) is designed and lands with
- * the slice.
+ * ⚠️ **No new copy and no new behaviour in this ticket.** Every string below is an
+ * existing key (`home.begin`, `home.clanEntry`); the CTA, the pill's behaviour and
+ * the tutorial hand-off are unchanged — they have been *moved* into their regions.
  *
- * ✅ SCRUM-92 (2026-10-10): the **clan pill** has landed in the header — the one
- * element that makes *"Home is clan-scoped"* true, and SCRUM-46's last unmet scope
- * item. It is a real component (`src/components/clan-pill.tsx`) on real
- * `myClans()` data, at the geometry SCRUM-91 measured. Its rules live in
- * `src/lib/clan-pill.ts` so `check:lib` asserts them without a device.
+ * ── TWO THINGS THAT MUST NOT BE "TIDIED AWAY" ───────────────────────────────
+ * 1. ⚠️ **The `settingsSlot` is RESERVED, EMPTY, and 44 px wide.** The pill's x is
+ *    board-relative: 390 − 20 − 44 − 10 − 236 = **80**, the only empty rectangle
+ *    SCRUM-91 measured. Collapsing the slot slides the pill 54 px right of where
+ *    the board signed it off, and `check:lib` §14 freezes that geometry.
+ * 2. ⚠️ **The zero-clan entry stays** even though the pill replaced it. SCRUM-91
+ *    drew only the 1-clan and 2+-clan pills, so **with zero clans the design has
+ *    no clan control at all** — and the fork's Skip can land a user back here. It
+ *    is an un-designed gap, labelled as one; deleting it would strand a clan-less
+ *    user on Home with no route to the fork.
  */
 
-export default function HomeScaffold() {
+/**
+ * The regions rendered inside the scroll view.
+ *
+ * ⚠️ Derived from `HOME_REGION_ORDER`, not hand-listed — so the constant in
+ * `home-layout.ts` is load-bearing rather than decorative, and a region removed
+ * from the order cannot silently keep rendering.
+ */
+const BODY_REGIONS = HOME_REGION_ORDER.filter(
+  (region): region is Exclude<HomeRegion, 'header'> => region !== 'header',
+);
+
+export default function HomeShrine() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [clans, setClans] = useState<readonly PillClan[]>([]);
@@ -59,17 +79,69 @@ export default function HomeScaffold() {
     }, []),
   );
 
+  /**
+   * One region's contents.
+   *
+   * ⚠️ `null` is correct for a region whose ticket has not landed — the parent
+   * `View` still renders its reserved band, which is what makes the structure
+   * visible. Do not fill these with placeholder prose: that would need fresh copy,
+   * and the shrine's copy is doc 15 §8's.
+   */
+  const regionContent = (region: Exclude<HomeRegion, 'header'>) => {
+    switch (region) {
+      // SCRUM-161 — the tribute total and the streak slot.
+      case 'totals':
+        return null;
+
+      // SCRUM-162 — the altar art and the tablet slots (SCRUM-146).
+      case 'altar':
+        return null;
+
+      // ✅ The offer is taken AT the altar, never from the chrome (S36 measured it).
+      case 'cta':
+        return (
+          <Pressable
+            accessibilityRole="button"
+            testID="home-begin"
+            onPress={() => {
+              // ── SCRUM-85 · the FIRST burn is a TUTORIAL ────────────────────
+              // ⚠️ Read the first-run record HERE, at the tap, rather than in an
+              // effect: the flag must reflect the device's state at the moment of
+              // the decision, and a stale render must not send an already-tutored
+              // user back through a demo.
+              void (async () => {
+                const firstRun = await readFirstRun();
+                const params = needsTutorial(firstRun) ? { [DEMO_PARAM]: DEMO_VALUE } : {};
+                router.push({ pathname: '/capture', params });
+              })();
+            }}
+            style={({ pressed }) => [styles.begin, pressed && { opacity: 0.8 }]}
+          >
+            <Text style={styles.beginLabel}>{t('home.begin')}</Text>
+          </Pressable>
+        );
+
+      // SCRUM-164 — the Book and League entries (and Settings, once it exists).
+      case 'footer':
+        return clans.length === 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            testID="home-clan-entry"
+            onPress={() => {
+              router.push('/clan');
+            }}
+            style={({ pressed }) => [styles.clanEntry, pressed && { opacity: 0.8 }]}
+          >
+            <Text style={styles.clanEntryLabel}>{t('home.clanEntry')}</Text>
+          </Pressable>
+        ) : null;
+    }
+  };
+
   return (
     <View style={styles.screen}>
-      {/* ── the header (SCRUM-92) ────────────────────────────────────────────
-          The pill's x is board-relative, so the row reserves `btn · settings`
-          (44×44) to its right: 390 − 20 − 44 − 10 − 236 puts the pill at **x 80 … 316**,
-          the ONLY empty rectangle on the signed-off Home (SCRUM-91 measured it).
-          ⚠️ Neither neighbour is built yet — the app mark is art and the settings
-          screen does not exist (both belong to the shrine, SCRUM-53) — so the slot
-          is left EMPTY but reserved, which is what keeps the pill from having to
-          move when they land. */}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
+      {/* ── header · NOT scrolled (its x is measured; scrolling would break it) ── */}
+      <View style={[styles.header, { paddingTop: insets.top }]} testID="home-region-header">
         <View style={styles.headerSpacer} />
         <ClanPill clans={clans} />
         <View style={styles.settingsSlot} />
@@ -83,106 +155,18 @@ export default function HomeScaffold() {
           { paddingBottom: insets.bottom + space.lg },
         ]}
       >
-      <Text style={styles.eyebrow}>Joss Paper AR · scaffold</Text>
-      <Text style={styles.title}>The shell is alive</Text>
-      <Text style={styles.body}>
-        Expo Router renders this from <Text style={styles.code}>src/app/index.tsx</Text>. The theme
-        bridge, the domain modules and the CI checks are wired. The ritual screens land with the
-        slice (SCRUM-53).
-      </Text>
-
-      <Text style={styles.sectionTitle}>The four bands — the acceptance test</Text>
-      <Text style={styles.caption}>
-        Measured off the fire's own artwork (doc 05 §2). These grade the throw; fps does not.
-      </Text>
-      {AIM_BANDS.map((band) => (
-        <View key={band.id} style={styles.row}>
-          <View style={[styles.swatch, { backgroundColor: brand.gold }]} />
-          <Text style={styles.rowLabel}>
-            {localized(band.label)}
-          </Text>
-          <Text style={styles.rowValue}>
-            ±{band.maxOffsetPx} ×{band.multiplier.toFixed(1)}
-          </Text>
-        </View>
-      ))}
-      <View style={styles.row}>
-        <View style={[styles.swatch, { backgroundColor: text.muted }]} />
-        <Text style={styles.rowLabel}>{t('band_miss')}</Text>
-        <Text style={styles.rowValue}>— ×0 · returns</Text>
-      </View>
-
-      <Text style={styles.sectionTitle}>Store catalogue — base = 1.2 × price</Text>
-      <Text style={styles.caption}>doc 10 §1 · S13d. The 20% accrual keeps the store a sink.</Text>
-      {OFFERINGS.map((o) => (
-        <View key={o.code} style={styles.row}>
-          <Text style={styles.rowLabel}>{localized(o.name)}</Text>
-          <Text style={styles.rowValue}>
-            {o.price} / {baseValueOf(o.price)}
-            {o.priceSource === 'derived' ? ' *' : ''}
-          </Text>
-        </View>
-      ))}
-      <Text style={styles.caption}>* the House price is DERIVED from its base — PM to confirm.</Text>
-
-      <Text style={styles.sectionTitle}>Burn limits — the AI-cost control</Text>
-      <View style={styles.row}>
-        <Text style={styles.rowLabel}>Photo burns / day</Text>
-        <Text style={styles.rowValue}>{DAILY_PHOTO_BURNS}</Text>
-      </View>
-      <View style={styles.row}>
-        <Text style={styles.rowLabel}>Store burns / day</Text>
-        <Text style={styles.rowValue}>{DAILY_STORE_BURNS}</Text>
-      </View>
-
-      <Text style={styles.caption}>
-        Touch targets are {TOUCH_TARGET} px; type scales fluidly (hero renders at{' '}
-        {Math.round(fluidSize(fontSize.hero, 390))} px on the 390 px reference).
-      </Text>
-
-      {/* ── the slice begins here (SCRUM-53 / PR-4) ────────────────────────── */}
-      <Pressable
-        accessibilityRole="button"
-        testID="home-begin"
-        onPress={() => {
-          // ── SCRUM-85 · the FIRST burn is a TUTORIAL ────────────────────────
-          // ⚠️ Read the first-run record HERE, at the tap, rather than in an
-          // effect: the flag must reflect the device's state at the moment of
-          // the decision, and a stale render must not send an already-tutored
-          // user back through a demo.
-          void (async () => {
-            const firstRun = await readFirstRun();
-            const params = needsTutorial(firstRun)
-              ? { [DEMO_PARAM]: DEMO_VALUE }
-              : {};
-            router.push({ pathname: '/capture', params });
-          })();
-        }}
-        style={({ pressed }) => [styles.begin, pressed && { opacity: 0.8 }]}
-      >
-        <Text style={styles.beginLabel}>{t('home.begin')}</Text>
-      </Pressable>
-
-      {/* ── the clan surface, for a user with NO clan (SCRUM-92) ─────────────
-          ⚠️ The header PILL above replaced this always-on scaffold entry. This
-          fallback survives for the one state the design does NOT cover: SCRUM-91
-          drew only the 1-clan and 2+-clan pills, so with zero clans Home has no
-          designed clan control — and while `AFTER_TUTORIAL_ROUTE` sends a new user
-          to the fork, the fork's Skip can return them here. Deleting this would
-          leave a clan-less user with no route from Home, so it stays, un-designed
-          and explicitly labelled as a GAP rather than dressed up as the pill. */}
-      {clans.length === 0 ? (
-        <Pressable
-          accessibilityRole="button"
-          testID="home-clan-entry"
-          onPress={() => {
-            router.push('/clan');
-          }}
-          style={({ pressed }) => [styles.clanEntry, pressed && { opacity: 0.8 }]}
-        >
-          <Text style={styles.clanEntryLabel}>{t('home.clanEntry')}</Text>
-        </Pressable>
-      ) : null}
+        {BODY_REGIONS.map((region) => {
+          const content = regionContent(region);
+          return (
+            <View
+              key={region}
+              testID={`home-region-${region}`}
+              style={[styles.region, content === null ? styles.reserved : null]}
+            >
+              {content}
+            </View>
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -208,43 +192,21 @@ const styles = StyleSheet.create({
     marginLeft: HEADER_SPEC.settingsGap,
   },
   content: { paddingHorizontal: space.lg },
-  eyebrow: {
-    color: text.muted,
-    fontSize: fontSize.caption.at390,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: space.xs,
-  },
-  title: {
-    color: text.ink,
-    fontSize: fontSize.titlePage.at390,
-    fontWeight: '700',
-    marginBottom: space.sm,
-  },
-  body: { color: text.inkSoft, fontSize: fontSize.body.at390, lineHeight: 22, marginBottom: space.lg },
-  code: { color: text.azurite, fontFamily: 'monospace' },
-  sectionTitle: {
-    color: text.cinnabar,
-    fontSize: fontSize.titleRow.at390,
-    fontWeight: '700',
-    marginTop: space.lg,
-    marginBottom: space.xs,
-  },
-  caption: { color: text.muted, fontSize: fontSize.caption.at390, marginBottom: space.sm },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: TOUCH_TARGET,
-    backgroundColor: surface.row,
+  /**
+   * A region's box. ⚠️ The heights below are **placeholders**, not board geometry —
+   * `home-layout.ts` deliberately carries no y-ranges until the art lands
+   * (SCRUM-162), and SCRUM-163 will replace them with the measured bands and a
+   * gate. They exist so a structure-only shrine is visible on glass.
+   */
+  region: { marginBottom: space.lg },
+  reserved: {
+    minHeight: 96,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: surface.paperEdge,
     borderRadius: radius.md,
-    paddingHorizontal: space.md,
-    marginBottom: TOUCH_GAP,
   },
-  rowLabel: { flex: 1, color: text.ink, fontSize: fontSize.body.at390 },
-  rowValue: { color: text.gold, fontSize: fontSize.body.at390, fontWeight: '600' },
-  swatch: { width: 12, height: 12, borderRadius: 3, marginRight: space.sm },
   begin: {
-    marginTop: space.xl,
     minHeight: TOUCH_TARGET,
     backgroundColor: brand.cinnabar,
     borderRadius: radius.pill,
@@ -253,7 +215,6 @@ const styles = StyleSheet.create({
   },
   beginLabel: { color: onColorCream, fontSize: fontSize.bodyLg.at390, fontWeight: '600' },
   clanEntry: {
-    marginTop: space.md,
     minHeight: TOUCH_TARGET,
     borderRadius: radius.pill,
     borderWidth: 1,
