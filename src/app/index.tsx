@@ -3,6 +3,8 @@ import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-na
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { ClanPill } from '@/components/clan-pill';
+import { AltarHalo } from '@/components/home/altar-halo';
+import { AppMark, SettingsGear } from '@/components/home/header-art';
 import { ShrineBase } from '@/components/home/shrine-base';
 import { ShrineCanvas } from '@/components/home/shrine-canvas';
 import { myClans } from '@/lib/clan-api';
@@ -87,7 +89,9 @@ export default function HomeShrine() {
       case 'header':
         return (
           <>
-            <View style={[styles.abs, bandRect(HOME_BANDS.headerMark, s)]} testID="home-app-mark" />
+            <View style={[styles.abs, bandRect(HOME_BANDS.headerMark, s)]} testID="home-app-mark">
+              <AppMark />
+            </View>
             {/* ⚠️ The pill's x is board-relative: 390 − 20 − 44 − 10 − 236 = 80. */}
             <View
               style={[styles.abs, { left: PILL_X_ON_REFERENCE * s, top: HOME_BANDS.settings.y * s }]}
@@ -95,10 +99,21 @@ export default function HomeShrine() {
             >
               <ClanPill clans={clans} scale={s} />
             </View>
+            {/*
+              ⚠️ DECORATIVE FOR NOW, and deliberately not a `Pressable`. The board draws
+              this as `btn · settings` and the gear belongs here — but the settings screen
+              arrives with SCRUM-151, and ⚠️ **a control that renders and does nothing is
+              the SCRUM-145 defect** (an inert "Throw again" that passed every per-screen
+              gate). It becomes a button the moment it has a destination, not before.
+            */}
             <View
-              style={[styles.abs, bandRect(HOME_BANDS.settings, s), styles.reserved]}
+              style={[styles.abs, bandRect(HOME_BANDS.settings, s), styles.centred]}
               testID="home-settings-slot"
-            />
+            >
+              <View style={{ width: 20 * s, height: 20 * s }}>
+                <SettingsGear />
+              </View>
+            </View>
           </>
         );
 
@@ -121,10 +136,9 @@ export default function HomeShrine() {
       case 'altar':
         return (
           <>
-            <View
-              style={[styles.abs, bandRect(HOME_BANDS.halo, s), styles.reserved]}
-              testID="home-halo-band"
-            />
+            <View style={[styles.abs, bandRect(HOME_BANDS.halo, s)]} testID="home-halo-band">
+              <AltarHalo />
+            </View>
             <View
               style={[styles.abs, bandRect(HOME_BANDS.offerings, s), styles.reserved]}
               testID="home-offerings-band"
@@ -213,5 +227,6 @@ const styles = StyleSheet.create({
   },
   ctaLabel: { color: onColorCream, fontWeight: '600' },
   clanEntry: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  centred: { alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.8 },
 });
