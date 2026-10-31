@@ -557,3 +557,38 @@ EN is pixel-identical; 中文 shifts **18 px right**.
 Only the chip pinned a left edge to a fixed x with a variable width.
 
 `check:lib` **487 → 492** — the defect is asserted as arithmetic (58-wide label ⇒ 40 px hole).
+
+## 2026-10-31 — the tablet sheet: the altar can hold someone (`8e560b5`)
+
+`SCRUM-146` **Done** (+ children 165 cap · 168 sheet · 166 read · 167 display). `SCRUM-148` stays
+**In Progress** — `163` (geometry gate) and `164` (Book entry + way back) are still open.
+
+### ⚠️⚠️ TWO TRAPS, both invisible to every gate
+**1 · A `<Stack.Screen>` declaration can become the INITIAL ROUTE.**
+`<Stack.Screen name="ancestor" options={{presentation:'modal'}} />` made the app boot **straight
+onto the sheet**, Home never mounted, and `router.back()` said *"the action GO_BACK was not
+handled by any navigator"*. ⚠️ **Do not declare screens in `_layout` to set presentation.** A
+route file is enough. (If a modal is ever needed, verify the boot path on glass.)
+
+**2 · A ROUTE PARAM IS A COPY OF A FACT, AND A COPY CAN ARRIVE EMPTY.**
+`role` and `count` travelled as params for one build; with no push they arrived `null`, and the
+sheet told a **clan HEAD** that only a head may edit. It now reads `myClans()` +
+`clanAncestors()` itself, and renders **nothing** until they land (no refusal flash).
+
+### ⚠️ The RLS failure mode that matters
+`ancestors_update_elder` **filters** rather than raises: a member's archive returns **zero rows
+and no error**. So `archiveAncestor()` ends in `.select('id')` and treats an empty result as a
+refusal. ⚠️ Any new write path needs the same treatment, or the app will report success over a
+row it never touched.
+
+### Rules module (pure, gateable)
+`src/lib/ancestor-sheet.ts` — every constant is a **MIRROR** of the DB (`EDIT_ROLES` ↔ RPC +
+policies · `ANCESTOR_CAP` 10 ↔ `clans.ancestor_cap` · 20/40/20 ↔ the `CHECK`s). §23 asserts
+**`btrim` first** (three spaces ⇒ `surname_required`), `nullif` (blank ⇒ `NULL`), that the cap is
+**not** the display cap of 4, and `capReached` uses `>=` (fault-tested).
+
+`check:lib` **515** · `npm run check` EXIT 0 · `tsc` 0.
+
+### ⚠️ Seen on glass and NOT fixed
+A **Latin** surname renders one letter per line in the vertical name slot (`C h e n`) — the board
+is drawn for 中文. Needs an owner decision: rotate for Latin, or keep vertical everywhere.
