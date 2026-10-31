@@ -430,3 +430,54 @@ export async function clanBook(clanId: string, limit = 50): Promise<ApiResult<Bo
 }
 
 
+
+/** One live ancestral tablet (SCRUM-146). ⚠️ Names: doc 13 §4 — never log or share these. */
+export interface Ancestor {
+  readonly id: string;
+  readonly surname: string;
+  readonly givenName: string | null;
+  readonly relationship: string | null;
+  /** 0..9, assigned by the server (`save_ancestor`). */
+  readonly slot: number;
+}
+
+/**
+ * The clan's live tablets, by slot.
+ *
+ * ⚠️ **A TABLE read, not an RPC — and that is the correct choice here.**
+ * `ancestors_select_member` grants `SELECT` to a clan member, so **RLS is the access model**
+ * for reading; `save_ancestor` is only needed for writing (it carries the role ladder and the
+ * cap). ⚠️ Adding a read RPC would have meant a migration and a SECOND place that decides who
+ * may see a name.
+ *
+ * ⚠️ `archived_at is null` is not a preference: the partial unique index
+ * `ancestors_live_slot_uniq` is the server's own definition of "live", so the client uses the
+ * same predicate rather than inventing one.
+ */
+export async function clanAncestors(clanId: string): Promise<ApiResult<Ancestor[]>> {
+  const { data, error } = await supabase()
+    .from('ancestors')
+    .select('id, surname, given_name, relationship, slot')
+    .eq('clan_id', clanId)
+    .is('archived_at', null)
+    .order('slot', { ascending: true });
+  if (error) return { ok: false, reason: reasonOf(error) };
+
+  const rows = (data ?? []) as unknown[];
+  const out: Ancestor[] = [];
+  for (const row of rows.map(asRecord)) {
+    if (!row) continue;
+    const id = str(row.id);
+    const surname = str(row.surname);
+    // ⚠️ Skip a row the server cannot have written — a nameless tablet is not renderable.
+    if (!id || !surname) continue;
+    out.push({
+      id,
+      surname,
+      givenName: str(row.given_name),
+      relationship: str(row.relationship),
+      slot: num(row.slot),
+    });
+  }
+  return { ok: true, data: out };
+}

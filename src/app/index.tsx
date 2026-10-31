@@ -9,7 +9,9 @@ import { Offerings } from '@/components/home/offerings';
 import { StreakPanel, TributePanel } from '@/components/home/panels';
 import { ShrineBase } from '@/components/home/shrine-base';
 import { ShrineCanvas } from '@/components/home/shrine-canvas';
-import { myClans } from '@/lib/clan-api';
+import { Tablet } from '@/components/home/tablet';
+import { altarView, pageStep } from '@/lib/altar';
+import { clanAncestors, myClans, type Ancestor } from '@/lib/clan-api';
 import { PILL_X_ON_REFERENCE, type PillClan } from '@/lib/clan-pill';
 import { readFirstRun } from '@/lib/first-run';
 import { fetchHomeSummary } from '@/lib/home-api';
@@ -23,7 +25,7 @@ import {
 } from '@/lib/home-layout';
 import { t } from '@/lib/i18n';
 import { DEMO_PARAM, DEMO_VALUE, needsTutorial } from '@/lib/tutorial';
-import { brand, fontSize, onColorCream, radius, surface } from '@/theme/tokens';
+import { brand, fontSize, onColorCream, radius, surface, text } from '@/theme/tokens';
 
 /**
  * HOME — the shrine (SCRUM-148 · SCRUM-160 · SCRUM-162).
@@ -62,6 +64,10 @@ export default function HomeShrine() {
    * zero — see `homePanels` (SCRUM-161).
    */
   const [summary, setSummary] = useState<SummaryResult | null>(null);
+  /** ⚠️ The live tablets of the active clan — names, so they never leave this screen. */
+  const [ancestors, setAncestors] = useState<readonly Ancestor[]>([]);
+  /** Which tablet the carousel shows. `altarView` clamps it, so a removal cannot strand it. */
+  const [page, setPage] = useState(0);
   /** ⚠️ The ONLY place the panel state is decided — `ready` · `loading` · `failed`. */
   const panels = homePanels(summary);
 
@@ -73,9 +79,17 @@ export default function HomeShrine() {
       let cancelled = false;
       void (async () => {
         const mine = await myClans();
+        const list = mine.ok ? mine.data : [];
         if (!cancelled) {
-          setClans(mine.ok ? mine.data.map((c) => ({ name: c.name, role: c.role })) : []);
+          setClans(list.map((c) => ({ name: c.name, role: c.role })));
         }
+        // ⚠️ The tablets belong to the ACTIVE clan — the same `list[0]` the pill shows, so the
+        // two can never disagree about which clan the shrine is scoped to.
+        const activeClan = list[0];
+        const tablets = activeClan
+          ? await clanAncestors(activeClan.clanId)
+          : { ok: true as const, data: [] as Ancestor[] };
+        if (!cancelled) setAncestors(tablets.ok ? tablets.data : []);
         // ⚠️ Re-read alongside the clan list: a burn awards tribute and moves the streak, so
         // the shrine comes back from `/reward` showing stale numbers without this.
         const totals = await fetchHomeSummary();
@@ -158,8 +172,13 @@ export default function HomeShrine() {
           </>
         );
 
-      // ── altar · the halo, the offerings and the shrine base ───────────────
-      case 'altar':
+      // ── altar · the halo, the offerings, the shrine base and the tablet ───
+      case 'altar': {
+        const view = altarView(ancestors.length, page);
+        // ⚠️ The board draws the ＋ slot and the CENTRE TABLET on the SAME band
+        // (131,285 129×307) — see `altar.ts`. They swap in place; nothing below moves.
+        const slot = HOME_BANDS.addSlot;
+        const current = view.kind === 'tablet' ? ancestors[view.index] : null;
         return (
           <>
             <View style={[styles.abs, bandRect(HOME_BANDS.halo, s)]} testID="home-halo-band">
@@ -175,8 +194,50 @@ export default function HomeShrine() {
               style={[styles.abs, bandRect(HOME_BANDS.caption, s)]}
               testID="home-caption-band"
             />
+
+            {/* ⚠️ EMPTY → the ＋ slot is RESERVED, not drawn: its art (`slot · ＋ add a tablet`)
+                is un-ported, and the add flow is not built. A tappable ＋ with no destination
+                is the SCRUM-145 defect. It becomes real with the sheet, in this same ticket. */}
+            {view.kind === 'empty' ? (
+              <View
+                style={[styles.abs, bandRect(slot, s), styles.reserved]}
+                testID="home-add-slot"
+              />
+            ) : (
+              <View style={[styles.abs, bandRect(slot, s)]} testID="home-tablet">
+                <Tablet
+                  name={current ? `${current.surname}${current.givenName ?? ''}` : ''}
+                  width={slot.w * s}
+                  height={slot.h * s}
+                />
+              </View>
+            )}
+
+            {/* ⚠️ A carousel, never a "+N more": at the cap of 10 every tablet must be reachable
+                (the board draws prev/next at 26,412 and 340,412). The ends are ends — no wrap. */}
+            {view.kind === 'tablet' && view.hasPrev ? (
+              <Pressable
+                accessibilityRole="button"
+                testID="home-tablet-prev"
+                onPress={() => setPage(pageStep(view.index, view.count, -1))}
+                style={[styles.abs, bandRect(HOME_BANDS.carouselPrev, s), styles.carousel]}
+              >
+                <Text style={[styles.carouselGlyph, { fontSize: 28 * s }]}>{'\u2039'}</Text>
+              </Pressable>
+            ) : null}
+            {view.kind === 'tablet' && view.hasNext ? (
+              <Pressable
+                accessibilityRole="button"
+                testID="home-tablet-next"
+                onPress={() => setPage(pageStep(view.index, view.count, 1))}
+                style={[styles.abs, bandRect(HOME_BANDS.carouselNext, s), styles.carousel]}
+              >
+                <Text style={[styles.carouselGlyph, { fontSize: 28 * s }]}>{'\u203A'}</Text>
+              </Pressable>
+            ) : null}
           </>
         );
+      }
 
       // ── cta · the offer is taken AT the altar, never from the chrome ──────
       case 'cta':
@@ -261,6 +322,8 @@ const styles = StyleSheet.create({
   },
   ctaLabel: { color: onColorCream, fontWeight: '600' },
   clanEntry: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  carousel: { alignItems: 'center', justifyContent: 'center' },
+  carouselGlyph: { color: text.inkSoft, fontWeight: '700' },
   /** `btn · settings` — paperDeep fill, ink stroke; radius + width are scaled inline. */
   settingsBtn: {
     backgroundColor: surface.paperDeep,

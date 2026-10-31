@@ -95,6 +95,10 @@ export const HOME_BANDS = {
   halo: { x: 18, y: 160, w: 354, h: 420 },
   /** `slot · ＋ add a tablet (tap)` — 131,285 129×307 (empty altar only). */
   addSlot: { x: 131, y: 285, w: 129, h: 307 },
+  /** `nav · carousel prev` — 26,412 24×40. Only when there is more than one tablet. */
+  carouselPrev: { x: 26, y: 412, w: 24, h: 40 },
+  /** `nav · carousel next` — 340,412 24×40. */
+  carouselNext: { x: 340, y: 412, w: 24, h: 40 },
   /** `art · offerings (front)` — 30,434 330×170. */
   offerings: { x: 30, y: 434, w: 330, h: 170 },
   /** `art · shrine base (table)` — 16,588 358×76. */

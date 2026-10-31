@@ -56,6 +56,7 @@ import {
   dotSitsOnTray,
 } from '../offerings-layout.ts';
 import { formatPoints, homePanels } from '../home-panels.ts';
+import { altarView, pageStep } from '../altar.ts';
 import { BULK_PREFIX, createSplitStorage, bulkKey } from '../split-storage.ts';
 import {
   MAX_ATTEMPTS,
@@ -1392,6 +1393,47 @@ function homePanelChecks(): void {
     `${ink.toFixed(2)}:1 — use text.cinnabar instead`);
 }
 
+/**
+ * 21 · The altar's carousel (SCRUM-146).
+ *
+ * ⚠️ TWO FAILURES THIS PREVENTS, both silent:
+ *   · **the index is clamped.** Archiving the tablet the carousel is sitting on would leave the
+ *     index past the end of the list and the altar rendering nothing — with `count` still > 0,
+ *     so nothing looks empty, it just vanishes;
+ *   · **the ends are ends.** `pageStep` does not wrap, because a carousel that silently loops is
+ *     a carousel a user cannot tell they have finished.
+ *
+ * ⚠️ And the band is shared: `slot · ＋ add a tablet` and the centre tablet are BOTH
+ * 131,285 129×307 on the board, so the ＋ and the first tablet swap in place. If they ever stop
+ * sharing a band, the whole shrine shifts when the first tablet is added — that is asserted by
+ * `HOME_BANDS.addSlot` being the band both branches use, and §18's fit check covering it.
+ */
+function altarChecks(): void {
+  section('21 · The altar\'s carousel — clamped, and the ends are ends (SCRUM-146)');
+
+  check('no tablets → the altar offers the ＋ slot', altarView(0, 0).kind === 'empty');
+  check('…and a stale page index cannot resurrect one', altarView(0, 7).kind === 'empty');
+
+  const first = altarView(3, 0);
+  check('the first of three has no prev, only next',
+    first.kind === 'tablet' && !first.hasPrev && first.hasNext && first.index === 0);
+  const last = altarView(3, 2);
+  check('the last of three has no next, only prev',
+    last.kind === 'tablet' && last.hasPrev && !last.hasNext && last.index === 2);
+  check('one tablet shows no arrows at all',
+    altarView(1, 0).kind === 'tablet' && !altarView(1, 0).hasPrev && !altarView(1, 0).hasNext);
+
+  // ⚠️ THE CLAMP — the archived-tablet case.
+  const stranded = altarView(3, 9);
+  check('an index past the end is CLAMPED to the last tablet, never "nothing"',
+    stranded.kind === 'tablet' && stranded.index === 2, JSON.stringify(stranded));
+
+  check('pageStep does not wrap at the start', pageStep(0, 3, -1) === 0);
+  check('pageStep does not wrap at the end', pageStep(2, 3, 1) === 2);
+  check('pageStep moves one', pageStep(1, 3, -1) === 0 && pageStep(1, 3, 1) === 2);
+  check('pageStep on an empty altar stays at 0', pageStep(0, 0, 1) === 0);
+}
+
 async function main(): Promise<void> {
   await storageChecks();
   await drainChecks();
@@ -1464,6 +1506,7 @@ async function main(): Promise<void> {
   homeShrineScaleChecks();
   offeringsPlacementChecks();
   homePanelChecks();
+  altarChecks();
 
   check('guard: a 5-character key is NOT valid', !isValidIdempotencyKey('12345'));
   check('guard: junk is NOT a clan code', normaliseClanCode('not-a-code!!') === null);
