@@ -656,6 +656,6 @@ Every one was found by **looking at the phone**, with `tsc` and 515+ checks gree
 1. **`SCRUM-163`** — geometry gate, 360 dp. Cheap, and it guards the class above.
 2. **`SCRUM-164`** — the Book entry + a way back (the tab bar is not the whole ticket).
 3. **`SCRUM-151`** — Profile & Settings, **including the language switcher** the app still lacks.
-4. **`SCRUM-147`** onboarding → **`150`** store →美白 **`149`** item burn → **`155`** seed → **`157`** demo run.
+4. **`SCRUM-147`** onboarding → **`150`** store → **`149`** item burn → **`155`** seed → **`157`** demo run.
 
 ⚠️ **`SCRUM-12`** is still blocked on the **`SCRUM-159`** decision, and **`SCRUM-208`** is yours.
