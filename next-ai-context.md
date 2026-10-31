@@ -454,3 +454,39 @@ Software developer (not a mobile specialist) · AI vibe-coding · no timeline pr
 *Updated 2026-10-05 (**S29 wrap**) — **`SCRUM-55` built and merged (PR #16)**: the three decided-but-unwritten ADRs are now recorded — **ADR-004** ✅ · **ADR-006** ✅ · **ADR-008** ✅ **Accepted** after the PM answered A–D on **SCRUM-62** (A3 · caps 2/3 · SG-for-now · D strong NO → **SCRUM-63**). **All nine §6 decisions recorded, all eight ADRs Accepted**, guarded by `npm run check:adrs` (fault-tested red on four cases). **`SCRUM-41` closed** — Mastercard **1.2808**, ≈ **S$6.38 / US$4.98** of the approved US$10–20, **no overrun**. New standing rule in `AGENTS.md`: a decision needing the PM goes to **Jira + the active sprint**. Hosted project **11/11 migrations, no drift**. Cost this session: **S$0.00**.*
 *Previous (2026-10-04, S28b) — `SCRUM-59` built: the AI-budget stop-rule is LIVE (migration `0011`; queue, never fail; the spec's $0.10 floor kept) with its own fault-tested test and a live proof (0.5 s / `cost_micros` NULL) → [[AppDesignConceptBoard/19-build-plan-services-api-environments|doc 19]] §12.5. Unsigned AI-session commits accepted ([[CONTRIBUTING]] § Commits).*
 *Purpose: context hand-off for the next AI session. Session history, superseded review queues and the dated change log moved to [[completed-work-archive]] (2026-10-02, S26); open work lives in [[follow-up-items]].*
+
+## 2026-10-31 (later) — the tab bar, and 4 defects the board comparison found
+
+**`SCRUM-164`** (a **subtask** — it takes its parent's sprint; ⚠️ `customfield_10020` cannot be
+set on it, and a JQL `sprint = X` will never list it). Committed `7d6479c`.
+
+### Shipped
+- **Tab bar** `nav · …` → `src/components/home/tab-bar.tsx`: 390×80 `paperDeep`, 3 px `ink` top
+  rule, tabs at **12 · 106 · 199 · 293** (86×62, r12 active). Wired **Shrine → /**, **League →
+  /league**. **Store / Profile render DISABLED** — their screens are `SCRUM-150` / `SCRUM-151`, and
+  a dead link or an inert live-looking tab are both worse.
+- **The three Home lines the owner found missing against `EN · 1`**: `caption · altar state`,
+  `hint · cta`, `zone · customizable temple (label)` — all now keyed (`home.altarEmpty`,
+  `home.ctaHint`, `home.templeChip`) in EN + 中文.
+- **The `＋` in the empty slot** (44 pt, `text.gold`) — drawn, still **not** a `Pressable`.
+
+### ⚠️ Four things worth remembering
+1. **The board's active tab is 1.44 : 1** — `#9A2B18` on `#C23B22`. Unreadable. The build ships
+   `#FFF8E8` (**4.90 : 1**) and §22 pins **both** ratios. Filed **`SCRUM-208`**.
+2. **The coordinate trap, again — in new code.** Tabs at board `top: 774` inside a band already at
+   764 → **the bar drew with no tabs at all**. §22 now asserts `topInBar === tab.y − band.y` —
+   *the relationship, not the bound*.
+3. **A centred `＋` landed on the incense smoke** and read as a cross in it. It sits **40 board px
+   down**. Only glass showed this.
+4. **A route's existence is now a gate**: §22 `existsSync`s every tab route against `src/app/`.
+
+### 中文 verified on glass
+神龛 · 联赛 · 商店 · 我的 · 功德点 600 · 连续 1 天 · 尚未安奉牌位 — 轻点 ＋ 安放 ·
+每日供奉一件有意义之物 · 此处一切皆可自定义 · 开始供奉 · 族长 — one baseline per row, no clipped
+glyph, no Latin. ⚠️ Glyphs render in the **system** sans; the boards' serif is not applied.
+
+### Still open on 164
+**A Book entry from the shrine** and **a way back from each destination** — the ticket asks for
+both, the tab bar supplies neither. Do not read "164 done" into the commit.
+
+`check:lib` **482** · `npm run check` EXIT 0 · `tsc` 0.
