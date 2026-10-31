@@ -1352,6 +1352,41 @@ So a first measure pass whose height spec is not EXACT **latches the PreviewView
 
 ---
 
+### 12.47 · S67+13 — SCRUM-144 answered (option A): the Book's empty-state copy is signed off, and doc 15 §8 can no longer go stale silently (2026-10-31)
+
+**The decision.** The PM accepted **option A**: the proposed wording ships **as written**, and the table of record gains the row it was missing. ⚠️ **No copy changed** — that is what option A means; the value of the answer is that the strings moved from *"my proposal"* to *"the signed-off copy"*.
+
+| key | EN (signed off) | 中文 (signed off) | §8 row |
+|---|---|---|---|
+| `book_empty` | *No offerings yet. The first one will appear here.* | 尚无供奉。第一笔将显示在这里。 | **C18** |
+
+**What closed.** ✅ **`SCRUM-122` was parked `In Review` on exactly this answer** — its AC 3 says the copy is doc 15 §8's and *"do not invent the ZH string"*, and §8 had no empty-state row (**C14 · C15 · C16 only**). With **C18** in the table, AC 3 is met and the ticket is **`Done`**.
+
+**What shipped.**
+- ✅ **doc 15 §8 gains row `C18`** — *Book · empty state* — the gap itself, closed.
+- ✅ **The PROPOSAL markers are gone** from `src/lib/i18n.ts` (**both** locales' comments) and from `check:lib` §16's key list; they now cite **C18** as the authority.
+- ✅ **A new gate — `check:copy` rule 4** (**15 → 30 checks**): the Book's four keys are read back **out of doc 15 §8** and compared **character for character, both locales**:
+
+  | key | §8 row |
+  |---|---|
+  | `book_header` | C14 |
+  | `book_outside` | C15 |
+  | `book_window` | C16 |
+  | `book_empty` | **C18** |
+
+**⚠️ Why a gate, and not just the row.** This ticket existed because **the table of record had a gap and nothing could see it**: `SCRUM-122`'s AC pointed at §8, §8 had no row, and the only reason anyone noticed is that a reviewer read the description. ⚠️ **A proposal no gate can see is one edit away from rot** — the next session would re-derive the same question. Rule 4 asserts the direction that was missing (*every Book key must HAVE a row, and the two must agree*), so **before C18 existed it was RED**. ⚠️ **Stated scope, not implied:** this is **four** keys against **four** rows — **not** a whole-table parity check. §8's rows carry no key column, so a row→key map for all 18 would be a guess dressed up as a gate. The Book is where the gap happened, so the Book is where the assertion is.
+
+**Fault-tested, both directions:**
+- revert the §8 row (**C18 → not a row**) → ⚠️ **RED**: *"book_empty IS doc 15 §8's row C18 — §8 carries no C18"*;
+- change **one word** of the shipped EN (*"the first one will"* → *"the first will"*) → ⚠️ **RED**: *"…its EN is C18's, character for character"*;
+- ⚠️ **restored byte-identically, proven by `sha256sum -c`**, not by eye.
+
+⚠️ **Stated limitation:** the rule parses **markdown italics**, so a §8 row that stops being fully italicised (`*…*`) becomes **unreadable** rather than mis-compared — the row assertion then fires, which is the safe direction, but a reformat of that table is a gate-visible event.
+
+**Verification:** `npx tsc --noEmit` **0** · `npm run check` **EXIT 0** · `check:copy` **15 → 30** · ⚠️ **US$0.00** — no generation, no device run, no EAS build.
+
+---
+
 ### 12.46 · S67+11 — SCRUM-122: the Book's empty state had no copy, so it borrowed the window line (2026-10-25)
 
 **The defect, seen on glass.** An empty Book of Tributes rendered the window note **twice** and left a **heading over nothing**:
@@ -1389,6 +1424,8 @@ Return to the shrine
 | `book_empty` | *No offerings yet. The first one will appear here.* | 尚无供奉。第一笔将显示在这里。 |
 
 ⚠️ The 中文 deliberately reuses the table's own words — **供奉** (§8's C15/C17) and **显示** (C16) — rather than inventing vocabulary.
+
+> ✅ **RESOLVED 2026-10-31 (`SCRUM-144`, option A)** — §8 now carries row **C18** holding exactly that copy, so the proposal is signed off, **no string changed**, and **`SCRUM-122` is `Done`**. ⚠️ The gap is also no longer invisible: **`check:copy` rule 4** reads the Book's four keys back out of §8 and fails if either side moves. See **§12.47**.
 
 **Verification:** `npx tsc --noEmit` **0** · `npm run check` **EXIT 0** · `check:lib` **409 → 416**.
 

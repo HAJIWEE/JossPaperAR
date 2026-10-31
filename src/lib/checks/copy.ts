@@ -112,7 +112,8 @@ const walk = (dir: string): string[] =>
 console.log('copy-check · every user-visible string is localised');
 console.log('\n1 · no site renders BOTH languages at once');
 console.log('2 · no user-visible literal outside t() / localized()');
-console.log('3 · no t(key) call leaves a declared placeholder unsubstituted\n');
+console.log('3 · no t(key) call leaves a declared placeholder unsubstituted');
+console.log('4 · the Book\'s copy IS doc 15 §8\'s — the table of record\n');
 
 const bilingualHits: string[] = [];
 const literalHits: string[] = [];
@@ -266,6 +267,77 @@ check(`no t(key) call leaves a declared placeholder unsubstituted (${placeholder
   placeholderHits.length === 0, placeholderHits.slice(0, 8).join('\n      '));
 if (dynamicKeys > 0) {
   console.log(`  – ${dynamicKeys} call site(s) use a dynamic key — NOT statically checkable`);
+}
+
+// ── 4 · the Book's copy IS doc 15 §8's — the table of record (SCRUM-144) ────
+//
+// ⚠️ WHY THIS EXISTS. `SCRUM-122` needed an empty-state string, and its AC said the copy is
+// **doc 15 §8's** — *"do not invent the ZH string"*. ⚠️ But §8 had **no empty-state row**, so
+// there was nothing to take: the key shipped as a marked **PROPOSAL** and `SCRUM-144` asked
+// the PM. The answer (option A) signed the wording off **and added it to the table** (row
+// **C18**) — which is the only version of "signed off" that survives the next session.
+//
+// ⚠️ A PROPOSAL NO GATE CAN SEE IS ONE EDIT AWAY FROM ROT. This asserts the direction that
+// was missing: every Book key must HAVE a §8 row, and the two must agree character for
+// character in **both** locales. ⚠️ **Before C18 existed this was RED** — it is a regression
+// guard for exactly this decision, not decoration.
+//
+// ⚠️ STATED SCOPE, not implied: this maps **four** keys to **four** rows. It is NOT a
+// whole-table parity check — §8's rows carry no key column, so a row→key map for all 18 would
+// be a guess dressed up as a gate. The Book is where the gap actually happened, so the Book
+// is where the assertion is. ⚠️ Add a fifth `book_*` key and it needs a row, or this goes red.
+const DOC15 = path.join(PROJ, 'AppDesignConceptBoard', '15-clan-model-and-book-of-tributes.md');
+
+/** `| C14 | Book · header | *Book of Tributes* | *供奉簿* |` → id, moment, EN cell, ZH cell. */
+const ROW = /^\|\s*(C\d+)\s*\|\s*([^|]+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|$/;
+
+/** `*…*` is markdown emphasis in the table, never part of the shipped string. */
+const cellText = (cell: string): string => {
+  const italic = /^\*([^*]+)\*$/.exec(cell);
+  return italic === null ? cell.replace(/\*/g, '').trim() : italic[1];
+};
+
+function copyTable(): Map<string, { moment: string; en: string; zh: string }> {
+  const rows = new Map<string, { moment: string; en: string; zh: string }>();
+  for (const line of fs.readFileSync(DOC15, 'utf8').split('\n')) {
+    const m = ROW.exec(line);
+    if (m === null) continue;
+    rows.set(m[1], { moment: m[2], en: cellText(m[3]), zh: cellText(m[4]) });
+  }
+  return rows;
+}
+
+/** The Book's keys and the §8 row each one IS. ⚠️ A new Book key means a new row in §8. */
+const BOOK_COPY: ReadonlyArray<readonly [key: string, row: string]> = [
+  ['book_header', 'C14'],
+  ['book_outside', 'C15'],
+  ['book_window', 'C16'],
+  ['book_empty', 'C18'],
+];
+
+const table = copyTable();
+
+check(`the copy table of record was reached (${table.size} §8 rows read)`, table.size >= 15,
+  `parsed ${table.size} rows from ${path.relative(PROJ, DOC15)} — the gate is blind`);
+
+// ⚠️ POSITIVE CONTROL — a parser that reads nothing passes every row assertion below silently,
+// which is the failure mode `stripNonCopy` already taught this file.
+check('the §8 row parser fires on a real row (positive control)',
+  ROW.test('| C18 | Book · empty state | *No offerings yet. The first one will appear here.* | *尚无供奉。第一笔将显示在这里。* |'),
+  'the row regex is blind — check ROW');
+check('…and strips the table\'s markdown emphasis, not the string',
+  cellText('*Book of Tributes*') === 'Book of Tributes',
+  'cellText kept the asterisks — the comparison would fail on real rows');
+
+for (const [key, row] of BOOK_COPY) {
+  const cells = table.get(row);
+  check(`${key} IS doc 15 §8's row ${row} — a shipped key has a row in the table of record`,
+    cells !== undefined, `§8 carries no ${row} — the table of record has a gap again`);
+  if (cells === undefined) continue;
+  check(`…its EN is ${row}'s, character for character`, en[key] === cells.en,
+    `i18n "${en[key]}" ≠ §8 "${cells.en}"`);
+  check(`…its 中文 is ${row}'s, character for character`, zh[key] === cells.zh,
+    `i18n "${zh[key]}" ≠ §8 "${cells.zh}"`);
 }
 
 for (const [file, reason] of EXEMPT) {
