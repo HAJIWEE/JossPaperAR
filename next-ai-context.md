@@ -610,3 +610,52 @@ Without the second, `Bartholomew` runs out of the plaque's ends. `0.58` em advan
 on purpose — RN cannot measure text without a layout pass.
 
 `check:lib` **515 → 524** (§24), fault-tested (forcing `vertical` turns two checks red).
+
+---
+
+# 📍 SESSION WRAP — 2026-10-31 (S71)
+
+## Where the build is
+**Step 1 of the full-app plan is built.** Home is no longer a scaffold: shrine base, app mark,
+settings gear, halo, offerings, the tablet, the tribute/streak panels and the tab bar are all
+ported from the boards and on glass — and the altar can finally **hold a tablet**.
+
+```
+`SCRUM-146` ✅ Done   (+ 165 cap · 166 read · 167 display · 168 sheet)
+`SCRUM-161` ✅ Done   tribute + streak panels live
+`SCRUM-162` ✅ Done   the Penpot port
+`SCRUM-164` 🔄 In Progress   tab bar built · **Book entry + way back still missing**
+`SCRUM-148` 🔄 In Progress   ⚠️ NOT done — 163 + 164 remain
+`SCRUM-163` ⏳ To Do        the geometry gate (360 dp assertions)
+`SCRUM-208` ⏳ To Do        ⚠️ yours: the board's active tab is 1.44:1
+```
+
+**Pushed to glass:** EAS `preview` build **`de4c1df9`**, commit **`89d15cd`**, project
+`josspaperar/joss-paper-ar`. ⚠️ Verify the install off `dumpsys package app.josspaperar | grep
+lastUpdateTime`, not off `adb`'s exit code — a rejected install reports success (`SCRUM-145`).
+
+## ⚠️ THE FOUR DEFECTS THAT NO GATE CAUGHT
+Every one was found by **looking at the phone**, with `tsc` and 515+ checks green:
+
+1. **A `<Stack.Screen>` declaration became the stack's INITIAL route** — the app booted onto the
+   tablet sheet, Home never mounted, `router.back()` answered *"GO_BACK was not handled"*.
+   ⚠️ Do not declare screens in `_layout` to set `presentation`.
+2. **A route param arrived EMPTY** — `role`/`count` as params meant a **clan HEAD** was told only
+   a head may edit. ⚠️ **A param is a copy of a fact.** Read the fact.
+3. **Tabs positioned at board `top: 774` inside a band already at 764** — the bar drew **no tabs
+   at all**. The fourth time this class has shipped.
+4. **`useWindowDimensions()` answers 345 × 745 on a 360 × 800 device** — sizing to it letterboxed
+   the whole shrine. ⚠️ **Size compositions to `Dimensions.get('screen')`.**
+
+## ⚠️ Two rules that keep paying
+· **Assert the RELATIONSHIP, not the bound** — `topInBar === tab.y − band.y`, not `topInBar === 10`.
+· **Pin both numbers when the board is wrong** — §22 asserts the board's 1.44:1 *and* the build's
+  4.90:1, so neither "copy the board" nor "nudge it back" passes silently.
+
+## Next, in order
+1. **`SCRUM-163`** — geometry gate, 360 dp. Cheap, and it guards the class above.
+2. **`SCRUM-164`** — the Book entry + a way back (the tab bar is not the whole ticket).
+3. **`SCRUM-151`** — Profile & Settings, **including the language switcher** the app still lacks.
+4. **`SCRUM-147`** onboarding → **`150`** store →美白 **`149`** item burn → **`155`** seed → **`157`** demo run.
+
+⚠️ **`SCRUM-12`** is still blocked on the **`SCRUM-159`** decision, and **`SCRUM-208`** is yours.

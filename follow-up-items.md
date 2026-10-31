@@ -7,6 +7,19 @@
 ## 🎯 Immediate Actions (Next 1–2 Weeks)
 
 ### 🔴 On the critical path
+
+- 🏮 **S71 (2026-10-31) — STEP 1 IS BUILT: the shrine, the altar, the tablet sheet and the tab bar are on glass. ⚠️ US$0.00 AI spend; one EAS `preview` build (`de4c1df9`).**
+  - ✅ **The altar can hold a tablet for the first time** (`SCRUM-146` ✅ · `165` ✅ · `168` ✅): `＋` → sheet → `save_ancestor` → the plaque renders. Verified end-to-end on `HN615L005386` and read back through Postgres.
+  - ✅ **The shrine fills the phone**: sized to `Dimensions.get('screen')`, not RN's inset window — board `[0,0][720,1558]`, tab bar `[0,1410][720,1600]`.
+  - ✅ **Ported & gated**: shrine base · app mark · settings · halo · offerings · tablet · tab bar · tribute/streak panels · the three board lines the build was missing.
+  - ⚠️⚠️ **Four defects found only on glass** (every gate was green): a `<Stack.Screen>` declaration **became the initial route**; a **route param arrived empty** and told a clan HEAD it could not edit; tabs at board `top:774` **rendered no tabs at all**; a **Latin name stacked one letter per line**.
+  - ⏳ **Still open on the parent `SCRUM-148`** — do **not** read the commits as closing it:
+
+- 🧭 **`SCRUM-163` (To Do) — the geometry gate, incl. the 360 dp assertions.** Cheap. It is what stops the **absolute-vs-board-relative** class that has now shipped **four** times.
+- 🧭 **`SCRUM-164` (In Progress) — the tab bar is built, but the ticket asks for a **Book** entry and **a way back** from each destination.** Neither exists.
+- 🎯 **`SCRUM-208` (To Do) — ⚠️ YOURS, not mine: the Home board's active tab is `#9A2B18` on `#C23B22` = **1.44:1**. The build ships 4.90:1 and §22 pins both, but the **board** still needs the fix.**
+- ⚠️ **`SCRUM-151` — the app has NO language switcher**, so 中文 is only reachable by forcing the locale in a probe (reverted each time). Pull it forward if you want to check 中文 yourself.
+
 - 🐞 **S67+12 (2026-10-25) — `SCRUM-145` (owner-found on glass): `/burn`'s "Throw again" button rendered but did nothing after a SECOND miss; fixing it exposed TWO more defects (`check:throw` 47 → 55). ⚠️ US$0.00 in AI spend; one EAS build.**
   - ⚠️ **A COUPLING, not a typo**: the render asked `!canThrow(n)` while the handler required `!canThrow(n + 1)` → the button agreed for the FIRST rethrow and disagreed for the SECOND. ⚠️ Same class as `fireBoxTop`.
   - ✅ **One predicate now** — `landedAction` → `'rethrow' | 'confirm' | 'rest'`; **a hit is always confirmable**.
