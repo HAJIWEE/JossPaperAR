@@ -223,7 +223,25 @@ Run lint and typecheck before declaring any task done.
 Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
 Docs: https://docs.expo.dev/eas/index.md
 
-### ⚠️ On THIS machine, EAS Build is the only route to glass — a local Android build cannot work
+### ⚠️ Getting code onto the floor device — the FAST loop first, EAS only when you need an APK
+
+**Measured 2026-10-31 (SCRUM-160/162).** `Expo Go + Metro over adb reverse` puts the **working tree** on the device in seconds. Try it before anything else.
+
+```bash
+adb reverse tcp:8081 tcp:8081
+npx expo start --port 8081                    # loads .env at boot
+adb shell am start -a android.intent.action.VIEW -d "exp://127.0.0.1:8081"
+adb exec-out screencap -p > /tmp/shot.png
+adb shell uiautomator dump /sdcard/ui.xml     # machine-readable bounds + testIDs
+```
+
+It bundled **4.8 s / 2094 modules**, and Fast Refresh applied a fix with no rebuild. ⚠️ **It verifies the ACTUAL working tree**, which is stronger evidence than an APK built from a past commit.
+
+⚠️ **`uiautomator dump` is how a layout claim becomes checkable.** It prints each `testID` as `resource-id` with `bounds`, so *"the regions render in order"* becomes a table instead of an opinion — that is what caught the clipped art below.
+
+⚠️ **Two Expo Go artifacts, not app bugs:** the grey gear bubble top-right is **Expo Go's own dev FAB**; and Metro **rewrites `tsconfig.json`** on boot (it re-adds `.expo/types` to `include`) — `git checkout -- tsconfig.json` afterwards.
+
+### ⚠️ A local NATIVE build cannot work here — so a real APK must come from EAS
 
 `npx expo run:android` **fails**, and not for a reason that can be fixed in the repo:
 
@@ -231,7 +249,7 @@ Docs: https://docs.expo.dev/eas/index.md
 
 Only **Java 25** is installed (`/usr/lib/jvm` holds `java-25-openjdk` plus JREs — no 17, no 21), and the Android Gradle Plugin cannot use it as a compiler toolchain. Measured **2026-10-31** (SCRUM-160); it cost a **1 m 09 s** Gradle run to find out.
 
-**So: to see code on glass, build with EAS** — `eas build --profile preview --platform android`, then `adb install -r <apk>` — which is also what every earlier session did.
+**So a real APK — needed once a native module is added, or for a release-shaped build — comes from EAS**: `eas build --profile preview --platform android`, then `adb install -r <apk>`.
 
 ⚠️ **EAS builds from git.** Commit and push first: an uncommitted worktree has nothing to build, and the build records the commit hash it actually used (check it with `build_info` — if it does not match yours, you built the wrong tree).
 
