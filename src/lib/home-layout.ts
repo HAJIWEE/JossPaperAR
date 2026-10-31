@@ -99,6 +99,8 @@ export const HOME_BANDS = {
   carouselPrev: { x: 26, y: 412, w: 24, h: 40 },
   /** `nav · carousel next` — 340,412 24×40. */
   carouselNext: { x: 340, y: 412, w: 24, h: 40 },
+  /** `zone · customizable temple (label)` — 28,214 224×22. */
+  templeChip: { x: 28, y: 214, w: 224, h: 22 },
   /** `art · offerings (front)` — 30,434 330×170. */
   offerings: { x: 30, y: 434, w: 330, h: 170 },
   /** `art · shrine base (table)` — 16,588 358×76. */
@@ -220,3 +222,27 @@ export function isShrineOrder(regions: readonly string[]): boolean {
     regions.every((region, i) => region === HOME_REGION_ORDER[i])
   );
 }
+
+/**
+ * The tab bar — `nav · …` on `EN · 1 Home / Shrine`, read 2026-10-31.
+ *
+ * Four tabs at x **12 · 106 · 199 · 293**, each 86 wide and 62 tall, inset 10 under the bar's
+ * top edge; the active one gets a `#C23B22` pill with **r12**.
+ *
+ * ⚠️ **THE BOARD'S ACTIVE-TAB INK IS A DEFECT, AND IT IS NOT COPIED.** `nav · tab Shrine
+ * (active bg)` is `#C23B22` and its icon/label are inked `#9A2B18` — dark red on cinnabar red =
+ * **1.44:1**, far under AA's 4.5 and visibly legible only if you already know what it says.
+ * `onColorCream` (#FFF8E8) on the same fill is **4.90:1**, so that is what the bar renders and
+ * `check:lib` §22 asserts the arithmetic. ⚠️ **Filed for the board, not silently "fixed".**
+ */
+export const TAB_BAR = {
+  /** The ink rule along the bar's top edge. */
+  topLine: 3,
+  // ⚠️ `topInBar` is the number a CHILD of the bar band must use: the band already starts at
+  // board y 764, so `top: 774` would push every tab 764 px down and out of view. ⚠️ Measured on
+  // glass 2026-10-31 — the bar drew its background and NO tabs, because this is the same
+  // absolute-vs-board-relative class as the offerings offset. §22 asserts the two agree.
+  tab: { y: 774, topInBar: 10, w: 86, h: 62, radius: 12 },
+  /** The four tab origins, from the board. ⚠️ Not evenly spaced (94 · 93 · 94). */
+  xs: [12, 106, 199, 293] as const,
+} as const;

@@ -134,6 +134,16 @@ export const MESSAGES = {
     // so the same key can be reused where sentence case is wanted.
     'home.tributeLabel': 'Tribute points',
     'home.streakLabel': '%{days}-day streak',
+    // ⚠️ Board copy — `EN · 1 Home / Shrine` (Penpot, 2026-10-31). The caption and the hint
+    // were MISSING from the build until the owner diffed it against the board.
+    'home.altarEmpty': 'Your altar is empty — tap ＋ to add a tablet.',
+    'home.ctaHint': 'Offer something meaningful, once a day',
+    'home.templeChip': 'Everything here is customizable',
+    // ⚠️ The tab bar's four labels — `nav · tab * label`, EN board.
+    'nav.shrine': 'Shrine',
+    'nav.league': 'League',
+    'nav.store': 'Store',
+    'nav.profile': 'Profile',
 
     // ── the throw (doc 05 §2 — the four bands) ────────────────────────────
     'band_bullseye': 'Bullseye',
@@ -381,6 +391,14 @@ export const MESSAGES = {
     // unit used by `reward.tributeUnit`, so the shrine and the reward screen agree.
     'home.tributeLabel': '功德点',
     'home.streakLabel': '连续 %{days} 天',
+    // ⚠️ Board copy — `ZH · 1 Home / 首页` (Penpot, 2026-10-31).
+    'home.altarEmpty': '尚未安奉牌位 — 轻点 ＋ 安放',
+    'home.ctaHint': '每日供奉一件有意义之物',
+    'home.templeChip': '此处一切皆可自定义',
+    'nav.shrine': '神龛',
+    'nav.league': '联赛',
+    'nav.store': '商店',
+    'nav.profile': '我的',
 
     'band_bullseye': '正中',
     'band_devout': '虔诚',

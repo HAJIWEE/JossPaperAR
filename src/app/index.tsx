@@ -9,6 +9,7 @@ import { Offerings } from '@/components/home/offerings';
 import { StreakPanel, TributePanel } from '@/components/home/panels';
 import { ShrineBase } from '@/components/home/shrine-base';
 import { ShrineCanvas } from '@/components/home/shrine-canvas';
+import { TabBar } from '@/components/home/tab-bar';
 import { Tablet } from '@/components/home/tablet';
 import { altarView, pageStep } from '@/lib/altar';
 import { clanAncestors, myClans, type Ancestor } from '@/lib/clan-api';
@@ -190,19 +191,70 @@ export default function HomeShrine() {
             <View style={[styles.abs, bandRect(HOME_BANDS.shrineBase, s)]} testID="home-shrine-base">
               <ShrineBase />
             </View>
+            {/* ⚠️ The ALTAR-STATE CAPTION — on the board it is `Your altar is empty — tap ＋ to add
+                a tablet.`, i.e. the EMPTY state's own line. The filled board's caption text is not
+                yet read, so nothing renders here when a tablet exists rather than inventing one. */}
             <View
               style={[styles.abs, bandRect(HOME_BANDS.caption, s)]}
               testID="home-caption-band"
-            />
+            >
+              {view.kind === 'empty' ? (
+                <Text
+                  numberOfLines={1}
+                  style={{ color: text.inkSoft, fontSize: 12 * s }}
+                >
+                  {t('home.altarEmpty')}
+                </Text>
+              ) : null}
+            </View>
+
+            {/* ⚠️ `hint · cta` — the line the board sets above the offer button. */}
+            <View style={[styles.abs, bandRect(HOME_BANDS.hintCta, s)]} testID="home-hint-band">
+              <Text numberOfLines={1} style={{ color: text.inkSoft, fontSize: 12 * s }}>
+                {t('home.ctaHint')}
+              </Text>
+            </View>
+
+            {/* ⚠️ `zone · customizable temple (label)` — the chip that tells the owner the altar is
+                theirs. ⚠️ Only the LABEL is drawn: the chip's own background fill could not be read
+                from the plugin yet, and a guessed chip is worse than a bare line. */}
+            <View
+              style={[styles.abs, bandRect(HOME_BANDS.templeChip, s), styles.chip]}
+              testID="home-temple-chip"
+            >
+              <Text numberOfLines={1} style={{ color: text.gold, fontSize: 10.5 * s }}>
+                {t('home.templeChip')}
+              </Text>
+            </View>
 
             {/* ⚠️ EMPTY → the ＋ slot is RESERVED, not drawn: its art (`slot · ＋ add a tablet`)
                 is un-ported, and the add flow is not built. A tappable ＋ with no destination
                 is the SCRUM-145 defect. It becomes real with the sheet, in this same ticket. */}
             {view.kind === 'empty' ? (
               <View
-                style={[styles.abs, bandRect(slot, s), styles.reserved]}
+                style={[
+                  styles.abs,
+                  bandRect(slot, s),
+                  styles.reserved,
+                  styles.slotCentre,
+                  // ⚠️ 40 board px down, NOT centred: the slot band's lower half is where the
+                  // burner and its smoke sit, so a centred ＋ reads as a cross floating in the
+                  // smoke. Measured on glass 2026-10-31.
+                  { paddingTop: 40 * s },
+                ]}
                 testID="home-add-slot"
-              />
+              >
+                {/* ⚠️ The ＋ ITSELF. Without it the empty altar is a dashed rectangle and the
+                    caption's "tap ＋" has nothing to point at — the gap the owner found against
+                    the board. ⚠️ It is still NOT a Pressable: the sheet lands in this ticket
+                    (`SCRUM-168`), and a control with nowhere to go is the `SCRUM-145` defect. */}
+                <Text
+                  allowFontScaling={false}
+                  style={{ color: text.gold, fontSize: 44 * s, fontWeight: '300' }}
+                >
+                  ＋
+                </Text>
+              </View>
             ) : (
               <View style={[styles.abs, bandRect(slot, s)]} testID="home-tablet">
                 <Tablet
@@ -286,10 +338,12 @@ export default function HomeShrine() {
       // ── footer · the tab bar (SCRUM-164) ──────────────────────────────────
       case 'footer':
         return (
-          <View
-            style={[styles.abs, bandRect(HOME_BANDS.tabbar, s), styles.reserved]}
-            testID="home-tabbar-band"
-          />
+          <View style={[styles.abs, bandRect(HOME_BANDS.tabbar, s)]} testID="home-tabbar-band">
+            {/* ⚠️ Store and Profile are DISABLED inside the bar: their screens are
+                SCRUM-150 / SCRUM-151. A dead link or an inert live-looking tab would both be
+                worse than a visibly unavailable one. */}
+            <TabBar active="shrine" scale={s} />
+          </View>
         );
     }
   };
@@ -315,6 +369,16 @@ const styles = StyleSheet.create({
     borderColor: surface.paperEdge,
     borderRadius: radius.md,
   },
+  /** The temple chip's own pill — the board's `(chip)` surface, so the line is not bare. */
+  chip: {
+    borderWidth: 1,
+    borderColor: surface.paperEdge,
+    borderRadius: radius.md,
+    paddingHorizontal: 8,
+    justifyContent: 'center',
+  },
+  /** ⚠️ A child of a band positions itself in the BAND's space — the trap that hid the tabs. */
+  slotCentre: { alignItems: 'center', justifyContent: 'flex-start' },
   cta: {
     backgroundColor: brand.cinnabar,
     alignItems: 'center',

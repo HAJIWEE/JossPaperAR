@@ -11,6 +11,7 @@
  * ⚠️ FAULT-TEST IT: change an expected string and confirm it goes RED.
  */
 
+import { existsSync } from 'node:fs';
 import { isValidClanName } from '../clan-rules.ts';
 import { bookView, showsBookSectionTitle } from '../clan-roles.ts';
 import {
@@ -47,7 +48,7 @@ import {
   shouldHoldInvite,
 } from '../invite-flow.ts';
 import { LOCALES, MESSAGES, detectLocale, localized, messageKeys, setLocale, t } from '../i18n.ts';
-import { HOME_BANDS, bandFits, bandRect, homeFitScale } from '../home-layout.ts';
+import { HOME_BANDS, TAB_BAR, bandFits, bandRect, homeFitScale } from '../home-layout.ts';
 import {
   OFFERINGS_VIEWBOX,
   OFFERING_DOTS,
@@ -1180,6 +1181,10 @@ function screenCopyChecks(): void {
     // (`EN · 1 Home / Shrine`, `ZH · 1 Home / 首页`), so they are held to the same
     // both-locales + no-Latin-in-中文 rule as everything else here.
     'home.tributeLabel', 'home.streakLabel',
+    // ⚠️ SCRUM-164 — the tab bar's four labels and the three Home lines the owner found
+    // MISSING against the board (`EN · 1 Home / Shrine`).
+    'nav.shrine', 'nav.league', 'nav.store', 'nav.profile',
+    'home.altarEmpty', 'home.ctaHint', 'home.templeChip',
   ];
   const zh = MESSAGES.zh as unknown as Record<string, string>;
   const en = MESSAGES.en as unknown as Record<string, string>;
@@ -1434,6 +1439,72 @@ function altarChecks(): void {
   check('pageStep on an empty altar stays at 0', pageStep(0, 0, 1) === 0);
 }
 
+/**
+ * §22 · The tab bar (SCRUM-164).
+ *
+ * ⚠️ This section exists because the bar is the first surface whose **board itself is wrong**:
+ * `nav · tab Shrine` inks `#9A2B18` on a `#C23B22` pill. That is **1.44:1** — the text is barely
+ * distinguishable from its own background, and no amount of careful porting would have fixed it.
+ * The build renders `onColorCream` (**4.90:1**) instead, and the assertion below pins BOTH numbers
+ * so that neither "copy the board" nor "nudge it back" can pass silently.
+ */
+function tabBarChecks(): void {
+  section('22 · The tab bar — geometry, dead links, and the board\'s contrast defect (SCRUM-164)');
+
+  check('tabs start at x = 12 (board)', TAB_BAR.xs[0] === 12);
+  check('there are four tabs, each 86 wide', TAB_BAR.xs.length === 4 && TAB_BAR.tab.w === 86);
+
+  const lastRight = TAB_BAR.xs[3] + TAB_BAR.tab.w;
+  check('the last tab ends inside the 390 canvas', lastRight === 379 && lastRight <= 390, `${lastRight}`);
+
+  // ⚠️ The board's spacing is NOT even (94 · 93 · 94), so "four 86-wide tabs fit in 390" does not
+  // imply "they do not overlap". Assert the relationship, not the bound.
+  let overlapping = '';
+  for (let i = 0; i < TAB_BAR.xs.length - 1; i += 1) {
+    if (TAB_BAR.xs[i] + TAB_BAR.tab.w > TAB_BAR.xs[i + 1]) {
+      overlapping = `${TAB_BAR.xs[i]} runs into ${TAB_BAR.xs[i + 1]}`;
+    }
+  }
+  check('…and no two tabs overlap', overlapping === '', overlapping);
+
+  const bar = HOME_BANDS.tabbar;
+  // ⚠️ The relationship that failed on glass: a child of the band applies topInBar, and it must
+  // be the tab's board y MINUS the band's.
+  check(
+    "topInBar is the tab board-y minus the band y (the glass bug)",
+    TAB_BAR.tab.topInBar === TAB_BAR.tab.y - bar.y,
+    `${TAB_BAR.tab.topInBar} vs ${TAB_BAR.tab.y - bar.y}`,
+  );
+  check(
+    'the tab row sits inside the bar band',
+    TAB_BAR.tab.y >= bar.y && TAB_BAR.tab.y + TAB_BAR.tab.h <= bar.y + bar.h,
+  );
+
+  // ⚠️ THE DEFECT, pinned. Both numbers, so a future "fix" to the board has to change this.
+  const boardInk = contrastRatio('#9a2b18', '#c23b22');
+  check(
+    "⚠️ the board's active-tab ink FAILS AA — this is WHY the build deviates",
+    boardInk < 4.5,
+    `${boardInk.toFixed(2)}:1`,
+  );
+  const builtInk = contrastRatio('#fff8e8', '#c23b22');
+  check('…and the ink the build actually uses passes AA', builtInk >= 4.5, `${builtInk.toFixed(2)}:1`);
+
+  // ⚠️ DEAD LINKS. A tab may only point at a route whose screen file exists: `Store` and
+  // `Profile` are disabled for exactly this reason (`SCRUM-150` / `SCRUM-151`), and this check is
+  // what stops a future tab being wired to a screen someone assumed was there.
+  const ROUTES: ReadonlyArray<readonly [string, string]> = [
+    ['/', 'index.tsx'],
+    ['/league', 'league.tsx'],
+  ];
+  for (const [route, file] of ROUTES) {
+    check(
+      `the "${route}" tab points at a screen that exists (${file})`,
+      existsSync(new URL(`../../app/${file}`, import.meta.url)),
+    );
+  }
+}
+
 async function main(): Promise<void> {
   await storageChecks();
   await drainChecks();
@@ -1507,6 +1578,7 @@ async function main(): Promise<void> {
   offeringsPlacementChecks();
   homePanelChecks();
   altarChecks();
+  tabBarChecks();
 
   check('guard: a 5-character key is NOT valid', !isValidIdempotencyKey('12345'));
   check('guard: junk is NOT a clan code', normaliseClanCode('not-a-code!!') === null);
