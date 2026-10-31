@@ -55,6 +55,7 @@ import {
   OFFERING_TRAYS,
   dotSitsOnTray,
 } from '../offerings-layout.ts';
+import { formatPoints, homePanels } from '../home-panels.ts';
 import { BULK_PREFIX, createSplitStorage, bulkKey } from '../split-storage.ts';
 import {
   MAX_ATTEMPTS,
@@ -1174,6 +1175,10 @@ function screenCopyChecks(): void {
     // ⚠️ SCRUM-122 — the Book's empty state. ⚠️ **A PROPOSAL, not signed-off copy**: doc 15
     // §8 carries no empty-state row (C14–C16 only). See the `🎯 Decide:` ticket on SCRUM-122.
     'book_empty',
+    // ⚠️ SCRUM-161 — the shrine's two panels. Both strings are the BOARD's copy
+    // (`EN · 1 Home / Shrine`, `ZH · 1 Home / 首页`), so they are held to the same
+    // both-locales + no-Latin-in-中文 rule as everything else here.
+    'home.tributeLabel', 'home.streakLabel',
   ];
   const zh = MESSAGES.zh as unknown as Record<string, string>;
   const en = MESSAGES.en as unknown as Record<string, string>;
@@ -1337,6 +1342,56 @@ function offeringsPlacementChecks(): void {
     heights.size === 2, `heights: ${[...heights].join(', ')}`);
 }
 
+/**
+ * 20 · The shrine's panels never lie (SCRUM-161).
+ *
+ * ⚠️ THE RULE: **a failed read must never render as `0`.** "0 tribute points" is a claim
+ * about the user's history; a failed read is a claim about the network. Showing the second
+ * as the first is a lie the user cannot detect — the same class as `bookView` showing an
+ * empty Book when the server had a problem.
+ *
+ * ⚠️ And a second, smaller one: the panels ink `brand.cinnabarDeep` as TEXT, which the
+ * token role rule forbids (`brand.*` is decorative). That exception is taken because the
+ * board does it — so the ratio is asserted here rather than trusted.
+ */
+function homePanelChecks(): void {
+  section('20 · The shrine\'s panels — a failure is never a zero (SCRUM-161)');
+
+  check('before the read, the state is `loading` — not `ready` with zeros',
+    homePanels(null).kind === 'loading');
+
+  const failed = homePanels({ ok: false, reason: 'network_error' });
+  check('a failed read is `failed` and carries its reason',
+    failed.kind === 'failed' && failed.reason === 'network_error');
+  // ⚠️ POSITIVE CONTROL — the shape that would be a lie.
+  check('…and it is NOT `ready` (a zero here would claim the user earned nothing)',
+    failed.kind !== 'ready');
+
+  const ready = homePanels({ ok: true, data: { tribute: 12480, streakDays: 12 } });
+  check('a successful read formats the total the way the board inks it (12,480)',
+    ready.kind === 'ready' && ready.tribute === '12,480', JSON.stringify(ready));
+  check('…and keeps the streak as the server gave it', ready.kind === 'ready' && ready.streakDays === 12);
+
+  check('a non-finite total is a broken payload, not a zero',
+    homePanels({ ok: true, data: { tribute: Number.NaN, streakDays: 1 } }).kind === 'failed');
+  check('…and so is a non-finite streak',
+    homePanels({ ok: true, data: { tribute: 1, streakDays: Number.POSITIVE_INFINITY } }).kind === 'failed');
+
+  const negative = homePanels({ ok: true, data: { tribute: -5, streakDays: -2 } });
+  check('a negative is clamped to 0 rather than printed with a minus',
+    negative.kind === 'ready' && negative.tribute === '0' && negative.streakDays === 0);
+
+  check('formatPoints groups thousands by hand (not toLocaleString)',
+    formatPoints(0) === '0' && formatPoints(999) === '999'
+      && formatPoints(1000) === '1,000' && formatPoints(1234567) === '1,234,567');
+  check('…and truncates a fractional total', formatPoints(12.9) === '12');
+
+  // ⚠️ The token-role exception, measured.
+  const ink = contrastRatio('#9A2B18', '#F5F0E8');
+  check(`the streak's cinnabarDeep ink on paper passes AA (${ink.toFixed(2)}:1)`, ink >= 4.5,
+    `${ink.toFixed(2)}:1 — use text.cinnabar instead`);
+}
+
 async function main(): Promise<void> {
   await storageChecks();
   await drainChecks();
@@ -1408,6 +1463,7 @@ async function main(): Promise<void> {
   screenCopyChecks();
   homeShrineScaleChecks();
   offeringsPlacementChecks();
+  homePanelChecks();
 
   check('guard: a 5-character key is NOT valid', !isValidIdempotencyKey('12345'));
   check('guard: junk is NOT a clan code', normaliseClanCode('not-a-code!!') === null);

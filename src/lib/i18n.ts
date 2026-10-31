@@ -127,6 +127,13 @@ export const MESSAGES = {
     'store.buyCancel': 'Cancel',
     'home.begin': 'Begin an offering',
     'home.clanEntry': 'Clan',
+    // ⚠️ BOTH strings are doc 15 §8's Board copy, read off `EN · 1 Home / Shrine` and
+    // `ZH · 1 Home / 首页` (Penpot, 2026-10-31) — NOT written here. The panels are
+    // `panel · tribute label` ("TRIBUTE POINTS" / 功德点) and `panel · streak label`
+    // ("12-day streak" / 连续 12 天). The EN is uppercased by the STYLE, not the string,
+    // so the same key can be reused where sentence case is wanted.
+    'home.tributeLabel': 'Tribute points',
+    'home.streakLabel': '%{days}-day streak',
 
     // ── the throw (doc 05 §2 — the four bands) ────────────────────────────
     'band_bullseye': 'Bullseye',
@@ -370,6 +377,10 @@ export const MESSAGES = {
     'store.buyCancel': '取消',
     'home.begin': '开始供奉',
     'home.clanEntry': '宗族',
+    // ⚠️ Board copy — `ZH · 1 Home / 首页` (Penpot, 2026-10-31). 功德点 is already the
+    // unit used by `reward.tributeUnit`, so the shrine and the reward screen agree.
+    'home.tributeLabel': '功德点',
+    'home.streakLabel': '连续 %{days} 天',
 
     'band_bullseye': '正中',
     'band_devout': '虔诚',

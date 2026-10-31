@@ -6,11 +6,14 @@ import { ClanPill } from '@/components/clan-pill';
 import { AltarHalo } from '@/components/home/altar-halo';
 import { AppMark, SettingsGear } from '@/components/home/header-art';
 import { Offerings } from '@/components/home/offerings';
+import { StreakPanel, TributePanel } from '@/components/home/panels';
 import { ShrineBase } from '@/components/home/shrine-base';
 import { ShrineCanvas } from '@/components/home/shrine-canvas';
 import { myClans } from '@/lib/clan-api';
 import { PILL_X_ON_REFERENCE, type PillClan } from '@/lib/clan-pill';
 import { readFirstRun } from '@/lib/first-run';
+import { fetchHomeSummary } from '@/lib/home-api';
+import { homePanels, type SummaryResult } from '@/lib/home-panels';
 import {
   HOME_BANDS,
   HOME_REGION_ORDER,
@@ -54,6 +57,13 @@ export default function HomeShrine() {
   /** Board px → device dp, contain-fit on BOTH axes. The ONE conversion on this screen. */
   const s = homeFitScale(windowWidth, windowHeight);
   const [clans, setClans] = useState<readonly PillClan[]>([]);
+  /**
+   * ⚠️ `null` = not asked yet. A failure is kept as a failure, **never** folded into a
+   * zero — see `homePanels` (SCRUM-161).
+   */
+  const [summary, setSummary] = useState<SummaryResult | null>(null);
+  /** ⚠️ The ONLY place the panel state is decided — `ready` · `loading` · `failed`. */
+  const panels = homePanels(summary);
 
   // The pill must reflect a clan created or joined *after* Home first mounted, so
   // this re-reads on every focus (the `clan/index.tsx` pattern).
@@ -66,6 +76,10 @@ export default function HomeShrine() {
         if (!cancelled) {
           setClans(mine.ok ? mine.data.map((c) => ({ name: c.name, role: c.role })) : []);
         }
+        // ⚠️ Re-read alongside the clan list: a burn awards tribute and moves the streak, so
+        // the shrine comes back from `/reward` showing stale numbers without this.
+        const totals = await fetchHomeSummary();
+        if (!cancelled) setSummary(totals);
       })();
       return () => {
         cancelled = true;
@@ -135,14 +149,12 @@ export default function HomeShrine() {
       case 'totals':
         return (
           <>
-            <View
-              style={[styles.abs, bandRect(HOME_BANDS.tribute, s), styles.reserved]}
-              testID="home-tribute-band"
-            />
-            <View
-              style={[styles.abs, bandRect(HOME_BANDS.streak, s), styles.reserved]}
-              testID="home-streak-band"
-            />
+            <View style={[styles.abs, bandRect(HOME_BANDS.tribute, s)]} testID="home-tribute-band">
+              <TributePanel state={panels} scale={s} />
+            </View>
+            <View style={[styles.abs, bandRect(HOME_BANDS.streak, s)]} testID="home-streak-band">
+              <StreakPanel state={panels} scale={s} />
+            </View>
           </>
         );
 
