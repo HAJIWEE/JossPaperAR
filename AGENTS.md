@@ -240,7 +240,7 @@ Only **Java 25** is installed (`/usr/lib/jvm` holds `java-25-openjdk` plus JREs 
 - `expo run:android` **rewrites `package.json`**'s `android`/`ios` scripts to `expo run:*`. That is **not your change** — `git checkout -- package.json` and do not commit it.
 - it generates **`android/`**, and ⚠️ **`android/` and `ios/` are NOT in `.gitignore`**. A `git add -A` in this repo commits the entire generated native tree. **Stage files explicitly**, never `-A`, while this is true.
 
-⚠️ **Do not poll the build in the foreground.** `eas build` prints a build id and then *waits*; a `preview` build sat in the queue for **>10 minutes** (2026-10-31). Run it in the background and read the state with the Expo `build_info` tool, not with a `tail` on the CLI log.
+⚠️ **Do not poll the build in the foreground.** `eas build` prints a build id and then *waits*; a `preview` build was **still in the queue ~30 minutes after submission** (2026-10-31), so treat it as a background job. Run it detached and read the state with the Expo `build_info` tool — not with a `tail` on the CLI log.
 
 ⚠️ **And read the install result off the device, not off the script** — `adb shell dumpsys package <pkg> | grep lastUpdateTime`. An install that reports success can have been rejected (`INSTALL_FAILED_USER_RESTRICTED`, SCRUM-145).
 
