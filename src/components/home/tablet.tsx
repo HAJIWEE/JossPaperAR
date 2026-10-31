@@ -15,17 +15,22 @@
  * the board's own pigments — a lacquered tablet is not UI chrome, and `tokens.ts` has no role
  * for it.
  *
- * ── THE NAME IS SET VERTICALLY ──────────────────────────────────────────────
+ * ── THE NAME: VERTICAL FOR 中文, ROTATED FOR LATIN ──────────────────────────
  * ⚠️ The board's text layer for the name is **51 × 170** on a 93-wide tablet — tall and narrow,
  * i.e. one character per line, which is how a 牌位 is written. RN has no `writing-mode`, so the
  * characters are stacked as separate `Text` lines inside the gold frame. ⚠️ **Both the frame and
  * the type scale with the tablet**, so a 4× smaller peek tablet gets 4× smaller glyphs rather
  * than clipped ones.
+ *
+ * ⚠️ **A Latin name is NOT stacked.** `Chen` set one character per line is four lines of a single
+ * letter — seen on the device 2026-10-31. It is set on one line and rotated 90° instead, so it
+ * runs along the plaque like a spine. `nameOrientation()` owns that decision; see `tablet-name.ts`.
  */
 
 import { Text, View } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 
+import { nameOrientation, rotatedNameSize } from '@/lib/tablet-name';
 import { brand } from '@/theme/tokens';
 
 /** The board's own pigments — `tablet · centre`, read 2026-10-31. */
@@ -99,23 +104,49 @@ export function Tablet({
     height: TABLET_TEXT_BOX.h * s,
   };
   const chars = Array.from(name);
+  const orientation = nameOrientation(name);
   // ⚠️ Fit the column, not the box: a long name gets smaller glyphs rather than overflowing the
   // gold frame. 1.08 is the board's own leading for stacked characters.
   const line = Math.min((box.width * 0.82), (box.height / Math.max(1, chars.length)) * 0.82);
+  // ⚠️ Latin is set on ONE line and rotated: stacked, `Chen` is four lines of one letter.
+  const rotatedSize = rotatedNameSize(box, Math.max(1, chars.length));
 
   return (
     <View style={{ width, height }} testID={testID}>
       <TabletPlate />
       <View style={[{ position: 'absolute', alignItems: 'center', justifyContent: 'center' }, box]}>
-        {chars.map((ch, i) => (
-          <Text
-            key={`${i}-${ch}`}
-            allowFontScaling={false}
-            style={{ color: brand.gold, fontSize: line, lineHeight: line * 1.08, fontWeight: '600' }}
+        {orientation === 'vertical' ? (
+          chars.map((ch, i) => (
+            <Text
+              key={`${i}-${ch}`}
+              allowFontScaling={false}
+              style={{ color: brand.gold, fontSize: line, lineHeight: line * 1.08, fontWeight: '600' }}
+            >
+              {ch}
+            </Text>
+          ))
+        ) : (
+          // ⚠️ The inner view is the frame with its axes SWAPPED, so its centre coincides with the
+          // box centre and a 90° rotation lands exactly on the frame. Rotating a view laid out at
+          // the unrotated size would hang the name off one end of the plaque.
+          <View
+            style={{
+              width: box.height,
+              height: box.width,
+              alignItems: 'center',
+              justifyContent: 'center',
+              transform: [{ rotate: '90deg' }],
+            }}
           >
-            {ch}
-          </Text>
-        ))}
+            <Text
+              numberOfLines={1}
+              allowFontScaling={false}
+              style={{ color: brand.gold, fontSize: rotatedSize, fontWeight: '600' }}
+            >
+              {name.trim()}
+            </Text>
+          </View>
+        )}
       </View>
     </View>
   );

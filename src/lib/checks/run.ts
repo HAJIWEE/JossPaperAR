@@ -48,6 +48,7 @@ import {
   shouldHoldInvite,
 } from '../invite-flow.ts';
 import { LOCALES, MESSAGES, detectLocale, localized, messageKeys, setLocale, t } from '../i18n.ts';
+import { nameOrientation, rotatedNameSize } from '../tablet-name.ts';
 import {
   ANCESTOR_CAP,
   EDIT_ROLES,
@@ -1608,6 +1609,39 @@ function ancestorSheetChecks(): void {
   check('…and a legacy over-cap clan does not underflow', slotsRemaining(14) === 0);
 }
 
+/**
+ * §24 · How a name is set on a tablet (SCRUM-146).
+ *
+ * ⚠️ A 牌位 is written top-to-bottom — correct for 陈秀英, wrong for `Chen`, which stacked gives
+ * four lines of one letter on a plaque. Seen on glass 2026-10-31.
+ */
+function tabletNameChecks(): void {
+  section("24 · Tablet names — vertical for CJK, rotated for Latin (SCRUM-146)");
+
+  check('陈秀英 is set vertically (the column IS the convention)',
+    nameOrientation('陈秀英') === 'vertical');
+  check('⚠️ Chen is NOT — stacked it is four lines of one letter',
+    nameOrientation('Chen') === 'rotated');
+  check('Tan Wei is rotated on ONE line (a space does not make it a column)',
+    nameOrientation('Tan Wei') === 'rotated');
+  check('⚠️ a MIXED name is vertical — a stele does not rotate half a name',
+    nameOrientation('陈 Chen') === 'vertical');
+  check('and 陳 (traditional) is vertical too', nameOrientation('陳') === 'vertical');
+  check('an empty name falls to vertical, so nothing rotates a zero-length line',
+    nameOrientation('') === 'vertical' && nameOrientation('   ') === 'vertical');
+
+  // ⚠️ The size shrinks as the name grows: the line must fit ALONG the frame, not just across it.
+  const box = { width: 71.4, height: 235.8 };
+  const short = rotatedNameSize(box, 4);
+  const long = rotatedNameSize(box, 11);
+  check('a short Latin name is bounded by the frame WIDTH, not the length',
+    Math.abs(short - box.width * 0.62) < 1e-9, `${short.toFixed(2)}`);
+  check('⚠️ a long one shrinks so it cannot run out of the frame ends',
+    long < short, `11 chars ${long.toFixed(2)} < 4 chars ${short.toFixed(2)}`);
+  check('…and never below zero for a degenerate length',
+    rotatedNameSize(box, 0) > 0 && Number.isFinite(rotatedNameSize(box, 400)));
+}
+
 async function main(): Promise<void> {
   await storageChecks();
   await drainChecks();
@@ -1683,6 +1717,7 @@ async function main(): Promise<void> {
   altarChecks();
   tabBarChecks();
   ancestorSheetChecks();
+  tabletNameChecks();
 
   check('guard: a 5-character key is NOT valid', !isValidIdempotencyKey('12345'));
   check('guard: junk is NOT a clan code', normaliseClanCode('not-a-code!!') === null);
