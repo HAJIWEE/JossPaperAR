@@ -490,3 +490,39 @@ glyph, no Latin. ⚠️ Glyphs render in the **system** sans; the boards' serif 
 both, the tab bar supplies neither. Do not read "164 done" into the commit.
 
 `check:lib` **482** · `npm run check` EXIT 0 · `tsc` 0.
+
+## 2026-10-31 (later still) — the shrine now FILLS the screen (`4aebbd0`)
+
+**Owner feedback on glass:** the shrine floated as a 390 × 844 rectangle with a strip of paper on
+all four sides, worst under the tab bar where a `paperDeep` bar sat on a `paper` page.
+
+### ⚠️ The measurement — this is the one to remember
+`uiautomator` on the POCO C81 Pro (**720 × 1600 px = 360 × 800 dp**):
+
+| node | bounds | meaning |
+|---|---|---|
+| app root | `[0,0][720,1600]` | the app **does** span the full screen |
+| shrine canvas | `[15,53][705,1547]` | **345 × 745 dp** — a window inside the screen |
+
+⚠️ **`useWindowDimensions()` answers 345 × 745 on this device, not 360 × 800.** Sizing to it is
+what produced the letterbox. **Size compositions to `Dimensions.get('screen')`.**
+
+### Fixed
+- canvas + screen both take `Dimensions.get('screen')` → `min(0.923, 0.948) = 0.923` → board
+  **exactly 360 dp wide**, no side gap;
+- canvas anchored **top-left**, not centred;
+- `shrineBleedDp()` stretches the tab bar's own `paperDeep` over the 21 dp strip below the board —
+  bar now `[0,1410][720,1600]`, to the physical edge.
+
+### ⚠️ Contain-fit is KEPT — cover would clip the CTA
+At cover the board is 800 dp tall against 746 dp above the bar, which cuts the **offering button**
+off the bottom. Full width **and** nothing clipped beats obeying "cut it off" literally. A shorter
+screen that forces the choice is a **design decision**, not a silent one.
+
+### §18 now pins the defect
+`check:lib` **482 → 487**: the width rule fills exactly, plus a **positive control** that
+window-fit loses >10 dp per side, plus `shrineBleedDp(844, 1) === 0` so a correct screen shows no
+phantom strip.
+
+⚠️ 中文 re-checked at the ~4 % larger scale — that is where `numberOfLines={1}` would ellipsize:
+none of the seven strings truncated.
