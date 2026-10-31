@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { ClanPill } from '@/components/clan-pill';
 import { AltarHalo } from '@/components/home/altar-halo';
 import { AppMark, SettingsGear } from '@/components/home/header-art';
+import { Offerings } from '@/components/home/offerings';
 import { ShrineBase } from '@/components/home/shrine-base';
 import { ShrineCanvas } from '@/components/home/shrine-canvas';
 import { myClans } from '@/lib/clan-api';
@@ -152,10 +153,9 @@ export default function HomeShrine() {
             <View style={[styles.abs, bandRect(HOME_BANDS.halo, s)]} testID="home-halo-band">
               <AltarHalo />
             </View>
-            <View
-              style={[styles.abs, bandRect(HOME_BANDS.offerings, s), styles.reserved]}
-              testID="home-offerings-band"
-            />
+            <View style={[styles.abs, bandRect(HOME_BANDS.offerings, s)]} testID="home-offerings-band">
+              <Offerings />
+            </View>
             <View style={[styles.abs, bandRect(HOME_BANDS.shrineBase, s)]} testID="home-shrine-base">
               <ShrineBase />
             </View>
