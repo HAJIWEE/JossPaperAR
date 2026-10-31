@@ -112,6 +112,16 @@ wc -c .env supabase/functions/.env        # ≈935 and ≈2260; a ~19-byte file 
 awk -F= '/^FAL_KEY=/{print "FAL_KEY value length: " length($2)}' supabase/functions/.env  # ≈72
 ```
 
+⚠️ **AND A THIRD gitignored THING A WORKTREE LACKS: `supabase/.temp/`.** It holds the `link` state (`project-ref`, `pooler-url`, `linked-project.json`) under `supabase/.gitignore:3`, so without it every remote command dies with **`Cannot find project ref. Have you run supabase link?`** — which reads as "this repo was never linked" rather than "this worktree is missing a file". ⚠️ **The main checkout IS linked; copy the state instead of re-linking:**
+
+```bash
+V="/home/gweejiahan/Documents/Obsidian Vault/Projects/JossPaperAR"
+cp -r "$V/supabase/.temp" supabase/.temp
+npx supabase migration list          # now answers with real remote versions
+```
+
+⚠️ **Read that list before `db push`.** Measured 2026-10-31: the worktree was **two** migrations behind, not one — `20261024160000_stale_job_sweep` (SCRUM-126) had been committed weeks earlier and **never pushed**, alongside the session's own new file. `db push` applies pending migrations **in order**, so it took both; applying only your own is not an option it offers.
+
 ⚠️ **THE TRAP THAT MAKES THIS EXPENSIVE: a stub is worse than an absence.** Measured 2026-10-17
 (S59): the worktree's `supabase/functions/.env` was **19 bytes with a 10-character `FAL_KEY` value**,
 while the vault's is **2,260 bytes with a 72-character key**. `ls` succeeds, the variable *looks*

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { Fragment, useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
@@ -233,7 +233,16 @@ export default function HomeShrine() {
     }
   };
 
-  return <ShrineCanvas>{HOME_REGION_ORDER.map((name) => region(name))}</ShrineCanvas>;
+  return (
+    <ShrineCanvas>
+      {HOME_REGION_ORDER.map((name) => (
+        // ⚠️ The Fragment carries the key, not the region: `region()` returns either one
+        // element or SEVERAL (title panels, the altar group), so without this the array's
+        // items have no key and React warns "Each child in a list should have a unique key".
+        <Fragment key={name}>{region(name)}</Fragment>
+      ))}
+    </ShrineCanvas>
+  );
 }
 
 const styles = StyleSheet.create({
