@@ -526,3 +526,34 @@ phantom strip.
 
 ⚠️ 中文 re-checked at the ~4 % larger scale — that is where `numberOfLines={1}` would ellipsize:
 none of the seven strings truncated.
+
+## 2026-10-31 — the locale-length alignment bug class (`b5ba052`)
+
+**Owner:** *"in Chinese the 族長 is now too far left. Make sure to check all these alignment
+issues that arise due to different character lengths."*
+
+### ⚠️ The shape of the bug — recognise it on the next badge
+**An element whose LEFT EDGE is pinned to a fixed x while its WIDTH comes from the label.**
+
+`clan · pill` on the boards: the role chip is at **dx 106 in both locales**, but **94 wide in EN**
+and **58 in ZH**. Left-anchored, 中文 therefore ends at 164 and leaves a **40 px hole** before the
+`›` at 204. ⚠️ **EN was correct BY LUCK** — its label is exactly 94 wide, the space available — so
+the bug is invisible in the language you build in. Faithfully porting the board reproduced it.
+
+### Fixed
+`PILL_SPEC.chip.slotWidth = 94` (the board's EN width) + the chip **centres** in the slot.
+EN is pixel-identical; 中文 shifts **18 px right**.
+
+| | chip | centre | `›` |
+|---|---|---|---|
+| EN `👑 Clan Head` | 346 – 516 | **431** | 524 |
+| 中文 `👑 族长` | **376** – 486 | **431** | 524 |
+
+**Assert the CENTRE, not the edge.** The centres agree; the left edges must not.
+
+### Audit — every other bilingual surface is clean
+· tab labels centred in a fixed 86 tab · panel labels both at x **57** · `1-day streak` and
+`连续 1 天` both centre at **579** · CTA/caption/hint/temple chip centred or left-aligned.
+Only the chip pinned a left edge to a fixed x with a variable width.
+
+`check:lib` **487 → 492** — the defect is asserted as arithmetic (58-wide label ⇒ 40 px hole).
