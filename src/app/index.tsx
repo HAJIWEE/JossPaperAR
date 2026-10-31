@@ -105,9 +105,22 @@ export default function HomeShrine() {
               arrives with SCRUM-151, and ⚠️ **a control that renders and does nothing is
               the SCRUM-145 defect** (an inert "Throw again" that passed every per-screen
               gate). It becomes a button the moment it has a destination, not before.
+
+              ⚠️ The BUTTON SURFACE is part of the board and was missing at first: the
+              owner read the bare gear as misaligned, and it was — `btn · settings` is a
+              `#EAE2D2` fill with a **2.5 px ink stroke and r14**, i.e. exactly the clan
+              pill's treatment (`PILL_SPEC.radius` 14 · `borderWidth` 2.5). Without it the
+              icon had nothing to sit in. ⚠️ RN draws the stroke INSIDE the box, so at
+              scale 1 the 2.5 is the right number here — no `CONTENT_PAD_H` correction,
+              because this surface holds no text to inset.
             */}
             <View
-              style={[styles.abs, bandRect(HOME_BANDS.settings, s), styles.centred]}
+              style={[
+                styles.abs,
+                bandRect(HOME_BANDS.settings, s),
+                styles.settingsBtn,
+                { borderRadius: 14 * s, borderWidth: 2.5 * s },
+              ]}
               testID="home-settings-slot"
             >
               <View style={{ width: 20 * s, height: 20 * s }}>
@@ -227,6 +240,12 @@ const styles = StyleSheet.create({
   },
   ctaLabel: { color: onColorCream, fontWeight: '600' },
   clanEntry: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  centred: { alignItems: 'center', justifyContent: 'center' },
+  /** `btn · settings` — paperDeep fill, ink stroke; radius + width are scaled inline. */
+  settingsBtn: {
+    backgroundColor: surface.paperDeep,
+    borderColor: brand.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   pressed: { opacity: 0.8 },
 });
