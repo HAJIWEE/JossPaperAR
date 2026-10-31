@@ -48,6 +48,13 @@ import {
 } from '../invite-flow.ts';
 import { LOCALES, MESSAGES, detectLocale, localized, messageKeys, setLocale, t } from '../i18n.ts';
 import { HOME_BANDS, bandFits, bandRect, homeFitScale } from '../home-layout.ts';
+import {
+  OFFERINGS_VIEWBOX,
+  OFFERING_DOTS,
+  OFFERING_DOT_RADIUS,
+  OFFERING_TRAYS,
+  dotSitsOnTray,
+} from '../offerings-layout.ts';
 import { BULK_PREFIX, createSplitStorage, bulkKey } from '../split-storage.ts';
 import {
   MAX_ATTEMPTS,
@@ -1281,6 +1288,55 @@ function homeShrineScaleChecks(): void {
     Math.abs(844 / 390 - 2.1641) < 0.001);
 }
 
+/**
+ * 19 · The altar's offerings sit on their trays (SCRUM-162).
+ *
+ * ⚠️ WHY THIS EXISTS, in the owner's words: *"the placement of the decorations on the
+ * altar is misaligned."* The four offering dots had kept the **group-space** y (76 / 78)
+ * while every path beside them had the inner group's `+68` folded in — so they floated
+ * **68 units above their trays**.
+ *
+ * ⚠️NOTHING EXISTING COULD SEE IT. `tsc` cannot read SVG coordinates; a **bounds** check
+ * passes because 76 and 144 are both legal inside a 170-tall viewBox; and a snapshot would
+ * only have made the mistake look approved. ⚠️ **The only catchable form is the
+ * RELATIONSHIP**: a dot rests on a tray. That is what this asserts.
+ */
+function offeringsPlacementChecks(): void {
+  section('19 · The altar\'s offerings sit on their trays (SCRUM-162)');
+
+  const detached = OFFERING_DOTS.filter((dot) => !dotSitsOnTray(dot));
+  check(`every offering dot rests on a tray (${OFFERING_DOTS.length} dots · ${OFFERING_TRAYS.length} trays)`,
+    detached.length === 0,
+    `detached: ${detached.map((d) => `(${d.cx},${d.cy})`).join(', ')}`);
+
+  // ⚠️ POSITIVE CONTROL — the detector must FIRE on the exact defect that shipped.
+  check('…and the rule REJECTS a group-space dot, which is the bug that shipped',
+    !dotSitsOnTray({ cx: 10, cy: 76 }),
+    'dotSitsOnTray accepted cy 76 — the offset bug would pass this gate');
+
+  // A dot must be inside the viewBox, dot and all.
+  const outOfBox = OFFERING_DOTS.filter(
+    (dot) =>
+      dot.cx - OFFERING_DOT_RADIUS < 0 ||
+      dot.cx + OFFERING_DOT_RADIUS > OFFERINGS_VIEWBOX.w ||
+      dot.cy - OFFERING_DOT_RADIUS < 0 ||
+      dot.cy + OFFERING_DOT_RADIUS > OFFERINGS_VIEWBOX.h,
+  );
+  check('…and every dot is whole inside the 330 × 170 viewBox', outOfBox.length === 0,
+    outOfBox.map((d) => `(${d.cx},${d.cy})`).join(', '));
+
+  const traysOut = OFFERING_TRAYS.filter(
+    (t) => t.x < 0 || t.y < 0 || t.x + t.w > OFFERINGS_VIEWBOX.w || t.y + t.h > OFFERINGS_VIEWBOX.h,
+  );
+  check('…and every tray is inside it too', traysOut.length === 0, JSON.stringify(traysOut));
+
+  // ⚠️ The pairs are drawn at slightly different heights on the board (144 / 146) — if a
+  // future edit "tidies" them onto one line, say so rather than silently accepting it.
+  const heights = new Set(OFFERING_DOTS.map((d) => d.cy));
+  check('…and the board\'s deliberate 2-unit stagger is preserved (144 / 146, not one line)',
+    heights.size === 2, `heights: ${[...heights].join(', ')}`);
+}
+
 async function main(): Promise<void> {
   await storageChecks();
   await drainChecks();
@@ -1351,6 +1407,7 @@ async function main(): Promise<void> {
   zhScriptChecks();
   screenCopyChecks();
   homeShrineScaleChecks();
+  offeringsPlacementChecks();
 
   check('guard: a 5-character key is NOT valid', !isValidIdempotencyKey('12345'));
   check('guard: junk is NOT a clan code', normaliseClanCode('not-a-code!!') === null);

@@ -25,6 +25,11 @@
 
 import Svg, { Ellipse, G, Path } from 'react-native-svg';
 
+import {
+  OFFERING_DOTS,
+  OFFERING_DOT_RADIUS,
+  OFFERING_TRAYS,
+} from '@/lib/offerings-layout';
 import { brand, surface } from '@/theme/tokens';
 
 /** The board's own pigments — `art · offerings (front)`, read 2026-10-31. */
@@ -79,16 +84,32 @@ export function Offerings() {
       <Path d="M144,162L152,162L150,170L146,170Z" fill={ART.foot} stroke={brand.ink} strokeWidth={1.5} strokeLinejoin="round" />
       <Path d="M178,162L186,162L184,170L180,170Z" fill={ART.foot} stroke={brand.ink} strokeWidth={1.5} strokeLinejoin="round" />
 
-      {/* ── the two outer trays ── */}
-      <Path d="M0,150L32,150L27,158L5,158Z" fill={ART.tray} stroke={brand.ink} strokeWidth={2} strokeLinejoin="round" />
-      <Path d="M330,150L298,150L303,158L325,158Z" fill={ART.tray} stroke={brand.ink} strokeWidth={2} strokeLinejoin="round" />
+      {/* ── the two outer trays ──
+          ⚠️ Generated from `OFFERING_TRAYS`, not typed twice: the dot-placement rule in
+          `check:lib` §19 asserts the dots rest on THESE lips, so a tray that moved without
+          the constant would be a lie the gate could not see. */}
+      {OFFERING_TRAYS.map((tray) => (
+        <Path
+          key={tray.x}
+          d={`M${tray.x},${tray.y}L${tray.x + tray.w},${tray.y}L${tray.x + tray.w - 5},${tray.y + tray.h}L${tray.x + 5},${tray.y + tray.h}Z`}
+          fill={ART.tray}
+          stroke={brand.ink}
+          strokeWidth={2}
+          strokeLinejoin="round"
+        />
+      ))}
 
-      {/* ── the four candle flames sitting on those trays ── */}
+      {/* ── the four offering dots resting in those trays ──
+          ⚠️ These were WRONG on the first pass: every PATH had the board's inner group
+          offset (+68) folded in, but these ellipses kept the **group-space** y (76 / 78)
+          and floated 68 units above their trays. ⚠️ **A mixed coordinate space is
+          invisible to `tsc` and to every bounds check** — both 76 and 144 are legal inside
+          the viewBox. It is now a relationship (`dotSitsOnTray`) that `check:lib` §19
+          asserts, which is the only form of check that can catch this class. */}
       <G fill={ART.ember} stroke={brand.ink} strokeWidth={2} strokeLinejoin="round">
-        <Ellipse cx={10} cy={76} rx={6} ry={6} />
-        <Ellipse cx={22} cy={78} rx={6} ry={6} />
-        <Ellipse cx={308} cy={76} rx={6} ry={6} />
-        <Ellipse cx={320} cy={78} rx={6} ry={6} />
+        {OFFERING_DOTS.map((dot) => (
+          <Ellipse key={`${dot.cx}`} cx={dot.cx} cy={dot.cy} rx={OFFERING_DOT_RADIUS} ry={OFFERING_DOT_RADIUS} />
+        ))}
       </G>
 
       {/* ── the left candle: body, tray, flame, core ── */}
