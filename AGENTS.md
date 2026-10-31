@@ -223,6 +223,27 @@ Run lint and typecheck before declaring any task done.
 Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
 Docs: https://docs.expo.dev/eas/index.md
 
+### ⚠️ On THIS machine, EAS Build is the only route to glass — a local Android build cannot work
+
+`npx expo run:android` **fails**, and not for a reason that can be fixed in the repo:
+
+> *Toolchain installation '/usr/lib/jvm/java-25-openjdk' does not provide the required capabilities: [JAVA_COMPILER]*
+
+Only **Java 25** is installed (`/usr/lib/jvm` holds `java-25-openjdk` plus JREs — no 17, no 21), and the Android Gradle Plugin cannot use it as a compiler toolchain. Measured **2026-10-31** (SCRUM-160); it cost a **1 m 09 s** Gradle run to find out.
+
+**So: to see code on glass, build with EAS** — `eas build --profile preview --platform android`, then `adb install -r <apk>` — which is also what every earlier session did.
+
+⚠️ **EAS builds from git.** Commit and push first: an uncommitted worktree has nothing to build, and the build records the commit hash it actually used (check it with `build_info` — if it does not match yours, you built the wrong tree).
+
+⚠️ **Two side effects of even *attempting* a local run**, both of which have bitten:
+
+- `expo run:android` **rewrites `package.json`**'s `android`/`ios` scripts to `expo run:*`. That is **not your change** — `git checkout -- package.json` and do not commit it.
+- it generates **`android/`**, and ⚠️ **`android/` and `ios/` are NOT in `.gitignore`**. A `git add -A` in this repo commits the entire generated native tree. **Stage files explicitly**, never `-A`, while this is true.
+
+⚠️ **Do not poll the build in the foreground.** `eas build` prints a build id and then *waits*; a `preview` build sat in the queue for **>10 minutes** (2026-10-31). Run it in the background and read the state with the Expo `build_info` tool, not with a `tail` on the CLI log.
+
+⚠️ **And read the install result off the device, not off the script** — `adb shell dumpsys package <pkg> | grep lastUpdateTime`. An install that reports success can have been rejected (`INSTALL_FAILED_USER_RESTRICTED`, SCRUM-145).
+
 ## Rules
 
 - If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.

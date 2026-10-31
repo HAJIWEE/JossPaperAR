@@ -4,10 +4,11 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ClanPill } from '@/components/clan-pill';
+import { ShrineBase } from '@/components/home/shrine-base';
 import { myClans } from '@/lib/clan-api';
 import { HEADER_SPEC, type PillClan } from '@/lib/clan-pill';
 import { readFirstRun } from '@/lib/first-run';
-import { HOME_REGION_ORDER, type HomeRegion } from '@/lib/home-layout';
+import { HOME_BANDS, HOME_REGION_ORDER, type HomeRegion } from '@/lib/home-layout';
 import { t } from '@/lib/i18n';
 import { DEMO_PARAM, DEMO_VALUE, needsTutorial } from '@/lib/tutorial';
 import { TOUCH_TARGET, brand, fontSize, onColorCream, radius, space, surface, text } from '@/theme/tokens';
@@ -93,9 +94,15 @@ export default function HomeShrine() {
       case 'totals':
         return null;
 
-      // SCRUM-162 — the altar art and the tablet slots (SCRUM-146).
+      // SCRUM-162 — the altar art. ⚠️ The shrine base has landed; the halo, the
+      // offerings and the ＋ slot (`HOME_BANDS.addSlot`) are the rest of the ticket,
+      // and the tablet slots themselves are SCRUM-146's.
       case 'altar':
-        return null;
+        return (
+          <View style={styles.altar} testID="home-altar-art">
+            <ShrineBase />
+          </View>
+        );
 
       // ✅ The offer is taken AT the altar, never from the chrome (S36 measured it).
       case 'cta':
@@ -192,6 +199,13 @@ const styles = StyleSheet.create({
     marginLeft: HEADER_SPEC.settingsGap,
   },
   content: { paddingHorizontal: space.lg },
+  /**
+   * ⚠️ The art escapes the content padding ON PURPOSE. `HOME_BANDS.shrineBase` is
+   * `x 16` on a 390 px board and **358 wide**, so inside `content` (which pads 20)
+   * it would be clipped to 350 and shifted 4 px left. Negative margin, then the
+   * band's own x — the drawing then lands exactly where the board put it.
+   */
+  altar: { marginHorizontal: -space.lg, paddingLeft: HOME_BANDS.shrineBase.x },
   /**
    * A region's box. ⚠️ The heights below are **placeholders**, not board geometry —
    * `home-layout.ts` deliberately carries no y-ranges until the art lands
