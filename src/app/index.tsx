@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,7 +8,7 @@ import { ShrineBase } from '@/components/home/shrine-base';
 import { myClans } from '@/lib/clan-api';
 import { HEADER_SPEC, type PillClan } from '@/lib/clan-pill';
 import { readFirstRun } from '@/lib/first-run';
-import { HOME_BANDS, HOME_REGION_ORDER, type HomeRegion } from '@/lib/home-layout';
+import { HOME_BANDS, HOME_REGION_ORDER, homeScale, type HomeRegion } from '@/lib/home-layout';
 import { t } from '@/lib/i18n';
 import { DEMO_PARAM, DEMO_VALUE, needsTutorial } from '@/lib/tutorial';
 import { TOUCH_TARGET, brand, fontSize, onColorCream, radius, space, surface, text } from '@/theme/tokens';
@@ -60,6 +60,9 @@ const BODY_REGIONS = HOME_REGION_ORDER.filter(
 export default function HomeShrine() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { width: windowWidth } = useWindowDimensions();
+  /** ⚠️ Board px → device dp. See `homeScale` — measured on glass, 360 dp here. */
+  const scale = homeScale(windowWidth);
   const [clans, setClans] = useState<readonly PillClan[]>([]);
 
   // The header pill must reflect a clan created or joined *after* Home first
@@ -99,7 +102,10 @@ export default function HomeShrine() {
       // and the tablet slots themselves are SCRUM-146's.
       case 'altar':
         return (
-          <View style={styles.altar} testID="home-altar-art">
+          <View
+            style={[styles.altar, { paddingLeft: HOME_BANDS.shrineBase.x * scale }]}
+            testID="home-altar-art"
+          >
             <ShrineBase />
           </View>
         );
@@ -205,7 +211,7 @@ const styles = StyleSheet.create({
    * it would be clipped to 350 and shifted 4 px left. Negative margin, then the
    * band's own x — the drawing then lands exactly where the board put it.
    */
-  altar: { marginHorizontal: -space.lg, paddingLeft: HOME_BANDS.shrineBase.x },
+  altar: { marginHorizontal: -space.lg },
   /**
    * A region's box. ⚠️ The heights below are **placeholders**, not board geometry —
    * `home-layout.ts` deliberately carries no y-ranges until the art lands

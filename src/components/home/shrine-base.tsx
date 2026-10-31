@@ -24,9 +24,10 @@
  * the altar, not UI colour, and `tokens.ts` has no role for them.
  */
 
+import { useWindowDimensions } from 'react-native';
 import Svg, { G, Path } from 'react-native-svg';
 
-import { HOME_BANDS } from '@/lib/home-layout';
+import { HOME_BANDS, homeScale } from '@/lib/home-layout';
 
 /** The board's own fills — `art · shrine base (table)`, read 2026-10-31. */
 const ART = {
@@ -44,15 +45,15 @@ const ART = {
   ink: '#1A1A1A',
 } as const;
 
-export function ShrineBase({
-  width = HOME_BANDS.shrineBase.w,
-  height = HOME_BANDS.shrineBase.h,
-}: {
-  width?: number;
-  height?: number;
-} = {}) {
+export function ShrineBase() {
+  const { width } = useWindowDimensions();
+  const scale = homeScale(width);
   return (
-    <Svg width={width} height={height} viewBox="0 0 358 76">
+    <Svg
+      width={HOME_BANDS.shrineBase.w * scale}
+      height={HOME_BANDS.shrineBase.h * scale}
+      viewBox="0 0 358 76"
+    >
       <G strokeLinejoin="round">
         {/* the table top */}
         <Path d="M14,0L344,0L358,12L0,12Z" fill={ART.top} stroke={ART.ink} strokeWidth={3} />

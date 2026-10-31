@@ -112,6 +112,24 @@ export const HOME_BANDS = {
  */
 export const BOARD_ORIGIN_Y = 180;
 
+/**
+ * The scale from the 390 px board to the real window.
+ *
+ * ⚠️ **MEASURED ON GLASS — 2026-10-31, POCO C81 Pro (`HN615L005386`): 720×1600 @
+ * 320 dpi = **360 dp** wide.** Rendering `HOME_BANDS` unscaled put the shrine base's
+ * right edge at `16 + 358 = 374` dp on a 360 dp screen — ⚠️ **14 dp off the side, and
+ * the art was visibly clipped.** No gate could see it: every number was correct, in
+ * the wrong frame. `clan-pill`'s fixed 236 had hidden the problem because a pill in a
+ * row can overflow invisibly.
+ *
+ * ⚠️ So bands are **board px** and every consumer multiplies by this. A band must
+ * never be pasted into a style as a raw number.
+ */
+export function homeScale(windowWidth: number): number {
+  return windowWidth / DESIGN_REFERENCE_WIDTH;
+}
+
+
 
 /**
  * Is this the region list a shrine must have, in the right order?
