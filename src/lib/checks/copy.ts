@@ -111,7 +111,8 @@ const walk = (dir: string): string[] =>
 console.log('copy-check · every user-visible string is localised');
 console.log('\n1 · no site renders BOTH languages at once');
 console.log('2 · no user-visible literal outside t() / localized()');
-console.log('3 · no t(key) call leaves a declared placeholder unsubstituted\n');
+console.log('3 · no t(key) call leaves a declared placeholder unsubstituted');
+console.log('4 · the Book\'s copy IS doc 15 §8\'s — the table of record\n');
 
 const bilingualHits: string[] = [];
 const literalHits: string[] = [];
