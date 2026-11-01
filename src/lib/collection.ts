@@ -6,7 +6,7 @@
  * `PREPARING_COPY` and `PROFILE_ROWS` live in modules rather than in JSX.
  */
 
-import { OFFERINGS } from '../domain/catalogue.ts';
+import { OFFERINGS, type OfferingCode } from '../domain/catalogue.ts';
 import { localized } from './i18n.ts';
 
 /**
@@ -123,6 +123,17 @@ export function collectionOverflows(itemCount: number): boolean {
  * `null` return is a REAL answer — a row whose code the bundle does not know is a row the bundle
  * cannot name, and it renders as a gap rather than as the code.
  */
+/**
+ * ⚠️ **The art wants the UNION, the RPC returns a STRING.** `burns.item_code` is `text`, so a code
+ * the bundle does not know is possible — and it must resolve to `null` (no art) rather than to a
+ * cast that would draw the WRONG illustration.
+ */
+export function collectedItemCode(code: string | null): OfferingCode | null {
+  if (code === null) return null;
+  const found = OFFERINGS.find((o) => o.code === code);
+  return found === undefined ? null : found.code;
+}
+
 export function collectedItemName(code: string | null): string | null {
   if (code === null) return null;
   const found = OFFERINGS.find((o) => o.code === code);

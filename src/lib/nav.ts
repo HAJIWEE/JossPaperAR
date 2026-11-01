@@ -17,6 +17,9 @@ import { PROFILE_ROUTE } from './profile.ts';
 
 export const LEAGUE_ROUTE = '/league';
 /** ⚠️ The shrine is the index route, so its path is the root — not `/shrine`. */
+/** ⚠️ The storefront — SCRUM-150. It was `null` (disabled) until this landed. */
+export const STORE_ROUTE = '/store';
+
 export const SHRINE_ROUTE = '/';
 
 export interface NavTab {
@@ -53,7 +56,7 @@ export interface NavTab {
 export const NAV_TABS: readonly NavTab[] = [
   { key: 'shrine', icon: '\u{1F3EE}', labelKey: 'nav.shrine', route: SHRINE_ROUTE, screen: 'index.tsx' },
   { key: 'league', icon: '\u{1F3C6}', labelKey: 'nav.league', route: LEAGUE_ROUTE, screen: 'league.tsx' },
-  { key: 'store', icon: '\u{1F6CD}', labelKey: 'nav.store', route: null, screen: null },
+  { key: 'store', icon: '\u{1F6CD}', labelKey: 'nav.store', route: STORE_ROUTE, screen: 'store.tsx' },
   // ⚠️ `PROFILE_ROUTE`, not a literal — the tab bar and `check:lib` §26 read the SAME string.
   { key: 'profile', icon: '\u{1F464}', labelKey: 'nav.profile', route: PROFILE_ROUTE, screen: 'profile.tsx' },
 ];

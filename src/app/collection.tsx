@@ -25,12 +25,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Dimensions, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { OfferingArt } from '@/components/offering-art';
 import { ScreenHud } from '@/components/screen-hud';
 import { myCollection, myCollectionTotals, type CollectionItem, type CollectionTotals } from '@/lib/account-api';
-import { COLLECTION, collectionGrid, collectedItemName, displayBurnCount } from '@/lib/collection';
+import { COLLECTION, collectedItemCode, collectedItemName, collectionGrid, displayBurnCount } from '@/lib/collection';
 import { t } from '@/lib/i18n';
 import { HUD } from '@/lib/profile';
-import { DESIGN_REFERENCE_WIDTH, brand, fontSize, radius, surface, text } from '@/theme/tokens';
+import { DESIGN_REFERENCE_WIDTH, brand, fontSize, surface, text } from '@/theme/tokens';
 
 /**
  * ⚠️ **WIDTH-ONLY, not `homeFitScale`.** The shrine contain-fits because its art must not be cropped
@@ -187,6 +188,8 @@ function CollectionCard({
 }) {
   const isEmpty = cell.kind === 'empty';
   const cardW = COLLECTION.card.w * s;
+  /** ⚠️ Resolved ONCE — `null` for a code the bundle does not ship, which draws no art. */
+  const artCode = collectedItemCode(cell.itemCode);
 
   return (
     <View
@@ -216,10 +219,18 @@ function CollectionCard({
               left: ((COLLECTION.card.w - COLLECTION.art.w) / 2) * s,
               width: COLLECTION.art.w * s,
               height: COLLECTION.art.h * s,
-              borderRadius: radius.md * s,
             },
           ]}
-        />
+        >
+          {/**
+            * ⚠️ **THE ART IS PORTED FROM PENPOT, NOT INVENTED** (`components/offering-art.tsx`).
+            * It was owed when this screen shipped; a card whose code the bundle does not know draws
+            * an EMPTY well rather than a wrong illustration.
+            */}
+          {artCode === null ? null : (
+            <OfferingArt code={artCode} boxW={COLLECTION.art.w * s} boxH={COLLECTION.art.h * s} />
+          )}
+        </View>
       )}
 
       {isEmpty ? (
@@ -322,7 +333,7 @@ const styles = StyleSheet.create({
   /** ⚠️ The empty slot is DASHED, not solid — the board's own distinction between the two states. */
   cardEmpty: { backgroundColor: 'transparent', borderStyle: 'dashed', borderColor: text.inkSoft },
   /** ⚠️ A plain surface, NOT an invented glyph — the illustration is owed. */
-  artWell: { backgroundColor: surface.paperDeep, alignSelf: 'center' },
+  artWell: { alignSelf: 'center', alignItems: 'center', justifyContent: 'center' },
   /** ⚠️ The `＋` is CENTRED in the slot; the copy lines are not — see `textBox` below. */
   plus: { color: '#77632F', alignSelf: 'center' },
   name: { position: 'absolute', color: text.ink, fontWeight: '700' },

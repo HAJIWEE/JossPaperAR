@@ -198,6 +198,21 @@ export const MESSAGES = {
     // ── Profile (SCRUM-151) ────────────────────────────────────────────────
     // ── Collection (SCRUM-151) ─────────────────────────────────────────────
     // ⚠️ Read off `EN · 8 Collection` / `EN · 8d Collection / empty`, 2026-11-01 — not written here.
+    // ── Store (SCRUM-150) ──────────────────────────────────────────────────
+    // ⚠️ Read off `EN · 7 Store`, 2026-11-01. ⚠️ The note is NOT the board's: the board's says
+    // *"Pay with cash or Store Points"*, and there is no cash rail — see `lib/store.ts`.
+    'store.title': 'Store',
+    'store.intro': 'Standard offerings.',
+    'store.pointsChip': 'Store Points %{points}',
+    'store.tabOfferings': 'Offerings',
+    'store.tabDecorations': 'Decorations',
+    'store.featured': 'FEATURED',
+    'store.featuredValue': 'base value %{value}',
+    'store.more': 'More bundles',
+    'store.base': 'base %{value}',
+    'store.price': '%{points} pts',
+    'store.note': 'Pay with Store Points — every burn earns Points at 20% of its tribute.',
+    'store.unreachable': 'The store could not be loaded just now.',
     'collection.title': 'Collection',
     'collection.burnedLabel': 'offerings burned',
     'collection.collectedLabel': 'items collected',
@@ -550,6 +565,19 @@ export const MESSAGES = {
     'hist.unreachable': '暂时无法载入历史记录。',
     // ── 我的（SCRUM-151）────────────────────────────────────────────────────
     // ── 收藏（SCRUM-151）─────────────────────────────────────────────────────
+    // ── 商店（SCRUM-150）──────────────────────────────────────────────────────
+    'store.title': '商店',
+    'store.intro': '标准供品。',
+    'store.pointsChip': '功德点 %{points}',
+    'store.tabOfferings': '供品',
+    'store.tabDecorations': '装饰',
+    'store.featured': '精选',
+    'store.featuredValue': '基础 %{value}',
+    'store.more': '更多套装',
+    'store.base': '基础 %{value}',
+    'store.price': '%{points} 点',
+    'store.note': '使用功德点购买 — 每次焚烧可获得其功德 20% 的点数。',
+    'store.unreachable': '暂时无法载入商店。',
     'collection.title': '收藏',
     'collection.burnedLabel': '已焚烧供品',
     'collection.collectedLabel': '已收藏物品',

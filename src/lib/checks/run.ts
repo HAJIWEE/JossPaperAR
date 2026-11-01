@@ -19,6 +19,9 @@ import { isValidClanName } from '../clan-rules.ts';
 import { PREPARING_PHASES, pipelineFailed } from '../../domain/slice.ts';
 import { NAV_TABS, activeTabKey, isSamePath, tabPressIsNoop } from '../nav.ts';
 import { COLLECTION, COLLECTION_SLOTS, collectionGrid, collectionOverflows, collectedItemName, displayBurnCount } from '../collection.ts';
+import { CASH_IS_READABLE, FEATURED_CODE, STORE_TABS, baseMetaValue, pointsPrice, storeList } from '../store.ts';
+import { ART_BOX, artCodes, artSize, fitArt } from '../offering-art.ts';
+import { getOffering } from '../../domain/catalogue.ts';
 import { bookView, showsBookSectionTitle } from '../clan-roles.ts';
 import {
   CONFIRM_SPEC,
@@ -1806,9 +1809,13 @@ function localeChecks(): void {
 
   check('the active tab is DERIVED from the path — every routed tab names itself',
     routedTabs.every((tab) => activeTabKey(tab.route as string) === tab.key), routedList);
-  check('⚠️ …and a tab with NO screen is never the active one (Store)',
-    NAV_TABS.some((tab) => tab.key === 'store' && tab.route === null)
-      && routedTabs.every((tab) => activeTabKey(tab.route as string) !== 'store'));
+  // ⚠️ POSITIVE CONTROL, and it had to be rewritten when SCRUM-150 landed: this used to read
+  // *"Store is never active"*, which stopped being true the moment the storefront existed. ⚠️ A
+  // control that outlives the fact it controls is worse than none, so it now uses a SYNTHETIC
+  // un-routed tab — which is what `route: null` means, whatever the real tabs happen to be.
+  check('⚠️ …and a tab with NO screen is never the active one',
+    activeTabKey('/store', [{ key: 'ghost', icon: '', labelKey: '', route: null, screen: null }]) === null
+      && activeTabKey('/store') === 'store');
   check('…and a path that is NOT a tab highlights NOTHING, rather than defaulting to the shrine',
     activeTabKey('/settings') === null && activeTabKey('/history') === null);
   // ⚠️ POSITIVE CONTROL — `activeTabKey` must not answer `null` for everything.
@@ -2194,6 +2201,61 @@ function collectionChecks(): void {
     OFFERINGS.every((o) => (collectedItemName(o.code) ?? '').length > 0));
 }
 
+/**
+ * §29 · The Store and the PORTED ART (SCRUM-150).
+ *
+ * ⚠️ The art is a **transcription**, so the gate that matters is that every catalogue code has
+ * some: a new offering would otherwise ship as a blank card, and ⚠️ nothing in `tsc` connects the
+ * catalogue to the illustrations.
+ */
+function storeChecks(): void {
+  section('29 · Store — the catalogue, the featured item, and the ported art (SCRUM-150)');
+
+  const { featured, more } = storeList();
+  check('the FEATURED item is the one the board features (Wealth Bundle)', featured.code === 'wealth_bundle');
+  check('…and "More bundles" is every OTHER catalogue item, once each',
+    more.length === OFFERINGS.length - 1 && !more.some((o) => o.code === featured.code));
+  // ⚠️ POSITIVE CONTROL — the two lists must not both be the whole catalogue.
+  check('⚠️ guard: the featured item is NOT also in the list beneath it',
+    !more.some((o) => o.code === FEATURED_CODE));
+
+  check('⚠️ the meta line is the REDEMPTION BASE (1.2×), not the price — see the board: `base 480`',
+    baseMetaValue(getOffering('joss_paper_stack')) === 480,
+    String(baseMetaValue(getOffering('joss_paper_stack'))));
+  check('…and it is the 20% rule, not a hard-coded 480',
+    OFFERINGS.every((o) => baseMetaValue(o) === Math.round(o.price * 1.2)));
+  check('⚠️ a price renders with a unit, and an UNPRICED item renders null (never "0 pts")',
+    pointsPrice(getOffering('gold_bar')) === '600'
+      && pointsPrice({ ...getOffering('gold_bar'), price: Number.NaN }) === null);
+
+  check('⚠️ Decorations is DISABLED — its prices are NULL until the economy pass',
+    STORE_TABS.some((tab) => tab.id === 'decorations' && !tab.enabled)
+      && STORE_TABS.some((tab) => tab.id === 'offerings' && tab.enabled));
+  check('⚠️ there is NO cash chip — no rail and no read, so it is omitted rather than faked',
+    CASH_IS_READABLE === false);
+
+  // ── ⚠️ THE ART — every catalogue code must have an illustration ─────────────
+  check('⚠️ EVERY catalogue offering has art (none ships as a blank card)',
+    artCodes().every((c) => { const b = artSize(c); return b.w > 0 && b.h > 0; }),
+    artCodes().map((c) => `${c}:${artSize(c).w}x${artSize(c).h}`).join(' '));
+  check('⚠️ the art aspects DIFFER — so a single fixed box would distort them',
+    new Set(artCodes().map((c) => artSize(c).w / artSize(c).h)).size > 1);
+  check('⚠️ `fitArt` CONTAINS — one scale for both axes, so nothing is stretched',
+    (() => { const f = fitArt('wealth_bundle', 100, 100);
+      return Math.abs(f.width / f.height - artSize('wealth_bundle').w / artSize('wealth_bundle').h) < 1e-9; })());
+  check('…and it never overflows the box it is given',
+    artCodes().every((c) => { const f = fitArt(c, 110, 80); return f.width <= 110.001 && f.height <= 80.001; }));
+  // ⚠️ POSITIVE CONTROL — the fit must actually USE the box, not collapse to zero.
+  check('⚠️ guard: the fit is not degenerate — it TOUCHES the box on the limiting axis',
+    artCodes().every((c) => {
+      const b = artSize(c);
+      const f = fitArt(c, 220, 106);
+      return Math.abs(Math.max(f.width / 220, f.height / 106) - 1) < 1e-9
+        && f.width <= 220.001 && f.height <= 106.001
+        && Math.abs(f.width / f.height - b.w / b.h) < 1e-9;
+    }));
+}
+
 function ancestorSheetChecks(): void {
   section('23 · The tablet sheet — the ladder, the cap, and btrim (SCRUM-168)');
 
@@ -2432,6 +2494,7 @@ async function main(): Promise<void> {
   altarChecks();
   tabBarChecks();
   collectionChecks();
+  storeChecks();
   ancestorSheetChecks();
   tabletNameChecks();
   shrineGeometryChecks();
