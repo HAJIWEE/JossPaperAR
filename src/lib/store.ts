@@ -72,10 +72,16 @@ export const STORE = {
 export const CASH_IS_READABLE = false;
 
 /**
- * ⚠️ **"Store Points" IS THE TRIBUTE BALANCE.** The board's chip says *Store Points 1,480*, and
+ * ⚠️ **"Store Points" IS THE TRIBUTE WALLET.** The board's chip says *Store Points 1,480*, and
  * `EN · 7`'s prices — *400 pts* for the Joss Paper Stack — are exactly `offerings_catalog.price`,
  * which `purchase_item` checks against the **`tribute`** balance. So the chip reads `home_summary()`'s
  * `tribute_total`; there is no second currency to fetch, and inventing one would be a fiction.
+ *
+ * ⚠️⚠️ **WALLET — and that word is the whole point.** `home_summary()` reads the `balances` view
+ * (`sum(ledger_events.amount)`), the **same source `purchase_item` spends**, so the chip falls by
+ * exactly the price a purchase charges. ⚠️ It used to read `sum(tributes.points)` — the Book of
+ * Tributes' lifetime-earned record, which never falls — and a player with 5000 tribute in the ledger
+ * saw *"Store Points 0"* beside a working Buy button (**SCRUM-150 AC 1**).
  */
 export const POINTS_CURRENCY = 'tribute';
 

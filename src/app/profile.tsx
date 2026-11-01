@@ -90,8 +90,8 @@ export default function ProfileScreen() {
   const [streakDays, setStreakDays] = useState<number | null>(null);
 
   /**
-   * ⚠️ Re-read on FOCUS, the same pattern the shrine uses: a burn moves the tribute total, and a
-   * language switch remounts the tree — so this must not be a once-per-mount read.
+   * ⚠️ Re-read on FOCUS, the same pattern the shrine uses: a burn moves the tribute WALLET and a
+   * store purchase moves it back, so this must not be a once-per-mount read.
    */
   useFocusEffect(
     useCallback(() => {
