@@ -7,12 +7,18 @@
 ## 🎯 Immediate Actions (Next 1–2 Weeks)
 
 ### 🔴 On the critical path
-- 🎯 **S67+13 (2026-10-31) — `SCRUM-144` ANSWERED (**option A**): the Book's empty-state copy is **SIGNED OFF**, **doc 15 §8 gains row `C18`**, and `check:copy` rule 4 holds the two together (`check:copy` **15 → 30**). ✅ **`SCRUM-122` → `Done`**, so **sprint 34 has no open work**. ⚠️ US$0.00.**
-  - ✅ **The decision**: the proposed wording ships **exactly as written** — ⚠️ **no string changed**, no generation, no device run, no EAS build.
-  - ✅ **`SCRUM-122` was parked `In Review` on precisely this** (its AC 3: *"the copy is doc 15 §8's — do not invent the ZH string"*, and §8 had **no empty-state row**). With **`C18`** in the table, AC 3 is met and the ticket is **`Done`**.
-  - ⚠️ **The defect worth remembering was the INVISIBLE gap**: the AC pointed at the table of record, the table had no row, and **the only detector was a human reading a description.** ⚠️ **A proposal no gate can see is one edit away from rot.** So rule 4 reads the Book's four keys **back out of §8** and compares them **character for character, both locales** (`book_header`→C14 · `book_outside`→C15 · `book_window`→C16 · `book_empty`→**C18**) — ⚠️ **it was RED before `C18` existed**, so it guards this decision rather than decorating it.
-  - ✅ **Fault-tested both ways**: delete the row → red (*"§8 carries no C18"*); change one word of the shipped EN → red. ⚠️ **Restored byte-identically (`sha256sum -c`).**
-  - ⚠️ **STATED SCOPE**: four keys / four rows — **not** a whole-table parity check (§8 has no key column). Another §8 row still needs its own assertion.
+
+- 🏮 **S71 (2026-10-31) — STEP 1 IS BUILT: the shrine, the altar, the tablet sheet and the tab bar are on glass. ⚠️ US$0.00 AI spend; one EAS `preview` build (`de4c1df9`).**
+  - ✅ **The altar can hold a tablet for the first time** (`SCRUM-146` ✅ · `165` ✅ · `168` ✅): `＋` → sheet → `save_ancestor` → the plaque renders. Verified end-to-end on `HN615L005386` and read back through Postgres.
+  - ✅ **The shrine fills the phone**: sized to `Dimensions.get('screen')`, not RN's inset window — board `[0,0][720,1558]`, tab bar `[0,1410][720,1600]`.
+  - ✅ **Ported & gated**: shrine base · app mark · settings · halo · offerings · tablet · tab bar · tribute/streak panels · the three board lines the build was missing.
+  - ⚠️⚠️ **Four defects found only on glass** (every gate was green): a `<Stack.Screen>` declaration **became the initial route**; a **route param arrived empty** and told a clan HEAD it could not edit; tabs at board `top:774` **rendered no tabs at all**; a **Latin name stacked one letter per line**.
+  - ⏳ **Still open on the parent `SCRUM-148`** — do **not** read the commits as closing it:
+
+- 🧭 **`SCRUM-163` (To Do) — the geometry gate, incl. the 360 dp assertions.** Cheap. It is what stops the **absolute-vs-board-relative** class that has now shipped **four** times.
+- 🧭 **`SCRUM-164` (In Progress) — the tab bar is built, but the ticket asks for a **Book** entry and **a way back** from each destination.** Neither exists.
+- 🎯 **`SCRUM-208` (To Do) — ⚠️ YOURS, not mine: the Home board's active tab is `#9A2B18` on `#C23B22` = **1.44:1**. The build ships 4.90:1 and §22 pins both, but the **board** still needs the fix.**
+- ⚠️ **`SCRUM-151` — the app has NO language switcher**, so 中文 is only reachable by forcing the locale in a probe (reverted each time). Pull it forward if you want to check 中文 yourself.
 
 - 🐞 **S67+12 (2026-10-25) — `SCRUM-145` (owner-found on glass): `/burn`'s "Throw again" button rendered but did nothing after a SECOND miss; fixing it exposed TWO more defects (`check:throw` 47 → 55). ⚠️ US$0.00 in AI spend; one EAS build.**
   - ⚠️ **A COUPLING, not a typo**: the render asked `!canThrow(n)` while the handler required `!canThrow(n + 1)` → the button agreed for the FIRST rethrow and disagreed for the SECOND. ⚠️ Same class as `fireBoxTop`.

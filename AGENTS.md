@@ -8,7 +8,8 @@ This is an Expo/React Native mobile application. Prioritize mobile-first pattern
 >
 > ```bash
 > # 1. which tickets are in flight but NOT in the sprint? — THIS must return nothing
-> jql: project = SCRUM AND sprint is EMPTY AND statusCategory = "In Progress"
+> # ⚠️ `AND issuetype != Subtask` is REQUIRED — see the trap under "Anything worked on" below.
+> jql: project = SCRUM AND sprint is EMPTY AND statusCategory = "In Progress" AND issuetype != Subtask
 >
 > # 2. and confirm your own ticket is actually in the sprint
 > jql: key = <ISSUE-KEY>   → field customfield_10020
@@ -66,8 +67,13 @@ editJiraIssue: { "customfield_10020": <id> }
 jql: key = <ISSUE-KEY>   → field customfield_10020
 
 # 4. before ending a session that changed any status, this MUST come back empty
-jql: project = SCRUM AND sprint is EMPTY AND statusCategory = "In Progress"
+# ⚠️ `AND issuetype != Subtask` is REQUIRED — see the trap directly below.
+jql: project = SCRUM AND sprint is EMPTY AND statusCategory = "In Progress" AND issuetype != Subtask
 ```
+
+⚠️⚠️ **THE TRAP: sub-tasks are invisible to the `sprint` predicate.** `sprint is EMPTY` returns a **sub-task even when its sprint field is set**. Measured **2026-10-31**: `SCRUM-162` is a `Subtask`, `customfield_10020 → { id: 67, "SCRUM Sprint 3", active }`, and the **un-scoped** query still returned it. With this project now carrying **47 sub-tasks**, that means the gate **cries wolf on every in-flight sub-task** — the exact failure mode the paragraph below is about.
+
+⚠️ **So scope it with `AND issuetype != Subtask`, and when you need a sub-task's sprint, read the field** — `JIRA_GET_ISSUE → customfield_10020` — **never the JQL.** (Same root cause as the sibling trap: `jql: sprint = "X"` returns **only top-level issues**, so counting a sprint with JQL under-reports by exactly its sub-tasks.)
 
 ⚠️ **Step 4 is the one that matters**, and the `statusCategory = "In Progress"` filter is deliberate. Widening it to `statusCategory != "Done"` returns **the entire backlog** — SCRUM-4, 5, 12, 13, 47, 49, 50, 51 and more — which is a *correct* backlog, not a failure. A gate that cries wolf is worse than no gate: an agent following "this must return nothing" would either drag every `To Do` ticket into the sprint or learn to ignore the check. **Scope the audit to work in flight.**
 
@@ -105,6 +111,16 @@ cp "$V/supabase/functions/.env" supabase/functions/.env
 wc -c .env supabase/functions/.env        # ≈935 and ≈2260; a ~19-byte file is a STUB
 awk -F= '/^FAL_KEY=/{print "FAL_KEY value length: " length($2)}' supabase/functions/.env  # ≈72
 ```
+
+⚠️ **AND A THIRD gitignored THING A WORKTREE LACKS: `supabase/.temp/`.** It holds the `link` state (`project-ref`, `pooler-url`, `linked-project.json`) under `supabase/.gitignore:3`, so without it every remote command dies with **`Cannot find project ref. Have you run supabase link?`** — which reads as "this repo was never linked" rather than "this worktree is missing a file". ⚠️ **The main checkout IS linked; copy the state instead of re-linking:**
+
+```bash
+V="/home/gweejiahan/Documents/Obsidian Vault/Projects/JossPaperAR"
+cp -r "$V/supabase/.temp" supabase/.temp
+npx supabase migration list          # now answers with real remote versions
+```
+
+⚠️ **Read that list before `db push`.** Measured 2026-10-31: the worktree was **two** migrations behind, not one — `20261024160000_stale_job_sweep` (SCRUM-126) had been committed weeks earlier and **never pushed**, alongside the session's own new file. `db push` applies pending migrations **in order**, so it took both; applying only your own is not an option it offers.
 
 ⚠️ **THE TRAP THAT MAKES THIS EXPENSIVE: a stub is worse than an absence.** Measured 2026-10-17
 (S59): the worktree's `supabase/functions/.env` was **19 bytes with a 10-character `FAL_KEY` value**,
@@ -222,6 +238,45 @@ Run lint and typecheck before declaring any task done.
 
 Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
 Docs: https://docs.expo.dev/eas/index.md
+
+### ⚠️ Getting code onto the floor device — the FAST loop first, EAS only when you need an APK
+
+**Measured 2026-10-31 (SCRUM-160/162).** `Expo Go + Metro over adb reverse` puts the **working tree** on the device in seconds. Try it before anything else.
+
+```bash
+adb reverse tcp:8081 tcp:8081
+npx expo start --port 8081                    # loads .env at boot
+adb shell am start -a android.intent.action.VIEW -d "exp://127.0.0.1:8081"
+adb exec-out screencap -p > /tmp/shot.png
+adb shell uiautomator dump /sdcard/ui.xml     # machine-readable bounds + testIDs
+```
+
+It bundled **4.8 s / 2094 modules**, and Fast Refresh applied a fix with no rebuild. ⚠️ **It verifies the ACTUAL working tree**, which is stronger evidence than an APK built from a past commit.
+
+⚠️ **`uiautomator dump` is how a layout claim becomes checkable.** It prints each `testID` as `resource-id` with `bounds`, so *"the regions render in order"* becomes a table instead of an opinion — that is what caught the clipped art below.
+
+⚠️ **Two Expo Go artifacts, not app bugs:** the grey gear bubble top-right is **Expo Go's own dev FAB**; and Metro **rewrites `tsconfig.json`** on boot (it re-adds `.expo/types` to `include`) — `git checkout -- tsconfig.json` afterwards.
+
+### ⚠️ A local NATIVE build cannot work here — so a real APK must come from EAS
+
+`npx expo run:android` **fails**, and not for a reason that can be fixed in the repo:
+
+> *Toolchain installation '/usr/lib/jvm/java-25-openjdk' does not provide the required capabilities: [JAVA_COMPILER]*
+
+Only **Java 25** is installed (`/usr/lib/jvm` holds `java-25-openjdk` plus JREs — no 17, no 21), and the Android Gradle Plugin cannot use it as a compiler toolchain. Measured **2026-10-31** (SCRUM-160); it cost a **1 m 09 s** Gradle run to find out.
+
+**So a real APK — needed once a native module is added, or for a release-shaped build — comes from EAS**: `eas build --profile preview --platform android`, then `adb install -r <apk>`.
+
+⚠️ **EAS builds from git.** Commit and push first: an uncommitted worktree has nothing to build, and the build records the commit hash it actually used (check it with `build_info` — if it does not match yours, you built the wrong tree).
+
+⚠️ **Two side effects of even *attempting* a local run**, both of which have bitten:
+
+- `expo run:android` **rewrites `package.json`**'s `android`/`ios` scripts to `expo run:*`. That is **not your change** — `git checkout -- package.json` and do not commit it.
+- it generates **`android/`**, and ⚠️ **`android/` and `ios/` are NOT in `.gitignore`**. A `git add -A` in this repo commits the entire generated native tree. **Stage files explicitly**, never `-A`, while this is true.
+
+⚠️ **Do not poll the build in the foreground.** `eas build` prints a build id and then *waits*; a `preview` build was **still in the queue ~30 minutes after submission** (2026-10-31), so treat it as a background job. Run it detached and read the state with the Expo `build_info` tool — not with a `tail` on the CLI log.
+
+⚠️ **And read the install result off the device, not off the script** — `adb shell dumpsys package <pkg> | grep lastUpdateTime`. An install that reports success can have been rejected (`INSTALL_FAILED_USER_RESTRICTED`, SCRUM-145).
 
 ## Rules
 

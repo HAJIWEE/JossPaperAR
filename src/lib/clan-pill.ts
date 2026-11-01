@@ -56,7 +56,27 @@ export const PILL_SPEC = {
   /** The stroke is `alignment: inner` on the board, so it does not add to 44. */
   borderWidth: 2.5,
   name: { dx: 14, width: 92, fontSize: 15, fontWeight: '700', lineHeight: 1.2 },
-  chip: { dx: 106, dy: 10, height: 24, radius: 12, fontSize: 12, fontWeight: '700' },
+  chip: {
+    dx: 106,
+    dy: 10,
+    height: 24,
+    radius: 12,
+    fontSize: 12,
+    fontWeight: '700',
+    /**
+     * ⚠️ **The chip's SLOT, not the chip's width.** The board draws the chip **94 wide in EN**
+     * (`👑 Clan Head`) and **58 wide in ZH** (`👑 族长`) — and anchors **both** at dx 106. Left-
+     * anchored, that leaves the 中文 pill with a **40 px hole** between the chip and the `›`, so
+     * the chip reads as shoved left. The owner reported exactly that on glass.
+     *
+     * So the slot is the WIDTH OF THE WIDEST LOCALE and the chip centres inside it: EN is
+     * pixel-identical to the board (94 in a 94 slot), 中文 moves 18 px right to **124**, and the
+     * pill's visual balance no longer depends on how many characters a language uses.
+     */
+    slotWidth: 94,
+    /** The ZH board's own chip width (`👑 族长`) — recorded so the gate can prove it centres. */
+    narrowestLabelWidth: 58,
+  },
   affordance: { dx: 204, dy: 13, size: 18, fontSize: 12, rotationOpenDeg: 90 },
 } as const;
 
