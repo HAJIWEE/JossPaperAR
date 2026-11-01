@@ -18,14 +18,16 @@
 | 4 | **Coarse location** (geohash cell ≈4 blocks) | optional | `grid_cells` (no identity) · `cell_burns` (user+cell+day) | server only; value **hidden as UI** (S11) | new-ground multiplier + decay |
 | 5 | **Tribute record** (points, image ref, visibility `private` default) | always | `tributes` (RLS) | owner only unless shared | the Book of Tributes |
 | 6 | **Ledger / purchases / grants** | always | `ledger_events` (append-only) | server only | balances, the receipt trail |
-| 7 | **Device/session id** (anonymous auth) | always | `auth.users` · `devices` | server only | identity without signup (ADR-004) |
+| 7 | **Device/session id** (anonymous auth) · ⚠️ **and an EMAIL once an account is made** | always · ⚠️ **email is REQUIRED to create or join a clan** | `auth.users` · `devices` | server only | identity — anonymous first, ⚠️ **account required for clan create/join** (ADR-004 **Amendment 1**, 2026-11-01) |
 | 8 | **`client_time`/tz** | always | on `burns` rows | server only | offline ordering (never for math — ADR-005) |
 | 9 | **Integrity signals** (accuracy, cell hops, flags) | automatic | `burns` · `integrity_flags` | server only | anti-cheat, log-only at alpha |
 | 10 | **Consent records** | on consent | `consent_records` (new, §11) | server only | proof of consent (PDPA/GDPR) |
 | 11 | **Usage events** | **opt-in only, default OFF** | analytics provider | provider | SCRUM-25 — never #1–#4, #9 |
 | 12 | **Ad id** | later (beta) | ad SDK | SDK | S9/ADR-008 |
 
-**Never collected:** NRIC/phone (no account wall — ADR-004) · raw GPS trail · contact lists · precise coordinates (only the coarse cell ever leaves the device) · payment cards (Play Billing handles money — we never see cards).
+**Never collected:** NRIC · phone · contact lists · raw GPS trail · precise coordinates (only the coarse cell ever leaves the device) · payment cards (Play Billing handles money — we never see cards).
+
+⚠️⚠️ **AMENDED 2026-11-01 (ADR-004 Amendment 1) — AN EMAIL IS NOW COLLECTED.** This line used to read *"NRIC/phone (no account wall — ADR-004)"*, and that is no longer true: the owner has ruled that **an account is required to create or join a clan**, and the account is an **email**. ⚠️ **It is the first data class in this product that identifies a PERSON rather than a device** — a contact identifier, not a session id — and that is a materially different privacy posture from the one this document was written around. ⚠️ **The knock-ons are recorded, not yet done:** §2's retention windows do not cover the email (it persists for the life of the account, not the 7-day photo window), the one-tap delete (ADR-007) must erase it, and the Play Store **data-safety declaration must now declare it**. Treat this row as the authority over any older prose below that assumes a device-only identity.
 
 ---
 
@@ -36,6 +38,7 @@
 | **Raw capture photo** | **purged 7 days after the job reaches terminal state** (`styled`/`rejected`) — retry/appeal window, then gone | nightly cron `purge_raw_captures` (nulls `storage_path`, deletes object) |
 | Styled sprite · tribute image | **while the account lives** | delete-all (§9) |
 | Ancestors · inventory · decorations · burns · ledger · streaks · quotas · tributes | **while the account lives** | delete-all (§9) |
+| ⚠️ **Account email** (ADR-004 **Amendment 1**, 2026-11-01) | **while the account lives** — it IS the account's identifier; no shorter window still lets the user sign in. ⚠️ **It is NOT covered by the 7-day photo window** | delete-all (§9) — the `auth.users` row and the email go with it |
 | `cell_burns` | **90 days rolling** (decay input only — SCRUM-12 needs recent history, not a trail) | nightly cron |
 | `grid_cells` | **indefinite** — aggregate, no user identity in the table | n/a (by construction) |
 | `rate_counters` | **24 h** (60s windows are the live data) | daily cron |

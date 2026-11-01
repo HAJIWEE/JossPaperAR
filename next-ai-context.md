@@ -1455,26 +1455,40 @@ services later."* Then, on seeing the draft: *"Yes its fine."* → **`SCRUM-215`
 | `ZH · 0d6 注册 · 邮箱` | 11960 | 1 |
 | `ZH · 0d7 注册 · 邮箱 / 输入验证码` | 12840 | 1 |
 | `ZH · 0d8 注册 · 邮箱 + Google（第二阶段）` | 13720 | 2 |
-| `EN · 0e13 Clan fork · with account offer` | 14600 | **1 — the ENTRY POINT** |
-| `ZH · 0e13 宗族入口 · 账号提示` | 15480 | **1 — the ENTRY POINT** |
+| `EN · 0e13 Clan fork · account required` | 14600 | **1 — the GATE** |
+| `ZH · 0e13 宗族入口 · 需要账号` | 15480 | **1 — the GATE** |
 
-⚠️ **THE ENTRY POINT IS DRAWN** (owner's answer: **(a) the clan fork**). Both are CLONES of the signed-off
-fork, so the app mark, title, sub, the two cards and their touch areas are identical. Added: **one 64-tall
-row** under the cards — disc + ✉️ glyph, a title, a sub-line — and the *"a clan is required"* note moved
-**726 → 796**. ⚠️ **A row, not a card:** the two existing choices are 190-tall cards, so the offer reads as
-a secondary affordance rather than a third equal choice.
+⚠️⚠️ **ADR-004 WAS AMENDED, 2026-11-01 — THE ACCOUNT IS NOW REQUIRED FOR CLAN CREATE/JOIN.** Owner's words:
+*"The user has to make an account to create or join a Clan, It will not be optional, The 'Account is
+optional' rule is only for the MVP. Now that we are building out the App we should be clear about that."*
+→ `## Amendment 1` now sits in `ADR-004`, the register row is updated, and **`check:adrs` passes 34/34**.
 
-⚠️⚠️ **AND IT COLLIDES WITH ADR-004 RULE 3, WHICH IS WORTH KNOWING BEFORE IT IS BUILT.** The fork sits
-**inside the first-run path** (`SCRUM-147`: *"splash → panels → permission → fork"*), and rule 3 says
-*"**No screen nags, no banner, no 'finish your profile' interstitial** … offered in context (clan features,
-cross-device continuity) — never demanded."* ⚠️ **A row on the fork is the closest thing in this design to
-the "banner" that rule names**, and it is the one place the user has no clan and no altar yet. ⚠️ The same
-offer at the **sharing** moment (`EN · 0e4` / `EN · 0e9`) is the in-context form the rule endorses.
-⚠️ **Drafted as asked, not as argued for** — flagged on `SCRUM-214` so the PM can move it knowingly.
+**⚠️ WHAT THE AMENDMENT CHANGES — rules 2, 3 and 6; rules 1, 4 and 5 stand:**
+- **Rule 2** NARROWED — the ritual, quotas, streaks, ledger, league and Book of Tributes still work
+  anonymously; **clan create/join** now requires an account.
+- **Rule 3** NARROWED — the clan flow is a **gate**, not an in-context offer. *"No screen nags, no banner,
+  no interstitial"* still governs **the ritual**.
+- ⚠️⚠️ **Rule 6 AMENDED — THE CLAUSE WITH TEETH.** It said *"no NRIC, no phone, no contact list — the
+  identity data class is the device/session id alone"*. **The app now collects an EMAIL**, which is a
+  **contact identifier**: it identifies a person and can reach them. ⚠️ **This is the first data class in
+  this product that identifies a PERSON rather than a device** — a real posture change, not paperwork.
+- **Rule 4** moves from convenience to **LOAD-BEARING** — the user burns anonymously first, so the upgrade
+  must **LINK the same `user_id`**. ⚠️ **A second user orphans the wallet, streak and history.**
+- ✅ **RULE 1 STANDS, DELIBERATELY:** the first burn (the tutorial) still needs **no account**. The ruling
+  names clan create/join, not the ritual. ⚠️ Gating the ritual would need its own ruling.
 
-⚠️ **EVERY STRING ON THESE TWO BOARDS IS A PROPOSAL** — doc 15 §8 carries none of it:
-`Save this altar to an account` · `Reach it from your family's phones` · `把这座祭坛存入账号` ·
-`家人的手机也能打开这座祭坛`. ⚠️ And the EN wording assumes an altar that does not exist yet on this screen.
+**✅ doc 13 IS UPDATED WITH IT:** row 7 and the *"Never collected"* line (which read *"NRIC/phone (no
+account wall — ADR-004)"*), **plus a new `Account email` row in §2's retention table** — doc 13's own rule
+of thumb is *"no new data class ships without a window"*.
+
+⚠️ **THE ENTRY-POINT BOARDS WERE REWORKED, because the earlier shape was wrong.** They were drafted as a
+tappable **offer row** — but a *required* account is not an offer, and ADR-004 rule 3's own reasoning
+rejects a soft wall (*"a hard wall with worse manners"*). So the row is **gone**; the two boards are now
+clones of the signed-off fork with the **note stating the gate**: `An account and a clan are required to
+tend this altar together.` / `需要账号与宗族，才能共同打理这座祭坛。`
+⚠️ **Both are PROPOSALS** — doc 15 §8 carries neither.
+⚠️ **Still the PM's call: WHERE the account sits** — before the fork (one gate) or after the choice
+(the fork's value explained first). The amendment is written placement-neutral.
 
 ⚠️ **All six built by CLONING** `EN · 0d` / `ZH · 0d` / `EN · 0d3` / `ZH · 0d3` — geometry, tokens, type
 scale and the app-mark header are identical to what was signed off.
