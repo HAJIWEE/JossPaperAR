@@ -2275,6 +2275,8 @@ function itemBurnChecks(): void {
 
 function storeChecks(): void {
   section('29 · Store — the catalogue, the featured item, and the ported art (SCRUM-150)');
+  // ⚠️ Re-derived here, not shared: `PROJECT_ROOT` is scoped to the function that makes it.
+  const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
   const { featured, more } = storeList();
   check('the FEATURED item is the one the board features (Wealth Bundle)', featured.code === 'wealth_bundle');
@@ -2298,6 +2300,36 @@ function storeChecks(): void {
       && STORE_TABS.some((tab) => tab.id === 'offerings' && tab.enabled));
   check('⚠️ there is NO cash chip — no rail and no read, so it is omitted rather than faked',
     CASH_IS_READABLE === false);
+
+  /**
+   * ⚠️⚠️ **THE SIZES MUST MATCH THE FILES ON DISK.** Since 2026-11-01 the art is five raster
+   * cut-outs, and `ART_BOX` in `lib/offering-art.ts` MIRRORS each PNG's pixel size so the fitting can
+   * happen in a pure module. ⚠️ **A mirror that drifts is worse than no mirror**: re-crop an image
+   * and the box would silently letterbox or overflow it, with `tsc` perfectly happy — both numbers
+   * are legal.
+   *
+   * ⚠️ So this reads each file's **IHDR** — bytes 16–23 of a PNG are width and height, big-endian —
+   * and asserts the mirror agrees. It is the same posture as the HUD's two sets of numbers and the
+   * tab bar's board values: the build's copy and the authority are compared, never assumed equal.
+   */
+  for (const code of artCodes()) {
+    const file = join(PROJECT_ROOT, `assets/offerings/${code}.png`);
+    if (!existsSync(file)) {
+      check(`the art file for "${code}" exists`, false, file);
+      continue;
+    }
+    const png = readFileSync(file);
+    const isPng = png.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    check(`⚠️ "${code}" is a real PNG (magic bytes, not a saved error page)`, isPng, file);
+    const w = png.readUInt32BE(16);
+    const h = png.readUInt32BE(20);
+    const box = artSize(code);
+    check(`⚠️ …and \`ART_BOX\` MATCHES it on disk (${w}×${h})`,
+      box.w === w && box.h === h, `mirror says ${box.w}×${box.h}, file says ${w}×${h}`);
+    // ⚠️ A cropped cut-out must not be square-by-accident: the padding was removed on purpose.
+    check(`…and it is a CROPPED cut-out, not the 1024×1024 original`,
+      !(w === 1024 && h === 1024), `${w}×${h}`);
+  }
 
   // ── ⚠️ THE ART — every catalogue code must have an illustration ─────────────
   check('⚠️ EVERY catalogue offering has art (none ships as a blank card)',

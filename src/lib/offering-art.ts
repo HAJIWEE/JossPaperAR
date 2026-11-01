@@ -15,15 +15,27 @@
 import { OFFERINGS, type OfferingCode } from '../domain/catalogue.ts';
 
 /** `code → "minX minY width height"`, from the board. ⚠️ Read by BOTH the drawings and the fit. */
+/**
+ * `code → "minX minY width height"`, from the **cropped PNG's own pixels**.
+ *
+ * ⚠️⚠️ **THE ART IS A RASTER NOW, NOT 82 SVG SHAPES** (owner's call, 2026-11-01):
+ * *"use `<image>` · use option 2"*. The five chosen style examples were cut out with
+ * `fal-ai/birefnet/v2` — the pipeline's OWN stage ⓓ — and cropped to their alpha bounding box,
+ * so the subject fills the box rather than floating in the 1024×1024 padding.
+ *
+ * ⚠️ **These numbers MIRROR the PNGs**, and a mirror that drifts is worse than none: `check:lib` §29
+ * reads the **IHDR of each file on disk** and asserts these agree, so a re-crop cannot leave the
+ * layout lying. The aspects genuinely DIFFER (0.50 for the phone against 1.44 for the bundle), which
+ * is why fitting is contained rather than stretched.
+ */
 export const ART_BOX: Record<OfferingCode, string> = {
-  joss_paper_stack: '0 0 85.8 72',
-  gold_bar: '0 0 102.9 72',
-  smartphone: '0 0 54.3 72',
-  house: '0 0 111.3 72',
-  wealth_bundle: '0 0 220.4 106',
+  joss_paper_stack: '0 0 787 764',
+  gold_bar: '0 0 750 539',
+  smartphone: '0 0 458 920',
+  house: '0 0 882 748',
+  wealth_bundle: '0 0 937 650',
 };
 
-/** The art's box in board px, parsed from the `viewBox`. ⚠️ Never re-typed as a second constant. */
 export function artSize(code: OfferingCode): { readonly w: number; readonly h: number } {
   const parts = ART_BOX[code].split(' ').map(Number);
   return { w: parts[2], h: parts[3] };
