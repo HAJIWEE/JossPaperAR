@@ -1440,41 +1440,50 @@ sign-in to sign out of.
 anonymous device cannot be shared across a family's phones, so doc 15's shared altar genuinely wants an
 account."*
 
-### ✅ THE DRAFT (2026-11-01, S73) — THREE BOARDS ON PENPOT
+### ✅ THE DRAFT — SIX BOARDS ON PENPOT, APPROVED 2026-11-01 (S73)
 
 ⚠️ **The owner answered (B):** *"first build a email based account sign up, then expand it to google
-services later."* So the account is **two phases**. ⚠️ **(A) is still open** (the profile name).
+services later."* Then, on seeing the draft: *"Yes its fine."* → **`SCRUM-215`** is the BUILD.
+⚠️ **(A) is still open** (the profile name), and it blocks the sign-up board's `FAMILY NAME` field.
 
-**Added — nothing signed off was touched:**
+**Added — nothing signed off was touched, all at x −320:**
 | board | y | phase |
 |---|---|---|
 | `EN · 0d6 Sign-up · email` | 9320 | 1 |
 | `EN · 0d7 Sign-up · email / verify code` | 10200 | 1 |
 | `EN · 0d8 Sign-up · email + Google (phase 2)` | 11080 | 2 |
+| `ZH · 0d6 注册 · 邮箱` | 11960 | 1 |
+| `ZH · 0d7 注册 · 邮箱 / 输入验证码` | 12840 | 1 |
+| `ZH · 0d8 注册 · 邮箱 + Google（第二阶段）` | 13720 | 2 |
 
-⚠️ **Built by CLONING** `EN · 0d Sign-up` / `EN · 0d3 Sign-up / verify code` — geometry, tokens, type scale
-and the app-mark header are identical, so the drafts track the originals if those are revised.
+⚠️ **All six built by CLONING** `EN · 0d` / `ZH · 0d` / `EN · 0d3` / `ZH · 0d3` — geometry, tokens, type
+scale and the app-mark header are identical to what was signed off.
 
 **⚠️ COPY CHANGED — the signed-off flow is PHONE-first, so this is not a one-field reskin:**
-`PHONE OR EMAIL` → `EMAIL` · `Phone or email` → `you@example.com` · the privacy note →
-*"Your email is only used to sign you in — never for ads or messages."* · `Sent to +65 9123 4567 by SMS` →
-`Sent to you@example.com` · `Wrong number? Edit` → `Wrong email? Edit`.
+`PHONE OR EMAIL` → `EMAIL` · `Phone or email` → `you@example.com` · `手机号或邮箱` → `邮箱` · the privacy
+notes reworded for email · `Sent to +65 9123 4567 by SMS` → `Sent to you@example.com` ·
+`Wrong number? Edit` → `Wrong email? Edit` · `号码有误？修改` → `邮箱有误？修改`.
+⚠️ **TWO ZH STRINGS ARE PROPOSALS, NOT SIGNED-OFF WORDS** (doc 15 §8 owns copy): the note's
+`邮件推送` half (SMS cannot be carried over verbatim) and `使用 Google 账号继续`.
 
-⚠️ **PHASE 2 IS ONLY TWO SHAPES:** an `or` divider and `Continue with Google` as a **secondary** button
-(paper `#f5f0e8`, ink stroke 2.5, r18 — the file's own secondary style). ⚠️ **But the primary button MOVES,
-690 → 560**, to make room — so phase 1 does *not* reserve the space, and the button will jump when Google
-ships. A choice for the PM, not a defect.
+⚠️ **PHASE 2 IS ONLY TWO SHAPES:** an `or`/`或` divider and `Continue with Google` as a **secondary**
+button (paper `#f5f0e8`, ink stroke 2.5, r18 — the file's own secondary style). ⚠️ **But the primary
+button MOVES, 690 → 560**, to make room — phase 1 does *not* reserve the space.
 
 ⚠️⚠️ **FOUND IN THE SIGNED-OFF BOARDS: a `LANGUAGE` caption with NO control under it** — on **`EN · 0d`
 AND `ZH · 0d`** (both checked). A label with nothing to label. ⚠️ Not invented into the draft: a control
 that no board specifies would be the same class as inventing a store price.
 
-⚠️ **GEOMETRY-VERIFIED, NOT EYEBALLED:** a collision sweep over all three boards found **no off-board
-shape and no unintended overlap**, and caught **one real bug of mine** — the phase-2 right rule overlapped
-the `or` label by 8px (fixed: the rule now starts at 218, giving symmetric 8px gaps).
+⚠️ **GEOMETRY-VERIFIED, NOT EYEBALLED:** a collision sweep over all six boards found **no off-board shape
+and no unintended overlap**, and caught **one real bug of mine** — the phase-2 right rule overlapped the
+`or` label by 8px (fixed: 20..172 · 180..210 · 218..370).
 ⚠️ **I cannot render a Penpot PNG export in this session** — the tool returns base64 inside a text block,
 so there is no image for me to look at. **The aesthetic call is the PM's**, which is this file's
 established division of labour.
+
+⚠️ **AND THE ENTRY POINT IS UNDRAWN.** The boards exist, but *where* the account is offered is not on any
+of them. ADR-004 and SCRUM-147 both forbid a sign-in wall before the first burn and name the **clan /
+invite flow** as the natural prompt — so `SCRUM-215` needs that decided before the screens can be placed.
 
 ## Gates
 
