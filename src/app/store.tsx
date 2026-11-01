@@ -20,12 +20,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { ConfirmCard } from '@/components/confirm-card';
 import { OfferingArt } from '@/components/offering-art';
 import { TabBarBand } from '@/components/home/tab-bar-band';
 import { ScreenHud } from '@/components/screen-hud';
 import { t } from '@/lib/i18n';
 import { fetchHomeSummary } from '@/lib/home-api';
+import type { OfferingCode } from '@/domain/catalogue';
 import { collectedItemName } from '@/lib/collection';
+import { purchaseItem } from '@/lib/offerings-api';
 import { HUD } from '@/lib/profile';
 import { STORE, STORE_TABS, baseMetaValue, pointsPrice, storeList } from '@/lib/store';
 import { DESIGN_REFERENCE_WIDTH, brand, fontSize, surface, text } from '@/theme/tokens';
@@ -38,6 +41,15 @@ export default function StoreScreen() {
   const s = scale();
   const [points, setPoints] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
+  /** ⚠️ The code awaiting confirmation, or `null`. One card, not one per item. */
+  const [buying, setBuying] = useState<{ readonly code: OfferingCode; readonly price: number } | null>(null);
+  const [buyIssue, setBuyIssue] = useState<string | null>(null);
+  /**
+   * ⚠️ **ONE KEY PER CONFIRM, not per attempt.** It is minted when the card OPENS and reused until
+   * it closes, so a retry after a dropped response cannot charge twice — the reason
+   * `purchase_item` takes a key at all. A fresh key per attempt would defeat it entirely.
+   */
+  const [buyKey, setBuyKey] = useState('');
 
   const load = useCallback(async () => {
     setFailed(false);
@@ -54,6 +66,32 @@ export default function StoreScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * Buy the confirmed item, then RELOAD the balance — the server is the authority on what is left, and
+   * a client-side subtraction would drift the moment a price changed.
+   */
+  const confirmBuy = useCallback(async () => {
+    if (buying === null) return;
+    const res = await purchaseItem(buying.code, buyKey);
+    setBuying(null);
+    if (!res.ok) {
+      /** ⚠️ The SERVER's reason, not invented copy: an empty balance and an unknown code differ. */
+      setBuyIssue(res.reason);
+      return;
+    }
+    setBuyIssue(null);
+    await load();
+  }, [buying, buyKey, load]);
+
+  /**
+   * ⚠️ **BUILT ON ONE LINE, ON PURPOSE.** `check:copy` fails a `t()` call that is SPLIT ACROSS
+   * LINES, because the extractor that finds untranslated copy cannot follow one — the check's own
+   * name is *"no t() call is split across lines"*. ⚠️ So the arguments are computed here and
+   * passed as one call, rather than formatted inline inside the JSX.
+   */
+  const buyBody =
+    buying === null ? '' : t('store.buyBody', { name: String(collectedItemName(buying.code)), points: String(buying.price) });
 
   const { featured, more } = storeList();
 
@@ -139,8 +177,15 @@ export default function StoreScreen() {
             <Text style={[styles.moreHead, { fontSize: 15 * s }]}>{t('store.more')}</Text>
             <View style={[styles.grid, { gap: (STORE.card.xs[1] - STORE.card.xs[0] - STORE.card.w) * s }]}>
               {more.map((item) => (
-                <View
+                <Pressable
                   key={item.code}
+                  accessibilityRole="button"
+                  onPress={() => {
+                    /** ⚠️ Mint the key HERE — opening the card is the intent, not the tap on Confirm. */
+                    setBuyKey(`buy:${item.code}:${Date.now()}`);
+                    setBuyIssue(null);
+                    setBuying({ code: item.code, price: item.price });
+                  }}
                   style={[styles.card, { width: STORE.cardFrame.w * s, height: STORE.cardFrame.h * s, borderRadius: STORE.cardFrame.radius * s, borderWidth: STORE.cardFrame.stroke * s, paddingHorizontal: STORE.card.pad * s }]}
                   testID={`store-item-${item.code}`}
                 >
@@ -160,13 +205,30 @@ export default function StoreScreen() {
                       </Text>
                     </View>
                   )}
-                </View>
+                </Pressable>
               ))}
             </View>
 
             <Text style={[styles.note, { fontSize: 11.5 * s }]} testID="store-note">
               {t('store.note')}
             </Text>
+
+            {/** ⚠️ The SERVER's own refusal, shown as it came — not reworded into copy. */}
+            {buyIssue === null ? null : (
+              <Text style={styles.issue} testID="store-issue">
+                {buyIssue}
+              </Text>
+            )}
+
+            <ConfirmCard
+              visible={buying !== null}
+              title={t('store.buyTitle')}
+              body={buyBody}
+              confirmLabel={t('store.buyConfirm')}
+              cancelLabel={t('common.cancel')}
+              onConfirm={() => void confirmBuy()}
+              onCancel={() => setBuying(null)}
+            />
           </>
         )}
       </ScrollView>
@@ -242,4 +304,5 @@ const styles = StyleSheet.create({
   },
   priceText: { color: text.ink, fontWeight: '700' },
   note: { color: text.inkSoft, marginTop: 16 },
+  issue: { color: brand.cinnabar, fontWeight: '700', marginTop: 8 },
 });

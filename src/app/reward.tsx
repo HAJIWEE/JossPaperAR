@@ -28,8 +28,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { myClans } from '@/lib/clan-api';
 import { markTutorialDone } from '@/lib/first-run';
 import { localized, t } from '@/lib/i18n';
-import { submitBurn, type BurnReceipt } from '@/lib/ritual';
-import { readRewardParams } from '@/lib/route-params';
+import { submitBurn, submitBurnItem, type BurnReceipt } from '@/lib/ritual';
+import { readItemRewardParams, readRewardParams } from '@/lib/route-params';
 import { AFTER_TUTORIAL_ROUTE, demoReceipt, type DemoReceipt } from '@/lib/tutorial';
 import { TOUCH_TARGET, fontSize, onColorCream, radius, space, surface } from '@/theme/tokens';
 
@@ -67,9 +67,21 @@ export default function Reward(): React.JSX.Element {
    * generic `bad_params` and a missing `offsetPx` became `NaN` — an award
    * submitted with a `NaN` offset. Both are now refused BY NAME.
    */
-  const parsed = readRewardParams(
-    useLocalSearchParams<{ captureId: string; offsetPx: string; throwNumber: string }>(),
-  );
+  const rawParams = useLocalSearchParams<{
+    captureId?: string;
+    itemCode?: string;
+    offsetPx?: string;
+    throwNumber?: string;
+    demo?: string;
+  }>();
+  /**
+   * ⚠️⚠️ **SCRUM-149 — THE ITEM BURN'S HALF OF `/reward`.** Exactly one of these parses, because
+   * `burns` XOR-enforces which id a burn carries. ⚠️ The two readers are separate for the reason
+   * `route-params.ts` records: a single widened reader would make the PHOTO path's id optional.
+   */
+  const itemParsed = readItemRewardParams(rawParams);
+  const itemCode = itemParsed.ok ? itemParsed.itemCode : null;
+  const parsed = readRewardParams(rawParams);
   const captureId = parsed.ok ? parsed.captureId : null;
   const accuracy = parsed.ok ? parsed.accuracyPx : 0;
   const throwNo = parsed.ok ? parsed.throwNumber : 1;
@@ -82,7 +94,8 @@ export default function Reward(): React.JSX.Element {
   const started = useRef(false);
 
   const submit = useCallback(async () => {
-    if (captureId === null) {
+    /** ⚠️ An item burn has no capture and needs none — both null is the only lost state. */
+    if (captureId === null && itemCode === null) {
       // A broken ROUTE cannot be retried into working — send them back honestly.
       setPhase(
         problem === 'missing_capture_id'
@@ -122,13 +135,19 @@ export default function Reward(): React.JSX.Element {
     }
 
     // Same arguments -> the same derived key. That is the whole safety story.
-    const result = await submitBurn(captureId, accuracy, throwNo, clan.clanId);
+    /**
+     * ⚠️ **THE ONE LINE THAT WAS MISSING FROM THE WHOLE APP.** `submit_burn` has accepted
+     * `item_code` since it was written, and until SCRUM-149 nothing sent it.
+     */
+    const result = itemCode !== null
+      ? await submitBurnItem(itemCode, accuracy, throwNo, clan.clanId)
+      : await submitBurn(captureId as string, accuracy, throwNo, clan.clanId);
     setPhase(
       result.kind === 'ok'
         ? { kind: 'shown', receipt: result.receipt }
         : { kind: 'retryable', reason: result.reason },
     );
-  }, [captureId, accuracy, throwNo, problem, demo, router]);
+  }, [captureId, itemCode, accuracy, throwNo, problem, demo, router]);
 
   // `started` mirrors preparing.tsx: a double-invoked effect would submit the
   // same throw twice, which is safe ONLY because the key is derived rather than

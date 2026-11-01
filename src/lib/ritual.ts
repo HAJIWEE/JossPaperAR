@@ -364,6 +364,67 @@ export async function submitBurn(
     return { kind: 'transient', reason: 'clan_required' };
   }
 
+  /**
+   * ⚠️ The key is DERIVED, never generated — same arguments, same key, so a retry cannot
+   * double-charge. ⚠️ The id is the FIRST component, so a photo and an item can never collide.
+   */
+  return postBurn(
+    { capture_id: captureId, accuracy: accuracyPx, clan_id: clanId },
+    `burn:${captureId}:${throwNumber}`,
+    opts,
+  );
+}
+
+/**
+ * ═══ SCRUM-149 · THE ITEM BURN ═══════════════════════════════════════════════════
+ *
+ * ⚠️⚠️ **THE HALF THE CLIENT NEVER HAD.** `submit_burn` has accepted `item_code` since it was
+ * written and `award-service` forwards the payload untouched, but the only caller sent a
+ * `capture_id` — so an item burn was reachable by no screen at all.
+ *
+ * ⚠️ **It sends `item_code` and NOT `capture_id`, and the two are MUTUALLY EXCLUSIVE.**
+ * `submit_burn` refuses a payload with both or neither (*"exactly one of capture_id / item_code is
+ * required"*), so this is not a variant that *may* also carry a capture — it must not.
+ *
+ * ⚠️ **The idempotency key is `burn:item:<code>:<throw>`.** The `item:` segment is what keeps an
+ * item burn from colliding with a capture whose uuid happens to be the code — impossible today, and
+ * free to make impossible.
+ */
+export async function submitBurnItem(
+  itemCode: string,
+  accuracyPx: number,
+  throwNumber: number,
+  clanId: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<SubmitResult> {
+  if (typeof itemCode !== 'string' || itemCode.trim().length === 0) {
+    return { kind: 'transient', reason: 'item_code_required' };
+  }
+  if (!Number.isFinite(accuracyPx) || accuracyPx < 0) {
+    return { kind: 'transient', reason: 'accuracy must be a finite, non-negative px offset' };
+  }
+  if (typeof clanId !== 'string' || clanId.length === 0) {
+    return { kind: 'transient', reason: 'clan_required' };
+  }
+  return postBurn(
+    { item_code: itemCode.trim(), accuracy: accuracyPx, clan_id: clanId },
+    `burn:item:${itemCode.trim()}:${throwNumber}`,
+    opts,
+  );
+}
+
+/**
+ * The one POST both burn paths make.
+ *
+ * ⚠️ Extracted so the two paths cannot drift on the things that matter: the auth header, the
+ * `Idempotency-Key` header, the `bad_response` guard, and the refusal to report a receipt without an
+ * award. ⚠️ **The payload is the only thing that differs.**
+ */
+async function postBurn(
+  payload: Record<string, unknown>,
+  idempotencyKey: string,
+  opts: { signal?: AbortSignal },
+): Promise<SubmitResult> {
   let token: string | undefined;
   let base: string;
   try {
@@ -375,8 +436,6 @@ export async function submitBurn(
   }
   if (!token) return { kind: 'transient', reason: 'not_authenticated' };
 
-  const idempotencyKey = `burn:${captureId}:${throwNumber}`;
-
   let res: Response;
   try {
     res = await fetch(`${base}/functions/v1/award-service`, {
@@ -387,7 +446,7 @@ export async function submitBurn(
         'Idempotency-Key': idempotencyKey,
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ capture_id: captureId, accuracy: accuracyPx, clan_id: clanId }),
+      body: JSON.stringify(payload),
       ...(opts.signal ? { signal: opts.signal } : {}),
     });
   } catch {

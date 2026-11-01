@@ -21,6 +21,7 @@ import { NAV_TABS, activeTabKey, isSamePath, tabPressIsNoop } from '../nav.ts';
 import { COLLECTION, COLLECTION_SLOTS, collectionGrid, collectionOverflows, collectedItemName, displayBurnCount } from '../collection.ts';
 import { CASH_IS_READABLE, FEATURED_CODE, STORE_TABS, baseMetaValue, pointsPrice, storeList } from '../store.ts';
 import { ART_BOX, artCodes, artSize, fitArt } from '../offering-art.ts';
+import { readBurnParams, readItemBurnParams, readItemRewardParams, readRewardParams } from '../route-params.ts';
 import { getOffering } from '../../domain/catalogue.ts';
 import { bookView, showsBookSectionTitle } from '../clan-roles.ts';
 import {
@@ -2208,6 +2209,70 @@ function collectionChecks(): void {
  * some: a new offering would otherwise ship as a blank card, and ⚠️ nothing in `tsc` connects the
  * catalogue to the illustrations.
  */
+/**
+ * §30 · The ITEM burn's route contract (SCRUM-149).
+ *
+ * ⚠️⚠️ **THE RULE THE WHOLE TICKET TURNS ON: an item burn carries `item_code` and NOT
+ * `capture_id`.** `submit_burn` refuses a payload with both or neither (*"exactly one of capture_id /
+ * item_code is required"*), so a route that could carry both would be a route that can express a
+ * state the server rejects — and it would make `captureId` OPTIONAL on the photo path, which is the
+ * exact defect `toRewardParams`' doc records. ⚠️ These two readers must never both succeed.
+ */
+function itemBurnChecks(): void {
+  section('30 · The item burn — the route contract (SCRUM-149)');
+  // ⚠️ Re-derived here, not shared: `PROJECT_ROOT` is scoped to the function that makes it.
+  const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+  const item = readItemBurnParams({ itemCode: 'gold_bar' });
+  check('an item burn parses from `itemCode` alone (no uri, no sprite)',
+    item.ok && item.itemCode === 'gold_bar');
+  check('⚠️ …and a MISSING item code is refused by name',
+    !readItemBurnParams({}).ok && !readItemBurnParams({ itemCode: '   ' }).ok);
+
+  /**
+   * ⚠️ **THE CROSS-CHECKS — each reader requires ITS OWN id, and neither accepts the other's.**
+   * This is the property that makes the two paths separable, and it is what the first version of this
+   * section got WRONG: it asserted that a payload carrying BOTH would be refused by the photo reader,
+   * and the suite said otherwise — `readBurnParams` has never heard of `itemCode` and accepts a
+   * capture whenever one is there. ⚠️ That is not a bug in the reader; it is a fact about it, and
+   * asserting the opposite would have been a gate that lies.
+   */
+  check('⚠️ the ITEM reader refuses a photo-only payload (no item_code)',
+    !readItemBurnParams({ captureId: 'abc', uri: 'file://x' }).ok);
+  check('⚠️ …and the PHOTO reader refuses an item-only payload (no capture_id)',
+    !readBurnParams({ itemCode: 'gold_bar' }).ok);
+  const neither = {};
+  check('…and with NEITHER, both readers refuse',
+    !readItemBurnParams(neither).ok && !readBurnParams(neither).ok);
+  /**
+   * ⚠️ **A PAYLOAD CARRYING BOTH IS REFUSED BY THE SERVER, NOT BY THE READERS** —
+   * `submit_burn`: *"exactly one of capture_id / item_code is required"*, and `burns` carries the same
+   * XOR as a constraint. ⚠️ So the CLIENT's job is to never SEND both, and the screen's rule is to
+   * prefer the item when both arrive — which is a fact about `burn.tsx`, so it is scanned, not assumed.
+   */
+  const burnSrc = readFileSync(join(PROJECT_ROOT, 'src/app/burn.tsx'), 'utf8');
+  check('⚠️ `burn.tsx` reads the ITEM params and prefers the item when both are present',
+    burnSrc.includes('readItemBurnParams(') && burnSrc.includes('toItemRewardParams(')
+      && burnSrc.includes('itemCode !== null'));
+  check('⚠️ …and it sends the item code on the ITEM path, never a capture',
+    readFileSync(join(PROJECT_ROOT, 'src/lib/ritual.ts'), 'utf8')
+      .includes("{ item_code: itemCode.trim(), accuracy: accuracyPx, clan_id: clanId }"));
+
+  const reward = readItemRewardParams({ itemCode: 'house', offsetPx: '41.5', throwNumber: '2' });
+  check('the item reward hop carries the code and the SAME accuracy/throw rules',
+    reward.ok && reward.itemCode === 'house' && reward.accuracyPx === 41.5 && reward.throwNumber === 2);
+  check('⚠️ …and a bad accuracy is refused, not rounded to a bullseye',
+    !readItemRewardParams({ itemCode: 'house', offsetPx: '' }).ok
+      && !readItemRewardParams({ itemCode: 'house', offsetPx: '-1' }).ok
+      && !readItemRewardParams({ itemCode: 'house', offsetPx: 'abc' }).ok);
+  check('…and a missing throw number defaults to the FIRST throw',
+    (() => { const r = readItemRewardParams({ itemCode: 'house', offsetPx: '10' });
+      return r.ok && r.throwNumber === 1; })());
+  // ⚠️ POSITIVE CONTROL — the two reward readers must not both accept one param set.
+  check('⚠️ guard: the photo reward reader REJECTS an item-only param set',
+    !readRewardParams({ itemCode: 'house', offsetPx: '10' }).ok);
+}
+
 function storeChecks(): void {
   section('29 · Store — the catalogue, the featured item, and the ported art (SCRUM-150)');
 
@@ -2495,6 +2560,7 @@ async function main(): Promise<void> {
   tabBarChecks();
   collectionChecks();
   storeChecks();
+  itemBurnChecks();
   ancestorSheetChecks();
   tabletNameChecks();
   shrineGeometryChecks();

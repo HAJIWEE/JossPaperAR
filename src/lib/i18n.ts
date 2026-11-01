@@ -221,6 +221,10 @@ export const MESSAGES = {
     'store.base': 'base %{value}',
     'store.price': '%{points} pts',
     'store.note': 'Pay with Store Points — every burn earns Points at 20% of its tribute.',
+    // ── Buying (SCRUM-150) ────────────────────────────────────────
+    'store.buyTitle': 'Buy this offering?',
+    'store.buyBody': '%{name} — %{points} Store Points. It lands in your offerings, ready to burn.',
+    'store.buyConfirm': 'Buy',
     'store.unreachable': 'The store could not be loaded just now.',
     'collection.title': 'Collection',
     'collection.burnedLabel': 'offerings burned',
@@ -594,6 +598,10 @@ export const MESSAGES = {
     'store.base': '基础 %{value}',
     'store.price': '%{points} 点',
     'store.note': '使用功德点购买 — 每次焚烧可获得其功德 20% 的点数。',
+    // ── 购买（SCRUM-150）───────────────────────────────────────────
+    'store.buyTitle': '购买这份供品？',
+    'store.buyBody': '%{name} —— %{points} 功德点。它会进入你的供品，随时可以焚烧。',
+    'store.buyConfirm': '购买',
     'store.unreachable': '暂时无法载入商店。',
     'collection.title': '收藏',
     'collection.burnedLabel': '已焚烧供品',
