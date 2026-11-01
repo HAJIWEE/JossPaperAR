@@ -176,6 +176,34 @@ export const MESSAGES = {
     // ⚠️ Shown on a row whose screen or server read does not exist yet. ⚠️ NOT a placeholder for a
     // dead link: the row renders DISABLED with this as its sub-label (the tab-bar pattern).
     'settings.notBuilt': 'Not built yet',
+    // ── History (SCRUM-151) ─────────────────────────────────────────────────
+    // ⚠️ Board copy: `EN · 8c History`, read 2026-11-01. ⚠️ The board's own footnote —
+    // *"Only your offerings — nothing about others."* — is the promise the SECURITY DEFINER read
+    // keeps, so it ships verbatim.
+    'hist.title': 'History',
+    'hist.weekHead': 'This week',
+    'hist.weekBurned': '%{count} burned',
+    'hist.weekTribute': '+%{points} tribute',
+    'hist.weekStreak': '🔥 %{days} days',
+    'hist.weekStreakOne': '🔥 1 day',
+    'hist.allHead': 'All offerings',
+    'hist.band': '%{band} ×%{mult}',
+    'hist.photoOffering': 'Photo offering',
+    'hist.note': 'Only your offerings — nothing about others.',
+    'hist.empty': 'Nothing here yet — your first offering lands here.',
+    // ⚠️ A FAILED read says so. ⚠️ It must NOT render as the empty state: "you have burned
+    // nothing" and "we could not reach the shrine" are different facts, and the empty copy
+    // states the first one as fact.
+    'hist.unreachable': 'Your history could not be loaded just now.',
+    // ── Profile (SCRUM-151) ────────────────────────────────────────────────
+    'profile.title': 'Profile',
+    'profile.rowHistory': 'History',
+    'profile.rowHistorySub': 'Recent burns & offerings',
+    'profile.rowCollection': 'Collection',
+    'profile.rowCollectionSub': 'Items you kept',
+    'profile.rowSettings': 'Settings',
+    'profile.rowSettingsSub': 'Language · notifications · privacy',
+    'profile.tributeLabel': 'Tribute Points',
     // ⚠️ The tablet sheet (SCRUM-146 · SCRUM-168). Every limit named here is the DB's own.
     // ⚠️ The sheet's copy is `EN · 1s Ancestor sheet` / `EN · 1s2 … / edit mode`, read off
     // Penpot 2026-11-01 — NOT written here. The title says *ancestor* (the person), not
@@ -493,6 +521,28 @@ export const MESSAGES = {
     'settings.deleting': '正在删除…',
     'settings.deleteFailed': '删除未成功 — 未清除任何数据。请重试。',
     'settings.notBuilt': '尚未实现',
+    // ── 历史（SCRUM-151）────────────────────────────────────────────────────
+    'hist.title': '历史',
+    'hist.weekHead': '本周',
+    'hist.weekBurned': '焚烧 %{count} 次',
+    'hist.weekTribute': '+%{points} 功德',
+    'hist.weekStreak': '🔥 连续 %{days} 天',
+    'hist.weekStreakOne': '🔥 连续 1 天',
+    'hist.allHead': '全部供品',
+    'hist.band': '%{band} ×%{mult}',
+    'hist.photoOffering': '照片供品',
+    'hist.note': '仅显示你自己的供品 — 不含他人。',
+    'hist.empty': '暂无记录 — 你的第一次供奉将出现在这里。',
+    'hist.unreachable': '暂时无法载入历史记录。',
+    // ── 我的（SCRUM-151）────────────────────────────────────────────────────
+    'profile.title': '我的',
+    'profile.rowHistory': '历史',
+    'profile.rowHistorySub': '最近的焚烧与供品',
+    'profile.rowCollection': '收藏',
+    'profile.rowCollectionSub': '你保留的供品',
+    'profile.rowSettings': '设置',
+    'profile.rowSettingsSub': '语言 · 通知 · 隐私',
+    'profile.tributeLabel': '功德点',
     // ⚠️ 牌位弹层 — 文案取自 `ZH · 1s 安奉牌位` / `ZH · 1s2 … / 编辑`（Penpot，2026-11-01）。
     'ancestor.titleAdd': '添加祖先',
     'ancestor.titleEdit': '编辑祖先',

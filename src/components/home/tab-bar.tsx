@@ -28,6 +28,7 @@ import { useRouter } from 'expo-router';
 
 import { TAB_BAR } from '@/lib/home-layout';
 import { t } from '@/lib/i18n';
+import { PROFILE_ROUTE } from '@/lib/profile';
 import { brand, onColorCream, surface, text } from '@/theme/tokens';
 
 type Tab = {
@@ -38,11 +39,22 @@ type Tab = {
   readonly route: string | null;
 };
 
+/**
+ * ⚠️ **Store is DISABLED, Profile is LIVE.** Store has no screen (SCRUM-150) and a route that 404s
+ * is a defect, not a placeholder — so it renders visibly unavailable. ⚠️ **Profile's screen now
+ * exists (SCRUM-151)**, so it became tappable the day it landed — which is exactly what this bar
+ * promised: the geometry does not change, only the state.
+ *
+ * ⚠️ The League tab's `#4` subtext is a RANK (`nav · tab League subtext`, `text.gold`); there is
+ * no rank read on this screen yet, so it is not drawn — a static "#4" would be a lie about the
+ * user's position.
+ */
 const TABS: readonly Tab[] = [
   { key: 'shrine', icon: '\u{1F3EE}', labelKey: 'nav.shrine', route: '/' },
   { key: 'league', icon: '\u{1F3C6}', labelKey: 'nav.league', route: '/league' },
   { key: 'store', icon: '\u{1F6CD}', labelKey: 'nav.store', route: null },
-  { key: 'profile', icon: '\u{1F464}', labelKey: 'nav.profile', route: null },
+  // ⚠️ `PROFILE_ROUTE`, not a literal — the tab bar and `check:lib` §26 read the SAME string.
+  { key: 'profile', icon: '\u{1F464}', labelKey: 'nav.profile', route: PROFILE_ROUTE },
 ];
 
 export function TabBar({ active, scale }: { active: string; scale: number }) {

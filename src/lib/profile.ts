@@ -13,6 +13,8 @@
  * and the list is asserted.
  */
 
+import type { Locale } from './i18n.ts';
+
 /** `btn · back (ink)` 18,40 42×42 r21 · `hud · screen title` at 60,51. Shared by both screens. */
 export const HUD = {
   back: { x: 18, y: 40, size: 42, radius: 21 },
@@ -79,6 +81,36 @@ export const PROFILE_CARD = { x: 20, w: 350, headerH: 120, tributeH: 76, radius:
 export const PROFILE_STATS = { xs: [20, 140, 260] as const, w: 110, h: 64, radius: 12, y: 328 } as const;
 
 /**
+ * `hist · week (bg)` — 20,124 350×64 **r14** · `hist · entry * (bg)` — 20,y 350×88 **r12**.
+ *
+ * ⚠️ The week card is r14 and the entries are r12 — measured, not a slip. The week card is a
+ * SUMMARY (it shares its radius with the Profile cards) and the entries are a LIST.
+ */
+export const HISTORY_SPEC = {
+  week: { x: 20, y: 124, w: 350, h: 64, radius: 14 },
+  row: {
+    x: 20,
+    w: 350,
+    h: 88,
+    radius: 12,
+    /** `hist · entry * (thumb)` — 32,246 60×60, so dx 12 / dy 14 inside the row, r10. */
+    thumbDx: 12,
+    thumbDy: 14,
+    thumb: 60,
+    thumbRadius: 10,
+    /** `hist · entry * (name)` — 106,246 → dx 86 / dy 14. */
+    textDx: 86,
+    nameDy: 14,
+    metaDy: 36,
+    bandDy: 56,
+    /** `hist · entry * (pts)` — 274,260 84×24, right-aligned inside the row. */
+    ptsDx: 254,
+    ptsDy: 28,
+    ptsW: 84,
+  },
+} as const;
+
+/**
  * ⚠️ The two rows that have **no server read** — stated here so the screens cannot quietly grow a
  * live-looking control for them. See the ticket comment: `public.tributes` exists but the RPC surface
  * has no read for it, so both render **visibly disabled** (the `tab-bar.tsx` pattern) rather than
@@ -86,11 +118,29 @@ export const PROFILE_STATS = { xs: [20, 140, 260] as const, w: 110, h: 64, radiu
  */
 export const PROFILE_ROWS_PENDING = ['history', 'collection'] as const;
 
-/** The Profile rows, in board order. `route: null` = not built yet. */
+/**
+ * ⚠️ **Every route this surface may point at** — the Profile tab, its rows, and the shrine's gear.
+ *
+ * Exported so the tab bar and `check:lib` read the SAME strings: a typo, or a route deleted later,
+ * would otherwise become a dead link (the SCRUM-145 defect) with nothing able to see it.
+ */
+export const PROFILE_ROUTE = '/profile';
+export const HISTORY_ROUTE = '/history';
+export const SETTINGS_ROUTE = '/settings';
+
+export const PROFILE_ROUTES: readonly string[] = [PROFILE_ROUTE, HISTORY_ROUTE, SETTINGS_ROUTE];
+
+/**
+ * ⚠️ The rows, in board order. `route: null` = **not built yet** → the row renders DISABLED.
+ *
+ * ⚠️ **History is LIVE as of SCRUM-151** — it needed a server read (`my_offerings`), which is a
+ * migration, so it was the last of the three to land. **Collection is still `null`**: it needs a
+ * per-item aggregate (`burned ×N`) that no RPC returns, so a card would have to invent the count.
+ */
 export const PROFILE_ROWS = [
-  { id: 'history', route: null },
+  { id: 'history', route: HISTORY_ROUTE },
   { id: 'collection', route: null },
-  { id: 'settings', route: '/settings' },
+  { id: 'settings', route: SETTINGS_ROUTE },
 ] as const;
 
 export type ProfileRowId = (typeof PROFILE_ROWS)[number]['id'];
@@ -98,4 +148,69 @@ export type ProfileRowId = (typeof PROFILE_ROWS)[number]['id'];
 /** ⚠️ Is this row a real destination? — the ONE place "is it wired" is decided. */
 export function rowIsLive(route: string | null): boolean {
   return route !== null;
+}
+
+/** The short month names the History meta line uses. ⚠️ Not `Intl`: Hermes' coverage varies. */
+const MONTHS: Record<Locale, readonly string[]> = {
+  en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+  zh: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+};
+
+/**
+ * The History meta line — `Today · 8:42 PM` / `Yesterday · 9:03 PM` / `26 Sep · 7:31 PM`.
+ *
+ * ⚠️ **Hand-formatted, not `Intl`.** Hermes ships a partial ICU, so `toLocaleTimeString('zh')` is
+ * not dependable across devices — and a date is the one string a user can immediately tell is wrong.
+ * ⚠️ 12-hour for EN and **24-hour for 中文**: the board draws `8:42 PM`, and `20:42` is how 中文
+ * reads a clock. Forcing one onto the other is the kind of "translation" that reads as a bug.
+ *
+ * ⚠️ An unparseable timestamp returns `''` rather than `Invalid Date` — the caller renders a blank
+ * line, which is honest, instead of a JavaScript error on a plaque.
+ */
+export function burnedAtLabel(iso: string, now: Date, locale: Locale): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return '';
+  return `${dayWord(at, now, locale)} · ${clock(at, locale)}`;
+}
+
+function sameLocalDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function dayWord(at: Date, now: Date, locale: Locale): string {
+  if (sameLocalDay(at, now)) return locale === 'zh' ? '今天' : 'Today';
+  const yesterday = new Date(now.getTime());
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (sameLocalDay(at, yesterday)) return locale === 'zh' ? '昨天' : 'Yesterday';
+  return `${at.getDate()} ${MONTHS[locale][at.getMonth()]}`;
+}
+
+function clock(at: Date, locale: Locale): string {
+  const minutes = String(at.getMinutes()).padStart(2, '0');
+  const h24 = at.getHours();
+  if (locale === 'zh') return `${String(h24).padStart(2, '0')}:${minutes}`;
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}:${minutes} ${h24 < 12 ? 'AM' : 'PM'}`;
+}
+
+/**
+ * The History thumb's glyph.
+ *
+ * ⚠️ `EN · 8c History` draws a GLYPH per thumb (车 · 金 · 屋 · 纸 · 机) and the catalogue carries
+ * **no glyph** — those are illustrative, and inventing a mapping would be a second source of truth
+ * for what an item is called. This DERIVES one from the name's first character, so it is
+ * locale-correct by construction and cannot drift from the name beside it.
+ * ⚠️ `Array.from`, not `[0]`: a name starting with a surrogate pair would otherwise cut in half.
+ */
+export function offeringGlyph(name: string): string {
+  return Array.from(name.trim())[0] ?? '';
+}
+
+/**
+ * ⚠️ **"1 days" is not copy.** `hist.weekStreak` is `🔥 %{days} days` and the board only draws the
+ * 12-day case — so the singular is ours, exactly as it is for the altar caption. A screen-side
+ * ternary would put the rule where no gate can read it, so it lives here.
+ */
+export function streakDayKey(days: number): string {
+  return days === 1 ? 'hist.weekStreakOne' : 'hist.weekStreak';
 }

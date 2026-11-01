@@ -72,3 +72,89 @@ function reasonOf(error: unknown): string {
   }
   return 'request_failed';
 }
+
+/**
+ * One row of the caller's own offering history — `EN · 8c History`.
+ *
+ * ⚠️ The RPC returns the burn's **STORED** band and award, never a re-derivation: recomputing the
+ * award from the band would silently rewrite history the moment a multiplier changes.
+ * ⚠️ `itemCode` is a CATALOGUE code, not a name — the screen resolves it through `OFFERINGS`, so a
+ * name or a glyph is never baked into a row.
+ */
+export interface OfferingRow {
+  readonly burnId: string;
+  /** `null` for a photo offering — `burns` holds exactly one of `item_code` / `capture_id`. */
+  readonly itemCode: string | null;
+  /** The `aim_band` enum as text: `bullseye` · `devout` · `graze` · `miss`. */
+  readonly band: string;
+  readonly points: number;
+  readonly burnedAt: string;
+}
+
+/** The History screen's THIS WEEK block. ⚠️ A trailing 7 days — see the migration's note. */
+export interface OfferingWeek {
+  readonly burned: number;
+  readonly tribute: number;
+  readonly streakDays: number;
+}
+
+/**
+ * The caller's own offerings, newest first.
+ *
+ * ⚠️ An EMPTY ARRAY here is a real answer ("you have burned nothing"), not a permission failure —
+ * the RPC raises `42501` when there is no identity, so the two cannot be confused. That distinction
+ * is the whole reason this is a `SECURITY DEFINER` read rather than a table select: `burns` has RLS
+ * on with **no policy**, so a plain select would return `[]` with no error and the screen would
+ * report "nothing here yet" to a user who has a hundred rows.
+ */
+export async function myOfferings(limit = 50): Promise<ApiResult<OfferingRow[]>> {
+  const { data, error } = await supabase().rpc('my_offerings', { p_limit: limit });
+  if (error) return { ok: false, reason: reasonOf(error) };
+
+  const rows = Array.isArray(data) ? data : [];
+  const out: OfferingRow[] = [];
+  for (const value of rows) {
+    const row = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
+    if (row === null) continue;
+    const burnId = typeof row.burn_id === 'string' ? row.burn_id : null;
+    /** ⚠️ A row with no id or no band is one the server cannot have written — skip, do not render. */
+    if (burnId === null || typeof row.band !== 'string') continue;
+    out.push({
+      burnId,
+      itemCode: typeof row.item_code === 'string' && row.item_code.length > 0 ? row.item_code : null,
+      band: row.band,
+      points: typeof row.points === 'number' && Number.isFinite(row.points) ? row.points : 0,
+      burnedAt: typeof row.burned_at === 'string' ? row.burned_at : '',
+    });
+  }
+  return { ok: true, data: out };
+}
+
+/**
+ * The caller's burns and award over the TRAILING 7 DAYS, plus the stored streak.
+ *
+ * ⚠️ A SEPARATE CALL, not a fold of `myOfferings()`: the client only holds a page, so a week with
+ * more rows than `p_limit` would report a total smaller than the list beneath it.
+ */
+export async function myOfferingsWeek(): Promise<ApiResult<OfferingWeek>> {
+  const { data, error } = await supabase().rpc('my_offerings_week');
+  if (error) return { ok: false, reason: reasonOf(error) };
+
+  /**
+   * ⚠️⚠️ **A `returns table (…)` FUNCTION COMES BACK AS AN ARRAY OF ROWS** — even though this one
+   * always returns exactly one. Reading it as an object yields `undefined` for every field, and the
+   * `?? 0` below then renders **"0 burned · 0 tribute"** over a real week. ⚠️ `tsc` cannot see it
+   * (there are no generated types) — **`check:clanapi` §12 caught it**, which is what that file is
+   * for. `my_offerings` was already an array and was fine; this one was not.
+   */
+  const rows = Array.isArray(data) ? data : [];
+  const first = rows.length > 0 ? rows[0] : null;
+  const row = typeof first === 'object' && first !== null ? (first as Record<string, unknown>) : null;
+
+  const at = (key: string): number => {
+    const value = row?.[key];
+    return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  };
+  return { ok: true, data: { burned: at('burned'), tribute: at('tribute'), streakDays: at('streak_days') } };
+}
+

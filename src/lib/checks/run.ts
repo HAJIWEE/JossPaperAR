@@ -56,7 +56,17 @@ import {
   normaliseLocale,
   resolveInitialLocale,
 } from '../locale.ts';
-import { LOCALE_PILL, PROFILE_ROWS, rowIsLive } from '../profile.ts';
+import {
+  HISTORY_SPEC,
+  LOCALE_PILL,
+  PROFILE_ROUTE,
+  PROFILE_ROUTES,
+  PROFILE_ROWS,
+  burnedAtLabel,
+  offeringGlyph,
+  rowIsLive,
+  streakDayKey,
+} from '../profile.ts';
 import { TABLET_NAME_MAX, nameOrientation, rotatedNameSize, tabletName } from '../tablet-name.ts';
 import {
   ANCESTOR_CAP,
@@ -1573,9 +1583,59 @@ function localeChecks(): void {
 
   // ── the Settings rows: wired, or visibly disabled — never a dead link ─────
   check('no Settings row links to a route that does not exist',
-    PROFILE_ROWS.filter((r) => r.route !== null).every((r) => r.route === '/settings'));
+    PROFILE_ROWS.filter((r) => r.route !== null).every((r) => PROFILE_ROUTES.includes(r.route as string)),
+    PROFILE_ROWS.map((r) => `${r.id}→${r.route}`).join(' '));
+  check('⚠️ …and a route NOT on the list would fail that check (not a tautology)',
+    !PROFILE_ROUTES.includes('/collection'));
   check('…and `rowIsLive` is the ONE place "is it wired" is decided',
     rowIsLive('/settings') && !rowIsLive(null));
+
+  // ⚠️ The ROUTE ITSELF — the tab bar and this assertion read the SAME string, so a typo in one
+  // cannot become a dead link that only a device would find.
+  check("the tab bar's Profile tab points at the screen that exists",
+    PROFILE_ROUTES.includes(PROFILE_ROUTE) && PROFILE_ROUTE === '/profile');
+
+  // ── the History helpers (SCRUM-151) ───────────────────────────────────────
+  // ⚠️ "1 days" is not copy. The board draws only the 12-day case, so the singular is ours.
+  check('⚠️ a ONE-day streak gets its own key (never "1 days")',
+    streakDayKey(1) === 'hist.weekStreakOne');
+  check('…and 0 · 2 · 12 take the plural',
+    [0, 2, 12].every((d) => streakDayKey(d) === 'hist.weekStreak'));
+  check('every streak key exists in BOTH locales',
+    ['hist.weekStreak', 'hist.weekStreakOne'].every(keyInBothLocales));
+
+  // ⚠️ The date line is HAND-formatted (Hermes' ICU is partial), so both shapes are assertable.
+  const burnAt = new Date('2026-11-01T20:42:00');
+  const nowAt = new Date('2026-11-01T21:00:00');
+  check('a burn TODAY reads "Today · …"',
+    burnedAtLabel(burnAt.toISOString(), nowAt, 'en').startsWith('Today · '),
+    burnedAtLabel(burnAt.toISOString(), nowAt, 'en'));
+  check('…and in 中文 it reads 今天',
+    burnedAtLabel(burnAt.toISOString(), nowAt, 'zh').startsWith('今天 · '));
+  check('⚠️ EN is 12-hour and 中文 is 24-hour (the board draws 8:42 PM; 中文 reads 20:42)',
+    burnedAtLabel(burnAt.toISOString(), nowAt, 'en').includes('8:42 PM')
+      && burnedAtLabel(burnAt.toISOString(), nowAt, 'zh').includes('20:42'));
+  check('yesterday is named, not dated',
+    burnedAtLabel(new Date('2026-10-31T09:03:00').toISOString(), nowAt, 'en').startsWith('Yesterday · '));
+  check('⚠️ an unparseable timestamp returns EMPTY — never "Invalid Date" on a plaque',
+    burnedAtLabel('not-a-date', nowAt, 'en') === '');
+
+  // ⚠️ The thumb glyph is DERIVED, because the catalogue carries none.
+  check("the thumb glyph is the name's first character",
+    offeringGlyph('Gold Bar') === 'G' && offeringGlyph('金条') === '金');
+  check('⚠️ …and it does not split a surrogate pair',
+    Array.from(offeringGlyph('𠀀x')).length === 1, JSON.stringify(offeringGlyph('𠀀x')));
+  check('an empty name yields an empty glyph (no crash on a blank plaque)',
+    offeringGlyph('   ') === '');
+
+  // ── the History geometry (the board's `hist · *`) ─────────────────────────
+  check('the week card is the board\'s 350×64 r14',
+    HISTORY_SPEC.week.w === 350 && HISTORY_SPEC.week.h === 64 && HISTORY_SPEC.week.radius === 14);
+  check('the entry row is 350×88 r12, with a 60 thumb',
+    HISTORY_SPEC.row.w === 350 && HISTORY_SPEC.row.h === 88
+      && HISTORY_SPEC.row.radius === 12 && HISTORY_SPEC.row.thumb === 60);
+  check('the thumb sits INSIDE the row (dx + width < the row width)',
+    HISTORY_SPEC.row.thumbDx + HISTORY_SPEC.row.thumb < HISTORY_SPEC.row.w);
 
   // ── the copy the switcher needs exists in BOTH locales ───────────────────
   const SETTINGS_KEYS = [
