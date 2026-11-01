@@ -54,7 +54,6 @@ export default function HistoryScreen() {
 
   return (
     <View style={styles.screen}>
-            <ScreenHud titleKey="hist.title" backTestID="history-back" titleTestID="history-title" />
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {failed ? (
@@ -97,6 +96,8 @@ export default function HistoryScreen() {
           </>
         )}
       </ScrollView>
+
+      <ScreenHud titleKey="hist.title" backTestID="history-back" titleTestID="history-title" />
     </View>
   );
 }

@@ -322,6 +322,16 @@
     would erase the owner's test clan, so it is their call.
   - ⚠️ **The Profile board's league chip, `remembering since` line and burned/collected/credits
     tiles are not drawn** — none has a read, and sample numbers look real and are invented.
+- **⚠️ `Transform` and `Burn` draw a back button on their boards, and the build has none.**
+  `EN · 3 Transform` draws `btn · back (ink)` + `hud · screen title` ("Your Offering"); `EN · 4 Burn`
+  draws the **dark** `hud · back circle`. ⚠️ **A back button there abandons an operation that has
+  already been PAID FOR** — Transform runs while a cartoonize job is in flight, Burn while the burn is
+  being submitted. So the target needs a **decision**, not a sweep: back to the shrine? back to the
+  capture? or refuse while in flight and say why? ⚠️ `EN · 5 Reward` draws **no** back button,
+  deliberately, and the build already matches.
+- **⚠️ `ScreenHud` is the standard, and `capture` now uses it; the clan screens do not.** ⚠️ Their
+  boards (`EN · 0e*`) draw **no** top back button — they use `clan-ui`'s bottom `GhostButton`, which
+  is a second idiom. That is a board-backed difference, not an oversight, but it is worth one pass.
 - **⚠️ The screen HUD's back circle is 34, not the board's 42.** `EN · 8` / `8b` / `8c` all draw
   `btn · back (ink)` at **18,40 42×42** with a **2.5** stroke, and `hud · screen title` starts at
   **x60** — so the ring ends exactly where the text begins. ⚠️ **On glass the ring reads as covering

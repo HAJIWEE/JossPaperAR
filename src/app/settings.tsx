@@ -129,7 +129,6 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.screen}>
-            <ScreenHud titleKey="settings.title" backTestID="settings-back" titleTestID="settings-title" />
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <SectionHead titleKey="settings.general" />
@@ -175,6 +174,8 @@ export default function SettingsScreen() {
           </Text>
         ) : null}
       </ScrollView>
+
+      <ScreenHud titleKey="settings.title" backTestID="settings-back" titleTestID="settings-title" />
 
       <ConfirmCard
         visible={confirming}

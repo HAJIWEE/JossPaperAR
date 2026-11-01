@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
-import { router } from 'expo-router';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 
-import { Body, GhostButton, PageTitle, Screen } from '@/components/clan-ui';
+import { Body } from '@/components/clan-ui';
 import { LeagueBoardView } from '@/components/league-board';
+import { ScreenHud } from '@/components/screen-hud';
 import { t } from '@/lib/i18n';
 import {
   type LeagueBoard,
   fetchLeagueBoard,
   subscribeToLeagueBoard,
 } from '@/lib/league-api';
-import { space } from '@/theme/tokens';
+import { HUD } from '@/lib/profile';
+import { space, surface } from '@/theme/tokens';
 
 /**
  * THE LEAGUE BOARD — `EN · 6 League` / `ZH · 6 League / 联赛` (SCRUM-11 step 6).
@@ -59,34 +60,33 @@ export default function LeagueScreen() {
   }, [cohortId, load]);
 
   return (
-    <Screen>
-      <PageTitle>{t('league.title')}</PageTitle>
-
-      {failed ? (
-        <Body>{t('league.unreachable')}</Body>
-      ) : board === null ? (
-        <View style={{ paddingVertical: space.lg }} testID="league-loading">
-          <ActivityIndicator />
-        </View>
-      ) : (
-        <LeagueBoardView board={board} />
-      )}
+    <View style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {failed ? (
+          <Body>{t('league.unreachable')}</Body>
+        ) : board === null ? (
+          <View style={{ paddingVertical: space.lg }} testID="league-loading">
+            <ActivityIndicator />
+          </View>
+        ) : (
+          <LeagueBoardView board={board} />
+        )}
+      </ScrollView>
 
       {/*
-        ⚠️ THE WAY BACK (SCRUM-164). The tab bar PUSHES this screen, so `back()` returns to the
-        shrine — but a deep link into `/league` has no history, and there `back()` answers
-        *"the action GO_BACK was not handled by any navigator"* (the trap an earlier session hit).
-        `canGoBack()` guards it, and the fallback is `replace('/')` rather than `push('/')`: a
-        push would leave the shrine on the stack TWICE, which is the double-push the ticket names.
+        ⚠️ THE WAY BACK (SCRUM-164 · standardized in SCRUM-151). It was a `GhostButton` reading
+        *"Return to the shrine"* — a second back idiom, and the only screen with one. It is now the
+        SAME HUD every other pushed screen uses.
+        ⚠️ **AFTER the ScrollView, and that is load-bearing:** the ScrollView fills the screen and is
+        painted last, so a HUD rendered BEFORE it is swallowed — it draws (through the transparent
+        scroll view) and never receives a tap. That was the Settings defect, 2026-11-01.
       */}
-      <GhostButton
-        testID="league-shrine"
-        label={t('common.done')}
-        onPress={() => {
-          if (router.canGoBack()) router.back();
-          else router.replace('/');
-        }}
-      />
-    </Screen>
+      <ScreenHud titleKey="league.title" backTestID="league-back" titleTestID="league-title" />
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: surface.paper },
+  content: { paddingTop: HUD.touch.y + HUD.touch.size + 15, paddingHorizontal: space.lg, paddingBottom: 40 },
+});

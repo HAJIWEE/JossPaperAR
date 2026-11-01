@@ -120,7 +120,6 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.screen}>
-            <ScreenHud titleKey="profile.title" backTestID="profile-back" titleTestID="profile-title" />
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {/* ── the header card ──────────────────────────────────────────────── */}
@@ -165,6 +164,8 @@ export default function ProfileScreen() {
           />
         ))}
       </ScrollView>
+
+      <ScreenHud titleKey="profile.title" backTestID="profile-back" titleTestID="profile-title" />
     </View>
   );
 }

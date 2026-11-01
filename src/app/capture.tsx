@@ -45,6 +45,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FullBleedCamera } from '@/components/full-bleed-camera';
+import { ScreenHud } from '@/components/screen-hud';
 import { INITIAL_OFFERING, transition, type Offering } from '@/domain/slice';
 import { t } from '@/lib/i18n';
 import { toCropParams } from '@/lib/route-params';
@@ -286,6 +287,8 @@ export default function CaptureScreen() {
         >
           <Text style={styles.buttonLabel}>{t('invite.grantCamera')}</Text>
         </Pressable>
+        {/* ⚠️ `EN · 2g Capture / camera denied` draws the back circle too — the denial is not a trap. */}
+        <ScreenHud tone="dark" backTestID="capture-back" />
       </View>
     );
   }
@@ -463,6 +466,14 @@ export default function CaptureScreen() {
       <Text accessibilityRole="alert" style={styles.srOnly}>
         {offering.state === 'idle' ? 'Ready to photograph' : 'Offering captured'}
       </Text>
+
+      {/*
+        ⚠️ THE WAY BACK (SCRUM-151). This screen had **none at all**, while `EN · 2 Capture` draws
+        `hud · back circle` — so the only way out was the OS back gesture. ⚠️ **Backing out here is
+        safe**: nothing is captured, nothing is spent, and the shrine is where the offering starts.
+        ⚠️ The DARK tone: the light HUD is an ink ring, which is invisible on a camera frame.
+      */}
+      <ScreenHud tone="dark" backTestID="capture-back" />
     </View>
   );
 }

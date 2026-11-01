@@ -11,7 +11,10 @@
  * ⚠️ FAULT-TEST IT: change an expected string and confirm it goes RED.
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { isValidClanName } from '../clan-rules.ts';
 import { bookView, showsBookSectionTitle } from '../clan-roles.ts';
 import {
@@ -59,6 +62,7 @@ import {
 import {
   HISTORY_SPEC,
   HUD,
+  HUD_TONES,
   LOCALE_PILL,
   PROFILE_ROUTE,
   PROFILE_ROUTES,
@@ -1661,6 +1665,72 @@ function localeChecks(): void {
     HUD.touch.size > HUD.back.size && circleLeft >= HUD.touch.x);
   check('…and the title clears the touch target too (not just the circle)',
     HUD.title.x >= HUD.touch.x + HUD.touch.size);
+
+  /**
+   * ── ⚠️⚠️ THE HUD'S Z-ORDER, ASSERTED IN EVERY SCREEN THAT USES IT ─────────
+   * **A `ScreenHud` declared BEFORE the `ScrollView` DRAWS AND NEVER RECEIVES A TAP.** The scroll
+   * view fills the viewport and is painted last; the HUD's own background is transparent, so it stays
+   * VISIBLE through it — which is exactly why the defect reads as *"the back button is not wired"*
+   * rather than as a layout problem. Measured on `HN615L005386`, 2026-11-01.
+   *
+   * ⚠️ **No pure assertion can see this** — it is a fact about the SOURCE ORDER of two siblings — so
+   * this reads the files, the same way `check:copy` does. ⚠️ And it is worth a gate precisely because
+   * the failure is invisible: the button looks perfect.
+   */
+  const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+  const HUD_SCREENS = [
+    'src/app/league.tsx',
+    'src/app/settings.tsx',
+    'src/app/history.tsx',
+    'src/app/profile.tsx',
+    // ⚠️ Capture has NO ScrollView (it is a full-bleed camera) — only the "is it there" half applies.
+    'src/app/capture.tsx',
+  ];
+  const hudBeforeScroll: string[] = [];
+  const hudMissing: string[] = [];
+  for (const rel of HUD_SCREENS) {
+    const file = join(PROJECT_ROOT, rel);
+    if (!existsSync(file)) {
+      hudMissing.push(rel);
+      continue;
+    }
+    const source = readFileSync(file, 'utf8');
+    const hudAt = source.indexOf('<ScreenHud');
+    if (hudAt < 0) {
+      hudMissing.push(rel);
+      continue;
+    }
+    /**
+     * ⚠️ Only meaningful when the screen HAS a scroll view. A full-bleed screen (Capture) has no
+     * sibling to be painted over, so the order question does not arise — and asserting it there would
+     * be a check that cannot fail.
+     */
+    const scrollEndsAt = source.lastIndexOf('</ScrollView>');
+    if (scrollEndsAt >= 0 && hudAt < scrollEndsAt) hudBeforeScroll.push(rel);
+  }
+  check(`⚠️ every screen renders <ScreenHud /> AFTER its </ScrollView> (${HUD_SCREENS.length} screens)`,
+    hudBeforeScroll.length === 0,
+    `rendered before the scroll view: ${hudBeforeScroll.join(', ')}`);
+  check('…and every screen in that list still renders a <ScreenHud /> (so the gate is not vacuous)',
+    hudMissing.length === 0, `no HUD: ${hudMissing.join(', ')}`);
+  // ⚠️ POSITIVE CONTROL — the detector must FIRE on the source order that shipped the defect.
+  check('⚠️ guard: a HUD declared before the scroll view WOULD fail that check',
+    '<ScreenHud x />\n<ScrollView></ScrollView>'.indexOf('<ScreenHud')
+      < '<ScreenHud x />\n<ScrollView></ScrollView>'.lastIndexOf('</ScrollView>'));
+
+  /**
+   * ⚠️ **THE TWO TONES ARE NOT INTERCHANGEABLE.** A light HUD on the camera is an ink ring on a dark
+   * frame — invisible. `EN · 2 Capture` and `EN · 4 Burn` draw `hud · back circle` (dark); everything
+   * on paper draws `btn · back (ink)` (light).
+   */
+  check('⚠️ the HUD has BOTH board tones, and they differ',
+    HUD_TONES.light.fill !== HUD_TONES.dark.fill
+      && HUD_TONES.light.stroke !== HUD_TONES.dark.stroke);
+  check('⚠️ …and the DARK tone rings in the paper colour, which is what makes it read on a dark frame',
+    HUD_TONES.dark.stroke === '#F5F0E8');
+  // ⚠️ POSITIVE CONTROL — the "they differ" assertion is not a tautology.
+  check('⚠️ guard: identical tones WOULD fail the differ check',
+    !(HUD_TONES.light.fill === HUD_TONES.dark.fill));
   check('the week card is the board\'s 350×64 r14',
     HISTORY_SPEC.week.w === 350 && HISTORY_SPEC.week.h === 64 && HISTORY_SPEC.week.radius === 14);
   check('the entry row is 350×88 r12, with a 60 thumb',

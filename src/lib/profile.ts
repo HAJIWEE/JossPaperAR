@@ -28,14 +28,39 @@ import type { Locale } from './i18n.ts';
  * reproduces an unreadable header is not more faithful, it is wrong in the same way.
  * ⚠️ **The TOUCH target stays 44** — the circle shrinks, what the finger hits does not.
  */
+/** `hud · screen title` — ⚠️ x moved **60 → 66**, so there is a real gap from the circle. */
 export const HUD = {
   /** ⚠️ Invisible, 44 — the project's floor for the 40–50s audience (N11). */
   touch: { x: 14, y: 41, size: 44 },
   /** ⚠️ The VISIBLE circle, drawn centred inside the touch target. Was the board's 42 / stroke 2.5. */
   back: { size: 34, borderWidth: 2 },
-  /** `hud · screen title` — ⚠️ x moved **60 → 66**, so there is a real gap from the circle. */
   title: { x: 66, y: 51 },
 } as const;
+
+/**
+ * ⚠️ **THE HUD HAS TWO BOARD VARIANTS, AND THEY ARE NOT INTERCHANGEABLE.**
+ *
+ * | where | circle | ring | glyph | title |
+ * |---|---|---|---|---|
+ * | **light** — on paper | `surface.paper` | `brand.ink` | `text.ink` | yes |
+ * | **dark** — on the camera/video | `#14110F @ 0.5` | `#F5F0E8` | `#F5F0E8` | **none** |
+ *
+ * ⚠️ A light HUD on the camera is an ink ring on a dark frame — invisible. The dark variant is
+ * `hud · back circle` on `EN · 2 Capture` and `EN · 4 Burn`; the light one is `btn · back (ink)` on
+ * `EN · 3 Transform`, `EN · 8`/`8b`/`8c`, `EN · 6 League`.
+ *
+ * ⚠️ **`reward` (`EN · 5`) draws NO back button** — deliberately, and the build matches: the offering
+ * is complete and the only ways on are the ones the screen offers. Do not "standardize" one onto it.
+ *
+ * ⚠️ `#14110F` and `#F5F0E8` are the board's own pigments. ⚠️ `#F5F0E8` **is** `surface.paper`, so
+ * the dark variant's ring is the paper colour — that is what makes it read on a dark frame.
+ */
+export const HUD_TONES = {
+  light: { fill: '#F5F0E8', stroke: '#1A1A1A', glyph: '#1A1A1A' },
+  dark: { fill: 'rgba(20,17,15,0.5)', stroke: '#F5F0E8', glyph: '#F5F0E8' },
+} as const;
+
+export type HudTone = keyof typeof HUD_TONES;
 
 /**
  * `profile · row * (bg)` — 20,y 350×64, **r12**.
