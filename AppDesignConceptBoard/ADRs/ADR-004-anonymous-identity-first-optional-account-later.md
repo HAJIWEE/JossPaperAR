@@ -103,11 +103,33 @@ The owner's ruling:
    wallet, streak and history are orphaned. ⚠️ **An implementation that creates a SECOND user fails this
    rule** — it is not a shortcut, it is the defect the rule exists to prevent.
 
-⚠️ **AND ONE THING IS DELIBERATELY NOT AMENDED: RULE 1.** The first burn — the tutorial — still happens
-with **no account at all**. The owner's ruling names *clan create/join*; it does not name the ritual, and
-rule 3's *"never demanded **to unlock the ritual**"* is exactly the line that keeps first-run free.
-⚠️ **If that is also to change it needs its own ruling** — it would put a wall in front of the first burn,
-which is the one thing this whole record was written to prevent.
+⚠️ **AND RULE 1 IS NOT ONLY UNCHANGED — IT IS NOW SPECIFIED, BY A SECOND RULING THE SAME DAY.** The first
+burn — the tutorial — still happens with **no account at all**. The ruling above names *clan create/join*;
+it does not name the ritual, and rule 3's *"never demanded **to unlock the ritual**"* is exactly the line
+that keeps first-run free. ⚠️ **Gating the ritual would need its own ruling** — it would put a wall in front
+of the first burn, which is the one thing this whole record was written to prevent.
+
+**WHAT THE FIRST BURN IS — ruled 2026-11-01:**
+
+> *"the FIRST BURN should be JUST A DEMO and use standard offerings to prevent cost runoff from people just
+> doing the demo and not signing up after."* — owner, 2026-11-01
+
+1. **It is JUST a demo** — no clan, no points, no ledger, no server call, no AI (`TUTORIAL_CONSEQUENCES`).
+2. ⚠️ **It uses a STANDARD OFFERING — the bundled catalogue art — NOT the player's photograph.**
+   ⚠️ **This is a COST rule, not a style choice.** The shipped demo photographs the room and pushes that
+   file through `/crop` → `/preparing` → `/burn`, and it is free today only because **four screens each
+   branch on `demo` and skip the upload and the generation**. ⚠️ **That is a CHAIN of four guards, not a
+   wall** — one of them falling through is the ≈US$0.09-per-user bill, spent on users who **never sign up**.
+   ⚠️ **A demo that takes no photo has NOTHING TO SEND**, so the guarantee stops depending on four branches
+   agreeing with each other.
+3. **It ENDS with the account creation workflow** — the demo's last beat hands off to the required account
+   step (the amendment above), which then hands off to the clan fork.
+
+⚠️ **NOT YET BUILT, AND RECORDED SO IT IS NOT FORGOTTEN.** The shipped demo still opens the camera
+(`capture.tsx`), crops (`crop.tsx`) and draws the player's own photo (`burn.tsx`'s `demoOffering`).
+⚠️ `TUTORIAL_CONSEQUENCES` deliberately does **not** carry a `capturesPhoto: false` flag yet — a flag
+asserted before the behaviour lands is a gate that passes while the code does the opposite, which is worse
+than no gate. **The flag and its assertion go in with the change that removes the camera from the demo.**
 
 ⚠️ **AND THE PRIVACY CONSEQUENCE IS REAL, NOT PAPERWORK.** The identity data class grows from *a device id
 held server-side* to *a device id **and** an email*. The email is **not** covered by the 7-day photo

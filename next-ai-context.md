@@ -1481,6 +1481,30 @@ optional' rule is only for the MVP. Now that we are building out the App we shou
 account wall — ADR-004)"*), **plus a new `Account email` row in §2's retention table** — doc 13's own rule
 of thumb is *"no new data class ships without a window"*.
 
+### ⚠️⚠️ AND A SECOND RULING THE SAME DAY — THE FIRST BURN IS **JUST A DEMO**, ON A **STANDARD OFFERING**
+
+Owner, 2026-11-01: *"the FIRST BURN should be JUST A DEMO and use standard offerings to prevent cost runoff
+from people just doing the demo and not signing up after."* → **`SCRUM-216`**. Recorded in
+**`ADR-004 Amendment 1`** (a *"WHAT THE FIRST BURN IS"* section) **and** `src/lib/tutorial.ts` — the file
+that owns the demo's invariants.
+
+1. **It is JUST a demo** — no clan, no points, no ledger, no server call, no AI.
+2. ⚠️ **It uses a STANDARD OFFERING — the bundled catalogue art — NOT the player's photograph.**
+3. **It ENDS with the account creation workflow**, which then hands off to the clan fork.
+
+⚠️⚠️ **WHY (2) IS A COST RULE, NOT A STYLE CHOICE.** The demo is free **today** — but only because
+**four screens each branch on `demo`** (`/capture` → `/crop` → `/preparing` → `/burn`) and skip the upload
+and the generation. ⚠️ **That is a CHAIN of four guards, not a wall:** one falling through is the
+**≈US$0.09-per-user** Path C bill, spent on the people who do the demo and **never sign up**.
+⚠️ **A demo that takes no photo has NOTHING TO SEND** — the guarantee stops depending on four branches
+agreeing with each other. ⚠️ Strictly stronger, and it is the owner's call.
+
+⚠️ **NOT YET BUILT.** The shipped demo still opens the camera, crops, and draws the player's own photo
+(`burn.tsx`'s `demoOffering` — whose three-form URI encoding trap exists *only* because of the photo).
+⚠️ **AND NO LYING FLAG WAS ADDED:** `TUTORIAL_CONSEQUENCES` deliberately does **not** carry
+`capturesPhoto: false` yet — a flag asserted before the behaviour lands is a gate that passes while the code
+does the opposite, which is worse than no gate. The flag goes in **with** the change that removes the camera.
+
 ⚠️ **THE ENTRY-POINT BOARDS WERE REWORKED, because the earlier shape was wrong.** They were drafted as a
 tappable **offer row** — but a *required* account is not an offer, and ADR-004 rule 3's own reasoning
 rejects a soft wall (*"a hard wall with worse manners"*). So the row is **gone**; the two boards are now

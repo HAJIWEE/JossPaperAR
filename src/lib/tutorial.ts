@@ -5,8 +5,9 @@
  * the user. so no clan involved and no real points to contribute to any clan.
  * after the tutorial build the PATH C mentioned in the ticket."*
  *
- * So the first-run sequence is **tutorial → your family's altar**: the first
- * burn demonstrates the ritual, and the real create/join flow follows it.
+ * So the first-run sequence is **tutorial → ACCOUNT → your family's altar**: the first burn demonstrates the
+ * ritual, the account is created, and then the real create/join flow follows it.
+ * ⚠️ **The account step is REQUIRED and is ADR-004 Amendment 1 (2026-11-01)** — it is a gate, not an offer.
  *
  * ── ⚠️ THE INVARIANT THAT MATTERS MOST ─────────────────────────────────────
  * **The tutorial must not spend AI money.** If the demo ran a real Path C
@@ -15,6 +16,25 @@
  * before any quota, clan or `app_config` budget row exists to catch it.
  * `TUTORIAL_CONSEQUENCES` states that as DATA so a gate asserts it rather than a
  * comment promising it.
+ *
+ * ── ⚠️⚠️ AND THE RULING THAT HARDENS IT: THE FIRST BURN IS **JUST A DEMO**, ON A **STANDARD OFFERING**
+ * Owner, 2026-11-01: *"the FIRST BURN should be JUST A DEMO and use standard offerings to prevent cost
+ * runoff from people just doing the demo and not signing up after."*
+ *
+ * ⚠️ **WHY "STANDARD OFFERING" IS A COST RULE AND NOT A STYLE CHOICE.** A demo that photographs the room
+ * produces a real local file and pushes it through `/crop` → `/preparing` → `/burn`. Today that is free
+ * because FOUR screens each branch on `demo` and skip the upload and the generation — ⚠️ **but that is a
+ * CHAIN of four guards, not a wall.** One of them falling through is the ≈US$0.09-per-user bill this file
+ * exists to prevent, and it would be spent on users who **never sign up** — the exact runoff named above.
+ * ⚠️ **A demo that never takes a photo has NOTHING TO SEND**, so the guarantee stops depending on four
+ * `if (demo)` branches agreeing with each other.
+ *
+ * ⚠️ **STATUS: THE RULING IS NOT YET BUILT — RECORDED HERE SO IT CANNOT BE FORGOTTEN.** The shipped demo
+ * still opens the camera (`capture.tsx`), crops (`crop.tsx`) and draws the player's own photograph
+ * (`burn.tsx`'s `demoOffering`). ⚠️ **`TUTORIAL_CONSEQUENCES` deliberately does NOT carry a
+ * `capturesPhoto: false` flag yet** — adding one before the behaviour lands would be a gate that passes
+ * while the code does the opposite, which is worse than no gate. ⚠️ **Add the flag and its assertion in
+ * the same change that removes the camera from the demo.**
  *
  * PURE on purpose: no React, no storage, no network — so `check:lib` can hold
  * the rule without a device.
