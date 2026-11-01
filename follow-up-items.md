@@ -311,6 +311,20 @@
 
 ### 🔧 Engineering, small
 
+- **`SCRUM-151` — what remains after the switcher.** ✅ The language switcher is built, persisted and
+  **verified on glass**; delete-all is wired behind the SCRUM-123 `ConfirmCard`. ⚠️ **Still open:**
+  - the **Profile screen** (`EN · 8 Profile`) — and therefore the **Profile tab**, still disabled;
+  - **History** and **Collection** — ⚠️ **neither has a server read.** The RPC surface
+    (`home_summary` · `clan_book` · `submit_burn` · …) returns no user tributes, and `public.tributes`
+    is unread. ⚠️ Adding it is a **migration**, which is why it is not in this pass. Both rows render
+    **disabled** rather than opening a screen that would show an empty list as fact.
+  - ⚠️ **The destructive delete has never been run.** The confirm path is verified; the delete itself
+    would erase the owner's test clan, so it is their call.
+- **⚠️ A language change RESTARTS navigation at the shrine.** That is the deliberate cost of the
+  `key={locale}` remount — the only reliable way to guarantee every string re-renders (see
+  `locale-provider.tsx`). If the restart is judged too rude, the fix is to capture and restore the
+  pathname around the remount.
+
 - **⚠️ The `＋`/`✕` class, for the third time.** S72 shipped a close button that drew a **plus** —
   two bars at `0°`/`90°`, where an X needs `±45°`. Two prior occurrences of the same class exist
   (the SCRUM-145 inert control; the tab bar drawn with no tabs). ⚠️ **A shape that is *almost*

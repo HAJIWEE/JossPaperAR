@@ -725,6 +725,7 @@ was added. Not a defect — different data.
 `SCRUM-209` ⏳ To Do        ⚠️ NEW — 🎯 Decide: where the Book entry lives (no board draws one)
 `SCRUM-164` 🔄 In Progress  League half DONE · Book half BLOCKED on SCRUM-209
 `SCRUM-163` 🔄 In Review   ⚠️ the geometry gate — §25, and it is fault-tested
+`SCRUM-151` 🔄 In Progress  ⚠️ the SWITCHER is built and on glass · Profile + history still open
 `SCRUM-148` 🔄 In Progress  the umbrella
 ```
 
@@ -807,11 +808,76 @@ the **live preview** updating to `Tan` · the **keyboard lift** · **archive →
 
 1. **`SCRUM-209`** — the Book entry's placement. **It is the PM's call**, and `SCRUM-164` cannot
    finish without it.
-2. **`SCRUM-163`** — the geometry gate, 360 dp. Cheap, and it guards the band class.
-3. **`SCRUM-151`** — Profile & Settings, **including the language switcher** the app still lacks.
-   ⚠️ The tab bar's Store/Profile stay **disabled** until 150/151 land; do not link a route that 404s.
+2. **`SCRUM-163`** — ✅ **done** (§25). The geometry gate is in and fault-tested.
+3. **`SCRUM-151`** — 🔄 **the switcher is built**; what remains is the **Profile screen** (and so the
+   Profile tab, still disabled), the **tribute-history read** (a migration — the RPC surface has
+   none), and Collection.
 4. **`SCRUM-147`** onboarding → **150** store → **149** item burn → **155** seed → **157** demo run.
 
 ⚠️ `SCRUM-12` is still blocked on the **`SCRUM-159`** decision, and **`SCRUM-208`** (the board's
 1.44:1 active tab) is the owner's.
+
+---
+
+# 📍 SESSION — 2026-11-01 (S72, continued)
+
+## ⚠️ The app had NO language switcher — and now it does
+
+Measured: **`setLocale` was called from no screen and no component**, and neither was `detectLocale`.
+Every string was translated and `check:lib` §15/§16 held both tables — **and a reviewer could not
+reach 中文.** That is the kind of defect no gate was looking for: the *translation* was complete, the
+*switch* did not exist.
+
+✅ **On glass:** shrine → gear → Settings · tap 中文 → **every string switched** · force-stop and
+relaunch → **still Chinese** (`神龛` · `联赛` · `商店`, `功德点`, `连续 1 天`) · tap EN → back.
+
+### ⚠️⚠️ THE TRAP: `setLocale` CHANGES NO PIXELS
+
+`t()` reads `i18n.locale` at **call** time, so changing it re-renders **nothing** — React cannot see
+the dependency. ⚠️ **And the obvious fix does not work either**, which is worth remembering:
+
+· screens do not **consume** the context (they call `t()`), so a context change never reaches them;
+· a provider re-rendering with the **same** `children` element makes React **bail out**;
+· react-navigation **memoises its descriptors**, so re-rendering the navigator returns the **same
+  element** for the screen.
+
+✅ So `LocaleProvider` remounts the subtree via **`key={locale}`** — load-bearing, not cosmetic.
+⚠️ **The cost, stated rather than hidden:** a language change restarts navigation at the shrine.
+
+### Rules (pure, `src/lib/locale.ts`)
+
+| rule | decides |
+|---|---|
+| `normaliseLocale` | a stored value is **untrusted**: `ZH`→`zh` · `zh-Hans-SG`→`zh` · `fr`→default |
+| `resolveInitialLocale` | **stored > device > default** — ⚠️ even when the stored choice disagrees with the device |
+| `LOCALE_LABELS` | **endonyms** (`EN` / `中文`), never `t()` keys — a switcher written in a language you cannot read is useless |
+
+### ✅ Delete-all is wired — and the sign-out is the subtle part
+
+`delete_my_data()` existed since PR-2 with **no caller**. It now runs behind the SCRUM-123
+`ConfirmCard`, then clears the tutorial record → **signs out and mints a fresh identity** → lands on
+the shrine.
+
+⚠️ The RPC's own payload says *"the auth.users row is not removed by SQL — that needs the Admin
+API"*, and `ensureAnonymousSession()` only signs in when there is **no session at all** — so without
+the sign-out the device would keep a **profile-less** identity and the next write would fail.
+
+⚠️ **The destructive delete was NOT run** — it would erase the owner's test clan. The confirm path
+(card · consequences · cancel) is verified.
+
+### ⚠️ What is NOT done, and is visible rather than hidden
+
+**History and Collection have no server read** — the RPC surface has none, and `public.tributes` is
+unread. ⚠️ Adding it is a **migration**, so it is not in this pass. Both rows render **disabled**
+(the `tab-bar.tsx` pattern), as do the Settings rows with nothing behind them (notifications ·
+analytics · export · policies · sign out). ⚠️ `Original photos` is a **statement** — its sub IS the
+retention policy, and it has no chevron because it has no destination.
+
+⚠️ **`SCRUM-151` stays In Progress, not Done.**
+
+### Gates
+
+`check:lib` **581 → 603** (§26) · `npm run check` **EXIT 0** · `tsc` 0 · 17 copy checks.
+**Fault-tested:** `normaliseLocale` losing its tag fallback → **1 red**; `resolveInitialLocale`
+letting the device beat the stored choice → **2 red**; restored byte-identical (`sha256sum -c` OK).
 
