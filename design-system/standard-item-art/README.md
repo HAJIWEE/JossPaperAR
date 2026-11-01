@@ -120,6 +120,42 @@ Choosing is **not** the same as shipping. The app draws the Penpot vectors today
 
 ⚠️ Option 1 is more work and more faithful to how every other illustration in this app is built.
 
+## ✅ The cut-outs are DONE — `cutout/`
+
+The generated images sit on a **warm rice-paper background**, which
+`STYLE_TEMPLATE_V3.background` **asks for** and which the app **cannot use** — the offering is drawn
+**over the camera**. So all five went through **`fal-ai/birefnet/v2`**, the **same cutout model Path C's
+stage ⓓ uses**, to get real alpha.
+
+| file | size | corner alpha | transparent |
+|---|---|---|---|
+| `cutout/joss-paper-stack.png` | 662 KB | **0** | 66% |
+| `cutout/gold-bar.png` | 386 KB | **0** | 76% |
+| `cutout/smartphone.png` | 409 KB | **0** | 69% |
+| `cutout/house.png` | 723 KB | **0** | 60% |
+| `cutout/wealth-bundle.png` | 573 KB | **0** | 67% |
+
+⚠️ **"RGBA" IN A FILE HEADER IS NOT EVIDENCE OF TRANSPARENCY.** It proves the channel *exists*,
+not that it is *used* — so the check above reads the actual pixels (`PIL`), and every file has a
+**fully transparent corner** and a sensible opaque fraction.
+
+⚠️ **These are ~0.4–0.7 MB rasters**, down from ~1 MB opaque. See the trade-off below.
+
+## ⚠️ Still to do — the SWAP-IN
+
+The app still draws the hand-ported Penpot vectors (`components/offering-art.tsx`, 82 shapes).
+Replacing them is the remaining step, and it is a **real decision**:
+
+1. **Re-draw the picks as `react-native-svg`** — the project's established pattern (`fire-art.tsx`,
+   `altar-halo.tsx`). Scales cleanly, code-owned, recolourable. ⚠️ **Lots of work** — these are
+   raster illustrations, not paths, so this is tracing by eye.
+2. **Bundle the cut-out PNGs and draw them with `<Image>`** — fast, uses exactly what was chosen,
+   and the alpha is already right. ⚠️ **Costs ~2.7 MB of bundled assets** and the art can no
+   longer be recoloured or scaled losslessly.
+
+⚠️ **Option 2 is the honest one if the goal is to match the pipeline quickly**; option 1 is what
+this app has done for every other illustration. **Not started — awaiting the owner's call.**
+
 ## Where the files live
 
 - **Repo:** `design-system/standard-item-art/` (committed with the branch)
