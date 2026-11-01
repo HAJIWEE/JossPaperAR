@@ -725,7 +725,7 @@ was added. Not a defect — different data.
 `SCRUM-209` ⏳ To Do        ⚠️ NEW — 🎯 Decide: where the Book entry lives (no board draws one)
 `SCRUM-164` 🔄 In Progress  League half DONE · Book half BLOCKED on SCRUM-209
 `SCRUM-163` 🔄 In Review   ⚠️ the geometry gate — §25, and it is fault-tested
-`SCRUM-151` 🔄 In Progress  ⚠️ the SWITCHER is built and on glass · Profile + history still open
+`SCRUM-151` 🔄 In Progress  ✅ switcher · ✅ History (migration) · ✅ Profile + the Profile tab · ⚠️ Collection open
 `SCRUM-148` 🔄 In Progress  the umbrella
 ```
 
@@ -880,4 +880,63 @@ retention policy, and it has no chevron because it has no destination.
 `check:lib` **581 → 603** (§26) · `npm run check` **EXIT 0** · `tsc` 0 · 17 copy checks.
 **Fault-tested:** `normaliseLocale` losing its tag fallback → **1 red**; `resolveInitialLocale`
 letting the device beat the stored choice → **2 red**; restored byte-identical (`sha256sum -c` OK).
+
+---
+
+## 📍 SESSION — 2026-11-01 (S72, continued again) — the migration
+
+### ⚠️ HISTORY COULD NOT BE BUILT FROM THE CLIENT
+
+`EN · 8c History` draws the user's own burns, and **nothing in the RPC surface returned them**.
+`home_summary` returns two aggregates; `clan_book` returns the **clan's** entries. ⚠️ `public.burns`
+and `public.tributes` have RLS enabled with **no policy**, so a plain client select answers `[]`
+with **no error** — and the screen would have read *"Nothing here yet"* over a hundred rows.
+
+✅ **Migration `20261101101000_my_offerings.sql` — APPLIED to the hosted project** (`db push`), and
+applied locally by `supabase db reset` (⚠️ **`supabase start` restores a BACKUP and does NOT apply a
+new migration file — `db reset` is what re-applies from disk**).
+
+| function | returns |
+|---|---|
+| `my_offerings(p_limit)` | the caller's own burns, newest first |
+| `my_offerings_week()` | burns + award over the **trailing 7 days** + the stored streak |
+
+⚠️ Both **`SECURITY DEFINER`**, scoped to `auth.uid()` **in the WHERE clause** — not by a policy the
+caller could widen. That is the board's own footnote: *"Only your offerings — nothing about others."*
+
+⚠️ Both return the burn's **STORED** band and award, never a re-derivation — recomputing the award
+would silently rewrite history the moment a multiplier changes.
+
+⚠️ `my_offerings_week` is a **second function**, not a fold of the first: the client holds a PAGE, so
+a heavy week would report a total **smaller than the list beneath it**.
+
+⚠️ **"Week" is a trailing 7 days** because the league week (Mon–Sun) and the streak period (local
+day) already disagree; picking either would invent a third meaning.
+
+### ⚠️⚠️ THE BUG `check:clanapi` CAUGHT — and `tsc` could not
+
+A `returns table (…)` function comes back from PostgREST as an **ARRAY OF ROWS, even for one row**.
+`myOfferingsWeek` read it as an **object**, so every field was `undefined` and the `?? 0` rendered
+**"0 burned · 0 tribute"** over a real week. ⚠️ **There are no generated DB types, so `tsc` is blind
+to it.** The contract test now asserts the LIST shape explicitly.
+
+### ✅ Verified on glass
+
+**Profile:** the clan · `Clan Head` · 600 tribute · 1-day streak · three rows.
+**History:** `THIS WEEK 0 burned · +0 tribute · 🔥 1 day` · **ALL OFFERINGS with a real burn row**
+(*"Photo offering · 24 Oct · 2:00 PM · Devout ×1.5 · +600"*) · the board's footnote.
+
+⚠️ **`"🔥 1 days"` was caught ON GLASS** — the board draws only the 12-day case, so the singular is
+ours (`streakDayKey`, asserted).
+
+### Gates
+
+`check:lib` **603 → 619** · `check:clanapi` **111 → 122** · `check:sql` **27/27** ·
+`supabase/tests/my_offerings.sql` **O1–O6 all green** · `npm run check` **EXIT 0** · `tsc` 0.
+
+### ⚠️ Still open on SCRUM-151
+
+**Collection** needs a per-item aggregate (`burned ×N`) that no RPC returns — the row stays disabled
+rather than showing an invented count. ⚠️ And the destructive **delete has still never been run**
+(it would erase the owner's test clan).
 

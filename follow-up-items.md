@@ -311,15 +311,20 @@
 
 ### 🔧 Engineering, small
 
-- **`SCRUM-151` — what remains after the switcher.** ✅ The language switcher is built, persisted and
-  **verified on glass**; delete-all is wired behind the SCRUM-123 `ConfirmCard`. ⚠️ **Still open:**
-  - the **Profile screen** (`EN · 8 Profile`) — and therefore the **Profile tab**, still disabled;
-  - **History** and **Collection** — ⚠️ **neither has a server read.** The RPC surface
-    (`home_summary` · `clan_book` · `submit_burn` · …) returns no user tributes, and `public.tributes`
-    is unread. ⚠️ Adding it is a **migration**, which is why it is not in this pass. Both rows render
-    **disabled** rather than opening a screen that would show an empty list as fact.
+- **`SCRUM-151` — what remains after the switcher AND the history.** ✅ The language switcher is
+  built, persisted and **verified on glass** · ✅ **History is built** (it needed a migration —
+  `my_offerings` / `my_offerings_week`, **applied to the hosted project**) · ✅ delete-all is wired
+  behind the SCRUM-123 `ConfirmCard` · ✅ the **Profile screen** exists and the **Profile tab is
+  live**. ⚠️ **Still open:**
+  - **Collection** — the cards need a per-item aggregate (`burned ×N`) that no RPC returns, so the
+    row stays **disabled** rather than showing an invented count.
   - ⚠️ **The destructive delete has never been run.** The confirm path is verified; the delete itself
     would erase the owner's test clan, so it is their call.
+  - ⚠️ **The Profile board's league chip, `remembering since` line and burned/collected/credits
+    tiles are not drawn** — none has a read, and sample numbers look real and are invented.
+- **⚠️ `award_snapshot` is capped at 1650 by a CHECK, and `EN · 8c History` draws a `+1,920` bullseye.**
+  The board is illustrative and the constraint is the authority — noted, not fixed. Worth a look if
+  the award ladder ever moves.
 - **⚠️ A language change RESTARTS navigation at the shrine.** That is the deliberate cost of the
   `key={locale}` remount — the only reliable way to guarantee every string re-renders (see
   `locale-provider.tsx`). If the restart is judged too rude, the fix is to capture and restore the
