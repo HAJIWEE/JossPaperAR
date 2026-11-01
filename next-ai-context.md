@@ -1523,6 +1523,31 @@ demo→account handoff, so agree that seam before either lands; `219` lands with
 ⚠️ **Sprint gate** (`In Progress` outside the sprint) returned **EMPTY** before and after all of today's
 Jira writes.
 
+### 📱 THE APK IS ON THE DEVICE — and it runs STANDALONE (2026-11-01)
+
+| | |
+|---|---|
+| build | **`a1e226db-f7f5-42a6-8d60-811f83453773`** · profile `preview` · **FINISHED** in **19 m 51 s** |
+| commit | `24560c6` — read off the build record, so it is provably the tree that was built |
+| artifact | `https://expo.dev/artifacts/eas/3s7H0MRNvH-4HwXbPRDtyh9d74-7K5SpSsV3kV3hQTk.apk` (**142 MB**) |
+| install | `adb install -r` → **Success**, and ⚠️ **verified ON THE DEVICE**: `dumpsys package app.josspaperar` moved `lastUpdateTime` **08:26:31 → 21:43:13** |
+| standalone | ✅ **Metro was STOPPED**, then the app was launched — `app.josspaperar/.MainActivity` is top-resumed and the shrine renders |
+
+⚠️ **`app.josspaperar` IS A SECOND INSTALL, NOT EXPO GO.** The device now carries **both**: Expo Go
+(`host.exp.exponent`) with the account it has held all session, and the standalone APK with its **own**
+anonymous session (a different clan, a different wallet). ⚠️ **`adb install -r` keeps app data**, so the
+standalone app kept the session it already had — which is why it shows state rather than a first run.
+
+⚠️⚠️ **THE TRAP I HIT, WORTH KEEPING: `eas build` PRINTS THE BUILD PAGE, NOT THE ARTIFACT.**
+My first watcher grepped `/tmp/eas.log` for `expo.dev/artifacts/*.apk` and **never fired** — the CLI prints
+`…/projects/joss-paper-ar/builds/<id>` and nothing else. The artifact URL only comes from the **EAS API**
+(`build_info` → `artifacts.applicationArchiveUrl`). ⚠️ **A watcher that greps for the wrong string fails
+silently and looks like a slow build** — it sat "waiting" for 25 minutes after the build had finished.
+⚠️ **Poll `build_info`, not the CLI's stdout.**
+
+⚠️ **And the build is ~142 MB / ~20 min because the archive is 178 MB** — EAS's own log says so and points
+at `.easignore`. Not a problem today; worth knowing before the next one.
+
 ⚠️ **THE ENTRY-POINT BOARDS WERE REWORKED, because the earlier shape was wrong.** They were drafted as a
 tappable **offer row** — but a *required* account is not an offer, and ADR-004 rule 3's own reasoning
 rejects a soft wall (*"a hard wall with worse manners"*). So the row is **gone**; the two boards are now
