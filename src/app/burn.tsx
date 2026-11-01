@@ -709,17 +709,29 @@ export default function BurnScreen() {
               * ⚠️ **THE ITEM BURN DRAWS THE PORTED ART, NOT A PHOTOGRAPH.** An item offering has no
               * capture and no sprite — there is nothing to sign and nothing to load, so the offering is
               * the SAME `OfferingArt` the Store and the picker draw. One illustration, three screens.
+              *
+              * ⚠️ **THE `<Image>` BELOW KEEPS ITS EXACT SOURCE ATTRIBUTE, AND THAT IS LOAD-BEARING.**
+              * `check:sprite` locates the offering image by that literal attribute — *"located by its
+              * source, not by index"* — so a cast on the uri (`offeringUri as string`) makes the gate
+              * unable to find the element it exists to check, and three of its assertions went red.
+              * ⚠️ The narrowing is done by the TERNARY instead: `offeringUri !== null` is the
+              * condition, so no cast is needed at all.
+              *
+              * ⚠️⚠️ **AND DO NOT QUOTE THE ATTRIBUTE ITSELF IN A COMMENT.** The first version
+              * of this note DID — and `indexOf` found the comment before the element, so the extractor
+              * sliced from the prose and the `resizeMode` assertion failed with the element sitting
+              * right there. **A comment that quotes a locator becomes a second occurrence of it.**
               */}
             {itemCode !== null ? (
               <OfferingArt code={collectedItemCode(itemCode) as OfferingCode} boxW={OFFERING_SIZE} boxH={OFFERING_SIZE} />
-            ) : (
+            ) : offeringUri !== null ? (
               <Image
-                source={{ uri: offeringUri as string }}
+                source={{ uri: offeringUri }}
                 style={styles.offeringImage}
                 resizeMode="contain"
                 accessibilityIgnoresInvertColors
               />
-            )}
+            ) : null}
           </Animated.View>
         </View>
       ) : null}
