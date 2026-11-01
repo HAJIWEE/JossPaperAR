@@ -24,6 +24,7 @@ import { router } from 'expo-router';
 import { BAND_IDS, getBand, type BandId } from '@/domain/aim';
 import { OFFERINGS } from '@/domain/catalogue';
 import { myOfferings, myOfferingsWeek, type OfferingRow, type OfferingWeek } from '@/lib/account-api';
+import { ScreenHud } from '@/components/screen-hud';
 import { activeLocale, localized, t } from '@/lib/i18n';
 import { HISTORY_SPEC, HUD, burnedAtLabel, offeringGlyph, streakDayKey } from '@/lib/profile';
 import { brand, fontSize, radius, surface, text } from '@/theme/tokens';
@@ -53,24 +54,7 @@ export default function HistoryScreen() {
 
   return (
     <View style={styles.screen}>
-      {/* ── the HUD — `btn · back (ink)` + `hud · screen title` ─────────────── */}
-      <View style={[styles.abs, { left: HUD.back.x, top: HUD.back.y, width: HUD.back.size, height: HUD.back.size }]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('clan.back')}
-          testID="history-back"
-          onPress={() => {
-            if (router.canGoBack()) router.back();
-            else router.replace('/');
-          }}
-          style={({ pressed }) => [styles.back, pressed && styles.pressed]}
-        >
-          <Text style={styles.backGlyph}>{'\u2039'}</Text>
-        </Pressable>
-      </View>
-      <Text style={[styles.abs, { left: HUD.title.x, top: HUD.title.y }]} testID="history-title">
-        {t('hist.title')}
-      </Text>
+            <ScreenHud titleKey="hist.title" backTestID="history-back" titleTestID="history-title" />
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {failed ? (
@@ -122,20 +106,7 @@ const now = new Date();
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: surface.paper },
-  abs: { position: 'absolute' },
-  content: { paddingTop: HUD.back.y + HUD.back.size + 18, paddingHorizontal: HISTORY_SPEC.row.x, paddingBottom: 40 },
-  back: {
-    width: HUD.back.size,
-    height: HUD.back.size,
-    borderRadius: HUD.back.radius,
-    borderWidth: 2.5,
-    borderColor: brand.ink,
-    backgroundColor: surface.paper,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backGlyph: { color: text.ink, fontSize: 24, lineHeight: 28 },
-  title: { color: text.ink, fontSize: fontSize.titleRow.at390, fontWeight: '700' },
+  content: { paddingTop: HUD.touch.y + HUD.touch.size + 15, paddingHorizontal: HISTORY_SPEC.row.x, paddingBottom: 40 },
   sectionHead: {
     color: text.inkSoft,
     fontSize: fontSize.caption.at390,

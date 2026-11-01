@@ -15,10 +15,26 @@
 
 import type { Locale } from './i18n.ts';
 
-/** `btn · back (ink)` 18,40 42×42 r21 · `hud · screen title` at 60,51. Shared by both screens. */
+/**
+ * The screen header — `btn · back (ink)` + `hud · screen title`. Shared by Profile · Settings · History.
+ *
+ * ── ⚠️ THE VISIBLE CIRCLE IS 34, NOT THE BOARD'S 42 ─────────────────────────
+ * `EN · 8` / `8b` / `8c` all draw `btn · back (ink)` at **18,40 42×42** with a **2.5** stroke, and
+ * `hud · screen title` starting at **x60** — i.e. the ring ends at exactly 60, where the text begins.
+ * ⚠️ **On glass the ring reads as touching the `S`**, and a bold filled circle out-weighs the 17 dp
+ * title beside it. Measured on `HN615L005386`, 2026-11-01.
+ *
+ * ⚠️ So this is a **deliberate departure**, filed for the board rather than copied: a port that
+ * reproduces an unreadable header is not more faithful, it is wrong in the same way.
+ * ⚠️ **The TOUCH target stays 44** — the circle shrinks, what the finger hits does not.
+ */
 export const HUD = {
-  back: { x: 18, y: 40, size: 42, radius: 21 },
-  title: { x: 60, y: 51 },
+  /** ⚠️ Invisible, 44 — the project's floor for the 40–50s audience (N11). */
+  touch: { x: 14, y: 41, size: 44 },
+  /** ⚠️ The VISIBLE circle, drawn centred inside the touch target. Was the board's 42 / stroke 2.5. */
+  back: { size: 34, borderWidth: 2 },
+  /** `hud · screen title` — ⚠️ x moved **60 → 66**, so there is a real gap from the circle. */
+  title: { x: 66, y: 51 },
 } as const;
 
 /**

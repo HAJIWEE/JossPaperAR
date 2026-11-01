@@ -27,6 +27,7 @@ import { ConfirmCard } from '@/components/confirm-card';
 import { LocaleToggle } from '@/components/locale-toggle';
 import { deleteMyData, resetIdentity } from '@/lib/account-api';
 import { clearFirstRun } from '@/lib/first-run';
+import { ScreenHud } from '@/components/screen-hud';
 import { t } from '@/lib/i18n';
 import { HUD, SETTINGS_ROW } from '@/lib/profile';
 import { brand, fontSize, onColorCream, radius, surface, text } from '@/theme/tokens';
@@ -128,24 +129,7 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.screen}>
-      {/* ── the HUD — `btn · back (ink)` + `hud · screen title` ─────────────── */}
-      <View style={[styles.abs, { left: HUD.back.x, top: HUD.back.y, width: HUD.back.size, height: HUD.back.size }]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('clan.back')}
-          testID="settings-back"
-          onPress={() => {
-            if (router.canGoBack()) router.back();
-            else router.replace('/');
-          }}
-          style={({ pressed }) => [styles.back, pressed && styles.pressed]}
-        >
-          <Text style={styles.backGlyph}>{'\u2039'}</Text>
-        </Pressable>
-      </View>
-      <Text style={[styles.abs, { left: HUD.title.x, top: HUD.title.y }]} testID="settings-title">
-        {t('settings.title')}
-      </Text>
+            <ScreenHud titleKey="settings.title" backTestID="settings-back" titleTestID="settings-title" />
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <SectionHead titleKey="settings.general" />
@@ -207,20 +191,7 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: surface.paper },
-  abs: { position: 'absolute' },
-  content: { paddingTop: HUD.back.y + HUD.back.size + 18, paddingHorizontal: SETTINGS_ROW.x, paddingBottom: 40 },
-  back: {
-    width: HUD.back.size,
-    height: HUD.back.size,
-    borderRadius: HUD.back.radius,
-    borderWidth: 2.5,
-    borderColor: brand.ink,
-    backgroundColor: surface.paper,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backGlyph: { color: text.ink, fontSize: 24, lineHeight: 28 },
-  title: { color: text.ink, fontSize: fontSize.titleRow.at390, fontWeight: '700' },
+  content: { paddingTop: HUD.touch.y + HUD.touch.size + 15, paddingHorizontal: SETTINGS_ROW.x, paddingBottom: 40 },
   sectionHead: {
     color: text.inkSoft,
     fontSize: fontSize.caption.at390,

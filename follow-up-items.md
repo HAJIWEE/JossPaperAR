@@ -322,6 +322,14 @@
     would erase the owner's test clan, so it is their call.
   - ⚠️ **The Profile board's league chip, `remembering since` line and burned/collected/credits
     tiles are not drawn** — none has a read, and sample numbers look real and are invented.
+- **⚠️ The screen HUD's back circle is 34, not the board's 42.** `EN · 8` / `8b` / `8c` all draw
+  `btn · back (ink)` at **18,40 42×42** with a **2.5** stroke, and `hud · screen title` starts at
+  **x60** — so the ring ends exactly where the text begins. ⚠️ **On glass the ring reads as covering
+  the `S`** and out-weighs the 17 dp title beside it (measured 2026-11-01). The build uses
+  **34 / stroke 2**, title at **66**, and keeps the **44 touch target**. §26 pins **both** the board's
+  numbers and the build's, so neither "copy the board" nor "nudge it back" passes silently.
+  ⚠️ **Filed for the board — the three boards should be updated to match.** The three copies of this
+  header are now one component (`screen-hud.tsx`), which is why the fix could not land in two places.
 - **⚠️ `award_snapshot` is capped at 1650 by a CHECK, and `EN · 8c History` draws a `+1,920` bullseye.**
   The board is illustrative and the constraint is the authority — noted, not fixed. Worth a look if
   the award ladder ever moves.

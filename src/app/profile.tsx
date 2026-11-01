@@ -24,6 +24,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { myClans } from '@/lib/clan-api';
 import { fetchHomeSummary } from '@/lib/home-api';
 import { homePanels } from '@/lib/home-panels';
+import { ScreenHud } from '@/components/screen-hud';
 import { t } from '@/lib/i18n';
 import { HUD, PROFILE_CARD, PROFILE_ROWS, PROFILE_ROW, rowIsLive } from '@/lib/profile';
 import { ROLE_LABEL_KEY } from '@/lib/clan-flow';
@@ -119,24 +120,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.screen}>
-      {/* ── the HUD — `btn · back (ink)` + `hud · screen title` ─────────────── */}
-      <View style={[styles.abs, { left: HUD.back.x, top: HUD.back.y, width: HUD.back.size, height: HUD.back.size }]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('clan.back')}
-          testID="profile-back"
-          onPress={() => {
-            if (router.canGoBack()) router.back();
-            else router.replace('/');
-          }}
-          style={({ pressed }) => [styles.back, pressed && styles.pressed]}
-        >
-          <Text style={styles.backGlyph}>{'\u2039'}</Text>
-        </Pressable>
-      </View>
-      <Text style={[styles.abs, { left: HUD.title.x, top: HUD.title.y }]} testID="profile-title">
-        {t('profile.title')}
-      </Text>
+            <ScreenHud titleKey="profile.title" backTestID="profile-back" titleTestID="profile-title" />
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {/* ── the header card ──────────────────────────────────────────────── */}
@@ -187,20 +171,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: surface.paper },
-  abs: { position: 'absolute' },
-  content: { paddingTop: HUD.back.y + HUD.back.size + 18, paddingHorizontal: PROFILE_CARD.x, paddingBottom: 40 },
-  back: {
-    width: HUD.back.size,
-    height: HUD.back.size,
-    borderRadius: HUD.back.radius,
-    borderWidth: 2.5,
-    borderColor: brand.ink,
-    backgroundColor: surface.paper,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backGlyph: { color: text.ink, fontSize: 24, lineHeight: 28 },
-  title: { color: text.ink, fontSize: fontSize.titleRow.at390, fontWeight: '700' },
+  content: { paddingTop: HUD.touch.y + HUD.touch.size + 15, paddingHorizontal: PROFILE_CARD.x, paddingBottom: 40 },
   card: {
     minHeight: PROFILE_CARD.headerH,
     borderRadius: PROFILE_CARD.radius,

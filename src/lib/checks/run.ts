@@ -58,6 +58,7 @@ import {
 } from '../locale.ts';
 import {
   HISTORY_SPEC,
+  HUD,
   LOCALE_PILL,
   PROFILE_ROUTE,
   PROFILE_ROUTES,
@@ -1628,7 +1629,38 @@ function localeChecks(): void {
   check('an empty name yields an empty glyph (no crash on a blank plaque)',
     offeringGlyph('   ') === '');
 
-  // ── the History geometry (the board's `hist · *`) ─────────────────────────
+  // ── the screen HUD (Profile · Settings · History) ─────────────────────────
+  /**
+   * ⚠️⚠️ **THE RING MUST NOT TOUCH THE TITLE.** The board puts a 42 circle at x18 with a 2.5 stroke
+   * and starts `hud · screen title` at x60 — so the ring ends exactly where the text begins, and on
+   * glass it reads as covering the `S`. Measured 2026-11-01, filed for the board.
+   */
+  const circleLeft = HUD.touch.x + (HUD.touch.size - HUD.back.size) / 2;
+  const circleRight = circleLeft + HUD.back.size;
+  check('⚠️ the back circle does NOT touch the title (the on-glass defect)',
+    HUD.title.x > circleRight,
+    `circle ends at ${circleRight}, title starts at ${HUD.title.x}`);
+  /**
+   * ⚠️⚠️ **THE BOARD'S OWN NUMBERS ARE PINNED TOO** — the §22 rule: when the board is wrong, assert
+   * BOTH numbers, so neither "copy the board" nor "nudge it back" can pass silently.
+   * `btn · back (ink)` is at x18 and 42 wide, so its ring ends at **60** — exactly where
+   * `hud · screen title` begins. That is the defect, stated as arithmetic.
+   */
+  const BOARD_RING_RIGHT = 18 + 42;
+  check('⚠️ …and the BOARD\'s own numbers WOULD touch (this is why the build deviates)',
+    BOARD_RING_RIGHT >= 60,
+    `board ring ends ${BOARD_RING_RIGHT}, board title starts 60`);
+  // ⚠️ POSITIVE CONTROL — the detector must FIRE when the title is moved back onto the ring.
+  check('⚠️ guard: moving the title onto the ring makes the check FAIL',
+    !(53 > circleRight), `title at 53 vs ring at ${circleRight}`);
+  check('⚠️ …and the TOUCH target is still ≥ 44 — the CIRCLE shrank, not the target',
+    HUD.touch.size >= 44, `${HUD.touch.size}`);
+  check('⚠️ …and the visible circle is SMALLER than the board\'s 42 (a filed deviation)',
+    HUD.back.size < 42, `${HUD.back.size}`);
+  check('…and it is drawn INSIDE the touch target, not beside it',
+    HUD.touch.size > HUD.back.size && circleLeft >= HUD.touch.x);
+  check('…and the title clears the touch target too (not just the circle)',
+    HUD.title.x >= HUD.touch.x + HUD.touch.size);
   check('the week card is the board\'s 350×64 r14',
     HISTORY_SPEC.week.w === 350 && HISTORY_SPEC.week.h === 64 && HISTORY_SPEC.week.radius === 14);
   check('the entry row is 350×88 r12, with a 60 thumb',
