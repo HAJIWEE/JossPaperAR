@@ -1158,3 +1158,114 @@ this ticket named.
 `check:lib` **657 → 660** (3 new, incl. a positive control) · `npm run check` **EXIT 0** · `tsc` 0.
 ⚠️ **US$0.00** — no AI call, no EAS build.
 
+
+---
+
+# 📍 SESSION — 2026-11-01 (S72, final) — THE STANDARD ITEMS' ART, AND THE ITEM BURN
+
+⚠️ **Read this section before touching `components/offering-art.tsx`, `assets/offerings/`, or the
+burn path.** Three things changed shape in ways that are not obvious from the diff.
+
+## ⚠️⚠️ 1 · THE STANDARD-ITEM ART IS NOW A RASTER, NOT 82 SVG SHAPES
+
+**Owner's finding:** *"the standard items' Art Style is not consistent with the art generated thru
+the pipeline."* **Confirmed** — the five items were hand-ported Penpot vectors (flat fills, hard
+outlines) while a Path C capture is a **very coarse low-poly 3D cartoon**. Two visual languages on
+one screen.
+
+**What was done:**
+
+1. **Regenerated in the pipeline's OWN style** — `fal-ai/nano-banana-2`, the endpoint
+   `_shared/pathc.ts:366` calls, from `STYLE_TEMPLATE_V3` **verbatim** (`_shared/pathtemplate.ts`).
+   Two variants each, **all ten kept** in `design-system/standard-item-art/`.
+2. **The owner picked:** `gold-bar-v1` · `house-v2` · `joss-paper-stack-v1` · `smartphone-v1` ·
+   `wealth-bundle-v1`.
+3. **Cut out with `fal-ai/birefnet/v2`** — the pipeline's **own stage ④** — because a generated image
+   sits on the warm rice-paper background the template *asks for* and the app draws **over the camera**.
+4. **Cropped to the alpha bbox + 2%**, so the subject FILLS its box rather than floating in
+   1024×1024 padding. ⚠️ **This is why the aspects now differ** — 0.50 (phone) against 1.44 (bundle).
+5. **Bundled as `<Image>`** at `assets/offerings/<code>.png` — **option 2**, the owner's call.
+
+⚠️⚠️ **THE TRADE-OFF IS NOW PERMANENT AND ACCEPTED:** the art **cannot be recoloured** and **does not
+scale losslessly**, and it costs **~2.4 MB of bundled assets**. ⚠️ **If the style changes again these
+are REGENERATED, not edited.** Option 1 (re-trace as `react-native-svg`, which is what every OTHER
+illustration here does — `fire-art.tsx`, `altar-halo.tsx`) was declined.
+
+⚠️ **Static `require`s, one per code.** Metro resolves those at BUILD time; a computed path
+(`require(\`…/${code}.png\`)`) bundles **nothing** and fails only on a device.
+
+## ⚠️ 2 · THE ITEM BURN EXISTS NOW — and it is TWO route readers, not one
+
+**`submitBurnItem(itemCode, accuracy, throwNo, clanId)`** is the half the client never had.
+`submit_burn` has accepted `item_code` since it was written and `award-service` forwards the payload
+untouched, but the only caller sent a `capture_id` — so an item burn was reachable by **no screen**.
+
+**The chain, all verified on glass except the last step:** buy → own → pick → burn.
+
+| piece | where |
+|---|---|
+| inventory read + purchase | `lib/offerings-api.ts` — ⚠️ **`inventory` is the ONE economy table with a client SELECT policy** (`inventory_select_own`), so this needed **no migration** |
+| the picker | `src/app/offerings.tsx` + `lib/picker.ts` — ⚠️ **an unowned item is DRAWN and drawn as unavailable**, because the board does exactly that (`card · Wealth Bundle (bg)` is `fill=none` with an outline) |
+| the item submit | `lib/ritual.ts` — the shared POST is `postBurn()` so the two paths cannot drift |
+| item mode on the burn screen | `src/app/burn.tsx` — draws the **same `OfferingArt`** the Store and picker draw |
+| the buy flow | `src/app/store.tsx` — a `ConfirmCard`, **one idempotency key per CONFIRM** |
+
+⚠️⚠️ **TWO PARALLEL ROUTE READERS — `readItemBurnParams` / `readItemRewardParams` sit BESIDE
+`readBurnParams` / `readRewardParams`, never widened.** `burns` XOR-enforces which id a burn carries
+and the server refuses a payload with **both or neither**; a single reader accepting either could
+express a state the server rejects, **and would make `captureId` optional on the photo path** — the
+defect `toRewardParams`' doc records.
+
+⚠️ **§30's FIRST VERSION LIED.** It asserted a payload carrying **both** ids would be refused by the
+photo reader. It is not — `readBurnParams` has never heard of `itemCode`. That is a **fact about the
+reader, not a bug in it**, so §30 now asserts the cross-checks that are *true*.
+
+## ⚠️ 3 · THREE TRAPS, ALL REAL, ALL RECORDED IN THE GATES
+
+1. **A COMMENT THAT QUOTES A LOCATOR BECOMES A SECOND OCCURRENCE OF IT.** `check:sprite` finds the
+offering `<Image>` by its literal source attribute; an item-mode comment *quoted* that attribute, so
+`indexOf` found the **comment** first and the `resizeMode` assertion failed **with the element sitting
+right there**. ⚠️ Do not quote a locator in a comment.
+2. **`ItemRewardParams` had to be a TYPE ALIAS, not an `interface`** — TypeScript gives implicit index
+signatures to aliases but not interfaces, and expo-router types `params` as an index-signature record.
+⚠️ **That rule was ALREADY documented in `route-params.ts` and was broken anyway.**
+3. **`check:copy` caught a `t()` call split across lines** — the extractor's blind spot, exactly what
+that check exists for.
+
+## ⚠️ 4 · THE STORE'S POINTS CHIP READS THE WRONG NUMBER — NOT FIXED
+
+* the chip reads `home_summary()` → **`sum(tributes.points)`**
+* `purchase_item` checks **`public.balances`** → **`sum(ledger_events.amount)`**
+
+⚠️ **They are different sources.** With 5000 in the ledger the chip showed **"Store Points 0"** and the
+purchase went through anyway — a player sees "0 points" beside a working Buy button. ⚠️ **There is no
+client read for the ledger balance** (`ledger_events` is RLS-on with no policy, like `burns`), so the
+fix needs a `SECURITY DEFINER` read, i.e. **a migration**. ⚠️ **This is the top of the next session.**
+
+## ⚠️ 5 · PRODUCTION DATA WAS WRITTEN, ON THE OWNER'S SAY-SO
+
+The test account **`a27627ad-d703-4606-87e1-7283a1e57ccc`** — identified from `auth.users` as the only
+identity signed in that day, ⚠️ **not guessed** — was credited with **+5000 tribute** via an
+`adjustment` `ledger_events` row (`seq 1`, reason *"SCRUM-149 and SCRUM-150 test credit…"*). ⚠️ **The
+ledger is APPEND-ONLY — a correction is a compensating row with a `reason`, never an `UPDATE`**, and
+the `ledger_adjustment_needs_reason` CHECK enforces it. The account then bought a Joss Paper Stack
+(−400 tribute, +80 store accrual) and now holds **4200 tribute · 80 store points · 1 × joss_paper_stack**.
+
+## ⚠️ NEXT SESSION — IN ORDER
+
+1. **LOOK AT THE NEW ART ON GLASS.** ⚠️ **This was NOT done.** The gate proves the sizes match the
+   files; it **cannot** prove they *look right* at 110×80 (Store/Collection/picker) and in the 72 px
+   burn box. ⚠️ **Expected problem: `smartphone` may read too small** — at 0.50 aspect it is tall and
+   thin, so in a wide box it contains to about half the height. `adb reverse` + Metro, then Store →
+   Collection → picker → burn, screenshotting each.
+2. **The points chip defect (§4 above)** — a migration + a `SECURITY DEFINER` balance read.
+3. **`7d` item detail and `7e`'s own buy sheet** — the buy is a `ConfirmCard` on the storefront, not
+   the board's shape. ⚠️ **The cash rail remains native**: Google Play Billing, an EAS build, Play
+   Console, with no read for a cash balance anywhere.
+
+## Gates
+
+`check:lib` **697 → 708 → 723** · `check:clanapi` **122 → 134** · `npm run check` **EXIT 0** · `tsc` 0 ·
+`expo-doctor` 21/21 · **US$0.41 spent this session** (US$0.40 of images + US$0.01 of cutouts), all
+**estimates at published rates**, flagged as such in `project-costs.md`. fal.ai ≈ **US$6.39 / S$8.18**
+of the approved US$10–20.
