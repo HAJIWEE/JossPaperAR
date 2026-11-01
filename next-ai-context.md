@@ -683,3 +683,23 @@ adb shell dumpsys package app.josspaperar | grep -i lastUpdateTime
 
 ⚠️ `SCRUM-145`'s lesson: an install can be **rejected** (`INSTALL_FAILED_USER_RESTRICTED`) *after*
 a successful download and still print success. `lastUpdateTime` is the only proof.
+
+### ✅ UPDATE (2026-11-01 08:26) — the APK IS ON THE GLASS
+The build finished overnight and is installed on `HN615L005386`:
+
+| | |
+|---|---|
+| `lastUpdateTime` | **2026-11-01 08:26:31** (read off `dumpsys`, not `adb`'s exit code) |
+| `versionName` | 1.0.0 · `versionCode` 1 · targetSdk 36 |
+| code | commit **`89d15cd`** — ⚠️ `git diff 89d15cd..HEAD` touches **only `.md` files**, so the APK carries the current code |
+
+⚠️ **The overnight watcher's install FAILED** (`adb: no devices/emulators found`) — the phone was
+disconnected. Re-run by hand once it is attached; `adb install -r` took ~5 s for the 133 MB APK.
+
+✅ **Verified in the RELEASE bundle, not just Expo Go:** home renders (`home-add-slot`,
+`home-tabbar-band`), the clan pill resolves, and tapping `＋` opens the sheet with all five
+controls — so the role read works outside the dev client too.
+⚠️ The altar reads **empty** on this device because the standalone app is a **different account**
+(`Gwee`, 3,850 tribute, 2-day streak) from the Expo Go test clan (`Ba`, 600, 1-day) where `Chen`
+was added. Not a defect — different data.
+✅ **And the Expo Go dev FAB is gone**, so the settings gear is finally unobstructed.
