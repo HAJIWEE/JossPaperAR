@@ -48,6 +48,15 @@ import {
   shouldHoldInvite,
 } from '../invite-flow.ts';
 import { LOCALES, MESSAGES, detectLocale, localized, messageKeys, setLocale, t } from '../i18n.ts';
+import {
+  LOCALE_KEY,
+  LOCALE_LABELS,
+  detectLocaleFromTags,
+  isLocale,
+  normaliseLocale,
+  resolveInitialLocale,
+} from '../locale.ts';
+import { LOCALE_PILL, PROFILE_ROWS, rowIsLive } from '../profile.ts';
 import { TABLET_NAME_MAX, nameOrientation, rotatedNameSize, tabletName } from '../tablet-name.ts';
 import {
   ANCESTOR_CAP,
@@ -1507,6 +1516,79 @@ function shrineGeometryChecks(): void {
 }
 
 /**
+ * §26 · The language switcher (SCRUM-151 · SCRUM-34).
+ *
+ * ⚠️ **Measured 2026-11-01: `setLocale` was called from no screen and no component**, so the app was
+ * permanently English while every string was translated and §15/§16 held both tables. ⚠️ A reviewer
+ * could not reach 中文. These assertions hold the rules that fix it — the RULES, because the control
+ * itself is a device fact and the ORDER of precedence is a fact about data.
+ */
+function localeChecks(): void {
+  section('26 · The language switcher — untrusted input, the device only as a guess (SCRUM-151)');
+
+  // ⚠️ READER CONTROL FIRST: a renamed key or a missing label reads `undefined`, and every
+  // assertion below would then pass or fail for the wrong reason.
+  check('every locale has a label (an option with no label is invisible)',
+    LOCALES.every((l) => typeof LOCALE_LABELS[l] === 'string' && LOCALE_LABELS[l].length > 0),
+    JSON.stringify(LOCALE_LABELS));
+  check('⚠️ the labels are ENDONYMS — 中文 is not hidden behind an English word',
+    LOCALE_LABELS.zh === '中文' && LOCALE_LABELS.en === 'EN');
+  check('the storage key is namespaced', LOCALE_KEY.startsWith('josspaperar.'), LOCALE_KEY);
+
+  // ── normaliseLocale — a stored value is UNTRUSTED ─────────────────────────
+  check('a valid tag passes through', normaliseLocale('zh') === 'zh');
+  check('…case-insensitively, and trimmed', normaliseLocale('ZH') === 'zh' && normaliseLocale('  en  ') === 'en');
+  check('⚠️ a full device tag falls back to its LANGUAGE (zh-Hans-SG → zh)',
+    normaliseLocale('zh-Hans-SG') === 'zh', normaliseLocale('zh-Hans-SG'));
+  check('⚠️ an unknown tag does NOT pass through — it becomes the default',
+    normaliseLocale('fr') === 'en' && normaliseLocale('klingon') === 'en');
+  check('…and so do null / undefined / empty / whitespace',
+    normaliseLocale(null) === 'en' && normaliseLocale(undefined) === 'en'
+      && normaliseLocale('') === 'en' && normaliseLocale('   ') === 'en');
+  // ⚠️ POSITIVE CONTROL — the guard must FIRE, not merely return the default by luck.
+  check('⚠️ guard: `isLocale` rejects exactly what `normaliseLocale` had to correct',
+    !isLocale('fr') && !isLocale('zh-Hans-SG') && isLocale('zh') && isLocale('en'));
+
+  // ── resolveInitialLocale — the ORDER is the rule ──────────────────────────
+  check('a stored choice WINS over the device', resolveInitialLocale('en', ['zh-Hans-SG']) === 'en');
+  check('⚠️ …even when it disagrees — an English speaker on a Chinese phone asked for English',
+    resolveInitialLocale('en', ['zh']) === 'en');
+  check('no stored value → the DEVICE decides', resolveInitialLocale(null, ['zh-Hans-SG']) === 'zh');
+  check('…and an EMPTY stored value counts as no choice', resolveInitialLocale('', ['zh']) === 'zh');
+  check('…and a whitespace one does too', resolveInitialLocale('   ', ['zh']) === 'zh');
+  check('a device with no opinion → the default', resolveInitialLocale(null, []) === 'en');
+  check('…and an unrecognised device tag does too', resolveInitialLocale(null, ['fr-CA']) === 'en');
+
+  // ⚠️ THE LOCAL TAG WALK MUST AGREE WITH i18n's — a second opinion is a drift waiting to happen.
+  const TAGS: readonly (readonly string[])[] = [['zh-Hans-SG'], ['en-SG'], ['fr-CA'], [], ['zh'], ['en-GB']];
+  const disagreed = TAGS.filter((tags) => detectLocaleFromTags(tags) !== detectLocale(tags));
+  check('⚠️ the local tag walk agrees with `i18n.detectLocale` on every sample',
+    disagreed.length === 0, JSON.stringify(disagreed));
+
+  // ── the switcher's geometry — the board's `set · lang pill` ───────────────
+  check('the pill is the board\'s 118×32, r16',
+    LOCALE_PILL.w === 118 && LOCALE_PILL.h === 32 && LOCALE_PILL.radius === 16);
+  check('⚠️ the active segment is INSET, so it sits INSIDE the track rather than on it',
+    LOCALE_PILL.inset > 0 && LOCALE_PILL.inset < LOCALE_PILL.h / 2);
+
+  // ── the Settings rows: wired, or visibly disabled — never a dead link ─────
+  check('no Settings row links to a route that does not exist',
+    PROFILE_ROWS.filter((r) => r.route !== null).every((r) => r.route === '/settings'));
+  check('…and `rowIsLive` is the ONE place "is it wired" is decided',
+    rowIsLive('/settings') && !rowIsLive(null));
+
+  // ── the copy the switcher needs exists in BOTH locales ───────────────────
+  const SETTINGS_KEYS = [
+    'settings.title', 'settings.general', 'settings.privacy', 'settings.language', 'settings.notBuilt',
+    'settings.deleteAll', 'settings.deleteTitle', 'settings.deleteBody', 'settings.deleteConfirm',
+    'settings.deleting', 'settings.deleteFailed', 'settings.retentionSub',
+  ];
+  const missingCopy = SETTINGS_KEYS.filter((k) => !keyInBothLocales(k));
+  check(`every Settings string exists in BOTH locales (${SETTINGS_KEYS.length})`,
+    missingCopy.length === 0, missingCopy.join(', '));
+}
+
+/**
  * 19 · The altar's offerings sit on their trays (SCRUM-162).
  *
  * ⚠️ WHY THIS EXISTS, in the owner's words: *"the placement of the decorations on the
@@ -1971,6 +2053,7 @@ async function main(): Promise<void> {
   ancestorSheetChecks();
   tabletNameChecks();
   shrineGeometryChecks();
+  localeChecks();
 
   check('guard: a 5-character key is NOT valid', !isValidIdempotencyKey('12345'));
   check('guard: junk is NOT a clan code', normaliseClanCode('not-a-code!!') === null);

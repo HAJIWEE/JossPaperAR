@@ -145,6 +145,37 @@ export const MESSAGES = {
     'nav.league': 'League',
     'nav.store': 'Store',
     'nav.profile': 'Profile',
+    // ── Settings (SCRUM-151) ────────────────────────────────────────────────
+    // ⚠️ Board copy: `EN · 8b Settings`, read 2026-11-01. ⚠️ The board's *"(SCRUM-43)"* on the
+    // policies row is a WIRE ANNOTATION and is deliberately NOT shipped — the same ruling the
+    // store's buy-confirm body got ("IAP sheet = placeholder in this wire.").
+    'settings.title': 'Settings',
+    'settings.general': 'General',
+    'settings.privacy': 'Privacy',
+    'settings.language': 'Language',
+    'settings.notifications': 'Daily remembrance reminder',
+    'settings.notificationsSub': 'One nudge each evening · 8:00 PM',
+    'settings.retention': 'Original photos',
+    'settings.retentionSub': 'Auto-deleted 7 days after the offering is ready',
+    'settings.analytics': 'Share usage analytics',
+    'settings.analyticsSub': "Off — we don't need it to run the app",
+    'settings.export': 'View or export my data',
+    'settings.exportSub': 'A summary of everything we hold',
+    'settings.deleteAll': 'Delete everything',
+    'settings.deleteAllSub': 'Erases offerings, collection & points — receipt issued',
+    'settings.policies': 'Privacy policy · Terms of Service',
+    'settings.policiesSub': 'Published at josspaperar.app',
+    'settings.signOut': 'Sign out',
+    // ⚠️ The confirm's body names the CONSEQUENCES, which is what SCRUM-151 asks for — a card that
+    // says only "are you sure?" is the thing ADR-007's one-tap delete is not allowed to be.
+    'settings.deleteTitle': 'Delete everything?',
+    'settings.deleteBody': 'This erases your offerings, your collection and your tribute points. It cannot be undone, and you will start again from first run.',
+    'settings.deleteConfirm': 'Delete everything',
+    'settings.deleting': 'Deleting…',
+    'settings.deleteFailed': 'The delete did not go through — nothing has been erased. Try again.',
+    // ⚠️ Shown on a row whose screen or server read does not exist yet. ⚠️ NOT a placeholder for a
+    // dead link: the row renders DISABLED with this as its sub-label (the tab-bar pattern).
+    'settings.notBuilt': 'Not built yet',
     // ⚠️ The tablet sheet (SCRUM-146 · SCRUM-168). Every limit named here is the DB's own.
     // ⚠️ The sheet's copy is `EN · 1s Ancestor sheet` / `EN · 1s2 … / edit mode`, read off
     // Penpot 2026-11-01 — NOT written here. The title says *ancestor* (the person), not
@@ -437,6 +468,31 @@ export const MESSAGES = {
     'nav.league': '联赛',
     'nav.store': '商店',
     'nav.profile': '我的',
+    // ── 设置（SCRUM-151）────────────────────────────────────────────────────
+    // ⚠️ 文案取自 `ZH · 8b 设置`（Penpot，2026-11-01）。⚠️ 板上的「(SCRUM-43)」是线稿批注，不予发布。
+    'settings.title': '设置',
+    'settings.general': '通用',
+    'settings.privacy': '隐私',
+    'settings.language': '语言',
+    'settings.notifications': '每日追思提醒',
+    'settings.notificationsSub': '每晚提醒一次 · 20:00',
+    'settings.retention': '原始照片',
+    'settings.retentionSub': '供奉完成后 7 天自动删除',
+    'settings.analytics': '分享使用数据',
+    'settings.analyticsSub': '已关闭 — 运行应用并不需要它',
+    'settings.export': '查看或导出我的数据',
+    'settings.exportSub': '我们保存的全部内容摘要',
+    'settings.deleteAll': '删除全部',
+    'settings.deleteAllSub': '清空供品、收藏与功德点 — 并出具回执',
+    'settings.policies': '隐私政策 · 服务条款',
+    'settings.policiesSub': '发布于 josspaperar.app',
+    'settings.signOut': '退出登录',
+    'settings.deleteTitle': '删除全部？',
+    'settings.deleteBody': '此操作将清空你的供品、收藏与功德点，无法撤销，并将回到首次使用状态。',
+    'settings.deleteConfirm': '删除全部',
+    'settings.deleting': '正在删除…',
+    'settings.deleteFailed': '删除未成功 — 未清除任何数据。请重试。',
+    'settings.notBuilt': '尚未实现',
     // ⚠️ 牌位弹层 — 文案取自 `ZH · 1s 安奉牌位` / `ZH · 1s2 … / 编辑`（Penpot，2026-11-01）。
     'ancestor.titleAdd': '添加祖先',
     'ancestor.titleEdit': '编辑祖先',

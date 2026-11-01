@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { LocaleProvider } from '@/components/locale-provider';
 import { ensureAnonymousSession } from '@/lib/session';
 import { surface } from '@/theme/tokens';
 
@@ -51,12 +52,21 @@ export default function RootLayout() {
         ⚠️ A route file is enough. Options belong in the layout only when they cannot change routing,
         and this one did.
       */}
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: surface.paper },
-        }}
-      />
+      {/*
+        ⚠️ `LocaleProvider` wraps the WHOLE navigator, and it REMOUNTS it on a language change
+        (`key={locale}` inside the provider). That is deliberate and load-bearing: `t()` reads
+        `i18n.locale` at call time and React cannot see that dependency, so nothing short of a
+        remount guarantees "every visible string changes" — see the provider's header.
+        ⚠️ The cost is that a language change restarts navigation at the shrine.
+      */}
+      <LocaleProvider>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: surface.paper },
+          }}
+        />
+      </LocaleProvider>
     </SafeAreaProvider>
   );
 }

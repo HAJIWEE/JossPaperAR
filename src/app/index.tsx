@@ -301,33 +301,32 @@ export default function HomeShrine() {
               <ClanPill clans={clans} scale={s} />
             </View>
             {/*
-              ⚠️ DECORATIVE FOR NOW, and deliberately not a `Pressable`. The board draws
-              this as `btn · settings` and the gear belongs here — but the settings screen
-              arrives with SCRUM-151, and ⚠️ **a control that renders and does nothing is
-              the SCRUM-145 defect** (an inert "Throw again" that passed every per-screen
-              gate). It becomes a button the moment it has a destination, not before.
-
-              ⚠️ The BUTTON SURFACE is part of the board and was missing at first: the
-              owner read the bare gear as misaligned, and it was — `btn · settings` is a
-              `#EAE2D2` fill with a **2.5 px ink stroke and r14**, i.e. exactly the clan
-              pill's treatment (`PILL_SPEC.radius` 14 · `borderWidth` 2.5). Without it the
-              icon had nothing to sit in. ⚠️ RN draws the stroke INSIDE the box, so at
-              scale 1 the 2.5 is the right number here — no `CONTENT_PAD_H` correction,
-              because this surface holds no text to inset.
+              ⚠️ NOW A REAL CONTROL. It was **decorative** from SCRUM-160 until now, on purpose:
+              the settings screen arrives with SCRUM-151, and *"a control that renders and does
+              nothing is the SCRUM-145 defect"*. ⚠️ SCRUM-151's screen now exists, so the gear
+              navigates to it — and the surface was never the problem: `btn · settings` is a
+              `#EAE2D2` fill with a **2.5 px ink stroke and r14**, exactly the clan pill's
+              treatment (`PILL_SPEC.radius` 14 · `borderWidth` 2.5).
+              ⚠️ RN draws the stroke INSIDE the box, so at scale 1 the 2.5 is the right number
+              here — no `CONTENT_PAD_H` correction, because this surface holds no text to inset.
             */}
-            <View
-              style={[
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('settings.title')}
+              testID="home-settings-slot"
+              onPress={() => router.push('/settings')}
+              style={({ pressed }) => [
                 styles.abs,
                 bandRect(HOME_BANDS.settings, s),
                 styles.settingsBtn,
                 { borderRadius: 14 * s, borderWidth: 2.5 * s },
+                pressed && styles.pressed,
               ]}
-              testID="home-settings-slot"
             >
               <View style={{ width: 20 * s, height: 20 * s }}>
                 <SettingsGear />
               </View>
-            </View>
+            </Pressable>
           </>
         );
 
