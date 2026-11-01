@@ -1505,6 +1505,24 @@ agreeing with each other. ⚠️ Strictly stronger, and it is the owner's call.
 `capturesPhoto: false` yet — a flag asserted before the behaviour lands is a gate that passes while the code
 does the opposite, which is worse than no gate. The flag goes in **with** the change that removes the camera.
 
+### 📋 END-OF-SESSION — JIRA (all in **sprint 3, id 67**, each verified by read-back)
+
+| ticket | what | status |
+|---|---|---|
+| **`SCRUM-214`** | 🎯 the identity decision — the account, the profile name, the demo, the entry point | **In Progress** ⚠️ *(A) the profile name is STILL OPEN* |
+| **`SCRUM-215`** | 📧 build the email-first sign-up + sign-in (phase 1); Google is phase 2 | To Do |
+| **`SCRUM-216`** | 🎬 the first burn is JUST A DEMO on a STANDARD OFFERING — remove the camera | To Do |
+| **`SCRUM-217`** | 🎯 Decide: **three copy strings** need the owner's wording | To Do |
+| **`SCRUM-218`** | 🌐 the sign-up boards' `LANGUAGE` caption has **no control** (EN + ZH) | To Do |
+| **`SCRUM-219`** | 🔒 the email's privacy knock-ons — `delete_my_data` + the Play declaration | To Do |
+| **`SCRUM-213`** | the anon-executable `stale_job_grace` (fixed earlier today) | In Review |
+| **`SCRUM-150`** | the Store — AC 1 met (the wallet fix), `7d`/`7e` still owed → `SCRUM-212` | **In Review** |
+
+⚠️ **Order that matters:** `217` (copy) blocks `215` (the build); `216` and `215` touch the same
+demo→account handoff, so agree that seam before either lands; `219` lands with `215`.
+⚠️ **Sprint gate** (`In Progress` outside the sprint) returned **EMPTY** before and after all of today's
+Jira writes.
+
 ⚠️ **THE ENTRY-POINT BOARDS WERE REWORKED, because the earlier shape was wrong.** They were drafted as a
 tappable **offer row** — but a *required* account is not an offer, and ADR-004 rule 3's own reasoning
 rejects a soft wall (*"a hard wall with worse manners"*). So the row is **gone**; the two boards are now
