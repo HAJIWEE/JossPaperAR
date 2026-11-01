@@ -18,12 +18,30 @@ import { OFFERINGS, type Offering, type OfferingCode } from '../domain/catalogue
 export const STORE = {
   /** `text · intro` — 20,86. */
   intro: { y: 86 },
-  /** `chip · points balance` — 250,82 122×28. ⚠️ There is NO cash chip: see `CASH_IS_READABLE`. */
-  chip: { y: 82, w: 122, h: 28, radius: 14 },
-  /** `switcher · Offerings` 23,115 171×33 and `… Decorations` 197,115 171×33. */
+  /**
+   * `chip · points balance (bg)` — 250,82 122×28, fill **gold**, stroke **gold** 1.5, r14.
+   * ⚠️ There is NO cash chip: see `CASH_IS_READABLE`.
+   */
+  chip: { y: 82, w: 122, h: 28, radius: 14, stroke: 1.5 },
+  /**
+   * `switcher · Offerings` 23,115 171×33 and `… Decorations` 197,115 171×33, inside a
+   * `switcher · category (bg)` at **20,112 350×38** — fill `paperDeep`, stroke ink 2.5, **r19**,
+   * i.e. a PILL. ⚠️ Without the outer pill the two segments read as two loose buttons.
+   */
   switcher: { y: 115, w: 171, h: 33, radius: 10, xs: [23, 197] as const },
-  /** `tag · FEATURED` — 30,174 86×22. */
-  tag: { y: 174, w: 86, h: 22 },
+  switcherBg: { w: 350, h: 38, radius: 19, stroke: 2.5 },
+  /** `tag · FEATURED (bg)` — 30,174 86×22, fill **gold**, stroke ink 2, r8. */
+  tag: { y: 174, w: 86, h: 22, radius: 8, stroke: 2 },
+  /**
+   * ⚠️⚠️ **THE CARD FRAMES — WHICH THE FIRST BUILD OMITTED ENTIRELY.** The board draws
+   * `card · <name> (bg)` at **165×150**, fill `surface.row`, stroke **ink 2.5**, **r14**, and
+   * `card · featured` at **354×190**, stroke **ink 3**, **r18**. Without them the art and the
+   * prices float on the page with nothing holding them — the defect the owner caught on glass.
+   */
+  cardFrame: { w: 165, h: 150, radius: 14, stroke: 2.5 },
+  featuredFrame: { w: 354, h: 190, radius: 18, stroke: 3 },
+  /** `card · <name> points (bg)` — 68×24, fill **gold**, stroke ink 2, r12. */
+  pricePill: { w: 68, h: 24, radius: 12, stroke: 2 },
   /** `art · wealth bundle (ingots)` — 85,195 220×106. */
   featuredArt: { y: 195, w: 220, h: 106 },
   /** `card · featured name` 30,308 · `… value` 30,330. */
@@ -31,8 +49,12 @@ export const STORE = {
   featuredValue: { y: 330 },
   /** `heading · more bundles` — 20,368. */
   moreHead: { y: 368 },
-  /** The item cards: art 72 tall at +37, name at +75, meta at +93, price row at +113. */
-  card: { w: 165, xs: [20, 197] as const, ys: [405, 567] as const, artH: 72, name: 75, meta: 93, price: 113 },
+  /**
+   * The item cards — frames at **y 396 / 558**, 165×150. ⚠️ The inner offsets are from the
+   * FRAME's top (396), not from the art: art at **+9** (`art · Cash Bundle` is at 405), name at
+   * **+84** (480), meta at **+102** (498), the price row at **+122** (518).
+   */
+  card: { w: 165, xs: [20, 197] as const, ys: [396, 558] as const, artH: 72, name: 84, meta: 102, price: 122, pad: 12 },
   /** `note · store` — 24,806 342×34. */
   note: { y: 806 },
 } as const;

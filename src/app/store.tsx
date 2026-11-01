@@ -83,6 +83,11 @@ export default function StoreScreen() {
             </View>
 
             {/* ── the switcher ⚠️ Decorations is disabled, not dead ────────── */}
+            {/* The pill BACKGROUND first — `switcher · category (bg)`, r19, ink 2.5. */}
+            <View
+              style={[styles.switcherBg, { height: STORE.switcherBg.h * s, borderRadius: STORE.switcherBg.radius * s, borderWidth: STORE.switcherBg.stroke * s, paddingHorizontal: 3 * s }]}
+              testID="store-switcher"
+            >
             <View style={[styles.switcher, { gap: (STORE.switcher.xs[1] - STORE.switcher.xs[0] - STORE.switcher.w) * s }]}>
               {STORE_TABS.map((tab) => (
                 <View
@@ -109,10 +114,14 @@ export default function StoreScreen() {
                 </View>
               ))}
             </View>
+            </View>
 
             {/* ── the FEATURED card ─────────────────────────────────────────── */}
-            <View style={styles.featured} testID="store-featured">
-              <View style={[styles.tag, { width: STORE.tag.w * s, height: STORE.tag.h * s }]}>
+            <View
+              style={[styles.featured, { borderRadius: STORE.featuredFrame.radius * s, borderWidth: STORE.featuredFrame.stroke * s, paddingHorizontal: 12 * s, paddingTop: 12 * s }]}
+              testID="store-featured"
+            >
+              <View style={[styles.tag, { width: STORE.tag.w * s, height: STORE.tag.h * s, borderRadius: STORE.tag.radius * s, borderWidth: STORE.tag.stroke * s }]}>
                 <Text style={[styles.tagText, { fontSize: 10 * s }]}>{t('store.featured')}</Text>
               </View>
               <View style={{ height: STORE.featuredArt.h * s, alignItems: 'center', justifyContent: 'center' }}>
@@ -130,7 +139,11 @@ export default function StoreScreen() {
             <Text style={[styles.moreHead, { fontSize: 15 * s }]}>{t('store.more')}</Text>
             <View style={[styles.grid, { gap: (STORE.card.xs[1] - STORE.card.xs[0] - STORE.card.w) * s }]}>
               {more.map((item) => (
-                <View key={item.code} style={[styles.card, { width: STORE.card.w * s }]} testID={`store-item-${item.code}`}>
+                <View
+                  key={item.code}
+                  style={[styles.card, { width: STORE.cardFrame.w * s, height: STORE.cardFrame.h * s, borderRadius: STORE.cardFrame.radius * s, borderWidth: STORE.cardFrame.stroke * s, paddingHorizontal: STORE.card.pad * s }]}
+                  testID={`store-item-${item.code}`}
+                >
                   <View style={{ height: STORE.card.artH * s, alignItems: 'center', justifyContent: 'center' }}>
                     <OfferingArt code={item.code} boxW={STORE.card.w * s} boxH={STORE.card.artH * s} />
                   </View>
@@ -140,9 +153,13 @@ export default function StoreScreen() {
                   <Text style={[styles.meta, { fontSize: 11 * s }]} numberOfLines={1}>
                     {t('store.base', { value: String(baseMetaValue(item)) })}
                   </Text>
-                  <Text style={[styles.price, { fontSize: 11 * s }]} numberOfLines={1}>
-                    {pointsPrice(item) === null ? '' : t('store.price', { points: pointsPrice(item) as string })}
-                  </Text>
+                  {pointsPrice(item) === null ? null : (
+                    <View style={[styles.pricePill, { width: STORE.pricePill.w * s, height: STORE.pricePill.h * s, borderRadius: STORE.pricePill.radius * s, borderWidth: STORE.pricePill.stroke * s }]}>
+                      <Text style={[styles.priceText, { fontSize: 11 * s }]} numberOfLines={1}>
+                        {t('store.price', { points: pointsPrice(item) as string })}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               ))}
             </View>
@@ -173,28 +190,56 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
     paddingHorizontal: 12,
     justifyContent: 'center',
-    backgroundColor: surface.row,
-    borderWidth: 2,
-    borderColor: brand.ink,
+    backgroundColor: brand.gold,
+    borderWidth: 1.5,
+    borderColor: brand.gold,
     marginTop: 8,
   },
   chipText: { color: text.ink, fontWeight: '700' },
-  switcher: { flexDirection: 'row', marginTop: 12 },
+  switcherBg: {
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
+    backgroundColor: surface.paperDeep,
+    borderColor: brand.ink,
+    marginTop: 12,
+  },
+  switcher: { flexDirection: 'row' },
   tab: { alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: brand.ink },
   tabOn: { backgroundColor: brand.cinnabar },
   tabOff: { backgroundColor: 'transparent', opacity: 0.45 },
   tabText: { color: text.ink, fontWeight: '700' },
   tabTextOn: { color: surface.paper },
-  featured: { marginTop: 16 },
-  tag: { backgroundColor: surface.paperDeep, alignItems: 'center', justifyContent: 'center', borderRadius: 6 },
-  tagText: { color: text.inkSoft, fontWeight: '700', letterSpacing: 0.8 },
+  featured: {
+    marginTop: 16,
+    backgroundColor: surface.row,
+    borderColor: brand.ink,
+  },
+  tag: {
+    backgroundColor: brand.gold,
+    borderColor: brand.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
+  },
+  tagText: { color: text.ink, fontWeight: '700', letterSpacing: 0.8 },
   featuredName: { color: text.ink, fontWeight: '700' },
   featuredValue: { color: text.inkSoft },
   moreHead: { color: text.ink, fontWeight: '700', marginTop: 20, marginBottom: 10 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  card: { marginBottom: 16 },
+  card: {
+    marginBottom: 16,
+    backgroundColor: surface.row,
+    borderColor: brand.ink,
+  },
   name: { color: text.ink, fontWeight: '700' },
   meta: { color: text.inkSoft },
-  price: { color: text.ink, fontWeight: '700', marginTop: 4 },
+  pricePill: {
+    backgroundColor: brand.gold,
+    borderColor: brand.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+  },
+  priceText: { color: text.ink, fontWeight: '700' },
   note: { color: text.inkSoft, marginTop: 16 },
 });
