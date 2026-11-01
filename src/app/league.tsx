@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { router } from 'expo-router';
 
-import { Body, PageTitle, Screen } from '@/components/clan-ui';
+import { Body, GhostButton, PageTitle, Screen } from '@/components/clan-ui';
 import { LeagueBoardView } from '@/components/league-board';
 import { t } from '@/lib/i18n';
 import {
@@ -70,6 +71,22 @@ export default function LeagueScreen() {
       ) : (
         <LeagueBoardView board={board} />
       )}
+
+      {/*
+        ⚠️ THE WAY BACK (SCRUM-164). The tab bar PUSHES this screen, so `back()` returns to the
+        shrine — but a deep link into `/league` has no history, and there `back()` answers
+        *"the action GO_BACK was not handled by any navigator"* (the trap an earlier session hit).
+        `canGoBack()` guards it, and the fallback is `replace('/')` rather than `push('/')`: a
+        push would leave the shrine on the stack TWICE, which is the double-push the ticket names.
+      */}
+      <GhostButton
+        testID="league-shrine"
+        label={t('common.done')}
+        onPress={() => {
+          if (router.canGoBack()) router.back();
+          else router.replace('/');
+        }}
+      />
     </Screen>
   );
 }

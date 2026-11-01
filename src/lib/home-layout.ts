@@ -109,6 +109,21 @@ export const HOME_BANDS = {
   cta: { x: 20, y: 676, w: 350, h: 66 },
   /** `nav · tabbar (bg)` — 0,764 390×80. ⚠️ Four tabs: Shrine · League · Store · Profile. */
   tabbar: { x: 0, y: 764, w: 390, h: 80 },
+  /**
+   * `sheet · panel` — 0,400 390×444, the tablet sheet's own band (SCRUM-146 · SCRUM-168).
+   *
+   * ⚠️ **Its bottom IS the board's bottom**: `400 + 444 = 844`. That is not a coincidence to
+   * preserve by hand — `check:lib` §23 asserts it, because a panel that stopped short of the
+   * board would leave a strip of shrine showing under the sheet, and one that ran past would
+   * draw off-canvas. ⚠️ The panel deliberately **covers the tab bar** (764): the board paints
+   * it after `footer`, and a modal bottom sheet is supposed to hide the chrome.
+   */
+  sheetPanel: { x: 0, y: 400, w: 390, h: 444 },
+  /**
+   * `preview · tablet (96)` — 288,490 96×228.6. ⚠️ The SAME art as the altar's centre tablet
+   * (129×307), scaled to 0.7465 — so the preview and the result cannot be different drawings.
+   */
+  sheetPreview: { x: 288, y: 490, w: 96, h: 228.6 },
 } as const;
 
 /**

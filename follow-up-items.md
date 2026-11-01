@@ -298,6 +298,44 @@
 **Timeline**: No pressure — hobby project with family legacy vision  
 **Priority**: Get cartoonization style right, then build the simple AR burning mechanic  
 
+## 🆕 Open items — added 2026-11-01 (S72)
+
+### ⏳ Needs the PM
+
+- **`SCRUM-209` — 🎯 Decide: where does the Book of Tributes entry live on the shrine?**
+  ⚠️ **No Home board draws one.** Every Home board was searched through the Penpot plugin for
+  `book` / `簿` / `ledger` / `tribute` / `entry`; the only hits are `panel · tribute`, the
+  tribute-points panel. Four options are laid out in the ticket with their consequences
+  (replace a tab · a fifth tab · make the tribute panel the entry · leave it on the clan-pill
+  path). ⚠️ **This blocks `SCRUM-164`'s Book half** — the League half has landed.
+
+### 🔧 Engineering, small
+
+- **⚠️ The `＋`/`✕` class, for the third time.** S72 shipped a close button that drew a **plus** —
+  two bars at `0°`/`90°`, where an X needs `±45°`. Two prior occurrences of the same class exist
+  (the SCRUM-145 inert control; the tab bar drawn with no tabs). ⚠️ **A shape that is *almost*
+  right reads as right until someone looks at the phone.** Worth a rendering gate if one can be
+  built cheaply — otherwise it belongs in the on-glass checklist.
+- **`RELATIONSHIP_CHIPS` writes free text.** `ancestors.relationship` has no enum, so a chip
+  stores its own localised label (`Father` / `父亲`). ⚠️ **A clan that switches language keeps
+  the old language's word**, and the chip then lights up for nobody. A `relationship` enum +
+  migration would fix it; it is a schema change, so it is not a drive-by.
+- **⚠️ The `氏` suffix is applied to CJK surnames only.** `tabletName()` returns a bare Latin
+  surname rather than `Chen氏`, because 氏 is CJK and would force the name into the vertical
+  branch (stacking `C h e n`). ⚠️ This is **our** reading of the board's rule — the board is
+  中文-only. Worth a line in the cultural review (doc 16) if the owner disagrees.
+- **`SCRUM-163`** — the geometry gate (360 dp). ⚠️ Still open, and S72 added two more bands
+  (`sheetPanel` · `sheetPreview`) that only a 390-wide assertion currently covers.
+
+### 📱 On-glass checklist additions (from S72)
+
+- Close a sheet with the **✕** and with the **scrim**.
+- Open the sheet with the **keyboard up** and confirm the panel lifts and the fields stay visible.
+- Add a tablet, then **archive** it, and confirm the caption goes empty → ＋ → filled.
+
+---
+
+
 ---
 
 *Purpose: track **open** follow-up actions. Completed and superseded items → [[completed-work-archive]].*  

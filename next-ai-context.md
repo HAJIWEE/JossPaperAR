@@ -711,3 +711,87 @@ controls — so the role read works outside the dev client too.
 (`Gwee`, 3,850 tribute, 2-day streak) from the Expo Go test clan (`Ba`, 600, 1-day) where `Chen`
 was added. Not a defect — different data.
 ✅ **And the Expo Go dev FAB is gone**, so the settings gear is finally unobstructed.
+
+---
+
+# 📍 SESSION — 2026-11-01 (S72)
+
+## What this session did
+
+**The tablet sheet now matches the board, and the shrine's League entry has a way back.**
+
+```
+`SCRUM-210` 🔄 In Review   ⚠️ NEW — the sheet rebuilt as the board's bottom sheet (under SCRUM-148)
+`SCRUM-209` ⏳ To Do        ⚠️ NEW — 🎯 Decide: where the Book entry lives (no board draws one)
+`SCRUM-164` 🔄 In Progress  League half DONE · Book half BLOCKED on SCRUM-209
+`SCRUM-148` 🔄 In Progress  the umbrella; 163 (geometry gate) still open
+```
+
+### ⚠️ The sheet was a SCREEN; the board draws a SHEET
+
+`SCRUM-146` shipped the tablet sheet as a **full-screen form on `/ancestor`**. `EN · 1s Ancestor
+sheet` draws something else: a **bottom sheet over the shrine**, with the halo, the panels and the
+tab bar all visible behind a scrim.
+
+✅ **So it is state on `src/app/index.tsx`, painted AFTER the footer** — which is why it covers the
+tab bar (the panel runs 400→844, the bar sits at 764). `/ancestor` is **deleted**.
+⚠️ **Not a route, deliberately:** a pushed route covers the shrine, and forcing
+`presentation: 'transparentModal'` from `_layout.tsx` is the exact declaration that once made the
+sheet the stack's **initial route**.
+
+### ⚠️ TWO defects the FIRST build shipped — and NO gate saw either
+
+Both were caught by **looking at the phone**, with `tsc` and 559 checks green:
+
+1. **The close button drew a PLUS.** Two bars at `0°` / `90°` — that is a `＋`. An **X needs ±45°**,
+   and the bars are the *diagonals* of the board's 14×14 box (14√2 ≈ 19.8 long).
+2. **The chips ran underneath the preview.** One wrapping row put `Father` **under the preview
+   tablet** (x 288). The board splits **3 then 2** — `—` · Grandfather · Grandmother / Father ·
+   Mother. That split is now `RELATIONSHIP_CHIP_ROW_BREAK`, asserted.
+
+### New pure rules (all gated, all fault-tested)
+
+| rule | what it decides |
+|---|---|
+| `tabletName()` | the name **PAINTED**: surname+given cut to 3 · no given name → **姓 + 氏** (the board draws `陈氏`) · ⚠️ a **LATIN** surname takes **no 氏** |
+| `altarCaption()` | empty / **singular** / plural — the screen used to render the EMPTY line unconditionally |
+| `RELATIONSHIP_CHIPS` + `chipSelected` / `chipValue` | the first chip clears the field; a hand-typed relationship lights up **no** chip |
+| `HOME_BANDS.sheetPanel` / `sheetPreview` | the sheet's geometry moved into `home-layout.ts` so the gate can hold it |
+
+⚠️ **Why a Latin surname takes no 氏 — and it is not pedantry.** 氏 is a clan suffix, so `Chen氏`
+means nothing; **and 氏 is CJK**, so appending it flips `nameOrientation` to `vertical` and stacks
+`C h e n` one glyph per line — **the exact defect the 90° rotation exists to prevent** (SCRUM-146).
+A bare `Chen` is Latin, so it rotates onto one line. Fault-tested: the first version appended 氏
+unconditionally and `check:lib` caught it.
+
+⚠️ **The two clauses of the board's hint are SEPARATE.** *"Surname + given name paint up to 3
+characters. No given name → 姓 + 氏…"* — the limit is stated for the first clause only, so
+`欧阳` + *(none)* paints `欧阳氏` and is **not** cut to three.
+
+### Gates
+
+`npm run check` **EXIT 0** · **559** lib checks (up from 515) · 17 copy checks · `tsc` 0 ·
+`expo-doctor` **21/21**. Fault-tested: break `tabletName` → **3 red**; `altarCaption` → **3 red**;
+`sheetPanel.h` 444→440 → **2 red**.
+
+### ✅ Verified on `HN615L005386` (Expo Go over `adb reverse`, port 8082)
+
+EDIT sheet over the shrine · ADD sheet with the board's `姓` placeholder · a chip selecting gold ·
+the **live preview** updating to `Tan` · the **keyboard lift** · **archive → empty altar + ＋ → add**
+→ the caption back on the filled line · **shrine → League → Return → shrine with exactly ONE
+`shrine-canvas`** (no double-push).
+
+⚠️ The test clan `Ba` now holds **`Tan`** — `Chen` was archived to exercise the empty-altar path.
+
+## Next, in order
+
+1. **`SCRUM-209`** — the Book entry's placement. **It is the PM's call**, and `SCRUM-164` cannot
+   finish without it.
+2. **`SCRUM-163`** — the geometry gate, 360 dp. Cheap, and it guards the band class.
+3. **`SCRUM-151`** — Profile & Settings, **including the language switcher** the app still lacks.
+   ⚠️ The tab bar's Store/Profile stay **disabled** until 150/151 land; do not link a route that 404s.
+4. **`SCRUM-147`** onboarding → **150** store → **149** item burn → **155** seed → **157** demo run.
+
+⚠️ `SCRUM-12` is still blocked on the **`SCRUM-159`** decision, and **`SCRUM-208`** (the board's
+1.44:1 active tab) is the owner's.
+

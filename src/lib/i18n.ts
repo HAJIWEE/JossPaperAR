@@ -145,20 +145,41 @@ export const MESSAGES = {
     'nav.league': 'League',
     'nav.store': 'Store',
     'nav.profile': 'Profile',
-    // ⚠️ The tablet sheet (SCRUM-168). Every limit named here is the DB's own.
-    'ancestor.titleAdd': 'Add a tablet',
-    'ancestor.titleEdit': 'Edit tablet',
+    // ⚠️ The tablet sheet (SCRUM-146 · SCRUM-168). Every limit named here is the DB's own.
+    // ⚠️ The sheet's copy is `EN · 1s Ancestor sheet` / `EN · 1s2 … / edit mode`, read off
+    // Penpot 2026-11-01 — NOT written here. The title says *ancestor* (the person), not
+    // *tablet* (the object), which is the board's own wording.
+    'ancestor.titleAdd': 'Add an ancestor',
+    'ancestor.titleEdit': 'Edit ancestor',
+    'ancestor.sheetSub': 'Their name is painted onto the tablet',
     'ancestor.surname': 'Surname',
     'ancestor.givenName': 'Given name',
+    'ancestor.labelGivenOptional': 'Given name (optional)',
     'ancestor.relationship': 'Relationship',
-    'ancestor.optional': 'optional',
-    'ancestor.save': 'Save tablet',
-    'ancestor.archive': 'Archive tablet',
+    'ancestor.placeOnAltar': 'Place on altar',
+    'ancestor.remove': 'Remove',
+    'ancestor.previewCaption': 'Tablet preview',
+    // ⚠️ The empty preview's placeholder — the board's own `preview · tablet · text (姓)`,
+    // i.e. the word "surname" standing where the name will be painted. Same in both locales.
+    'ancestor.previewPlaceholder': '姓',
+    // ⚠️ The board's rule, verbatim — it is the ONLY place the 3-character limit and the
+    // 姓+氏 fallback are explained to the user, and `tabletName()` implements both.
+    'ancestor.sheetHint': 'Surname + given name paint up to 3 characters. No given name → 姓 + 氏, the traditional short form.',
+    // ⚠️ The relationship chips write their OWN label into the free-text column — see
+    // `RELATIONSHIP_CHIPS`. `—` is the chip that clears it.
+    'ancestor.rel.none': '—',
+    'ancestor.rel.grandfather': 'Grandfather',
+    'ancestor.rel.grandmother': 'Grandmother',
+    'ancestor.rel.father': 'Father',
+    'ancestor.rel.mother': 'Mother',
     'ancestor.problemSurname': 'A surname is required.',
     'ancestor.problemTooLong': 'Too long — the limit is %{max} characters.',
     'ancestor.capReached': 'The altar holds %{cap} tablets. Archive one to add another.',
     'ancestor.archiveConfirm': 'An archived tablet leaves the altar. This cannot be undone.',
-    'ancestor.readOnly': 'Only the clan head, co-head or an elder may change the altar.',
+    // ⚠️ `caption · altar state` on `EN · 1b Home / tablets (carousel)`, read 2026-11-01. The
+    // singular is OURS: the board only draws the 3-tablet case, and "1 ancestors" is not copy.
+    'home.altarFilledOne': 'One ancestor enshrined — swipe or tap a tablet to edit.',
+    'home.altarFilled': '%{count} ancestors enshrined — swipe or tap a tablet to edit.',
 
     // ── the throw (doc 05 §2 — the four bands) ────────────────────────────
     'band_bullseye': 'Bullseye',
@@ -416,19 +437,30 @@ export const MESSAGES = {
     'nav.league': '联赛',
     'nav.store': '商店',
     'nav.profile': '我的',
-    'ancestor.titleAdd': '添加牌位',
-    'ancestor.titleEdit': '编辑牌位',
+    // ⚠️ 牌位弹层 — 文案取自 `ZH · 1s 安奉牌位` / `ZH · 1s2 … / 编辑`（Penpot，2026-11-01）。
+    'ancestor.titleAdd': '添加祖先',
+    'ancestor.titleEdit': '编辑祖先',
+    'ancestor.sheetSub': '名字将刻于牌位',
     'ancestor.surname': '姓氏',
     'ancestor.givenName': '名字',
+    'ancestor.labelGivenOptional': '名字（选填）',
     'ancestor.relationship': '称谓',
-    'ancestor.optional': '选填',
-    'ancestor.save': '保存牌位',
-    'ancestor.archive': '归档牌位',
+    'ancestor.placeOnAltar': '安放',
+    'ancestor.remove': '移走',
+    'ancestor.previewCaption': '牌位预览',
+    'ancestor.previewPlaceholder': '姓',
+    'ancestor.sheetHint': '姓与名共刻三字；未填名字则刻「姓＋氏」，依传统简称。',
+    'ancestor.rel.none': '—',
+    'ancestor.rel.grandfather': '祖父',
+    'ancestor.rel.grandmother': '祖母',
+    'ancestor.rel.father': '父亲',
+    'ancestor.rel.mother': '母亲',
     'ancestor.problemSurname': '需要填写姓氏',
     'ancestor.problemTooLong': '过长 — 上限 %{max} 个字',
     'ancestor.capReached': '神龛已奉 %{cap} 座牌位 — 归档一座后可再添加',
     'ancestor.archiveConfirm': '归档后牌位将离开神龛，无法撤销。',
-    'ancestor.readOnly': '只有族长、副族长或长老可以更改神龛',
+    'home.altarFilledOne': '已安奉 1 位祖先 — 滑动查看，轻点编辑',
+    'home.altarFilled': '已安奉 %{count} 位祖先 — 滑动查看，轻点编辑',
 
     'band_bullseye': '正中',
     'band_devout': '虔诚',

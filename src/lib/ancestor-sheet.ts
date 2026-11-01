@@ -106,3 +106,58 @@ export function capReached(liveCount: number): boolean {
 export function slotsRemaining(liveCount: number): number {
   return Math.max(0, ANCESTOR_CAP - liveCount);
 }
+
+/**
+ * The relationship chips, in board order — `EN · 1s Ancestor sheet`, two rows at y 652 and
+ * y 696: `—` · Grandfather · Grandmother · Father · Mother.
+ *
+ * ── ⚠️ THE FIRST ENTRY IS THE "NONE" CHIP, AND IT IS NOT A RELATIONSHIP ──────
+ * `—` clears the field. It is the only chip that maps to `null`, so `ancestor-sheet.ts`
+ * owns the index rather than leaving a `''` sentinel to be compared by luck at the call site.
+ *
+ * ── ⚠️ THE VALUES ARE i18n KEYS, NOT STORED STRINGS ─────────────────────────
+ * `ancestors.relationship` is free text (≤20 chars), so the chip WRITES its own localised
+ * label into it. That is the board's model: there is no relationship enum in the schema, and
+ * inventing one would be a migration this ticket does not have. ⚠️ The consequence is
+ * honest and worth stating: a tablet whose relationship was typed by hand highlights **no**
+ * chip, because no chip's label matches it.
+ */
+export const RELATIONSHIP_CHIPS = [
+  'ancestor.rel.none',
+  'ancestor.rel.grandfather',
+  'ancestor.rel.grandmother',
+  'ancestor.rel.father',
+  'ancestor.rel.mother',
+] as const;
+
+/** The "none" chip — the one that CLEARS the field. */
+export const RELATIONSHIP_NONE_CHIP = RELATIONSHIP_CHIPS[0];
+
+/**
+ * ⚠️ **The board splits the five chips 3 then 2, and that is a LAYOUT, not an accident.**
+ * `EN · 1s Ancestor sheet` puts `—` · Grandfather · Grandmother on the y 652 row and Father ·
+ * Mother on y 696. It matters because `preview · tablet (96)` starts at **x 288** — a single
+ * wrapping row runs `Father` straight underneath the tablet, which is what the first build did
+ * on glass (2026-11-01). Kept as a number so the split cannot drift from the board.
+ */
+export const RELATIONSHIP_CHIP_ROW_BREAK = 3;
+
+/**
+ * Is this chip the one that stands for the stored relationship?
+ *
+ * ⚠️ `label` is the chip's RESOLVED text (`t(chipKey)`), never the key: comparing a key to a
+ * stored value would be false for every chip, and the defect would look like "the chip just
+ * does not light up". The component resolves; this decides.
+ */
+export function chipSelected(chipKey: string, label: string, relationship: string): boolean {
+  if (chipKey === RELATIONSHIP_NONE_CHIP) return relationship.trim().length === 0;
+  return relationship.trim() === label.trim();
+}
+
+/**
+ * What tapping a chip WRITES into the field. `null` for the "none" chip, so the caller sends
+ * `null` to `save_ancestor` exactly as `normaliseAncestorForm` would.
+ */
+export function chipValue(chipKey: string, label: string): string | null {
+  return chipKey === RELATIONSHIP_NONE_CHIP ? null : label;
+}

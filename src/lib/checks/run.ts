@@ -48,20 +48,34 @@ import {
   shouldHoldInvite,
 } from '../invite-flow.ts';
 import { LOCALES, MESSAGES, detectLocale, localized, messageKeys, setLocale, t } from '../i18n.ts';
-import { nameOrientation, rotatedNameSize } from '../tablet-name.ts';
+import { TABLET_NAME_MAX, nameOrientation, rotatedNameSize, tabletName } from '../tablet-name.ts';
 import {
   ANCESTOR_CAP,
   EDIT_ROLES,
   GIVEN_NAME_MAX,
+  RELATIONSHIP_CHIPS,
+  RELATIONSHIP_CHIP_ROW_BREAK,
   RELATIONSHIP_MAX,
+  RELATIONSHIP_NONE_CHIP,
   SURNAME_MAX,
   canEditTablets,
   capReached,
+  chipSelected,
+  chipValue,
   normaliseAncestorForm,
   sheetProblem,
   slotsRemaining,
 } from '../ancestor-sheet.ts';
-import { HOME_BANDS, TAB_BAR, bandFits, bandRect, homeFitScale, shrineBleedDp } from '../home-layout.ts';
+import {
+  HOME_BANDS,
+  REFERENCE_HEIGHT,
+  REFERENCE_WIDTH,
+  TAB_BAR,
+  bandFits,
+  bandRect,
+  homeFitScale,
+  shrineBleedDp,
+} from '../home-layout.ts';
 import {
   OFFERINGS_VIEWBOX,
   OFFERING_DOTS,
@@ -70,7 +84,7 @@ import {
   dotSitsOnTray,
 } from '../offerings-layout.ts';
 import { formatPoints, homePanels } from '../home-panels.ts';
-import { altarView, pageStep } from '../altar.ts';
+import { altarCaption, altarView, pageStep } from '../altar.ts';
 import { BULK_PREFIX, createSplitStorage, bulkKey } from '../split-storage.ts';
 import {
   MAX_ATTEMPTS,
@@ -172,6 +186,20 @@ function check(name: string, condition: boolean, detail?: string): void {
 
 function section(title: string): void {
   console.log(`\n${title}`);
+}
+
+/**
+ * ⚠️ Does BOTH locales define this message?
+ *
+ * A module-level twin of `main()`'s local `keyExists`, for the section functions that assert a
+ * pure rule OWNS its copy. ⚠️ Section 3 already compares the two key SETS, so this is not a
+ * parity check — it is "the string this rule needs actually exists", which is the gap that let
+ * `t('clan_preview')` ship `[MISSING …]` to a player.
+ */
+function keyInBothLocales(key: string): boolean {
+  const en = MESSAGES.en as unknown as Record<string, string>;
+  const zh = MESSAGES.zh as unknown as Record<string, string>;
+  return typeof en[key] === 'string' && typeof zh[key] === 'string';
 }
 
 const stubUuid: UuidFactory = () => '00000000-1111-2222-3333-444444444444';
@@ -1492,6 +1520,17 @@ function altarChecks(): void {
   check('pageStep does not wrap at the end', pageStep(2, 3, 1) === 2);
   check('pageStep moves one', pageStep(1, 3, -1) === 0 && pageStep(1, 3, 1) === 2);
   check('pageStep on an empty altar stays at 0', pageStep(0, 0, 1) === 0);
+
+  // ── ⚠️ THE CAPTION — the defect the owner saw: the EMPTY line over a full altar ───────
+  check('no tablets → the EMPTY caption', altarCaption(0).key === 'home.altarEmpty');
+  check('⚠️ a negative count does NOT fall through to "−1 ancestors"', altarCaption(-3).key === 'home.altarEmpty');
+  check('one tablet → the SINGULAR (the board only draws the 3 case)', altarCaption(1).key === 'home.altarFilledOne');
+  check('…and it carries no placeholder to leave unsubstituted', altarCaption(1).options === undefined);
+  const three = altarCaption(3);
+  check('three tablets → the board\'s filled line', three.key === 'home.altarFilled');
+  check('…with the count interpolated as a STRING (i18n-js `%{count}`)', three.options?.count === '3');
+  check('every caption key exists in BOTH locales',
+    ['home.altarEmpty', 'home.altarFilledOne', 'home.altarFilled'].every(keyInBothLocales));
 }
 
 /**
@@ -1608,6 +1647,58 @@ function ancestorSheetChecks(): void {
   check('⚠️ 10 IS full — `>=`, not `>` (the 11th insert is what the trigger refuses)', capReached(10));
   check('…and 2 slots remain at 8', slotsRemaining(8) === 2);
   check('…and a legacy over-cap clan does not underflow', slotsRemaining(14) === 0);
+
+  // ── ⚠️ THE RELATIONSHIP CHIPS (the board port, 2026-11-01) ─────────────────────────────
+  check('there are five chips, as the board draws', RELATIONSHIP_CHIPS.length === 5);
+  check('⚠️ the FIRST chip is the "none" chip — it clears the field', RELATIONSHIP_CHIPS[0] === RELATIONSHIP_NONE_CHIP);
+  /**
+   * ⚠️ THE ROW SPLIT IS A LAYOUT CONSTRAINT, NOT COSMETIC. The preview tablet starts at x 288,
+   * so a single wrapping row runs `Father` underneath it — measured on glass 2026-11-01. The
+   * board splits 3 then 2, and this is that number.
+   */
+  check('⚠️ the board splits the chips 3 then 2 — the preview sits at x 288',
+    RELATIONSHIP_CHIP_ROW_BREAK === 3 && RELATIONSHIP_CHIP_ROW_BREAK < RELATIONSHIP_CHIPS.length,
+    `break at ${RELATIONSHIP_CHIP_ROW_BREAK} of ${RELATIONSHIP_CHIPS.length}`);
+  check('every chip key exists in BOTH locales', RELATIONSHIP_CHIPS.every(keyInBothLocales));
+
+  check('the "none" chip matches an EMPTY relationship', chipSelected(RELATIONSHIP_NONE_CHIP, '—', ''));
+  check('…and whitespace counts as empty (the server btrims)', chipSelected(RELATIONSHIP_NONE_CHIP, '—', '   '));
+  check('…but NOT a real relationship', !chipSelected(RELATIONSHIP_NONE_CHIP, '—', 'Father'));
+
+  check('a label chip matches its own label', chipSelected('ancestor.rel.father', 'Father', 'Father'));
+  check('…and ignores surrounding space (btrim, both sides)', chipSelected('ancestor.rel.father', 'Father', '  Father '));
+  /**
+   * ⚠️ THE HONEST CASE. `ancestors.relationship` is free text, so a value typed by hand matches
+   * no chip — and that is correct, not a bug to paper over with a "closest match".
+   */
+  check('⚠️ a HAND-TYPED relationship lights up NO chip', RELATIONSHIP_CHIPS.every(
+    (k) => !chipSelected(k, k === RELATIONSHIP_NONE_CHIP ? '—' : 'Father', 'Grand-uncle')));
+
+  check('the "none" chip WRITES null (not an empty string)', chipValue(RELATIONSHIP_NONE_CHIP, '—') === null);
+  check('a label chip writes its own label', chipValue('ancestor.rel.father', 'Father') === 'Father');
+
+  // ── ⚠️ THE PANEL'S GEOMETRY — the sheet covers the tab bar, and stops at the board's edge ──
+  const panel = HOME_BANDS.sheetPanel;
+  const bar = HOME_BANDS.tabbar;
+  check('the panel reaches the board\'s BOTTOM exactly (400 + 444 = 844)',
+    panel.y + panel.h === REFERENCE_HEIGHT, `${panel.y + panel.h} vs ${REFERENCE_HEIGHT}`);
+  check('⚠️ …so the panel COVERS the tab bar, as the board paints it',
+    panel.y <= bar.y && panel.y + panel.h >= bar.y + bar.h);
+  check('the panel spans the full board width', panel.x === 0 && panel.w === REFERENCE_WIDTH);
+
+  const prev = HOME_BANDS.sheetPreview;
+  check('the preview sits INSIDE the panel', prev.y >= panel.y && prev.y + prev.h <= panel.y + panel.h);
+  check('…and inside its x-range', prev.x >= panel.x && prev.x + prev.w <= panel.x + panel.w);
+  /**
+   * ⚠️ The preview and the altar's centre tablet are the SAME drawing at two scales — the whole
+   * reason `preview · tablet (96)` may reuse `Tablet`. If the aspect ratios ever disagree, one of
+   * them has been redrawn by hand.
+   */
+  const altarRatio = HOME_BANDS.addSlot.w / HOME_BANDS.addSlot.h;
+  const previewRatio = prev.w / prev.h;
+  check('⚠️ the preview is the altar tablet\'s SAME shape, scaled (aspect within 0.5%)',
+    Math.abs(altarRatio - previewRatio) / altarRatio < 0.005,
+    `${altarRatio.toFixed(4)} vs ${previewRatio.toFixed(4)}`);
 }
 
 /**
@@ -1641,6 +1732,42 @@ function tabletNameChecks(): void {
     long < short, `11 chars ${long.toFixed(2)} < 4 chars ${short.toFixed(2)}`);
   check('…and never below zero for a degenerate length',
     rotatedNameSize(box, 0) > 0 && Number.isFinite(rotatedNameSize(box, 400)));
+
+  // ── ⚠️ WHAT IS PAINTED — the board's own rule, and the altar and the preview share it ───
+  check('the limit is the board\'s 3 characters', TABLET_NAME_MAX === 3);
+  check('surname alone → 姓 + 氏, the traditional short form (the board draws 陈氏)',
+    tabletName('陈', null) === '陈氏', tabletName('陈', null));
+  check('…and an EMPTY given name is the same case, not a second rule',
+    tabletName('陈', '') === '陈氏' && tabletName('陈', '   ') === '陈氏');
+  check('surname + given → the first three characters (the board draws 陈大文)',
+    tabletName('陈', '大文') === '陈大文', tabletName('陈', '大文'));
+  check('⚠️ a longer name is TRUNCATED, not refused — the DB caps the surname at 20',
+    tabletName('陈', '大文长') === '陈大文', tabletName('陈', '大文长'));
+  /**
+   * ⚠️ The 姓+氏 clause is its OWN rule, so it is NOT cut to three — the board states the limit
+   * for "surname + given name" and then gives 姓 + 氏 as a separate case.
+   */
+  check('a two-character surname takes 氏 and is NOT cut to three',
+    tabletName('欧阳', null) === '欧阳氏', tabletName('欧阳', null));
+  /**
+   * ⚠️ A LATIN surname takes no 氏. Beyond meaning nothing, 氏 is CJK — appending it would flip
+   * `nameOrientation` to `vertical` and stack `C h e n` one glyph per line, the exact defect the
+   * rotation exists to prevent.
+   */
+  check('⚠️ a LATIN surname with no given name stays bare (氏 would force it VERTICAL)',
+    tabletName('Chen', null) === 'Chen' && nameOrientation(tabletName('Chen', null)) === 'rotated',
+    `${tabletName('Chen', null)} / ${nameOrientation(tabletName('Chen', null))}`);
+  check('no surname → nothing to paint (the caller supplies its own placeholder)',
+    tabletName('', '大文') === '' && tabletName('   ', null) === '');
+  check('the stored name is trimmed before it is painted', tabletName('  陈 ', ' 大文 ') === '陈大文');
+  /**
+   * ⚠️ SURROGATE SAFETY. `Array.from`, not `slice`: a 3-character cut by UTF-16 unit would split
+   * an emoji or a rare ideograph in half and render a replacement glyph on the plaque.
+   */
+  check('⚠️ a 3-character cut never splits a surrogate pair',
+    Array.from(tabletName('陈', '𠀀𠀁')).every((c) => c.codePointAt(0)! > 0xffff || c.length === 1)
+    && Array.from(tabletName('陈', '𠀀𠀁')).length === 3,
+    JSON.stringify(tabletName('陈', '𠀀𠀁')));
 }
 
 async function main(): Promise<void> {
