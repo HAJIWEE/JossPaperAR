@@ -449,7 +449,17 @@
   **wallet of 4600**; the Store chip read **"Store Points 4600"** and the shrine panel **"TRIBUTE POINTS
   4,600"** — both the **wallet**. ⚠️ **Under the old body BOTH would have read `0`.** So SCRUM-150 AC 1 is
   confirmed on the device, not only in the SQL test.
-- ⚠️⚠️ **A DEVICE-VERIFICATION TRAP FOUND WHILE DOING IT — worth keeping, and it bit TWICE.** The
+- 🎯 **`SCRUM-214` — FILED 2026-11-01 (S73), on the OWNER's finding from the device: the Profile shows the
+  CLAN name as the user's name, and the signed-off Login / Sign-up flow has no build ticket.** ⚠️ **Neither
+  half is the demo** — the tutorial never touches a clan. ⚠️ **The build matches the board:** `EN · 8
+  Profile` draws the name slot as *"The Song Family"*, and ⚠️ **the design has no personal-name field at
+  all** (`EN · 0d Sign-up` asks FAMILY NAME · PHONE OR EMAIL · LANGUAGE). ⚠️⚠️ **But a full `EN · 0c Login` +
+  `EN · 0d Sign-up` flow IS designed and signed off** (with error states, both locales; `SCRUM-28`/`29` are
+  `Done` **as design**), and **no build ticket exists** — `SCRUM-147`'s acceptance ends at the clan fork and
+  forbids a sign-in wall. ⚠️ Marker: Settings' **"Sign out"** row is **disabled** (*"Not built yet"*) —
+  there is no sign-in to sign out of. ⚠️ ADR-004 calls the clan/invite flow *"the first place this hurts"*.
+  **In sprint 3 (id 67), by read-back.**
+- ⚠️ **A device-verification trap, found while answering the above — worth keeping, and it bit TWICE.** The
   **FIRST** launch showed the shrine at **`0`** and nothing was wrong: **Expo Go had RESUMED the previous
   session's running app**, still holding the value it fetched *before* the migration. A focus re-read and
   a **cold launch** (force-stop → relaunch) both show **4,600**. ⚠️ **A single screenshot of a RESUMED app

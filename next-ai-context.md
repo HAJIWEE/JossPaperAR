@@ -1407,6 +1407,39 @@ navigating (`zoom_ceiling: assumed max=8 (native said undefined)` is SCRUM-132's
 correct in Expo Go). Dismiss it before navigating. ⚠️ Metro also **rewrites `tsconfig.json`** on boot —
 reverted, not committed.
 
+## ⚠️ 6 · THE OWNER'S FINDING — THE "PROFILE NAME" IS THE **CLAN** NAME, AND A DESIGNED LOGIN FLOW WAS NEVER BUILT
+
+**Reported from the device:** *"in the tutorial flow, we are taking the clan name as my profile name as well. Check if this is just for the demo version, or did we neglect to include a sign in flow?"* → **`SCRUM-214`** (🎯 Decide, in sprint 3). ⚠️ **No code changed.**
+
+⚠️ **IT IS NOT THE DEMO.** The tutorial (`SCRUM-85`) is a deliberate no-cost demo — `TUTORIAL_CONSEQUENCES`
+is `createsClan:false · awardsPoints:false · callsServer:false` — and its own copy says *"The demo needs no
+clan."* It never touches a clan. The clan name is the profile name for **every** user, always.
+
+⚠️ **THE BUILD MATCHES THE BOARD — checked in Penpot, not inferred.** `EN · 8 Profile` draws the name slot
+as **"The Song Family"**. And ⚠️ **the design has NO personal name anywhere**: `EN · 0d Sign-up` asks for
+**FAMILY NAME · PHONE OR EMAIL · LANGUAGE**, and nothing else. So *"your profile name is the family name"*
+is the **design's** answer, not a build omission. ⚠️ And the app has no name for a person at all —
+`profiles.display_label` is auto-generated (`'devotee-' + first 6 hex of the uuid`) and shown **only** on
+the league board.
+
+⚠️⚠️ **BUT THE REAL FINDING: A FULL LOGIN + SIGN-UP FLOW IS DESIGNED, SIGNED OFF, AND UNBUILT.** The Penpot
+file carries `EN · 0c Login` (*"Sign in to return to your shrine." · "Send code" · "Use a password
+instead"*), `EN · 0d Sign-up` (*"Create your account" · FAMILY NAME · PHONE OR EMAIL · "Your number is only
+used to sign you in — never for ads or messages."*) **plus their error states** (code sent · verifying ·
+wrong code · no network · validation · account exists), in **both locales**. `SCRUM-28` (Login) and
+`SCRUM-29` (Create account) are both **`Done` — as DESIGN tickets**.
+⚠️ **NEITHER HAS A BUILD TICKET.** `SCRUM-147` (build onboarding) is `To Do` and its own acceptance ends at
+the **clan fork** — *"splash → panels → permission → fork"* — with no account step; it also states the rule
+outright: *"Anonymous-first (ADR-004). **No sign-in wall before the first burn — nothing in onboarding may
+introduce one.**"*
+⚠️ So the position is: the account is **deferred by design** (ADR-004, *"anonymous device identity first,
+optional account later"*) and the *"later"* half is **unbuilt and untracked**. The visible marker is
+Settings' **"Sign out"** row, which renders **disabled** with the sub-line *"Not built yet"* — there is no
+sign-in to sign out of.
+⚠️ **ADR-004 names the natural prompt itself:** *"Clan and invite flows are the first place this hurts — an
+anonymous device cannot be shared across a family's phones, so doc 15's shared altar genuinely wants an
+account."*
+
 ## Gates
 
 `check:sql` **29 → 30** migrations · `check:lib` **723** · `npm run check` **EXIT 0** · `tsc` 0 ·
