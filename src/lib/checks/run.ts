@@ -2078,6 +2078,28 @@ function tabBarChecks(): void {
   check('⚠️ guard: the band scan finds the bar on a destination and misses it on a deeper screen',
     readFileSync(join(PROJECT_ROOT, 'src/app/league.tsx'), 'utf8').includes('<TabBarBand')
       && !readFileSync(join(PROJECT_ROOT, 'src/app/settings.tsx'), 'utf8').includes('<TabBarBand'));
+
+  /**
+   * ── ⚠️ THE SHRINE CARRIES NO BOOK ENTRY — A DECISION, NOT AN OMISSION ──
+   * (SCRUM-209 **Option 4**, owner's ruling 2026-11-01.)
+   *
+   * ⚠️ `SCRUM-164`'s original acceptance said *"tapping Book reaches `/clan/book`"*. **No Home board
+   * draws a Book entry** — every Home board was searched for `book` / `簿` / `ledger` / `tribute` /
+   * `entry`, and the only hits are `panel · tribute`. The owner declined to change a signed-off board
+   * and accepted that the Book stays **three taps deep** on the clan-pill path.
+   *
+   * ⚠️ The assertion is here because the decision is about a thing that is **ABSENT**, and absence is
+   * exactly what a future session would helpfully fill in. Same class as §26's *Burn has no back
+   * button* — a rule about a component that must not be rendered.
+   */
+  const shrineSource = readFileSync(join(PROJECT_ROOT, 'src/app/index.tsx'), 'utf8');
+  check('⚠️ the shrine has NO Book entry — the clan pill is the accepted path (SCRUM-209 Option 4)',
+    !shrineSource.includes('/clan/book'));
+  check('…and the Book is still REACHABLE — `/clan/manage` is the one place that pushes it',
+    readFileSync(join(PROJECT_ROOT, 'src/app/clan/manage.tsx'), 'utf8').includes("'/clan/book'"));
+  // ⚠️ POSITIVE CONTROL — the same absence scan must FIND a route where one really is present.
+  check('⚠️ guard: the same scan finds a route link on a screen that has one',
+    shrineSource.includes("'/clan'") && shrineSource.includes("'/capture'"));
 }
 
 /**

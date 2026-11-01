@@ -806,16 +806,20 @@ the **live preview** updating to `Tan` · the **keyboard lift** · **archive →
 
 ## Next, in order
 
-1. **`SCRUM-209`** — the Book entry's placement. **It is the PM's call**, and `SCRUM-164` cannot
-   finish without it.
-2. **`SCRUM-163`** — ✅ **done** (§25). The geometry gate is in and fault-tested.
-3. **`SCRUM-151`** — 🔄 **the switcher is built**; what remains is the **Profile screen** (and so the
-   Profile tab, still disabled), the **tribute-history read** (a migration — the RPC surface has
-   none), and Collection.
-4. **`SCRUM-147`** onboarding → **150** store → **149** item burn → **155** seed → **157** demo run.
+1. **`SCRUM-151`** — the last gap is **Collection**: the cards need a per-item aggregate
+   (`burned ×N`) that **no RPC returns**, so the row stays **disabled** rather than showing an
+   invented count. It needs a migration. Everything else on the ticket has landed.
+2. **`SCRUM-150`** the store → **149** item burn → **155** seed → **157** demo run. ⚠️ **`157` is the
+   sprint's acceptance gate.** ⚠️ And the store is now the most **visible** gap: the nav bar shows
+   four options with **Store dimmed**, and `SCRUM-143` is blocked on it.
+3. **`SCRUM-147`** onboarding.
 
-⚠️ `SCRUM-12` is still blocked on the **`SCRUM-159`** decision, and **`SCRUM-208`** (the board's
-1.44:1 active tab) is the owner's.
+✅ **Answered 2026-11-01:** `SCRUM-209` (Book entry → **Option 4**, the clan-pill path) and
+`SCRUM-208` (the board's 1.44:1 active tab → **the current implementation is accepted**). Both closed;
+⚠️ `208` leaves the **board** owed — see this session's section below.
+
+⚠️ `SCRUM-12` is still blocked on the **`SCRUM-159`** decision. ⚠️ `SCRUM-164` and `SCRUM-163` are
+**Done**.
 
 ---
 
@@ -1089,4 +1093,68 @@ check. Fault-tested by deleting `<TabBarBand` from `league.tsx` → red.
 `check:lib` **619 → 640 → 651 → 657** (38 new, incl. 6 positive controls) · `npm run check`
 **EXIT 0** · `tsc` 0.
 
+
+---
+
+## 📍 SESSION — 2026-11-01 (S72) — the two open decisions, answered
+
+Both PM decisions from the previous session's list are now closed. ⚠️ **Neither needed new product
+code — and that is the point of both.**
+
+### ✅ `SCRUM-209` — the Book entry: **Option 4, "leave it on the clan pill path"**
+
+⚠️ **No Home board draws a Book entry.** Every Home board was searched for `book` / `簿` / `ledger` /
+`tribute` / `entry`; the only hits are `panel · tribute`. The four options were: replace a tab · a
+fifth tab · make the tribute panel the entry · **leave it on the clan-pill path**. The owner took the
+fourth and declined to change a signed-off board.
+
+⚠️ **`SCRUM-164`'s acceptance was AMENDED, not met.** It said *"tapping Book reaches `/clan/book`"*.
+That is now **struck** — the ticket's description was edited so a `Done` ticket does not claim a
+control that does not exist, and its scripted pass is **shrine → League → shrine**, not
+`shrine → Book → …`.
+
+⚠️ **The accepted cost, stated so it is not rediscovered as a bug: the Book stays three taps deep**
+(`clan pill → /clan/manage → Book`).
+
+**Verified against the code, not assumed:**
+
+| claim | evidence |
+|---|---|
+| the shrine has no Book entry | `index.tsx` contains **no** `'/clan/book'` — it never did |
+| the Book is still reachable | `clan/manage.tsx:391` is the **only** push to `/clan/book` |
+| nothing to remove | the shrine's routes are `'/capture'`, `'/clan'`, `'/settings'` |
+
+⚠️ **And a gate, because the decision is about an ABSENCE** — which is exactly what a future session
+would helpfully fill in. §22 now asserts the shrine carries no Book affordance, **with a positive
+control** so the scan is proven able to find a route link where one really exists. Same class as §26's
+*"Burn has no back button"*. Fault-tested: appending `const BOOK = '/clan/book'` to `index.tsx` → red.
+
+### ✅ `SCRUM-208` — the board's 1.44:1 active tab: **the current implementation is accepted**
+
+The build renders `onColorCream` `#FFF8E8` on the `#C23B22` pill — **4.90 : 1**, comfortably AA.
+⚠️ **§22 already pins BOTH ratios**, so the decision is enforced in both directions: copying the
+board's `#9A2B18` fails the suite, and so does "fixing" the build to match it.
+
+⚠️ **Still owed, and it is the BOARD's, not the code's:** `nav · tab <name> icon` / `… label` for the
+**active** tab are still `#9A2B18` on `#C23B22` on all four Home boards. ⚠️ **The same token will
+recur on every other active-state surface** — the League screen and the Store are next — until the
+board is corrected. That is the residue this ticket leaves behind, and it is recorded in
+`follow-up-items.md` rather than closed silently.
+
+⚠️ **How it was caught, and why it mattered:** only by **porting it and looking at the phone**. No
+gate compares a Penpot board to a token set — so the *board* has nothing holding it, which is the gap
+this ticket named.
+
+### Board status after this session
+
+| ticket | was | now |
+|---|---|---|
+| `SCRUM-164` | 🔄 In Progress (Book half blocked) | ✅ **Done** — acceptance amended |
+| `SCRUM-208` | ⏳ To Do (PM decision) | ✅ **Done** — implementation accepted, board owed |
+| `SCRUM-209` | ⏳ To Do (PM decision) | ✅ **Done** — Option 4 |
+
+### Gates
+
+`check:lib` **657 → 660** (3 new, incl. a positive control) · `npm run check` **EXIT 0** · `tsc` 0.
+⚠️ **US$0.00** — no AI call, no EAS build.
 

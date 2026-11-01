@@ -302,12 +302,21 @@
 
 ### ⏳ Needs the PM
 
-- **`SCRUM-209` — 🎯 Decide: where does the Book of Tributes entry live on the shrine?**
-  ⚠️ **No Home board draws one.** Every Home board was searched through the Penpot plugin for
-  `book` / `簿` / `ledger` / `tribute` / `entry`; the only hits are `panel · tribute`, the
-  tribute-points panel. Four options are laid out in the ticket with their consequences
-  (replace a tab · a fifth tab · make the tribute panel the entry · leave it on the clan-pill
-  path). ⚠️ **This blocks `SCRUM-164`'s Book half** — the League half has landed.
+- ✅ **RESOLVED 2026-11-01 — `SCRUM-209`, the Book entry's placement: Option 4.** *"Leave it on the
+  clan pill path."* No board change, nothing to build. ⚠️ **`SCRUM-164`'s *"tapping Book reaches
+  `/clan/book`"* acceptance is therefore NOT met — it was AMENDED, not satisfied**, and the ticket's
+  description now says so. ⚠️ **The Book stays three taps deep** (`clan pill → /clan/manage → Book`);
+  that is the accepted cost, not a defect to fix later without a new decision. Verified against the
+  code: `index.tsx` contains **no** `'/clan/book'`, and `clan/manage.tsx:391` is the **only** push to
+  it. ⚠️ §22 now asserts the shrine carries **no** Book affordance — absence is exactly what a future
+  session would helpfully fill in.
+- ✅ **RESOLVED 2026-11-01 — `SCRUM-208`, the board's 1.44:1 active tab: the owner accepted the
+  CURRENT IMPLEMENTATION.** The build renders `onColorCream` `#FFF8E8` on the `#C23B22` pill —
+  **4.90 : 1**, comfortably AA — and §22 pins **both** ratios, so neither copying the board nor
+  "fixing" the build to match it can pass silently. ⚠️ **Still owed, and it is the BOARD's:**
+  `nav · tab <name> icon` / `… label` for the **active** tab are still `#9A2B18` on `#C23B22` on all
+  four Home boards. ⚠️ The same token will recur on **every other active-state surface** — the League
+  screen and the Store are next — until the board is corrected.
 
 ### 🔧 Engineering, small
 
