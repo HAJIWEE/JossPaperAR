@@ -201,6 +201,15 @@ export const MESSAGES = {
     // ── Store (SCRUM-150) ──────────────────────────────────────────────────
     // ⚠️ Read off `EN · 7 Store`, 2026-11-01. ⚠️ The note is NOT the board's: the board's says
     // *"Pay with cash or Store Points"*, and there is no cash rail — see `lib/store.ts`.
+    // ── The offerings picker (SCRUM-149) ───────────────────────────
+    // ⚠️ `EN · 2e Offerings picker`, 2026-11-01 — the note is the board's own sentence.
+    'picker.title': 'Choose an offering',
+    'picker.note': 'Nothing to photograph? Choose a standard offering — it arrives already in joss style.',
+    'picker.base': 'base %{value}',
+    'picker.owned': '×%{qty}',
+    'picker.notOwned': 'Not owned',
+    'picker.noneOwned': 'You own no offerings yet — buy one in the Store.',
+    'picker.unreachable': 'Your offerings could not be loaded just now.',
     'store.title': 'Store',
     'store.intro': 'Standard offerings.',
     'store.pointsChip': 'Store Points %{points}',
@@ -566,6 +575,14 @@ export const MESSAGES = {
     // ── 我的（SCRUM-151）────────────────────────────────────────────────────
     // ── 收藏（SCRUM-151）─────────────────────────────────────────────────────
     // ── 商店（SCRUM-150）──────────────────────────────────────────────────────
+    // ── 供品选择（SCRUM-149）────────────────────────────────
+    'picker.title': '选择供品',
+    'picker.note': '没有照片？选一份标准供品——它已经是金银纸的样子。',
+    'picker.base': '基础 %{value}',
+    'picker.owned': '×%{qty}',
+    'picker.notOwned': '未拥有',
+    'picker.noneOwned': '你还没有任何供品——请在商店购买。',
+    'picker.unreachable': '暂时无法载入供品。',
     'store.title': '商店',
     'store.intro': '标准供品。',
     'store.pointsChip': '功德点 %{points}',
