@@ -320,17 +320,39 @@
 
 ### 🔧 Engineering, small
 
-- **`SCRUM-151` — what remains after the switcher AND the history.** ✅ The language switcher is
-  built, persisted and **verified on glass** · ✅ **History is built** (it needed a migration —
-  `my_offerings` / `my_offerings_week`, **applied to the hosted project**) · ✅ delete-all is wired
-  behind the SCRUM-123 `ConfirmCard` · ✅ the **Profile screen** exists and the **Profile tab is
-  live**. ⚠️ **Still open:**
-  - **Collection** — the cards need a per-item aggregate (`burned ×N`) that no RPC returns, so the
-    row stays **disabled** rather than showing an invented count.
-  - ⚠️ **The destructive delete has never been run.** The confirm path is verified; the delete itself
-    would erase the owner's test clan, so it is their call.
-  - ⚠️ **The Profile board's league chip, `remembering since` line and burned/collected/credits
-    tiles are not drawn** — none has a read, and sample numbers look real and are invented.
+- ✅ **RESOLVED 2026-11-01 — `SCRUM-151` Collection is BUILT and on glass.** It needed a migration
+  (`20261101140000_my_collection.sql`, **applied**): `my_collection()` groups the caller's burns by
+  catalogue item, `my_collection_totals()` returns the two stat cards. ⚠️ **The grid is CATALOGUE
+  ITEMS ONLY** — a burn is either an item or a photo (the XOR), and the board draws item art, not
+  thumbnails, so a photo-only caller sees an empty grid and `items_collected 0`, which is TRUE.
+  ⚠️ **The Profile rows are now ALL live**; `PROFILE_ROWS_PENDING` is empty.
+  ⚠️ **Two defects were caught ON GLASS:** the copy **overflowed** the 170 px card (a flex column where
+  the board uses fixed offsets) and then **truncated** (the board's 145 px box fits its copy; Roboto
+  does not — a recorded font-metric deviation).
+- ⚠️⚠️ **`SCRUM-150` the Store is BIGGER THAN IT LOOKS, and two of its blockers are not code.**
+  Measured 2026-11-01 by reading the boards and the tree:
+  - **It is FOUR boards, not one:** `EN · 7 Store` (an Offerings/Decorations switcher · a FEATURED
+    card · "More bundles" · 4 item cards · two balance chips · a note), `EN · 7d Item detail` (name ·
+    type · description · cash price · points price · balances · state tag · Buy for cash / Redeem pts),
+    `EN · 7e Buy confirm · sheet` (a bottom sheet with Price / Balance-after rows · Confirm · Cancel),
+    plus `EN · 9*` (Buy offerings · Credits · Daily gift). `EN · 7b`/`7c`/`7f` add decoration variants.
+  - ⚠️ **THE CASH RAIL NEEDS GOOGLE PLAY BILLING.** The cards draw `$0.99` / `$1.99` and the confirm
+    sheet's own footnote says *"Google Play will ask you to verify."* That is a **native module**, and
+    ⚠️ **a local native build cannot work here** (`expo run:android` fails — only Java 25 is
+    installed, AGENTS.md), so it needs an **EAS build** *and* Play Console setup. ⚠️ **The POINTS rail
+    already exists server-side** (`purchase_item`), so that half is buildable today.
+  - ⚠️ **THE ITEM ART DOES NOT EXIST IN THE APP.** `EN · 7` draws `art · Cash Bundle` · `art · House` ·
+    `art · Phone` · `art · Gold Bar` · `art · wealth bundle (ingots)` — and `src/` has **no per-item
+    offering art at all** (the catalogue is code-owned names and prices; `components/home/offerings.tsx`
+    is the ALTAR's art). ⚠️ **Same for `EN · 8 Collection`'s cards** — its art well ships **empty and
+    deliberate**, not filled with an invented glyph.
+  - ⚠️ **So the honest split is:** the **points rail + the storefront/item-detail/buy-confirm
+    structure** is one buildable ticket; **the art** is a separate porting job (5+ Penpot
+    illustrations, each many polygon paths); **the cash rail** is a third, native one.
+- ⚠️ **`expo lint` BOOTSTRAPS ESLINT — and the repo has none.** Running it (AGENTS.md asks for lint)
+  added `eslint` + `eslint-config-expo` to `package.json`, a `lint` script, and a new
+  `eslint.config.js`. ⚠️ **None of that is the agent's change** — `git checkout -- package.json
+  package-lock.json` and delete the config, or it ships as an unexplained dependency bump.
 - ✅ **RESOLVED 2026-11-01 — the owner ruled on `Transform` / `Burn` backs.** The boards draw one
   (`EN · 3 Transform` / `3b` / `3d` → `btn · back (ink)` + `hud · screen title`; `EN · 4 Burn` → the
   **dark** `hud · back circle`), and the build has none. The ruling:
