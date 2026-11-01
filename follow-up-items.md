@@ -324,8 +324,11 @@
   surname rather than `Chen氏`, because 氏 is CJK and would force the name into the vertical
   branch (stacking `C h e n`). ⚠️ This is **our** reading of the board's rule — the board is
   中文-only. Worth a line in the cultural review (doc 16) if the owner disagrees.
-- **`SCRUM-163`** — the geometry gate (360 dp). ⚠️ Still open, and S72 added two more bands
-  (`sheetPanel` · `sheetPreview`) that only a 390-wide assertion currently covers.
+- **`SCRUM-163`** — ✅ **DONE** (2026-11-01, S72). The geometry gate is §25 in `check:lib`:
+  `check:lib` **559 → 581**, fault-tested (the CTA moved into the header band → **7 red**, each
+  naming the pair; restored byte-identical via `sha256sum -c`). ⚠️ §18 could not catch that class —
+  a band dragged into the wrong place still **fits** the canvas — and there is now an assertion
+  that says so. Supersedes the open line that stood here.
 
 ### 📱 On-glass checklist additions (from S72)
 

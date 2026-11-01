@@ -68,12 +68,17 @@ import {
 } from '../ancestor-sheet.ts';
 import {
   HOME_BANDS,
+  HOME_REGION_ORDER,
+  HOME_REGION_TOPS,
   REFERENCE_HEIGHT,
   REFERENCE_WIDTH,
   TAB_BAR,
+  bandAbove,
   bandFits,
   bandRect,
+  bandsOverlap,
   homeFitScale,
+  regionsStackDown,
   shrineBleedDp,
 } from '../home-layout.ts';
 import {
@@ -84,7 +89,7 @@ import {
   dotSitsOnTray,
 } from '../offerings-layout.ts';
 import { formatPoints, homePanels } from '../home-panels.ts';
-import { altarCaption, altarView, pageStep } from '../altar.ts';
+import { ALTAR_DISPLAY_SLOTS, altarCaption, altarView, pageStep } from '../altar.ts';
 import { BULK_PREFIX, createSplitStorage, bulkKey } from '../split-storage.ts';
 import {
   MAX_ATTEMPTS,
@@ -1383,6 +1388,125 @@ function homeShrineScaleChecks(): void {
 }
 
 /**
+ * §25 · The shrine's bands stack in the right ORDER (SCRUM-163).
+ *
+ * ── ⚠️ WHY §18 WAS NOT ENOUGH ────────────────────────────────────────────────
+ * §18 asserts every band **fits the canvas** and that `bandRect` converts correctly. ⚠️ Neither can
+ * see the failure this section exists for: **a band dragged into the wrong place still fits.**
+ * Move the CTA up into the header band and §18 stays green — the button is inside the canvas, its
+ * numbers are the board's own, and the composition is wrong.
+ *
+ * ⚠️ So these assertions are about **PAIRS**, not bands: `a` is above `b`, or the two regions do
+ * not overlap. That is the class this project has already shipped four times (the tabs at board
+ * `top: 774` inside a band already at 764; the shrine base 14 dp off the side), and every one of
+ * them was found by an eye rather than by a gate.
+ *
+ * ⚠️ **`bandsOverlap` is deliberately NOT applied inside the altar.** `halo` (160→580) and
+ * `offerings` (434→604) overlap because the offerings are painted IN FRONT of the halo. A gate that
+ * demanded no overlap there would fight the design; it is used between REGIONS instead.
+ */
+function shrineGeometryChecks(): void {
+  section("25 · The shrine's bands stack in the right order — and the altar holds 4 (SCRUM-163)");
+
+  // ── ⚠️ THE READER CONTROL, FIRST ───────────────────────────────────────────
+  // ⚠️ A renamed or dropped band reads as `undefined`, and `undefined <= undefined` is FALSE — so
+  // every assertion below would go red for the WRONG reason, and a reader would "fix" the gate by
+  // loosening it. Assert the names exist BEFORE asserting anything about their values.
+  const REQUIRED_BANDS = [
+    'headerMark', 'settings', 'tribute', 'streak', 'caption', 'hintCta', 'halo', 'addSlot',
+    'carouselPrev', 'carouselNext', 'templeChip', 'offerings', 'shrineBase', 'cta', 'tabbar',
+    'sheetPanel', 'sheetPreview',
+  ] as const;
+  const missingBands = REQUIRED_BANDS.filter((name) => !(name in HOME_BANDS));
+  check(
+    `the gate found the REAL constants (${REQUIRED_BANDS.length} bands by name)`,
+    missingBands.length === 0,
+    `missing: ${missingBands.join(', ')}`,
+  );
+  // ⚠️ …and the control is not a tautology: a name that is NOT there must report absent.
+  check('…and that control is not a tautology (a wrong name reads absent)',
+    !('ctaButton' in HOME_BANDS));
+
+  // ── the five regions stack DOWNWARD, in the render order ───────────────────
+  check('the five regions stack downward, in HOME_REGION_ORDER',
+    regionsStackDown(HOME_REGION_ORDER),
+    HOME_REGION_ORDER.map((r) => `${r}@${HOME_REGION_TOPS[r]}`).join(' → '));
+
+  // ⚠️ THE TICKET'S NAMED RELATIONSHIPS, each its own assertion so a failure names the PAIR.
+  check('the CTA band is BELOW the header band',
+    bandAbove(HOME_BANDS.settings, HOME_BANDS.cta),
+    `settings ends ${HOME_BANDS.settings.y + HOME_BANDS.settings.h}, cta starts ${HOME_BANDS.cta.y}`);
+  check('⚠️ the totals band does NOT overlap the CTA',
+    !bandsOverlap(HOME_BANDS.tribute, HOME_BANDS.cta)
+      && !bandsOverlap(HOME_BANDS.streak, HOME_BANDS.cta));
+  check('the footer sits BELOW the CTA',
+    bandAbove(HOME_BANDS.cta, HOME_BANDS.tabbar),
+    `cta ends ${HOME_BANDS.cta.y + HOME_BANDS.cta.h}, tabbar starts ${HOME_BANDS.tabbar.y}`);
+
+  // ── and the seams between the regions ─────────────────────────────────────
+  check('the header sits above the totals',
+    bandAbove(HOME_BANDS.settings, HOME_BANDS.tribute));
+  check('the totals sit above the altar (whose topmost band is the caption)',
+    bandAbove(HOME_BANDS.streak, HOME_BANDS.caption));
+  check("the altar's LAST band sits above the CTA (the art does not run under the button)",
+    bandAbove(HOME_BANDS.shrineBase, HOME_BANDS.cta),
+    `shrineBase ends ${HOME_BANDS.shrineBase.y + HOME_BANDS.shrineBase.h}, cta starts ${HOME_BANDS.cta.y}`);
+
+  // ── every altar band lives INSIDE the altar region ────────────────────────
+  const altarTop = HOME_BANDS.caption.y;
+  const altarBottom = HOME_BANDS.shrineBase.y + HOME_BANDS.shrineBase.h;
+  const ALTAR_BANDS = [
+    'caption', 'hintCta', 'halo', 'templeChip', 'addSlot', 'carouselPrev', 'carouselNext',
+    'offerings', 'shrineBase',
+  ] as const;
+  const strayed = ALTAR_BANDS.filter((name) => {
+    const band = HOME_BANDS[name];
+    return band.y < altarTop || band.y + band.h > altarBottom;
+  });
+  check(`every altar band is inside the altar region (${altarTop}→${altarBottom})`,
+    strayed.length === 0, `strayed: ${strayed.join(', ')}`);
+
+  // ── the altar holds FOUR, and that is not the clan cap ────────────────────
+  check('the altar displays 4 tablets before it pages', ALTAR_DISPLAY_SLOTS === 4,
+    `${ALTAR_DISPLAY_SLOTS}`);
+  check('⚠️ …and 4 is NOT the clan cap of 10 — the board pages, it does not refuse',
+    ALTAR_DISPLAY_SLOTS !== ANCESTOR_CAP);
+  check('…and 4 is the board frame that draws it (`EN · 1c Home / full (4 tablets)`)',
+    ALTAR_DISPLAY_SLOTS === 4 && ALTAR_DISPLAY_SLOTS < ANCESTOR_CAP);
+
+  // ── the carousel arrows FLANK the slot, and stay on the board ─────────────
+  const slot = HOME_BANDS.addSlot;
+  check('the prev arrow sits LEFT of the tablet slot',
+    HOME_BANDS.carouselPrev.x + HOME_BANDS.carouselPrev.w <= slot.x,
+    `prev ends ${HOME_BANDS.carouselPrev.x + HOME_BANDS.carouselPrev.w}, slot starts ${slot.x}`);
+  check('the next arrow sits RIGHT of the tablet slot',
+    HOME_BANDS.carouselNext.x >= slot.x + slot.w,
+    `next starts ${HOME_BANDS.carouselNext.x}, slot ends ${slot.x + slot.w}`);
+  check('…and neither arrow runs off the 390 board',
+    HOME_BANDS.carouselNext.x + HOME_BANDS.carouselNext.w <= REFERENCE_WIDTH);
+  check('the two arrows share one y (a pair, not two decisions)',
+    HOME_BANDS.carouselPrev.y === HOME_BANDS.carouselNext.y);
+
+  // ── ⚠️ POSITIVE CONTROLS — the predicates must FIRE on the defect they exist for ──
+  // ⚠️ THIS IS THE SHIPPED CLASS, REPRODUCED: the CTA dragged up into the header band.
+  // ⚠️ §18 stays GREEN under this corruption — the button still fits the canvas — which is the
+  // entire reason §25 exists. The third control asserts exactly that, so the gap cannot be
+  // forgotten if someone later folds §25 back into §18.
+  const CORRUPT_TOPS = { ...HOME_REGION_TOPS, cta: HOME_BANDS.headerMark.y };
+  check('⚠️ guard: the CTA moved into the header band makes the ORDER check FAIL',
+    !regionsStackDown(HOME_REGION_ORDER, CORRUPT_TOPS),
+    'regionsStackDown passed on a shrine whose CTA is at the top — the gate is blind');
+  check('⚠️ guard: …and `bandAbove` FAILS for the same corruption',
+    !bandAbove({ ...HOME_BANDS.cta, y: HOME_BANDS.headerMark.y }, HOME_BANDS.tribute));
+  check('⚠️ guard: …and the FIT check does NOT — which is why §18 could not catch it',
+    bandFits({ ...HOME_BANDS.cta, y: HOME_BANDS.headerMark.y }, 1, REFERENCE_WIDTH));
+  check('⚠️ guard: `bandsOverlap` reports the totals against a CTA moved onto them',
+    bandsOverlap(HOME_BANDS.tribute, { ...HOME_BANDS.cta, y: HOME_BANDS.tribute.y }));
+  check('⚠️ guard: …and it reports NO overlap for the real pair (not a always-true)',
+    !bandsOverlap(HOME_BANDS.tribute, HOME_BANDS.cta));
+}
+
+/**
  * 19 · The altar's offerings sit on their trays (SCRUM-162).
  *
  * ⚠️ WHY THIS EXISTS, in the owner's words: *"the placement of the decorations on the
@@ -1846,6 +1970,7 @@ async function main(): Promise<void> {
   tabBarChecks();
   ancestorSheetChecks();
   tabletNameChecks();
+  shrineGeometryChecks();
 
   check('guard: a 5-character key is NOT valid', !isValidIdempotencyKey('12345'));
   check('guard: junk is NOT a clan code', normaliseClanCode('not-a-code!!') === null);

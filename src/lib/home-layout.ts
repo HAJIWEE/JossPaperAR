@@ -251,6 +251,65 @@ export function bandFits(band: Band, scale: number, canvasWidth: number): boolea
   return (band.x + band.w) * scale <= canvasWidth + 0.01;
 }
 
+/**
+ * ⚠️ **Is `a` entirely ABOVE `b`?** — `a`'s bottom edge at or above `b`'s top edge.
+ *
+ * This is the relationship the shrine is actually made of, and the one no band's own numbers can
+ * express: every band above can be individually correct while the composition is wrong, because
+ * "correct" is a fact about a band and "in order" is a fact about a PAIR. ⚠️ `bandFits` cannot see
+ * it — a CTA dragged up into the header still fits the canvas perfectly.
+ */
+export function bandAbove(a: Band, b: Band): boolean {
+  return a.y + a.h <= b.y;
+}
+
+/**
+ * ⚠️ **Do `a` and `b` overlap VERTICALLY?** — not a defect on its own.
+ *
+ * ⚠️ **The altar's own art overlaps on purpose**: `halo` runs 160→580 and `offerings` 434→604,
+ * because the offerings are painted IN FRONT of the halo. So "no overlap" is the WRONG assertion
+ * for the altar, and asserting it there would have been a gate that fights the design. It is the
+ * right assertion between REGIONS (the totals panel against the CTA), which is where it is used.
+ */
+export function bandsOverlap(a: Band, b: Band): boolean {
+  return a.y < b.y + b.h && b.y < a.y + a.h;
+}
+
+/**
+ * The TOP of each region, in board px — the number the vertical order is read from.
+ *
+ * ⚠️ A region is a GROUP of bands, so "the region's y" is not a property the data has; it has to be
+ * chosen. It is the region's **topmost band**: `header` starts at the app mark, `totals` at the
+ * tribute panel, `altar` at the altar-state CAPTION (which sits above the halo), `cta` at the
+ * button and `footer` at the bar.
+ *
+ * ⚠️ Choosing `caption` for the altar is the load-bearing part: the caption is at y 152, ABOVE the
+ * halo's 160. Reading the altar's top off `halo` would give the same ORDER here, but it would be
+ * the wrong number, and the first band added above the halo would make it silently wrong.
+ */
+export const HOME_REGION_TOPS: Record<HomeRegion, number> = {
+  header: HOME_BANDS.headerMark.y,
+  totals: HOME_BANDS.tribute.y,
+  altar: HOME_BANDS.caption.y,
+  cta: HOME_BANDS.cta.y,
+  footer: HOME_BANDS.tabbar.y,
+};
+
+/**
+ * ⚠️ Do these regions stack DOWNWARD, in this order? — each one strictly below the last.
+ *
+ * Exported as a function (like `isShrineOrder`) so the gate asserts the SAME expression the layout
+ * means, rather than a re-implementation of it that can drift.
+ *
+ * ⚠️ **Strictly** below: two regions sharing a top edge is a layout bug, not a tie.
+ */
+export function regionsStackDown(
+  regions: readonly HomeRegion[],
+  tops: Record<HomeRegion, number> = HOME_REGION_TOPS,
+): boolean {
+  return regions.every((region, i) => i === 0 || tops[region] > tops[regions[i - 1]]);
+}
+
 
 
 

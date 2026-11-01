@@ -19,6 +19,19 @@
  * what SCRUM-146's brief warned about at the cap of 10.
  */
 
+/**
+ * ⚠️ How many tablets the BOARD draws before it pages — **4**, and it is NOT the clan cap.
+ *
+ * `ancestors.sequence` keeps **10** live rows (`slot 0..9`, `ancestor_cap`), while the altar
+ * DISPLAYS four and pages for the rest — `ancestor_cap`'s own comment in `slice_schema` says so
+ * explicitly, and `EN · 1c Home / full (4 tablets)` is the board that draws it. Conflating the two
+ * would either strand tablets or refuse the tenth for no reason.
+ *
+ * ⚠️ It is a **page size, not a width budget**: four 129-wide tablets do not fit across 390. The
+ * centre slot plus the peeking neighbours are what "4" counts.
+ */
+export const ALTAR_DISPLAY_SLOTS = 4;
+
 export type AltarView =
   | { readonly kind: 'empty' }
   | {

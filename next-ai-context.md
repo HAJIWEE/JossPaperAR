@@ -724,7 +724,8 @@ was added. Not a defect — different data.
 `SCRUM-210` 🔄 In Review   ⚠️ NEW — the sheet rebuilt as the board's bottom sheet (under SCRUM-148)
 `SCRUM-209` ⏳ To Do        ⚠️ NEW — 🎯 Decide: where the Book entry lives (no board draws one)
 `SCRUM-164` 🔄 In Progress  League half DONE · Book half BLOCKED on SCRUM-209
-`SCRUM-148` 🔄 In Progress  the umbrella; 163 (geometry gate) still open
+`SCRUM-163` 🔄 In Review   ⚠️ the geometry gate — §25, and it is fault-tested
+`SCRUM-148` 🔄 In Progress  the umbrella
 ```
 
 ### ⚠️ The sheet was a SCREEN; the board draws a SHEET
@@ -770,9 +771,28 @@ characters. No given name → 姓 + 氏…"* — the limit is stated for the fir
 
 ### Gates
 
-`npm run check` **EXIT 0** · **559** lib checks (up from 515) · 17 copy checks · `tsc` 0 ·
+`npm run check` **EXIT 0** · **581** lib checks (up from 515) · 17 copy checks · `tsc` 0 ·
 `expo-doctor` **21/21**. Fault-tested: break `tabletName` → **3 red**; `altarCaption` → **3 red**;
 `sheetPanel.h` 444→440 → **2 red**.
+
+### ⚠️ §25 — the geometry gate, and the class §18 could not see (SCRUM-163)
+
+**`check:lib` 559 → 581.** §18 asserts every band **fits the canvas** — ⚠️ **and a band dragged into
+the wrong place still fits.** So §25 asserts **PAIRS**: `a` is above `b`, or two regions do not
+overlap. New pure helpers: `bandAbove` · `bandsOverlap` · `HOME_REGION_TOPS` · `regionsStackDown` ·
+`ALTAR_DISPLAY_SLOTS`.
+
+⚠️ **`bandsOverlap` is deliberately NOT applied inside the altar** — `halo` (160→580) and
+`offerings` (434→604) overlap because the offerings are painted IN FRONT of the halo. A gate
+demanding no overlap there would fight the design.
+
+**Fault-test:** `HOME_BANDS.cta` moved from `y 676` into the header band (`y 54`) → **7 red**, each
+naming the pair (`…altar@152 → cta@54 → footer@764`; `settings ends 98, cta starts 54`). Restored
+from backup, `sha256sum -c` → **OK**, back to 581 green.
+
+⚠️ **The control that proves the gap was real**: `⚠️ guard: …and the FIT check does NOT — which is
+why §18 could not catch it` stays **green** under the corruption. §18 was blind; there is now an
+assertion that says so.
 
 ### ✅ Verified on `HN615L005386` (Expo Go over `adb reverse`, port 8082)
 
