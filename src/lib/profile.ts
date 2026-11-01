@@ -152,12 +152,12 @@ export const HISTORY_SPEC = {
 } as const;
 
 /**
- * ⚠️ The two rows that have **no server read** — stated here so the screens cannot quietly grow a
- * live-looking control for them. See the ticket comment: `public.tributes` exists but the RPC surface
- * has no read for it, so both render **visibly disabled** (the `tab-bar.tsx` pattern) rather than
- * opening a screen that would show an empty list as fact.
+ * ⚠️ **No Profile row is pending any more** — `history` and `collection` were the two that had no
+ * server read, and both now have one (`my_offerings` / `my_collection`). ⚠️ This constant used to say
+ * so; it is kept as an EMPTY list rather than deleted, because the gate below reads it and a
+ * re-appearing row must be a deliberate act.
  */
-export const PROFILE_ROWS_PENDING = ['history', 'collection'] as const;
+export const PROFILE_ROWS_PENDING: readonly string[] = [];
 
 /**
  * ⚠️ **Every route this surface may point at** — the Profile tab, its rows, and the shrine's gear.
@@ -168,19 +168,26 @@ export const PROFILE_ROWS_PENDING = ['history', 'collection'] as const;
 export const PROFILE_ROUTE = '/profile';
 export const HISTORY_ROUTE = '/history';
 export const SETTINGS_ROUTE = '/settings';
+export const COLLECTION_ROUTE = '/collection';
 
-export const PROFILE_ROUTES: readonly string[] = [PROFILE_ROUTE, HISTORY_ROUTE, SETTINGS_ROUTE];
+export const PROFILE_ROUTES: readonly string[] = [
+  PROFILE_ROUTE,
+  HISTORY_ROUTE,
+  COLLECTION_ROUTE,
+  SETTINGS_ROUTE,
+];
 
 /**
  * ⚠️ The rows, in board order. `route: null` = **not built yet** → the row renders DISABLED.
  *
- * ⚠️ **History is LIVE as of SCRUM-151** — it needed a server read (`my_offerings`), which is a
- * migration, so it was the last of the three to land. **Collection is still `null`**: it needs a
- * per-item aggregate (`burned ×N`) that no RPC returns, so a card would have to invent the count.
+ * ⚠️ **ALL THREE ARE LIVE as of SCRUM-151.** `history` needed `my_offerings`, `collection` needed
+ * `my_collection` — both are migrations, and both are why those rows rendered disabled for as long as
+ * they did: a card would otherwise have had to **invent** its count, which this project treats as
+ * worse than a missing screen.
  */
 export const PROFILE_ROWS = [
   { id: 'history', route: HISTORY_ROUTE },
-  { id: 'collection', route: null },
+  { id: 'collection', route: COLLECTION_ROUTE },
   { id: 'settings', route: SETTINGS_ROUTE },
 ] as const;
 

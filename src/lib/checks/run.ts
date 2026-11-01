@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { isValidClanName } from '../clan-rules.ts';
 import { PREPARING_PHASES, pipelineFailed } from '../../domain/slice.ts';
 import { NAV_TABS, activeTabKey, isSamePath, tabPressIsNoop } from '../nav.ts';
+import { COLLECTION, COLLECTION_SLOTS, collectionGrid, collectionOverflows, collectedItemName, displayBurnCount } from '../collection.ts';
 import { bookView, showsBookSectionTitle } from '../clan-roles.ts';
 import {
   CONFIRM_SPEC,
@@ -1592,8 +1593,11 @@ function localeChecks(): void {
   check('no Settings row links to a route that does not exist',
     PROFILE_ROWS.filter((r) => r.route !== null).every((r) => PROFILE_ROUTES.includes(r.route as string)),
     PROFILE_ROWS.map((r) => `${r.id}→${r.route}`).join(' '));
+  // ⚠️ POSITIVE CONTROL — and it must be a route that really is NOT on the list. ⚠️ This used to be
+  // `/collection`, back when Collection was unbuilt; SCRUM-151 wired it, so the control had to move
+  // to a path nothing serves. A control pointing at a route that HAS landed is no control at all.
   check('⚠️ …and a route NOT on the list would fail that check (not a tautology)',
-    !PROFILE_ROUTES.includes('/collection'));
+    !PROFILE_ROUTES.includes('/not-a-route'));
   check('…and `rowIsLive` is the ONE place "is it wired" is decided',
     rowIsLive('/settings') && !rowIsLive(null));
 
@@ -2110,6 +2114,86 @@ function tabBarChecks(): void {
  * asserted against the thing that actually decides — the RPC's ladder, the RLS policies, the
  * `CHECK` constraints and `clans.ancestor_cap`.
  */
+/**
+ * §28 · The Collection screen's rules (SCRUM-151).
+ *
+ * ⚠️ These are the facts `EN · 8 Collection` / `8d` decide and a render cannot assert: **which slot
+ * the items fill, which empty slot carries words, and which words**. The board draws six dashed slots
+ * and puts copy on exactly ONE of them — and the copy CHANGES when the grid is entirely empty. A JSX
+ * branch cannot be read by a gate, so the mapping lives in `lib/collection.ts` and is asserted here.
+ */
+function collectionChecks(): void {
+  section('28 · Collection — the grid, the empty state, and the count (SCRUM-151)');
+
+  // ── the board's geometry ──────────────────────────────────────────────────
+  check('the grid is SIX slots — two columns, three rows (board)',
+    COLLECTION_SLOTS === 6 && COLLECTION.card.xs.length === 2 && COLLECTION.card.ys.length === 3);
+  check('the columns are at x 20 · 197 (board)', COLLECTION.card.xs[0] === 20 && COLLECTION.card.xs[1] === 197);
+  check('…and the rows at y 168 · 350 · 532 (board)',
+    COLLECTION.card.ys[0] === 168 && COLLECTION.card.ys[1] === 350 && COLLECTION.card.ys[2] === 532);
+  check('the card is 165×170, r14 (board)',
+    COLLECTION.card.w === 165 && COLLECTION.card.h === 170 && COLLECTION.card.radius === 14);
+  check('the two stat cards are at x 20 · 205, 165×40 (board)',
+    COLLECTION.stat.xs[0] === 20 && COLLECTION.stat.xs[1] === 205
+      && COLLECTION.stat.w === 165 && COLLECTION.stat.h === 40);
+  // ⚠️ The grid must FIT the 390 canvas: two 165 cards + the 20 gutters + the 12 gap.
+  const gridRight = COLLECTION.card.xs[1] + COLLECTION.card.w;
+  check('⚠️ the second column ends inside the 390 canvas', gridRight === 362 && gridRight <= 390, `${gridRight}`);
+
+  // ── the fill order ────────────────────────────────────────────────────────
+  const three = collectionGrid([
+    { itemCode: 'gold_bar', burned: 5 },
+    { itemCode: 'house', burned: 1 },
+    { itemCode: 'joss_paper_stack', burned: 4 },
+  ]);
+  check('items fill the slots in READING ORDER',
+    three[0]?.itemCode === 'gold_bar' && three[1]?.itemCode === 'house' && three[2]?.itemCode === 'joss_paper_stack',
+    three.slice(0, 3).map((c) => String(c.itemCode)).join(' '));
+  check('…and the rest of the grid is EMPTY slots', three.slice(3).every((c) => c.kind === 'empty'));
+
+  // ── ⚠️ WHICH empty slot speaks, and what it says ──────────────────────────
+  check('⚠️ on a partly-filled grid the FIRST empty slot offers the next one',
+    three[3]?.emptyCopy === 'nextOne');
+  check('⚠️ …and every other empty slot is a bare ＋ (the board words only one)',
+    three.slice(4).every((c) => c.emptyCopy === 'none'),
+    three.slice(4).map((c) => c.emptyCopy).join(' '));
+
+  const none = collectionGrid([]);
+  check('⚠️ on an EMPTY grid all six are slots', none.every((c) => c.kind === 'empty'));
+  check('⚠️ …and the first says "nothing here yet", NOT "offer something new"',
+    none[0]?.emptyCopy === 'firstEver',
+    none[0]?.emptyCopy);
+  check('…with the other five bare', none.slice(1).every((c) => c.emptyCopy === 'none'));
+
+  const full = collectionGrid(
+    ['a', 'b', 'c', 'd', 'e', 'f'].map((code) => ({ itemCode: code, burned: 1 })),
+  );
+  check('a full grid has NO empty slot at all', full.every((c) => c.kind === 'item'));
+  // ⚠️ POSITIVE CONTROL — the two empty-copy words must not be the same value.
+  check('⚠️ guard: "firstEver" and "nextOne" are different, so the check above can fail',
+    none[0]?.emptyCopy !== three[3]?.emptyCopy);
+
+  check('⚠️ SEVEN collected items overflow the six slots (a real limit, not silent)',
+    !collectionOverflows(6) && collectionOverflows(7));
+
+  // ── ⚠️ the count is never ×0 ──────────────────────────────────────────────
+  check('⚠️ a count of 0 renders as 1 — a cell exists because a burn happened',
+    displayBurnCount(0) === 1 && displayBurnCount(-3) === 1);
+  check('a real count passes through, floored', displayBurnCount(5) === 5 && displayBurnCount(2.7) === 2);
+  check('⚠️ a non-number cannot render as NaN', displayBurnCount(Number.NaN) === 1);
+  // ⚠️ POSITIVE CONTROL — the clamp must not flatten every value to 1.
+  check('⚠️ guard: the count is not a constant', displayBurnCount(9) !== displayBurnCount(1));
+
+  // ── the name, never a raw code ────────────────────────────────────────────
+  check('a catalogue code resolves to a NAME, not the code',
+    collectedItemName('gold_bar') === 'Gold Bar', String(collectedItemName('gold_bar')));
+  check('⚠️ …and an unknown code resolves to null, so the screen shows a gap not "nope"',
+    collectedItemName('nope') === null && collectedItemName(null) === null);
+  // ⚠️ POSITIVE CONTROL — the resolver must FIND a name for every catalogue entry.
+  check('⚠️ guard: every catalogue offering resolves (none falls through)',
+    OFFERINGS.every((o) => (collectedItemName(o.code) ?? '').length > 0));
+}
+
 function ancestorSheetChecks(): void {
   section('23 · The tablet sheet — the ladder, the cap, and btrim (SCRUM-168)');
 
@@ -2347,6 +2431,7 @@ async function main(): Promise<void> {
   homePanelChecks();
   altarChecks();
   tabBarChecks();
+  collectionChecks();
   ancestorSheetChecks();
   tabletNameChecks();
   shrineGeometryChecks();

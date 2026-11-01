@@ -158,3 +158,83 @@ export async function myOfferingsWeek(): Promise<ApiResult<OfferingWeek>> {
   return { ok: true, data: { burned: at('burned'), tribute: at('tribute'), streakDays: at('streak_days') } };
 }
 
+/**
+ * One row of the Collection grid — `EN · 8 Collection`.
+ *
+ * ⚠️ `itemCode` is a CATALOGUE code, not a name: the screen resolves it through `OFFERINGS`, so a
+ * name or a glyph is never baked into a row (the rule `OfferingRow` records).
+ */
+export interface CollectionItem {
+  readonly itemCode: string;
+  /** ⚠️ A live `count(*)` from the server — never a tally the client keeps. */
+  readonly burned: number;
+  readonly lastBurnedAt: string;
+}
+
+/** The two stat cards above the grid. ⚠️ `itemsCollected` counts CATALOGUE items only. */
+export interface CollectionTotals {
+  readonly offeringsBurned: number;
+  readonly itemsCollected: number;
+}
+
+/**
+ * The caller's own burns, grouped by catalogue item, most-burned first.
+ *
+ * ⚠️ **CATALOGUE ITEMS ONLY.** A burn is either a catalogue item or a photo (`burns` XOR-enforces
+ * it); the board draws item art, not thumbnails, so the server excludes the photo burns. A caller
+ * who only burns photos therefore gets `[]` and `itemsCollected: 0` — which is TRUE, not a failure.
+ * ⚠️ That is also why the RPC raises `42501` when there is no identity: an empty grid and "you are
+ * not signed in" must not render identically.
+ */
+export async function myCollection(): Promise<ApiResult<CollectionItem[]>> {
+  const { data, error } = await supabase().rpc('my_collection');
+  if (error) return { ok: false, reason: reasonOf(error) };
+
+  /** ⚠️ A `returns table (…)` RPC arrives as an ARRAY — see `myOfferingsWeek`'s note. */
+  const rows = Array.isArray(data) ? data : [];
+  const out: CollectionItem[] = [];
+  for (const value of rows) {
+    const row = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
+    if (row === null) continue;
+    const itemCode = typeof row.item_code === 'string' ? row.item_code : null;
+    /** ⚠️ A row with no code is one the server cannot have written — skip, do not render. */
+    if (itemCode === null || itemCode.length === 0) continue;
+    const burned = typeof row.burned === 'number' && Number.isFinite(row.burned) ? row.burned : 0;
+    /** ⚠️ A zero count is not a collected item — the grid's own rule, so it cannot show "×0". */
+    if (burned <= 0) continue;
+    out.push({
+      itemCode,
+      burned,
+      lastBurnedAt: typeof row.last_burned_at === 'string' ? row.last_burned_at : '',
+    });
+  }
+  return { ok: true, data: out };
+}
+
+/**
+ * The two stat cards above the Collection grid.
+ *
+ * ⚠️ A SEPARATE CALL, not a fold of `myCollection()`: `itemsCollected` happens to equal the grid's
+ * row count, but `offeringsBurned` counts **every** burn — including the photo burns the grid
+ * deliberately omits. Deriving one from the other would silently equate them.
+ */
+export async function myCollectionTotals(): Promise<ApiResult<CollectionTotals>> {
+  const { data, error } = await supabase().rpc('my_collection_totals');
+  if (error) return { ok: false, reason: reasonOf(error) };
+
+  /** ⚠️ The same array-vs-object trap `myOfferingsWeek` documents. */
+  const rows = Array.isArray(data) ? data : [];
+  const first = rows.length > 0 ? rows[0] : null;
+  const row = typeof first === 'object' && first !== null ? (first as Record<string, unknown>) : null;
+
+  const at = (key: string): number => {
+    const value = row?.[key];
+    return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  };
+  return {
+    ok: true,
+    data: { offeringsBurned: at('offerings_burned'), itemsCollected: at('items_collected') },
+  };
+}
+
+

@@ -196,6 +196,20 @@ export const MESSAGES = {
     // states the first one as fact.
     'hist.unreachable': 'Your history could not be loaded just now.',
     // ── Profile (SCRUM-151) ────────────────────────────────────────────────
+    // ── Collection (SCRUM-151) ─────────────────────────────────────────────
+    // ⚠️ Read off `EN · 8 Collection` / `EN · 8d Collection / empty`, 2026-11-01 — not written here.
+    'collection.title': 'Collection',
+    'collection.burnedLabel': 'offerings burned',
+    'collection.collectedLabel': 'items collected',
+    // ⚠️ `×` is U+00D7, the multiplication sign — the board's glyph, not the letter `x`.
+    'collection.meta': 'burned ×%{count}',
+    'collection.emptyFirst1': 'Nothing here yet',
+    'collection.emptyFirst2': 'your first burn lands here',
+    'collection.emptyNext1': 'Offer something new',
+    'collection.emptyNext2': 'and it lands here',
+    'collection.note': 'Every offering you burn is kept here.',
+    // ⚠️ A FAILED read says so — it must NOT render as the empty state, for the reason `hist.unreachable` records.
+    'collection.unreachable': 'Your collection could not be loaded just now.',
     'profile.title': 'Profile',
     'profile.rowHistory': 'History',
     'profile.rowHistorySub': 'Recent burns & offerings',
@@ -535,6 +549,17 @@ export const MESSAGES = {
     'hist.empty': '暂无记录 — 你的第一次供奉将出现在这里。',
     'hist.unreachable': '暂时无法载入历史记录。',
     // ── 我的（SCRUM-151）────────────────────────────────────────────────────
+    // ── 收藏（SCRUM-151）─────────────────────────────────────────────────────
+    'collection.title': '收藏',
+    'collection.burnedLabel': '已焚烧供品',
+    'collection.collectedLabel': '已收藏物品',
+    'collection.meta': '焚烧 ×%{count}',
+    'collection.emptyFirst1': '这里还空着',
+    'collection.emptyFirst2': '第一份供品会留在这里',
+    'collection.emptyNext1': '再备一份新供品',
+    'collection.emptyNext2': '它就会留在这里',
+    'collection.note': '你焚烧的每一份供品都会保存在这里。',
+    'collection.unreachable': '暂时无法载入你的收藏。',
     'profile.title': '我的',
     'profile.rowHistory': '历史',
     'profile.rowHistorySub': '最近的焚烧与供品',
