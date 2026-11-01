@@ -1440,6 +1440,42 @@ sign-in to sign out of.
 anonymous device cannot be shared across a family's phones, so doc 15's shared altar genuinely wants an
 account."*
 
+### ✅ THE DRAFT (2026-11-01, S73) — THREE BOARDS ON PENPOT
+
+⚠️ **The owner answered (B):** *"first build a email based account sign up, then expand it to google
+services later."* So the account is **two phases**. ⚠️ **(A) is still open** (the profile name).
+
+**Added — nothing signed off was touched:**
+| board | y | phase |
+|---|---|---|
+| `EN · 0d6 Sign-up · email` | 9320 | 1 |
+| `EN · 0d7 Sign-up · email / verify code` | 10200 | 1 |
+| `EN · 0d8 Sign-up · email + Google (phase 2)` | 11080 | 2 |
+
+⚠️ **Built by CLONING** `EN · 0d Sign-up` / `EN · 0d3 Sign-up / verify code` — geometry, tokens, type scale
+and the app-mark header are identical, so the drafts track the originals if those are revised.
+
+**⚠️ COPY CHANGED — the signed-off flow is PHONE-first, so this is not a one-field reskin:**
+`PHONE OR EMAIL` → `EMAIL` · `Phone or email` → `you@example.com` · the privacy note →
+*"Your email is only used to sign you in — never for ads or messages."* · `Sent to +65 9123 4567 by SMS` →
+`Sent to you@example.com` · `Wrong number? Edit` → `Wrong email? Edit`.
+
+⚠️ **PHASE 2 IS ONLY TWO SHAPES:** an `or` divider and `Continue with Google` as a **secondary** button
+(paper `#f5f0e8`, ink stroke 2.5, r18 — the file's own secondary style). ⚠️ **But the primary button MOVES,
+690 → 560**, to make room — so phase 1 does *not* reserve the space, and the button will jump when Google
+ships. A choice for the PM, not a defect.
+
+⚠️⚠️ **FOUND IN THE SIGNED-OFF BOARDS: a `LANGUAGE` caption with NO control under it** — on **`EN · 0d`
+AND `ZH · 0d`** (both checked). A label with nothing to label. ⚠️ Not invented into the draft: a control
+that no board specifies would be the same class as inventing a store price.
+
+⚠️ **GEOMETRY-VERIFIED, NOT EYEBALLED:** a collision sweep over all three boards found **no off-board
+shape and no unintended overlap**, and caught **one real bug of mine** — the phase-2 right rule overlapped
+the `or` label by 8px (fixed: the rule now starts at 218, giving symmetric 8px gaps).
+⚠️ **I cannot render a Penpot PNG export in this session** — the tool returns base64 inside a text block,
+so there is no image for me to look at. **The aesthetic call is the PM's**, which is this file's
+established division of labour.
+
 ## Gates
 
 `check:sql` **29 → 30** migrations · `check:lib` **723** · `npm run check` **EXIT 0** · `tsc` 0 ·
