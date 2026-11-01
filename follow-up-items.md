@@ -336,13 +336,20 @@
   glass — predicate forced `false` → 0 back nodes *while the failure copy stayed on screen*.
   ⚠️ **Board deviation to file:** `EN · 4 Burn` and `EN · 3` (working) / `3b` (queued) still draw a
   back the build deliberately does not. ⚠️ `EN · 5 Reward` draws none and the build already matches.
+- ✅ **RESOLVED 2026-11-01 — the bar renders on ALL its own destinations** (owner's ruling:
+  *"Nav bar should be accessible for the 4 options it displays"*). It rendered on the **shrine only**,
+  so the bar's League and Profile buttons were **one-way pushes** — you arrived and the bar was gone.
+  Now `TabBarBand` renders on League and Profile too. ⚠️ **Board deviation to file:** `EN · 6 League`
+  and `EN · 8 Profile` draw `btn · back (ink)` + `hud · screen title` and **no** bar; both now carry
+  the bar as well as the HUD. ⚠️ **Store is still disabled** (no screen, SCRUM-150) — the 4th option
+  becomes reachable the day that screen lands, with no change needed here.
 - ⚠️ **Tapping the tab you are ALREADY ON used to re-render the page.** `TabBar`'s `onPress` was
-  `router.push(tab.route)` unconditionally, so tapping **Shrine while on the shrine** pushed a
-  **second `/`** onto the stack — the screen re-mounted and the stack grew one duplicate per tap.
-  Fixed 2026-11-01 with an `isActive` guard; verified by back-stack accounting (3 Shrine taps then
-  one BACK exits to the launcher, where pre-fix the duplicates would have absorbed the pops).
-  ⚠️ `active` is currently a **hardcoded `"shrine"`** prop, so the guard is only exercised on the
-  shrine until the other tabs live in the same bar.
+  `router.push(tab.route)` unconditionally, so tapping the current tab pushed a **duplicate route**
+  onto the stack — the screen re-mounted and the stack grew one entry per tap. Fixed 2026-11-01.
+  ⚠️ **The rule is global now**: the bar derives its active tab from `usePathname()` and takes **no
+  `active` prop**, so there is no caller that can hand it a wrong answer.
+  Verified on glass by back-stack accounting — on the **League** page, 3 taps of the League tab then
+  one BACK lands on the **shrine**; pre-fix those duplicates would have absorbed the pop.
 - **⚠️ `ScreenHud` is the standard, and `capture` now uses it; the clan screens do not.** ⚠️ Their
   boards (`EN · 0e*`) draw **no** top back button — they use `clan-ui`'s bottom `GhostButton`, which
   is a second idiom. That is a board-backed difference, not an oversight, but it is worth one pass.
