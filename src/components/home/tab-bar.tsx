@@ -75,7 +75,15 @@ export function TabBar({ active, scale }: { active: string; scale: number }) {
             accessibilityState={{ selected: isActive, disabled }}
             disabled={disabled}
             onPress={() => {
-              if (tab.route) router.push(tab.route);
+              /**
+               * ⚠️⚠️ **TAPPING THE TAB YOU ARE ALREADY ON MUST DO NOTHING.**
+               * It was `router.push(tab.route)` unconditionally, so tapping **Shrine while on the
+               * shrine** pushed a SECOND `/` onto the stack — the page re-rendered, and the stack
+               * grew a duplicate entry per tap. Measured on glass 2026-11-01.
+               * ⚠️ The `disabled` prop already covers `route === null`; this covers the other half.
+               */
+              if (isActive || tab.route === null) return;
+              router.push(tab.route);
             }}
             style={{
               position: 'absolute',

@@ -940,3 +940,87 @@ ours (`streakDayKey`, asserted).
 rather than showing an invented count. ⚠️ And the destructive **delete has still never been run**
 (it would erase the owner's test clan).
 
+---
+
+## 📍 SESSION — 2026-11-01 (S72, continued once more) — three nav/ritual corrections
+
+Three things the owner hit on glass, all now fixed and gated.
+
+### ⚠️⚠️ 1. Tapping the tab you are ALREADY ON re-rendered the page
+
+`TabBar`'s press handler was `router.push(tab.route)` **unconditionally**, so tapping **Shrine while
+on the shrine** pushed a **second `/`** onto the stack. The screen re-mounted (a visible re-render)
+and the stack grew **one duplicate per tap** — silently, because the top of the stack looks identical.
+
+⚠️ **The `disabled` prop covered the other half** (`route === null` → Store), which is why the bug
+looked like "Shrine is special" rather than "the handler never checks state":
+
+```tsx
+if (isActive || tab.route === null) return;   // ⚠️ isActive is the new half
+router.push(tab.route);
+```
+
+⚠️ **How it was proved** — not by eye, because a re-render looks the same. **Back-stack accounting:**
+tap Shrine 3×, then press BACK. The app exits to the launcher. ⚠️ **Pre-fix the three duplicates
+would have absorbed those pops and left us on the shrine** — so "we left the app" is the evidence
+that nothing was pushed. The control that makes it meaningful: a **real** push (League) *does*
+survive a BACK and returns to the shrine.
+
+⚠️ **`active` is a hardcoded `"shrine"` prop today** (`<TabBar active="shrine" …>`), so this guard is
+only *exercised* on the shrine until the other tabs share the bar. The guard is correct either way.
+
+### ⚠️ 2. The ritual's way out — and when it must NOT be there
+
+**The owner's ruling:**
+> *"Transform and burn should not have a back button. When entering the ritual after the picture starts
+> on the pipeline — after the user lassos or trims the picture and sends it into the pipeline — do not
+> have a back function unless it fails the pipeline."*
+
+⚠️ **This overrules the boards**, which draw a back on `EN · 3 Transform` / `3b` / `3d` **and**
+`EN · 4 Burn`. The reason it matters: **`working` and `parked` both hold an offering that has already
+been PAID FOR**, so a back there abandons a paid operation with no trace. The two states where nothing
+more happens without the user — **`spent`** (a lost capture) and **`offline`** (never left the phone) —
+are the only ones that get a way out.
+
+Implemented as a **pure predicate**, not a JSX condition, for the project's standing reason — *"a
+structure nothing can read is a structure no gate can hold"*:
+
+```ts
+export function pipelineFailed(phase: PreparingPhase | 'done'): boolean {
+  return phase === 'spent' || phase === 'offline';
+}
+```
+
+⚠️ `'done'` answers `false` deliberately: that phase routes away immediately and renders nothing, so a
+back would flash on a screen the user is leaving.
+
+### ⚠️ 3. And a rule about ABSENCE needs a source scan
+
+⚠️ **A gate cannot see a component that is not rendered** — the only thing that can hold *"Burn has no
+back button"* is reading the file. §26 now does exactly that:
+
+| assertion | why |
+|---|---|
+| `burn.tsx` contains **no** `<ScreenHud` | the owner's ruling; ⚠️ the board draws one |
+| `preparing.tsx` has `<ScreenHud` **and** `pipelineFailed(` | an *unconditional* HUD would trap a paid offering |
+| `settings.tsx` **does** contain `<ScreenHud` | ⚠️ **positive control** — proves the scan can find one |
+
+### ✅ Verified on `HN615L005386` (Expo Go over `adb reverse`, port 8081)
+
+* **Tab fix** — 3 Shrine taps → BACK → launcher (nothing pushed); League → BACK → shrine (a real push
+  still pops). Profile and League both navigate.
+* **The failed pipeline draws the back.** Deep-linking `/preparing` with **no params** lands in
+  `offline` — *"The offering could not reach the shrine." / "Nothing has been used — your offering is
+  safe." / "Check again"* (`prepare_offline: bad_params`), and the **paper back disc** is there.
+  ⚠️ The **LIGHT** tone, matching `EN · 3d`'s `btn · back (ink)` — a paper disc reads on
+  `surface.camera`; the dark tone would not.
+* **⚠️ Fault-tested the negative.** Forcing `pipelineFailed` to `return false` → **0 back nodes while
+  the failure copy stayed on screen** (so the absence was about the button, not a navigation change).
+  Restored → 1 node. ⚠️ **This is the check that proves the button is genuinely conditional** — a
+  gate that only ever sees "present" cannot tell a condition from a constant.
+
+### Gates
+
+`check:lib` **619 → 640** (21 new, incl. 3 positive controls) · `npm run check` **EXIT 0** · `tsc` 0.
+
+

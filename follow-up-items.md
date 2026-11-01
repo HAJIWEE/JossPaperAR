@@ -322,13 +322,27 @@
     would erase the owner's test clan, so it is their call.
   - ⚠️ **The Profile board's league chip, `remembering since` line and burned/collected/credits
     tiles are not drawn** — none has a read, and sample numbers look real and are invented.
-- **⚠️ `Transform` and `Burn` draw a back button on their boards, and the build has none.**
-  `EN · 3 Transform` draws `btn · back (ink)` + `hud · screen title` ("Your Offering"); `EN · 4 Burn`
-  draws the **dark** `hud · back circle`. ⚠️ **A back button there abandons an operation that has
-  already been PAID FOR** — Transform runs while a cartoonize job is in flight, Burn while the burn is
-  being submitted. So the target needs a **decision**, not a sweep: back to the shrine? back to the
-  capture? or refuse while in flight and say why? ⚠️ `EN · 5 Reward` draws **no** back button,
-  deliberately, and the build already matches.
+- ✅ **RESOLVED 2026-11-01 — the owner ruled on `Transform` / `Burn` backs.** The boards draw one
+  (`EN · 3 Transform` / `3b` / `3d` → `btn · back (ink)` + `hud · screen title`; `EN · 4 Burn` → the
+  **dark** `hud · back circle`), and the build has none. The ruling:
+  > *"Transform and burn should not have a back button. When entering the ritual after the picture
+  > starts on the pipeline — after the user lassos or trims the picture and sends it into the pipeline
+  > — do not have a back function unless it fails the pipeline."*
+
+  Implemented as `pipelineFailed(phase)` in `domain/slice.ts`: **`spent` and `offline` get a way out,
+  `working` and `parked` do not** (both still hold an offering already PAID FOR). ⚠️ **The predicate is
+  pure so `check:lib` §26 can hold it**, and §26 also scans the two screens: `burn.tsx` must contain
+  **no** `<ScreenHud`, `preparing.tsx`'s must sit behind `pipelineFailed`. Fault-tested both ways on
+  glass — predicate forced `false` → 0 back nodes *while the failure copy stayed on screen*.
+  ⚠️ **Board deviation to file:** `EN · 4 Burn` and `EN · 3` (working) / `3b` (queued) still draw a
+  back the build deliberately does not. ⚠️ `EN · 5 Reward` draws none and the build already matches.
+- ⚠️ **Tapping the tab you are ALREADY ON used to re-render the page.** `TabBar`'s `onPress` was
+  `router.push(tab.route)` unconditionally, so tapping **Shrine while on the shrine** pushed a
+  **second `/`** onto the stack — the screen re-mounted and the stack grew one duplicate per tap.
+  Fixed 2026-11-01 with an `isActive` guard; verified by back-stack accounting (3 Shrine taps then
+  one BACK exits to the launcher, where pre-fix the duplicates would have absorbed the pops).
+  ⚠️ `active` is currently a **hardcoded `"shrine"`** prop, so the guard is only exercised on the
+  shrine until the other tabs live in the same bar.
 - **⚠️ `ScreenHud` is the standard, and `capture` now uses it; the clan screens do not.** ⚠️ Their
   boards (`EN · 0e*`) draw **no** top back button — they use `clan-ui`'s bottom `GhostButton`, which
   is a second idiom. That is a board-backed difference, not an oversight, but it is worth one pass.

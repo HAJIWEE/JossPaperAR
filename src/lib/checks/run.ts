@@ -16,6 +16,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { isValidClanName } from '../clan-rules.ts';
+import { PREPARING_PHASES, pipelineFailed } from '../../domain/slice.ts';
 import { bookView, showsBookSectionTitle } from '../clan-roles.ts';
 import {
   CONFIRM_SPEC,
@@ -1731,6 +1732,43 @@ function localeChecks(): void {
   // ⚠️ POSITIVE CONTROL — the "they differ" assertion is not a tautology.
   check('⚠️ guard: identical tones WOULD fail the differ check',
     !(HUD_TONES.light.fill === HUD_TONES.dark.fill));
+
+  /**
+   * ── ⚠️ THE PIPELINE'S WAY OUT — ONLY ON FAILURE (owner's ruling, 2026-11-01) ──
+   * > *"After the user lassos or trims the picture and sends it into the pipeline, do not have a back
+   * > function unless it fails the pipeline."*
+   *
+   * ⚠️ While `working` or `parked` the offering is **already PAID FOR**, so a back button abandons it
+   * silently. ⚠️ `spent` and `offline` are the two states where nothing more happens without the user.
+   */
+  check('⚠️ a FAILED pipeline offers a way out (spent · offline)',
+    pipelineFailed('spent') && pipelineFailed('offline'));
+  check('⚠️ …and one still IN FLIGHT does NOT (working · parked) — it holds a paid offering',
+    !pipelineFailed('working') && !pipelineFailed('parked'));
+  check('…and `done` does not either (it routes away and renders nothing)',
+    !pipelineFailed('done'));
+  check('⚠️ every preparing phase is classified (none is forgotten)',
+    PREPARING_PHASES.every((phase) => typeof pipelineFailed(phase) === 'boolean'));
+  // ⚠️ POSITIVE CONTROL — the predicate must not answer the same for every phase.
+  check('⚠️ guard: the predicate is not a constant',
+    PREPARING_PHASES.some((phase) => pipelineFailed(phase))
+      && PREPARING_PHASES.some((phase) => !pipelineFailed(phase)));
+
+  /**
+   * ⚠️ **AND THE SCREENS, because the ruling is about WHERE the button is.** ⚠️ `EN · 4 Burn` DRAWS a
+   * back circle and the owner ruled it must not have one — so this is a deliberate board deviation,
+   * and a source scan is the only thing that can hold a rule about absence.
+   */
+  const burnSource = readFileSync(join(PROJECT_ROOT, 'src/app/burn.tsx'), 'utf8');
+  check("⚠️ the BURN screen has NO back button (the owner's ruling; the board draws one)",
+    !burnSource.includes('<ScreenHud'));
+  // ⚠️ …and Transform's IS conditional — an unconditional one would trap a paid offering.
+  const preparingSource = readFileSync(join(PROJECT_ROOT, 'src/app/preparing.tsx'), 'utf8');
+  check('⚠️ the TRANSFORM screen renders its HUD ONLY behind `pipelineFailed`',
+    preparingSource.includes('<ScreenHud') && preparingSource.includes('pipelineFailed('));
+  // ⚠️ POSITIVE CONTROL — the absence check must FIRE where a HUD IS present.
+  check('⚠️ guard: the same absence check FINDS the HUD on a screen that has one',
+    readFileSync(join(PROJECT_ROOT, 'src/app/settings.tsx'), 'utf8').includes('<ScreenHud'));
   check('the week card is the board\'s 350×64 r14',
     HISTORY_SPEC.week.w === 350 && HISTORY_SPEC.week.h === 64 && HISTORY_SPEC.week.radius === 14);
   check('the entry row is 350×88 r12, with a 60 thumb',
