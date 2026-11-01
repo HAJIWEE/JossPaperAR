@@ -7,6 +7,13 @@
 ## 🎯 Immediate Actions (Next 1–2 Weeks)
 
 ### 🔴 On the critical path
+- 🎯 **S67+13 (2026-10-31) — `SCRUM-144` ANSWERED (**option A**): the Book's empty-state copy is **SIGNED OFF**, **doc 15 §8 gains row `C18`**, and `check:copy` rule 4 holds the two together (`check:copy` **15 → 30**). ✅ **`SCRUM-122` → `Done`**, so **sprint 34 has no open work**. ⚠️ US$0.00.**
+  - ✅ **The decision**: the proposed wording ships **exactly as written** — ⚠️ **no string changed**, no generation, no device run, no EAS build.
+  - ✅ **`SCRUM-122` was parked `In Review` on precisely this** (its AC 3: *"the copy is doc 15 §8's — do not invent the ZH string"*, and §8 had **no empty-state row**). With **`C18`** in the table, AC 3 is met and the ticket is **`Done`**.
+  - ⚠️ **The defect worth remembering was the INVISIBLE gap**: the AC pointed at the table of record, the table had no row, and **the only detector was a human reading a description.** ⚠️ **A proposal no gate can see is one edit away from rot.** So rule 4 reads the Book's four keys **back out of §8** and compares them **character for character, both locales** (`book_header`→C14 · `book_outside`→C15 · `book_window`→C16 · `book_empty`→**C18**) — ⚠️ **it was RED before `C18` existed**, so it guards this decision rather than decorating it.
+  - ✅ **Fault-tested both ways**: delete the row → red (*"§8 carries no C18"*); change one word of the shipped EN → red. ⚠️ **Restored byte-identically (`sha256sum -c`).**
+  - ⚠️ **STATED SCOPE**: four keys / four rows — **not** a whole-table parity check (§8 has no key column). Another §8 row still needs its own assertion.
+
 - 🐞 **S67+12 (2026-10-25) — `SCRUM-145` (owner-found on glass): `/burn`'s "Throw again" button rendered but did nothing after a SECOND miss; fixing it exposed TWO more defects (`check:throw` 47 → 55). ⚠️ US$0.00 in AI spend; one EAS build.**
   - ⚠️ **A COUPLING, not a typo**: the render asked `!canThrow(n)` while the handler required `!canThrow(n + 1)` → the button agreed for the FIRST rethrow and disagreed for the SECOND. ⚠️ Same class as `fireBoxTop`.
   - ✅ **One predicate now** — `landedAction` → `'rethrow' | 'confirm' | 'rest'`; **a hit is always confirmable**.
@@ -16,7 +23,7 @@
 - 🐞 **S67+11 (2026-10-25) — `SCRUM-122` FIXED AND GATED (the Book's empty state had no copy) + a `preview` APK built for an on-glass review of it and 127 (`check:lib` 409 → 416). ⚠️ US$0.00 in AI spend; one EAS build.**
   - ✅ **The defect**: the window line rendered **twice** under an **unconditional** section title. ⚠️ **The cause was an ABSENCE** — no empty-state key existed.
   - ✅ **The fix**: `book_empty`, and the section title only with entries. ⚠️ **The rule is now PURE** (`bookView` in `clan-roles.ts`), so both defects are asserted (+7 checks, fault-tested).
-  - ⚠️ **AC 3 unmet from the table**: **doc 15 §8 has no empty-state row** → the key ships as a **PROPOSAL**, **`SCRUM-144`** is the **🎯 Decide** ticket, and **`SCRUM-122` stays `In Review`**.
+  - ⚠️ **AC 3 was therefore unmet — UNTIL 2026-10-31**: **doc 15 §8 had no empty-state row**, so the key shipped as a marked **PROPOSAL** and **`SCRUM-144`** was filed as the **🎯 Decide** ticket. ⚠️ **`SCRUM-122` stayed `In Review` on that one answer.** ✅ **CLOSED by S67+13** — §8 now carries row **`C18`**, the proposal is signed off, and both tickets are **`Done`**.
   - ✅ **ON GLASS** (APK from `be43d0e`, `adb install -r` → Success, `HN615L005386`): **127 VERIFIED** — `/preparing` shows the new title + body and ⚠️ **neither old string appears**; **122 PARTIAL** — the **list** path renders with the window note **once** and the title **above** its entries, but ⚠️ **the empty state was not seen** (it needs a clan with no offerings; creating a test clan in the hosted DB is residue and was not done).
 
 - 🐞 **S67+10 (2026-10-25) — `SCRUM-127` ANSWERED (OPTION B): the `/preparing` copy is per-phase and the collision is an assertion (`check:slice` 36 → 44). ⚠️ US$0.00.**

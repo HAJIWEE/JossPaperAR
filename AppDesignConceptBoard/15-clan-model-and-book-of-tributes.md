@@ -185,6 +185,7 @@ One active `code` per clan (Head can re-roll it): **link · QR · copyable code*
 | C15 | Book · outside view | *A member made this offering.* | *由宗族成员供奉。* |
 | C16 | Book · window note | *Showing the last month.* | *仅显示最近一个月。* |
 | C17 | Delete clan (head) | *Delete this clan? Every member loses the altar and the Book of Tributes. This cannot be undone.* | *删除宗族？所有成员将失去祭坛与供奉簿，无法复原。* |
+| C18 | Book · **empty** state | *No offerings yet. The first one will appear here.* | *尚无供奉。第一笔将显示在这里。* |
 
 **Terminology (ZH lock — confirm against the design row):** 宗族 clan · 族长 head · 长老 elder · 副族长 co-head · 成员 member · 供奉簿 Book of Tributes · 邀请码 invite code. *(供奉 already means "offering" in the shipped copy — [[10-economy-spec]] §4.)*
 

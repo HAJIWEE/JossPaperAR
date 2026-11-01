@@ -1163,8 +1163,9 @@ function screenCopyChecks(): void {
     // phases COLLIDE is `check:slice` §4, because a collision is a fact about the mapping.
     'ritual_preparing', 'ritual_busy', 'ritual.cannotPrepare',
     'ritual.spentBody', 'ritual.offlineTitle', 'ritual.offlineBody',
-    // ⚠️ SCRUM-122 — the Book's empty state. ⚠️ **A PROPOSAL, not signed-off copy**: doc 15
-    // §8 carries no empty-state row (C14–C16 only). See the `🎯 Decide:` ticket on SCRUM-122.
+    // ⚠️ SCRUM-122 — the Book's empty state. ✅ **SIGNED OFF (SCRUM-144 option A): doc 15 §8's
+    // row C18 IS the copy.** ⚠️ It shipped as a marked PROPOSAL while §8 had no empty-state row;
+    // `check:copy` rule 4 now asserts the table and this key agree, both locales.
     'book_empty',
   ];
   const zh = MESSAGES.zh as unknown as Record<string, string>;
