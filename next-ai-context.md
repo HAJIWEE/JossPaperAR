@@ -1232,7 +1232,7 @@ signatures to aliases but not interfaces, and expo-router types `params` as an i
 3. **`check:copy` caught a `t()` call split across lines** — the extractor's blind spot, exactly what
 that check exists for.
 
-## ⚠️ 4 · THE STORE'S POINTS CHIP READS THE WRONG NUMBER — NOT FIXED
+## ⚠️ 4 · THE STORE'S POINTS CHIP READ THE WRONG NUMBER — ✅ FIXED 2026-11-01 (S73)
 
 * the chip reads `home_summary()` → **`sum(tributes.points)`**
 * `purchase_item` checks **`public.balances`** → **`sum(ledger_events.amount)`**
@@ -1241,6 +1241,17 @@ that check exists for.
 purchase went through anyway — a player sees "0 points" beside a working Buy button. ⚠️ **There is no
 client read for the ledger balance** (`ledger_events` is RLS-on with no policy, like `burns`), so the
 fix needs a `SECURITY DEFINER` read, i.e. **a migration**. ⚠️ **This is the top of the next session.**
+
+> ✅ **RESOLVED 2026-11-01 (S73) — see the S73 section at the foot of this file.** `home_summary()` now
+> reads the **`balances` view** — *the same read `purchase_item` makes* — so the number shown and the
+> number enforced cannot drift. Migration `20261101150000_home_summary_tribute_wallet.sql`, applied to
+> the local stack **and** hosted, with `supabase/tests/tribute_wallet.sql` fault-tested.
+> ⚠️ **AND THE "no policy" REASON ABOVE IS WRONG — corrected by measurement:** `pg_policies` carries
+> **`ledger_select_own`** for `authenticated`, and `has_table_privilege('authenticated',
+> 'public.ledger_events','SELECT')` is **true**. A client *could* read its own ledger rows. The RPC is
+> still the right fix — it returns ONE **aggregate** row and is the same source the spend uses — but not
+> for the reason written here. ⚠️ `burns` carries `burns_select_own` too, so the same sentence in
+> `history.tsx` and `my_offerings.sql` is likewise stale.
 
 ## ⚠️ 5 · PRODUCTION DATA WAS WRITTEN, ON THE OWNER'S SAY-SO
 
@@ -1258,7 +1269,9 @@ the `ledger_adjustment_needs_reason` CHECK enforces it. The account then bought 
    burn box. ⚠️ **Expected problem: `smartphone` may read too small** — at 0.50 aspect it is tall and
    thin, so in a wide box it contains to about half the height. `adb reverse` + Metro, then Store →
    Collection → picker → burn, screenshotting each.
-2. **The points chip defect (§4 above)** — a migration + a `SECURITY DEFINER` balance read.
+2. ✅ **DONE 2026-11-01 (S73)** — the points chip defect (§4 above). Migration
+   `20261101150000_home_summary_tribute_wallet.sql`, applied and read back on the local stack **and**
+   hosted; `supabase/tests/tribute_wallet.sql` fault-tested (old body → **RED**).
 3. **`7d` item detail and `7e`'s own buy sheet** — the buy is a `ConfirmCard` on the storefront, not
    the board's shape. ⚠️ **The cash rail remains native**: Google Play Billing, an EAS build, Play
    Console, with no read for a cash balance anywhere.
@@ -1269,3 +1282,83 @@ the `ledger_adjustment_needs_reason` CHECK enforces it. The account then bought 
 `expo-doctor` 21/21 · **US$0.41 spent this session** (US$0.40 of images + US$0.01 of cutouts), all
 **estimates at published rates**, flagged as such in `project-costs.md`. fal.ai ≈ **US$6.39 / S$8.18**
 of the approved US$10–20.
+
+# 📍 SESSION — 2026-11-01 (S73) — THE TRIBUTE WALLET, AND A RED GATE FOUND IN THE SUITE
+
+⚠️ **Two defects closed, both by measurement, both with a gate. US$0.00** — no fal.ai call, no device
+run, no EAS build.
+
+## ⚠️⚠️ 1 · `home_summary()` READ THE RECORD WHERE THE SPEND READS THE WALLET
+
+**SCRUM-150 AC 1** is *"Balance shown; a purchase **drops it** by the documented price."* It did not.
+
+| who | source | what it is |
+|---|---|---|
+| the Store chip | `home_summary()` → **`sum(tributes.points)`** | the **Book of Tributes** record of offerings MADE (doc 15 §7.1) — **lifetime earned, never falls** |
+| `purchase_item` | **`public.balances`** → `sum(ledger_events.amount)` | the ledger — the view's own comment: *"the ONLY thing a balance is"* |
+
+⚠️ **TWO SOURCES FOR ONE FACT.** Measured on glass 2026-11-01: with **5000** tribute in the ledger the
+chip read **"Store Points 0"** — that account's credit was an `adjustment` row, which writes **no**
+`tributes` row — and the purchase **went through anyway**.
+
+✅ **THE FIX: one source.** `home_summary()` now reads `balances`, `where user_id = v_uid and
+currency = 'tribute'` — **character for character the read `purchase_item` makes before it refuses a
+purchase** (`20261004094000:86`). The number shown and the number enforced cannot drift.
+
+⚠️ **WHY THE WALLET IS RIGHT FOR EVERY SURFACE, not just the chip.** Doc 10 defines `tribute` as a
+**WALLET** — *"in: burn awards … out: store redemption"* — and the ZH label is **identical** on both
+surfaces (shrine panel and store chip are both **功德点**). So the **shrine panel and the Profile row
+track the wallet too**; they were reading a record. ⚠️ **Product-visible: the shrine's number now FALLS
+when tribute is spent.** That is what a balance does — recorded here so a future session does not read
+it as a regression.
+
+## ⚠️ 2 · `stale_job_grace()` WAS EXECUTABLE BY `anon` — AND `pr3_verification.sql` WAS RED ON THE TREE
+
+⚠️ **Found by RUNNING the suite, not by reading it.** `pr3_verification.sql`'s trap-#1 assertion —
+*"NOTHING in public is executable by anon"* — **failed on the tree as this session opened**, and
+**still failed with the old `home_summary` restored**, so it was not mine.
+
+`20261024160000_stale_job_sweep.sql` revoked its **sweep** from `public`/`anon`/`authenticated`
+(that file's lines 134-136) and **omitted the same three lines for the helper beside it**. So
+`stale_job_grace()` kept the default `EXECUTE TO PUBLIC`, and ⚠️ **PostgREST exposes every executable
+function in `public` as an RPC endpoint** — `POST /rest/v1/rpc/stale_job_grace` answered with no JWT.
+
+⚠️ **MEASURED 2026-11-01, local stack AND hosted, identical:** `stale_job_grace` anon=**t** ·
+`reconcile_stale_cartoonize_jobs` anon=**f**. Fixed by
+`20261101160000_stale_job_grace_revoke.sql`, re-measured **anon=f** on both.
+
+⚠️ **The blast radius was small and that is not the point.** The body is `select interval '15 minutes'`
+— immutable, no table access, nothing to leak. The defect is the **posture**: a rule with one silent
+exception is a rule the next function is written against by accident. ✅ Its only caller is the sweep,
+which is `SECURITY DEFINER` and keeps execute as its owner.
+
+## ⚠️ 3 · TWO MEASURED CORRECTIONS TO THE S72 NOTES
+
+1. ⚠️ **"`ledger_events` is RLS-on with no policy, like `burns`" is FALSE — measured.** Both tables
+   carry a SELECT policy (`ledger_select_own` · `burns_select_own`) **and** `authenticated` holds the
+   grant (`has_table_privilege(...) = true`). A client *can* read its own rows. The RPC is still the
+   right fix — an **aggregate**, and the same source the spend uses — but not for that reason.
+   ⚠️ The same stale sentence sits in `history.tsx` and `my_offerings.sql`; **not** corrected there yet.
+2. ⚠️ **A second, silent defect on the same read path:** `offerings-api.ts` asked for
+   `row.balance_after`, but `purchase_item` returns the key **`balance`** — so `balanceAfter` was
+   **always 0**. Nothing rendered it, which is why it survived. Fixed.
+
+## Gates
+
+`check:sql` **29 → 30** migrations · `check:lib` **723** · `npm run check` **EXIT 0** · `tsc` 0 ·
+⚠️ **the full local SQL suite is 14/14 GREEN — it was 13/14 before** (`pr3_verification` RED).
+New `supabase/tests/tribute_wallet.sql` (**W1–W5**), **fault-tested**: restoring the old body turns
+**W1 RED** (the record reads 1000 where the wallet reads 6000). Both migrations applied to the local
+stack **and** hosted, verified by read-back. ⚠️ `league_bootstrap.sql` failed once mid-session against
+a **dirty** local DB and passes on a clean one — residue, not order-sensitivity; a `db reset` before
+trusting a suite run remains the rule.
+
+## Next, in order
+
+1. ⚠️⚠️ **STILL OWED, AND STILL FIRST: LOOK AT THE NEW STANDARD-ITEM ART ON GLASS** (S72-final §1 —
+   untouched again this session). The gate proves the sizes match the files; it cannot prove they
+   *look* right at 110×80 and in the 72 px burn box.
+2. **`7d` item detail and `7e`'s own buy sheet** — the cash rail is native (Play Billing · EAS · Play
+   Console). `SCRUM-212`.
+3. ⚠️ **Correct the stale "no policy" sentence** in `history.tsx` and `my_offerings.sql` (§3.1).
+
