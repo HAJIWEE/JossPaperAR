@@ -1455,6 +1455,26 @@ services later."* Then, on seeing the draft: *"Yes its fine."* → **`SCRUM-215`
 | `ZH · 0d6 注册 · 邮箱` | 11960 | 1 |
 | `ZH · 0d7 注册 · 邮箱 / 输入验证码` | 12840 | 1 |
 | `ZH · 0d8 注册 · 邮箱 + Google（第二阶段）` | 13720 | 2 |
+| `EN · 0e13 Clan fork · with account offer` | 14600 | **1 — the ENTRY POINT** |
+| `ZH · 0e13 宗族入口 · 账号提示` | 15480 | **1 — the ENTRY POINT** |
+
+⚠️ **THE ENTRY POINT IS DRAWN** (owner's answer: **(a) the clan fork**). Both are CLONES of the signed-off
+fork, so the app mark, title, sub, the two cards and their touch areas are identical. Added: **one 64-tall
+row** under the cards — disc + ✉️ glyph, a title, a sub-line — and the *"a clan is required"* note moved
+**726 → 796**. ⚠️ **A row, not a card:** the two existing choices are 190-tall cards, so the offer reads as
+a secondary affordance rather than a third equal choice.
+
+⚠️⚠️ **AND IT COLLIDES WITH ADR-004 RULE 3, WHICH IS WORTH KNOWING BEFORE IT IS BUILT.** The fork sits
+**inside the first-run path** (`SCRUM-147`: *"splash → panels → permission → fork"*), and rule 3 says
+*"**No screen nags, no banner, no 'finish your profile' interstitial** … offered in context (clan features,
+cross-device continuity) — never demanded."* ⚠️ **A row on the fork is the closest thing in this design to
+the "banner" that rule names**, and it is the one place the user has no clan and no altar yet. ⚠️ The same
+offer at the **sharing** moment (`EN · 0e4` / `EN · 0e9`) is the in-context form the rule endorses.
+⚠️ **Drafted as asked, not as argued for** — flagged on `SCRUM-214` so the PM can move it knowingly.
+
+⚠️ **EVERY STRING ON THESE TWO BOARDS IS A PROPOSAL** — doc 15 §8 carries none of it:
+`Save this altar to an account` · `Reach it from your family's phones` · `把这座祭坛存入账号` ·
+`家人的手机也能打开这座祭坛`. ⚠️ And the EN wording assumes an altar that does not exist yet on this screen.
 
 ⚠️ **All six built by CLONING** `EN · 0d` / `ZH · 0d` / `EN · 0d3` / `ZH · 0d3` — geometry, tokens, type
 scale and the app-mark header are identical to what was signed off.
