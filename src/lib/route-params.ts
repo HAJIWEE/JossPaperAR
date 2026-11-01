@@ -313,3 +313,98 @@ export function readBurnParams(raw: {
     demo: isDemo(first(raw.demo)),
   };
 }
+
+/**
+ * ═══ SCRUM-149 · THE ITEM BURN'S PARAMS ════════════════════════════════════════
+ *
+ * ⚠️⚠️ **A PARALLEL READER, NOT A WIDENED ONE.** `burns` XOR-enforces *either* a `capture_id` *or*
+ * an `item_code`, and the server refuses a payload with both or neither
+ * (`submit_burn`: *"exactly one of capture_id / item_code is required"*). ⚠️ So a single reader that
+ * accepted either would be a reader that can express the state the server rejects — and it would
+ * make `captureId` **optional** on the photo path, which is exactly the defect `toRewardParams`'
+ * doc records ("the capture id is a required argument, so a caller cannot forget it the way
+ * `burn.tsx` did"). Two readers keep each path's requirement absolute.
+ */
+
+export type ItemBurnParamRead =
+  | { readonly ok: true; readonly itemCode: string; readonly demo: boolean }
+  | { readonly ok: false; readonly reason: 'missing_item_code' };
+
+/** The `/burn?itemCode=…` hop. ⚠️ An item offering has **no uri and no sprite** — it needs neither. */
+export function readItemBurnParams(raw: {
+  readonly itemCode?: string | string[];
+  readonly demo?: string | string[];
+}): ItemBurnParamRead {
+  const itemCode = first(raw.itemCode)?.trim() ?? '';
+  if (itemCode.length === 0) return { ok: false, reason: 'missing_item_code' };
+  return { ok: true, itemCode, demo: isDemo(first(raw.demo)) };
+}
+
+/**
+ * ⚠️ A **TYPE ALIAS**, for the reason `RewardParams` records above: TypeScript gives implicit
+ * index signatures to object type aliases but NOT to `interface` declarations, and expo-router types
+ * `router.push({ params })` as an index-signature record. ⚠️ An `interface` here fails `tsc` with
+ * *"not assignable to type 'UnknownInputParams'"* — which is exactly how this one was caught.
+ */
+export type ItemRewardParams = {
+  readonly itemCode: string;
+  readonly offsetPx: string;
+  readonly throwNumber: string;
+  readonly demo?: string;
+};
+
+/** Build the `/reward` params for an ITEM burn. ⚠️ `itemCode` is required, for the same reason. */
+export function toItemRewardParams(
+  itemCode: string,
+  offsetPx: number,
+  throwNumber: number,
+  demo = false,
+): ItemRewardParams {
+  return {
+    itemCode,
+    offsetPx: String(offsetPx),
+    throwNumber: String(throwNumber),
+    ...(demo ? { demo: DEMO_VALUE } : {}),
+  };
+}
+
+export type ItemRewardParamRead =
+  | {
+      readonly ok: true;
+      readonly itemCode: string;
+      readonly accuracyPx: number;
+      readonly throwNumber: number;
+      readonly demo: boolean;
+    }
+  | { readonly ok: false; readonly reason: 'missing_item_code' | 'bad_accuracy' | 'bad_throw_number' };
+
+/**
+ * The `/reward?itemCode=…` hop.
+ *
+ * ⚠️ The accuracy and throw checks are **the same checks** `readRewardParams` makes, and they are
+ * repeated rather than shared for the reason the two readers exist at all: the shared part is three
+ * lines and the difference is which id is REQUIRED.
+ */
+export function readItemRewardParams(raw: {
+  readonly itemCode?: string | string[];
+  readonly offsetPx?: string | string[];
+  readonly throwNumber?: string | string[];
+  readonly demo?: string | string[];
+}): ItemRewardParamRead {
+  const itemCode = first(raw.itemCode)?.trim() ?? '';
+  if (itemCode.length === 0) return { ok: false, reason: 'missing_item_code' };
+
+  const offsetRaw = first(raw.offsetPx);
+  const accuracyPx = Number(offsetRaw);
+  if (offsetRaw === undefined || offsetRaw.trim() === '' || !Number.isFinite(accuracyPx) || accuracyPx < 0) {
+    return { ok: false, reason: 'bad_accuracy' };
+  }
+
+  const throwRaw = first(raw.throwNumber);
+  const throwNumber = throwRaw === undefined || throwRaw.trim() === '' ? 1 : Number(throwRaw);
+  if (!Number.isInteger(throwNumber) || throwNumber < 1) {
+    return { ok: false, reason: 'bad_throw_number' };
+  }
+
+  return { ok: true, itemCode, accuracyPx, throwNumber, demo: isDemo(first(raw.demo)) };
+}

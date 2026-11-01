@@ -39,3 +39,20 @@ export async function markTutorialDone(): Promise<void> {
     // Leaving it unset replays the tutorial next launch — the safe direction.
   }
 }
+
+/**
+ * Forget the tutorial record — **"back to first run"** (SCRUM-151).
+ *
+ * ⚠️ Called by the one-tap delete, and only there. The delete's acceptance is *"lands back at first
+ * run"*, and a device that has already seen the tutorial is not at first run: the first burn would
+ * skip the walkthrough while the user is looking at an empty shrine with no clan. ⚠️ A failed clear
+ * leaves the record set, which skips the tutorial — the same survivable direction `readFirstRun`
+ * chooses when a READ fails.
+ */
+export async function clearFirstRun(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(FIRST_RUN_KEY);
+  } catch {
+    // The record survives; the user keeps the tutorial they already saw.
+  }
+}

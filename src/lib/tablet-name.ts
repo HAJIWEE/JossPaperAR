@@ -53,3 +53,54 @@ export function rotatedNameSize(box: { readonly width: number; readonly height: 
   const alongFrame = (box.height * 0.92) / Math.max(1, length * 0.58);
   return Math.min(acrossFrame, alongFrame);
 }
+
+/**
+ * How many characters a tablet's face carries.
+ *
+ * ⚠️ **The board's own number, not a guess.** `sheet · hint` on `EN · 1s Ancestor sheet`
+ * reads *"Surname + given name paint up to 3 characters. No given name → 姓 + 氏, the
+ * traditional short form."* Every tablet drawn on the Home boards carries three.
+ */
+export const TABLET_NAME_MAX = 3;
+
+/**
+ * The name PAINTED on a tablet — which is **not** the name that was stored.
+ *
+ * ── ⚠️ WHY THIS IS A RULE AND NOT A TEMPLATE ────────────────────────────────
+ * The altar and the sheet's preview must paint the SAME glyphs. Two call sites building
+ * the string inline is exactly how a preview and its result drift, and the drift is only
+ * visible on glass. So the rule lives here, once, and `check:lib` holds it.
+ *
+ * | stored | painted | why |
+ * |---|---|---|
+ * | `陈` + *(none)* | `陈氏` | ⚠️ The board draws it: `EN · 1b Home / tablets (carousel)` has `tablet · right (陈氏)`. |
+ * | `陈` + `大文` | `陈大文` | Surname + given, at the 3-character limit. |
+ * | `陈` + `大文长` | `陈大文` | ⚠️ **Truncated**, not refused — the DB caps the surname at 20. |
+ * | `Chen` + *(none)* | `Chen` | ⚠️ **No 氏** — see below. |
+ * | *(blank)* | `` | Nothing to paint; the caller draws its own placeholder. |
+ *
+ * ── ⚠️ THE TWO CLAUSES ARE SEPARATE, AND THE BOARD SAYS SO ─────────────────
+ * `sheet · hint`: *"Surname + given name paint up to 3 characters. **No given name → 姓 + 氏**,
+ * the traditional short form."* The limit is stated for the first clause only; 姓 + 氏 is its own
+ * rule. So `欧阳` + *(none)* paints `欧阳氏` and is **not** cut to three.
+ *
+ * ── ⚠️ 氏 IS CHINESE, SO A LATIN SURNAME DOES NOT TAKE IT ───────────────────
+ * Two reasons, and the second is the one that bites:
+ *   1. 氏 is a clan suffix; `Chen氏` means nothing.
+ *   2. ⚠️ **氏 is CJK, so appending it drags the name into the VERTICAL branch** —
+ *      `nameOrientation('Chen氏')` is `vertical`, i.e. `C h e n 氏` stacked one glyph per line,
+ *      which is exactly the defect the 90° rotation exists to prevent (SCRUM-146, seen on glass
+ *      2026-10-31). A bare `Chen` is Latin, so it rotates onto one line and reads as a name.
+ *
+ * ⚠️ `Array.from`, not `slice`: a name may carry a surrogate pair (an emoji, a rare
+ * ideograph outside the BMP), and slicing by UTF-16 unit would cut one in half. `Tablet`
+ * already reads the name the same way.
+ */
+export function tabletName(surname: string, givenName: string | null | undefined): string {
+  const s = surname.trim();
+  if (s.length === 0) return '';
+  const g = (givenName ?? '').trim();
+  /** ⚠️ No given name → the traditional short form 姓 + 氏, but only where 氏 means something. */
+  if (g.length === 0) return CJK.test(s) ? `${s}氏` : s;
+  return Array.from(s + g).slice(0, TABLET_NAME_MAX).join('');
+}

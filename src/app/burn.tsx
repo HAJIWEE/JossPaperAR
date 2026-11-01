@@ -43,6 +43,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ART_SCALE, FLAME_TOP_ABOVE_HEART, FireArt, type FireReaction } from '@/components/fire-art';
 import { FullBleedCamera } from '@/components/full-bleed-camera';
+import { OfferingArt } from '@/components/offering-art';
 import type { BandId } from '@/domain/aim';
 import {
   MAX_THROWS,
@@ -56,7 +57,9 @@ import {
 } from '@/domain/throw';
 import { localized, t } from '@/lib/i18n';
 import { nativeLoaderUriFromAnyForm } from '@/lib/native-path';
-import { readBurnParams, toRewardParams } from '@/lib/route-params';
+import { collectedItemCode } from '@/lib/collection';
+import { readBurnParams, readItemBurnParams, toItemRewardParams, toRewardParams } from '@/lib/route-params';
+import type { OfferingCode } from '@/domain/catalogue';
 import { supabase, supabaseConfig } from '@/lib/supabase';
 import {
   TOUCH_TARGET,
@@ -217,12 +220,25 @@ export default function BurnScreen() {
    * generic `bad_params`, which meant the slice could never show a receipt.
    * A missing id is now refused by name, at the screen that would have dropped it.
    */
-  const burnParams = readBurnParams(
-    useLocalSearchParams<{ captureId: string; uri: string; spritePath?: string; demo?: string }>(),
-  );
+  const rawParams = useLocalSearchParams<{
+    captureId?: string;
+    uri?: string;
+    spritePath?: string;
+    itemCode?: string;
+    demo?: string;
+  }>();
+  /**
+   * ⚠️⚠️ **SCRUM-149 — THE ITEM BURN.** `burns` XOR-enforces *either* a `capture_id` *or* an
+   * `item_code`, so this screen has TWO modes and exactly one of them is ever set. ⚠️ The two
+   * readers are kept separate rather than widened: a single reader that accepted either would make
+   * `captureId` optional on the PHOTO path, which is the defect `toRewardParams`' doc records.
+   */
+  const itemParams = readItemBurnParams(rawParams);
+  const itemCode = itemParams.ok ? itemParams.itemCode : null;
+  const burnParams = readBurnParams(rawParams);
   const captureId = burnParams.ok ? burnParams.captureId : null;
   /** SCRUM-85 — carried through to `/reward`, which branches on it. */
-  const demo = burnParams.ok ? burnParams.demo : false;
+  const demo = burnParams.ok ? burnParams.demo : itemParams.ok ? itemParams.demo : false;
   /**
    * The cartoonized sprite's key in the private `styled` bucket, or `null` when
    * this hop has none (the tutorial). The URI param is the ORIGINAL photo — it is
@@ -555,12 +571,15 @@ export default function BurnScreen() {
     // `/reward` refused with `bad_params` and the slice could never show a
     // receipt. It is now a REQUIRED argument of `toRewardParams`, so a future
     // edit cannot forget it — the compiler objects instead of the player finding out.
-    if (captureId === null) return;
+    if (captureId === null && itemCode === null) return;
     router.push({
       pathname: '/reward',
-      params: toRewardParams(captureId, preview.offsetPx, throwNumber, demo),
+      // ⚠️ Exactly ONE of these is ever taken, and the params carry the same discriminator.
+      params: itemCode !== null
+        ? toItemRewardParams(itemCode, preview.offsetPx, throwNumber, demo)
+        : toRewardParams(captureId as string, preview.offsetPx, throwNumber, demo),
     });
-  }, [preview, router, throwNumber, captureId, demo]);
+  }, [preview, router, throwNumber, captureId, itemCode, demo]);
 
   /**
    * The offering RETURNS on a miss (S9) — the sprite is not consumed. It glides
@@ -612,7 +631,8 @@ export default function BurnScreen() {
    * never be awarded. Reachable only if a future hop forgets the id, which is
    * exactly what `check:wire` now guards.
    */
-  if (captureId === null) {
+  /** ⚠️ BOTH null is the only lost state — an item burn has no capture and needs none. */
+  if (captureId === null && itemCode === null) {
     return (
       <View
         style={[
@@ -663,7 +683,7 @@ export default function BurnScreen() {
           so the drag, the flight and the return share one coordinate space.
           Rendered only once there is BOTH an image and a measured layout: `rest`
           is (0,0) before `onLayout`, so drawing earlier would flash it top-left. */}
-      {offeringUri !== null && size.height > 0 ? (
+      {(offeringUri !== null || itemCode !== null) && size.height > 0 ? (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           <Animated.View
             testID="burn-offering"
@@ -685,12 +705,33 @@ export default function BurnScreen() {
             {/* ⚠️ `contain`, never `cover`: the cut-out is not square, and
                 `cover` fills the box by cropping the offering. `contain` fits
                 the whole sprite inside it and keeps the aspect ratio. */}
-            <Image
-              source={{ uri: offeringUri }}
-              style={styles.offeringImage}
-              resizeMode="contain"
-              accessibilityIgnoresInvertColors
-            />
+            {/**
+              * ⚠️ **THE ITEM BURN DRAWS THE PORTED ART, NOT A PHOTOGRAPH.** An item offering has no
+              * capture and no sprite — there is nothing to sign and nothing to load, so the offering is
+              * the SAME `OfferingArt` the Store and the picker draw. One illustration, three screens.
+              *
+              * ⚠️ **THE `<Image>` BELOW KEEPS ITS EXACT SOURCE ATTRIBUTE, AND THAT IS LOAD-BEARING.**
+              * `check:sprite` locates the offering image by that literal attribute — *"located by its
+              * source, not by index"* — so a cast on the uri (`offeringUri as string`) makes the gate
+              * unable to find the element it exists to check, and three of its assertions went red.
+              * ⚠️ The narrowing is done by the TERNARY instead: `offeringUri !== null` is the
+              * condition, so no cast is needed at all.
+              *
+              * ⚠️⚠️ **AND DO NOT QUOTE THE ATTRIBUTE ITSELF IN A COMMENT.** The first version
+              * of this note DID — and `indexOf` found the comment before the element, so the extractor
+              * sliced from the prose and the `resizeMode` assertion failed with the element sitting
+              * right there. **A comment that quotes a locator becomes a second occurrence of it.**
+              */}
+            {itemCode !== null ? (
+              <OfferingArt code={collectedItemCode(itemCode) as OfferingCode} boxW={OFFERING_SIZE} boxH={OFFERING_SIZE} />
+            ) : offeringUri !== null ? (
+              <Image
+                source={{ uri: offeringUri }}
+                style={styles.offeringImage}
+                resizeMode="contain"
+                accessibilityIgnoresInvertColors
+              />
+            ) : null}
           </Animated.View>
         </View>
       ) : null}

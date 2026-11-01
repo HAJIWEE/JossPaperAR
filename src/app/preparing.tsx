@@ -36,7 +36,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { preparingCopy } from '@/domain/slice';
+import { ScreenHud } from '@/components/screen-hud';
+import { pipelineFailed, preparingCopy } from '@/domain/slice';
 import { t } from '@/lib/i18n';
 import { toBurnParams } from '@/lib/route-params';
 import {
@@ -315,6 +316,16 @@ export default function Preparing(): React.JSX.Element {
           )}
         </>
       )}
+
+      {/*
+        ⚠️ **A WAY OUT ONLY WHEN THE PIPELINE FAILED** (owner's ruling, 2026-11-01).
+        While it is `working` or `parked` there is deliberately **no back**: leaving abandons an
+        offering that has already been PAID FOR. ⚠️ `spent` and `offline` are the two states where
+        nothing more happens without the user, so they get one.
+        ⚠️ The LIGHT tone — `EN · 3d Transform / failed` draws `btn · back (ink)`, a paper disc, which
+        reads on this screen's `surface.camera` background.
+      */}
+      {pipelineFailed(phase.kind) ? <ScreenHud backTestID="preparing-back" /> : null}
     </View>
   );
 }

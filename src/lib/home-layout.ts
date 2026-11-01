@@ -109,6 +109,21 @@ export const HOME_BANDS = {
   cta: { x: 20, y: 676, w: 350, h: 66 },
   /** `nav · tabbar (bg)` — 0,764 390×80. ⚠️ Four tabs: Shrine · League · Store · Profile. */
   tabbar: { x: 0, y: 764, w: 390, h: 80 },
+  /**
+   * `sheet · panel` — 0,400 390×444, the tablet sheet's own band (SCRUM-146 · SCRUM-168).
+   *
+   * ⚠️ **Its bottom IS the board's bottom**: `400 + 444 = 844`. That is not a coincidence to
+   * preserve by hand — `check:lib` §23 asserts it, because a panel that stopped short of the
+   * board would leave a strip of shrine showing under the sheet, and one that ran past would
+   * draw off-canvas. ⚠️ The panel deliberately **covers the tab bar** (764): the board paints
+   * it after `footer`, and a modal bottom sheet is supposed to hide the chrome.
+   */
+  sheetPanel: { x: 0, y: 400, w: 390, h: 444 },
+  /**
+   * `preview · tablet (96)` — 288,490 96×228.6. ⚠️ The SAME art as the altar's centre tablet
+   * (129×307), scaled to 0.7465 — so the preview and the result cannot be different drawings.
+   */
+  sheetPreview: { x: 288, y: 490, w: 96, h: 228.6 },
 } as const;
 
 /**
@@ -234,6 +249,65 @@ export function bandRect(band: Band, scale: number) {
  */
 export function bandFits(band: Band, scale: number, canvasWidth: number): boolean {
   return (band.x + band.w) * scale <= canvasWidth + 0.01;
+}
+
+/**
+ * ⚠️ **Is `a` entirely ABOVE `b`?** — `a`'s bottom edge at or above `b`'s top edge.
+ *
+ * This is the relationship the shrine is actually made of, and the one no band's own numbers can
+ * express: every band above can be individually correct while the composition is wrong, because
+ * "correct" is a fact about a band and "in order" is a fact about a PAIR. ⚠️ `bandFits` cannot see
+ * it — a CTA dragged up into the header still fits the canvas perfectly.
+ */
+export function bandAbove(a: Band, b: Band): boolean {
+  return a.y + a.h <= b.y;
+}
+
+/**
+ * ⚠️ **Do `a` and `b` overlap VERTICALLY?** — not a defect on its own.
+ *
+ * ⚠️ **The altar's own art overlaps on purpose**: `halo` runs 160→580 and `offerings` 434→604,
+ * because the offerings are painted IN FRONT of the halo. So "no overlap" is the WRONG assertion
+ * for the altar, and asserting it there would have been a gate that fights the design. It is the
+ * right assertion between REGIONS (the totals panel against the CTA), which is where it is used.
+ */
+export function bandsOverlap(a: Band, b: Band): boolean {
+  return a.y < b.y + b.h && b.y < a.y + a.h;
+}
+
+/**
+ * The TOP of each region, in board px — the number the vertical order is read from.
+ *
+ * ⚠️ A region is a GROUP of bands, so "the region's y" is not a property the data has; it has to be
+ * chosen. It is the region's **topmost band**: `header` starts at the app mark, `totals` at the
+ * tribute panel, `altar` at the altar-state CAPTION (which sits above the halo), `cta` at the
+ * button and `footer` at the bar.
+ *
+ * ⚠️ Choosing `caption` for the altar is the load-bearing part: the caption is at y 152, ABOVE the
+ * halo's 160. Reading the altar's top off `halo` would give the same ORDER here, but it would be
+ * the wrong number, and the first band added above the halo would make it silently wrong.
+ */
+export const HOME_REGION_TOPS: Record<HomeRegion, number> = {
+  header: HOME_BANDS.headerMark.y,
+  totals: HOME_BANDS.tribute.y,
+  altar: HOME_BANDS.caption.y,
+  cta: HOME_BANDS.cta.y,
+  footer: HOME_BANDS.tabbar.y,
+};
+
+/**
+ * ⚠️ Do these regions stack DOWNWARD, in this order? — each one strictly below the last.
+ *
+ * Exported as a function (like `isShrineOrder`) so the gate asserts the SAME expression the layout
+ * means, rather than a re-implementation of it that can drift.
+ *
+ * ⚠️ **Strictly** below: two regions sharing a top edge is a layout bug, not a tie.
+ */
+export function regionsStackDown(
+  regions: readonly HomeRegion[],
+  tops: Record<HomeRegion, number> = HOME_REGION_TOPS,
+): boolean {
+  return regions.every((region, i) => i === 0 || tops[region] > tops[regions[i - 1]]);
 }
 
 

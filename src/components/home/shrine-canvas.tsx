@@ -49,6 +49,12 @@ export function ShrineCanvas({ children }: { children: ReactNode }) {
       contentContainerStyle={{ flexGrow: 1, alignItems: 'flex-start', justifyContent: 'flex-start' }}
       scrollEnabled={false}
       showsVerticalScrollIndicator={false}
+      /**
+       * ⚠️ `handled`, and it is load-bearing now the tablet sheet lives inside this canvas: the
+       * sheet has three inputs, and without this the FIRST tap on a chip or the save button is
+       * swallowed by the keyboard dismissal instead of reaching the control.
+       */
+      keyboardShouldPersistTaps="handled"
       testID="shrine-canvas"
     >
       <View

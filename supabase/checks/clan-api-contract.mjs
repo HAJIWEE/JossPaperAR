@@ -431,6 +431,111 @@ section('SCRUM-11 · get_league_board — the league contract');
     'expected a permission error, but the call went through');
 }
 
+// ═══ 12 · my_offerings — the History read (SCRUM-151) ══════════════════════
+// ⚠️ The argument name AND the response fields, because `account-api.ts` has no generated
+// types: a renamed `p_limit` or a dropped `burned_at` is invisible to `tsc` and fails only
+// on a device, as a blank History screen.
+section('12 · my_offerings · { p_limit } · my_offerings_week · {}');
+{
+  const { data, error } = await A.client.rpc('my_offerings', { p_limit: 5 });
+  check('my_offerings accepts { p_limit }', error === null, error?.message);
+  check('…and returns a LIST', Array.isArray(data), typeof data);
+
+  // ⚠️ THE POSITIVE CONTROL — a WRONG argument name must fail, or this check could not see
+  // a rename. (The SCRUM-46 suite is fault-tested exactly this way: `p_clan_id` → `p_clanid`.)
+  const wrongArg = await A.client.rpc('my_offerings', { p_limit_wrong: 5 });
+  check('⚠️ a WRONG argument name is rejected (so a rename cannot pass silently)',
+    !!wrongArg.error, 'expected PostgREST to reject an unknown argument');
+
+  const week = await A.client.rpc('my_offerings_week');
+  check('my_offerings_week accepts no arguments', week.error === null, week.error?.message);
+  /**
+   * ⚠️⚠️ **A `returns table (…)` FUNCTION IS AN ARRAY, EVEN FOR ONE ROW.** Asserting the LIST
+   * shape is the point: `account-api.ts` originally read this as an object, which made every
+   * field `undefined` and rendered "0 burned · 0 tribute" over a real week. ⚠️ `tsc` could not
+   * see it — this assertion is why it was caught before it reached the screen.
+   */
+  check('⚠️ my_offerings_week returns a LIST (a `returns table` fn is an array, not an object)',
+    Array.isArray(week.data), typeof week.data);
+  const weekRow = Array.isArray(week.data) ? week.data[0] : null;
+  check('…and the one row is present', weekRow !== null && typeof weekRow === 'object');
+  for (const key of ['burned', 'tribute', 'streak_days']) {
+    check(`  … has the "${key}" field, as a number`,
+      weekRow !== null && typeof weekRow[key] === 'number');
+  }
+
+  // ⚠️ An UNSIGNED client reaches neither: the EXECUTE grant was revoked from `anon`.
+  const anon = createClient(URL, ANON, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+  const anonList = await anon.rpc('my_offerings', { p_limit: 5 });
+  check('an UNSIGNED client cannot read the history', !!anonList.error,
+    'expected a permission error, but the call went through');
+  const anonWeek = await anon.rpc('my_offerings_week');
+  check('an UNSIGNED client cannot read the week block', !!anonWeek.error,
+    'expected a permission error, but the call went through');
+}
+
+// ═══ 13 · my_collection — the Collection read (SCRUM-151) ═══════════════════
+// ⚠️ Same reason as §12: `account-api.ts` has no generated types, so a renamed field or a
+// changed return SHAPE is invisible to `tsc` and fails only on a device — as a grid of blank
+// cards. ⚠️ And the array-vs-object trap is the live one here too: BOTH of these are
+// `returns table`, and BOTH are read by the client as arrays.
+section('13 · my_collection · {} · my_collection_totals · {}');
+{
+  const { data, error } = await A.client.rpc('my_collection');
+  check('my_collection accepts no arguments', error === null, error?.message);
+  check('⚠️ my_collection returns a LIST (a `returns table` fn is an array, not an object)',
+    Array.isArray(data), typeof data);
+
+  /**
+   * ⚠️ **The FIELD names, asserted even when the list is empty.** The client reads
+   * `item_code` / `burned` / `last_burned_at`; a rename would leave every card blank, and an
+   * empty caller would never reveal it. So the shape is checked against a synthetic row by
+   * asking PostgREST for the same select the client uses.
+   */
+  const shape = await A.client.from('burns').select('item_code').limit(0);
+  check('…and the burns table still exposes `item_code` (the column the grid groups by)',
+    shape.error === null, shape.error?.message);
+
+  const totals = await A.client.rpc('my_collection_totals');
+  check('my_collection_totals accepts no arguments', totals.error === null, totals.error?.message);
+  check('⚠️ …and ALSO returns a LIST (same trap as my_offerings_week)',
+    Array.isArray(totals.data), typeof totals.data);
+  const totalsRow = Array.isArray(totals.data) ? totals.data[0] : null;
+  check('…with exactly one row', totalsRow !== null && typeof totalsRow === 'object');
+  for (const key of ['offerings_burned', 'items_collected']) {
+    check(`  … has the "${key}" field, as a number`,
+      totalsRow !== null && typeof totalsRow[key] === 'number');
+  }
+  /**
+   * ⚠️ **The two totals must not be the same number by accident.** `offerings_burned` counts
+   * EVERY burn; `items_collected` counts DISTINCT catalogue items. They are equal only when no
+   * photo burn exists and no item repeats — so a signed-in caller with any history should see
+   * `offerings_burned >= items_collected`. A shape that swapped them would still pass every
+   * field check above.
+   */
+  check('⚠️ offerings_burned is never LESS than items_collected (they are different counts)',
+    totalsRow !== null && Number(totalsRow.offerings_burned) >= Number(totalsRow.items_collected),
+    `${totalsRow?.offerings_burned} vs ${totalsRow?.items_collected}`);
+
+  // ⚠️ POSITIVE CONTROL — a WRONG argument name must fail, or a rename could not be seen.
+  const wrongArg = await A.client.rpc('my_collection', { p_limit: 5 });
+  check('⚠️ a WRONG argument name is rejected (so a rename cannot pass silently)',
+    !!wrongArg.error, 'expected PostgREST to reject an unknown argument');
+
+  // ⚠️ An UNSIGNED client reaches neither: the EXECUTE grant was revoked from `anon`.
+  const anon = createClient(URL, ANON, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+  const anonList = await anon.rpc('my_collection');
+  check('an UNSIGNED client cannot read the collection', !!anonList.error,
+    'expected a permission error, but the call went through');
+  const anonTotals = await anon.rpc('my_collection_totals');
+  check('an UNSIGNED client cannot read the collection totals', !!anonTotals.error,
+    'expected a permission error, but the call went through');
+}
+
 // ═══ RESULT ════════════════════════════════════════════════════════════════
 console.log(`\n${'─'.repeat(64)}`);
 if (failures.length === 0) {

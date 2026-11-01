@@ -19,6 +19,19 @@
  * what SCRUM-146's brief warned about at the cap of 10.
  */
 
+/**
+ * ⚠️ How many tablets the BOARD draws before it pages — **4**, and it is NOT the clan cap.
+ *
+ * `ancestors.sequence` keeps **10** live rows (`slot 0..9`, `ancestor_cap`), while the altar
+ * DISPLAYS four and pages for the rest — `ancestor_cap`'s own comment in `slice_schema` says so
+ * explicitly, and `EN · 1c Home / full (4 tablets)` is the board that draws it. Conflating the two
+ * would either strand tablets or refuse the tenth for no reason.
+ *
+ * ⚠️ It is a **page size, not a width budget**: four 129-wide tablets do not fit across 390. The
+ * centre slot plus the peeking neighbours are what "4" counts.
+ */
+export const ALTAR_DISPLAY_SLOTS = 4;
+
 export type AltarView =
   | { readonly kind: 'empty' }
   | {
@@ -50,4 +63,29 @@ export function altarView(count: number, index: number): AltarView {
 export function pageStep(index: number, count: number, delta: number): number {
   if (count <= 0) return 0;
   return Math.min(Math.max(0, index + delta), count - 1);
+}
+
+/**
+ * The altar-state caption — `caption · altar state`, one line above the halo.
+ *
+ * ── ⚠️ WHY THE KEY IS CHOSEN HERE AND NOT IN THE SCREEN ─────────────────────
+ * `EN · 1 Home / Shrine` carries the EMPTY line and `EN · 1b Home / tablets (carousel)` the
+ * filled one; the screen used to render the empty line unconditionally, so a shrine holding
+ * three tablets still read *"Your altar is empty"* — the difference the owner saw against the
+ * board. The choice is a fact about the count, so it lives here where `check:lib` reads it.
+ *
+ * ⚠️ **The singular is OURS.** The board draws only the 3-tablet case, and `%{count} ancestors`
+ * would print *"1 ancestors"*. One key, one branch, asserted.
+ *
+ * ⚠️ `count <= 0` returns the EMPTY key rather than the plural: a negative count is not a
+ * state the server can produce, and falling through to "−1 ancestors" would be worse than
+ * the empty line.
+ */
+export function altarCaption(count: number): {
+  readonly key: string;
+  readonly options?: Record<string, unknown>;
+} {
+  if (count <= 0) return { key: 'home.altarEmpty' };
+  if (count === 1) return { key: 'home.altarFilledOne' };
+  return { key: 'home.altarFilled', options: { count: String(count) } };
 }

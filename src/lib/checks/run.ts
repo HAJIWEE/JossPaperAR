@@ -11,8 +11,18 @@
  * ⚠️ FAULT-TEST IT: change an expected string and confirm it goes RED.
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { isValidClanName } from '../clan-rules.ts';
+import { PREPARING_PHASES, pipelineFailed } from '../../domain/slice.ts';
+import { NAV_TABS, activeTabKey, isSamePath, tabPressIsNoop } from '../nav.ts';
+import { COLLECTION, COLLECTION_SLOTS, collectionGrid, collectionOverflows, collectedItemName, displayBurnCount } from '../collection.ts';
+import { CASH_IS_READABLE, FEATURED_CODE, STORE_TABS, baseMetaValue, pointsPrice, storeList } from '../store.ts';
+import { ART_BOX, artCodes, artSize, fitArt } from '../offering-art.ts';
+import { readBurnParams, readItemBurnParams, readItemRewardParams, readRewardParams } from '../route-params.ts';
+import { getOffering } from '../../domain/catalogue.ts';
 import { bookView, showsBookSectionTitle } from '../clan-roles.ts';
 import {
   CONFIRM_SPEC,
@@ -48,20 +58,60 @@ import {
   shouldHoldInvite,
 } from '../invite-flow.ts';
 import { LOCALES, MESSAGES, detectLocale, localized, messageKeys, setLocale, t } from '../i18n.ts';
-import { nameOrientation, rotatedNameSize } from '../tablet-name.ts';
+import {
+  LOCALE_KEY,
+  LOCALE_LABELS,
+  detectLocaleFromTags,
+  isLocale,
+  normaliseLocale,
+  resolveInitialLocale,
+} from '../locale.ts';
+import {
+  HISTORY_SPEC,
+  HUD,
+  HUD_TONES,
+  LOCALE_PILL,
+  PROFILE_ROUTE,
+  PROFILE_ROUTES,
+  PROFILE_ROWS,
+  burnedAtLabel,
+  offeringGlyph,
+  rowIsLive,
+  streakDayKey,
+} from '../profile.ts';
+import { TABLET_NAME_MAX, nameOrientation, rotatedNameSize, tabletName } from '../tablet-name.ts';
 import {
   ANCESTOR_CAP,
   EDIT_ROLES,
   GIVEN_NAME_MAX,
+  RELATIONSHIP_CHIPS,
+  RELATIONSHIP_CHIP_ROW_BREAK,
   RELATIONSHIP_MAX,
+  RELATIONSHIP_NONE_CHIP,
   SURNAME_MAX,
   canEditTablets,
   capReached,
+  chipSelected,
+  chipValue,
   normaliseAncestorForm,
   sheetProblem,
   slotsRemaining,
 } from '../ancestor-sheet.ts';
-import { HOME_BANDS, TAB_BAR, bandFits, bandRect, homeFitScale, shrineBleedDp } from '../home-layout.ts';
+import {
+  HOME_BANDS,
+  HOME_REGION_ORDER,
+  HOME_REGION_TOPS,
+  REFERENCE_HEIGHT,
+  REFERENCE_WIDTH,
+  TAB_BAR,
+  bandAbove,
+  bandFits,
+  bandRect,
+  bandsOverlap,
+  homeFitScale,
+  regionsStackDown,
+  shrineBleedDp,
+} from '../home-layout.ts';
 import {
   OFFERINGS_VIEWBOX,
   OFFERING_DOTS,
@@ -70,7 +120,7 @@ import {
   dotSitsOnTray,
 } from '../offerings-layout.ts';
 import { formatPoints, homePanels } from '../home-panels.ts';
-import { altarView, pageStep } from '../altar.ts';
+import { ALTAR_DISPLAY_SLOTS, altarCaption, altarView, pageStep } from '../altar.ts';
 import { BULK_PREFIX, createSplitStorage, bulkKey } from '../split-storage.ts';
 import {
   MAX_ATTEMPTS,
@@ -172,6 +222,20 @@ function check(name: string, condition: boolean, detail?: string): void {
 
 function section(title: string): void {
   console.log(`\n${title}`);
+}
+
+/**
+ * ⚠️ Does BOTH locales define this message?
+ *
+ * A module-level twin of `main()`'s local `keyExists`, for the section functions that assert a
+ * pure rule OWNS its copy. ⚠️ Section 3 already compares the two key SETS, so this is not a
+ * parity check — it is "the string this rule needs actually exists", which is the gap that let
+ * `t('clan_preview')` ship `[MISSING …]` to a player.
+ */
+function keyInBothLocales(key: string): boolean {
+  const en = MESSAGES.en as unknown as Record<string, string>;
+  const zh = MESSAGES.zh as unknown as Record<string, string>;
+  return typeof en[key] === 'string' && typeof zh[key] === 'string';
 }
 
 const stubUuid: UuidFactory = () => '00000000-1111-2222-3333-444444444444';
@@ -1355,6 +1419,442 @@ function homeShrineScaleChecks(): void {
 }
 
 /**
+ * §25 · The shrine's bands stack in the right ORDER (SCRUM-163).
+ *
+ * ── ⚠️ WHY §18 WAS NOT ENOUGH ────────────────────────────────────────────────
+ * §18 asserts every band **fits the canvas** and that `bandRect` converts correctly. ⚠️ Neither can
+ * see the failure this section exists for: **a band dragged into the wrong place still fits.**
+ * Move the CTA up into the header band and §18 stays green — the button is inside the canvas, its
+ * numbers are the board's own, and the composition is wrong.
+ *
+ * ⚠️ So these assertions are about **PAIRS**, not bands: `a` is above `b`, or the two regions do
+ * not overlap. That is the class this project has already shipped four times (the tabs at board
+ * `top: 774` inside a band already at 764; the shrine base 14 dp off the side), and every one of
+ * them was found by an eye rather than by a gate.
+ *
+ * ⚠️ **`bandsOverlap` is deliberately NOT applied inside the altar.** `halo` (160→580) and
+ * `offerings` (434→604) overlap because the offerings are painted IN FRONT of the halo. A gate that
+ * demanded no overlap there would fight the design; it is used between REGIONS instead.
+ */
+function shrineGeometryChecks(): void {
+  section("25 · The shrine's bands stack in the right order — and the altar holds 4 (SCRUM-163)");
+
+  // ── ⚠️ THE READER CONTROL, FIRST ───────────────────────────────────────────
+  // ⚠️ A renamed or dropped band reads as `undefined`, and `undefined <= undefined` is FALSE — so
+  // every assertion below would go red for the WRONG reason, and a reader would "fix" the gate by
+  // loosening it. Assert the names exist BEFORE asserting anything about their values.
+  const REQUIRED_BANDS = [
+    'headerMark', 'settings', 'tribute', 'streak', 'caption', 'hintCta', 'halo', 'addSlot',
+    'carouselPrev', 'carouselNext', 'templeChip', 'offerings', 'shrineBase', 'cta', 'tabbar',
+    'sheetPanel', 'sheetPreview',
+  ] as const;
+  const missingBands = REQUIRED_BANDS.filter((name) => !(name in HOME_BANDS));
+  check(
+    `the gate found the REAL constants (${REQUIRED_BANDS.length} bands by name)`,
+    missingBands.length === 0,
+    `missing: ${missingBands.join(', ')}`,
+  );
+  // ⚠️ …and the control is not a tautology: a name that is NOT there must report absent.
+  check('…and that control is not a tautology (a wrong name reads absent)',
+    !('ctaButton' in HOME_BANDS));
+
+  // ── the five regions stack DOWNWARD, in the render order ───────────────────
+  check('the five regions stack downward, in HOME_REGION_ORDER',
+    regionsStackDown(HOME_REGION_ORDER),
+    HOME_REGION_ORDER.map((r) => `${r}@${HOME_REGION_TOPS[r]}`).join(' → '));
+
+  // ⚠️ THE TICKET'S NAMED RELATIONSHIPS, each its own assertion so a failure names the PAIR.
+  check('the CTA band is BELOW the header band',
+    bandAbove(HOME_BANDS.settings, HOME_BANDS.cta),
+    `settings ends ${HOME_BANDS.settings.y + HOME_BANDS.settings.h}, cta starts ${HOME_BANDS.cta.y}`);
+  check('⚠️ the totals band does NOT overlap the CTA',
+    !bandsOverlap(HOME_BANDS.tribute, HOME_BANDS.cta)
+      && !bandsOverlap(HOME_BANDS.streak, HOME_BANDS.cta));
+  check('the footer sits BELOW the CTA',
+    bandAbove(HOME_BANDS.cta, HOME_BANDS.tabbar),
+    `cta ends ${HOME_BANDS.cta.y + HOME_BANDS.cta.h}, tabbar starts ${HOME_BANDS.tabbar.y}`);
+
+  // ── and the seams between the regions ─────────────────────────────────────
+  check('the header sits above the totals',
+    bandAbove(HOME_BANDS.settings, HOME_BANDS.tribute));
+  check('the totals sit above the altar (whose topmost band is the caption)',
+    bandAbove(HOME_BANDS.streak, HOME_BANDS.caption));
+  check("the altar's LAST band sits above the CTA (the art does not run under the button)",
+    bandAbove(HOME_BANDS.shrineBase, HOME_BANDS.cta),
+    `shrineBase ends ${HOME_BANDS.shrineBase.y + HOME_BANDS.shrineBase.h}, cta starts ${HOME_BANDS.cta.y}`);
+
+  // ── every altar band lives INSIDE the altar region ────────────────────────
+  const altarTop = HOME_BANDS.caption.y;
+  const altarBottom = HOME_BANDS.shrineBase.y + HOME_BANDS.shrineBase.h;
+  const ALTAR_BANDS = [
+    'caption', 'hintCta', 'halo', 'templeChip', 'addSlot', 'carouselPrev', 'carouselNext',
+    'offerings', 'shrineBase',
+  ] as const;
+  const strayed = ALTAR_BANDS.filter((name) => {
+    const band = HOME_BANDS[name];
+    return band.y < altarTop || band.y + band.h > altarBottom;
+  });
+  check(`every altar band is inside the altar region (${altarTop}→${altarBottom})`,
+    strayed.length === 0, `strayed: ${strayed.join(', ')}`);
+
+  // ── the altar holds FOUR, and that is not the clan cap ────────────────────
+  check('the altar displays 4 tablets before it pages', ALTAR_DISPLAY_SLOTS === 4,
+    `${ALTAR_DISPLAY_SLOTS}`);
+  check('⚠️ …and 4 is NOT the clan cap of 10 — the board pages, it does not refuse',
+    ALTAR_DISPLAY_SLOTS !== ANCESTOR_CAP);
+  check('…and 4 is the board frame that draws it (`EN · 1c Home / full (4 tablets)`)',
+    ALTAR_DISPLAY_SLOTS === 4 && ALTAR_DISPLAY_SLOTS < ANCESTOR_CAP);
+
+  // ── the carousel arrows FLANK the slot, and stay on the board ─────────────
+  const slot = HOME_BANDS.addSlot;
+  check('the prev arrow sits LEFT of the tablet slot',
+    HOME_BANDS.carouselPrev.x + HOME_BANDS.carouselPrev.w <= slot.x,
+    `prev ends ${HOME_BANDS.carouselPrev.x + HOME_BANDS.carouselPrev.w}, slot starts ${slot.x}`);
+  check('the next arrow sits RIGHT of the tablet slot',
+    HOME_BANDS.carouselNext.x >= slot.x + slot.w,
+    `next starts ${HOME_BANDS.carouselNext.x}, slot ends ${slot.x + slot.w}`);
+  check('…and neither arrow runs off the 390 board',
+    HOME_BANDS.carouselNext.x + HOME_BANDS.carouselNext.w <= REFERENCE_WIDTH);
+  check('the two arrows share one y (a pair, not two decisions)',
+    HOME_BANDS.carouselPrev.y === HOME_BANDS.carouselNext.y);
+
+  // ── ⚠️ POSITIVE CONTROLS — the predicates must FIRE on the defect they exist for ──
+  // ⚠️ THIS IS THE SHIPPED CLASS, REPRODUCED: the CTA dragged up into the header band.
+  // ⚠️ §18 stays GREEN under this corruption — the button still fits the canvas — which is the
+  // entire reason §25 exists. The third control asserts exactly that, so the gap cannot be
+  // forgotten if someone later folds §25 back into §18.
+  const CORRUPT_TOPS = { ...HOME_REGION_TOPS, cta: HOME_BANDS.headerMark.y };
+  check('⚠️ guard: the CTA moved into the header band makes the ORDER check FAIL',
+    !regionsStackDown(HOME_REGION_ORDER, CORRUPT_TOPS),
+    'regionsStackDown passed on a shrine whose CTA is at the top — the gate is blind');
+  check('⚠️ guard: …and `bandAbove` FAILS for the same corruption',
+    !bandAbove({ ...HOME_BANDS.cta, y: HOME_BANDS.headerMark.y }, HOME_BANDS.tribute));
+  check('⚠️ guard: …and the FIT check does NOT — which is why §18 could not catch it',
+    bandFits({ ...HOME_BANDS.cta, y: HOME_BANDS.headerMark.y }, 1, REFERENCE_WIDTH));
+  check('⚠️ guard: `bandsOverlap` reports the totals against a CTA moved onto them',
+    bandsOverlap(HOME_BANDS.tribute, { ...HOME_BANDS.cta, y: HOME_BANDS.tribute.y }));
+  check('⚠️ guard: …and it reports NO overlap for the real pair (not a always-true)',
+    !bandsOverlap(HOME_BANDS.tribute, HOME_BANDS.cta));
+}
+
+/**
+ * §26 · The language switcher (SCRUM-151 · SCRUM-34).
+ *
+ * ⚠️ **Measured 2026-11-01: `setLocale` was called from no screen and no component**, so the app was
+ * permanently English while every string was translated and §15/§16 held both tables. ⚠️ A reviewer
+ * could not reach 中文. These assertions hold the rules that fix it — the RULES, because the control
+ * itself is a device fact and the ORDER of precedence is a fact about data.
+ */
+function localeChecks(): void {
+  section('26 · The language switcher — untrusted input, the device only as a guess (SCRUM-151)');
+
+  // ⚠️ READER CONTROL FIRST: a renamed key or a missing label reads `undefined`, and every
+  // assertion below would then pass or fail for the wrong reason.
+  check('every locale has a label (an option with no label is invisible)',
+    LOCALES.every((l) => typeof LOCALE_LABELS[l] === 'string' && LOCALE_LABELS[l].length > 0),
+    JSON.stringify(LOCALE_LABELS));
+  check('⚠️ the labels are ENDONYMS — 中文 is not hidden behind an English word',
+    LOCALE_LABELS.zh === '中文' && LOCALE_LABELS.en === 'EN');
+  check('the storage key is namespaced', LOCALE_KEY.startsWith('josspaperar.'), LOCALE_KEY);
+
+  // ── normaliseLocale — a stored value is UNTRUSTED ─────────────────────────
+  check('a valid tag passes through', normaliseLocale('zh') === 'zh');
+  check('…case-insensitively, and trimmed', normaliseLocale('ZH') === 'zh' && normaliseLocale('  en  ') === 'en');
+  check('⚠️ a full device tag falls back to its LANGUAGE (zh-Hans-SG → zh)',
+    normaliseLocale('zh-Hans-SG') === 'zh', normaliseLocale('zh-Hans-SG'));
+  check('⚠️ an unknown tag does NOT pass through — it becomes the default',
+    normaliseLocale('fr') === 'en' && normaliseLocale('klingon') === 'en');
+  check('…and so do null / undefined / empty / whitespace',
+    normaliseLocale(null) === 'en' && normaliseLocale(undefined) === 'en'
+      && normaliseLocale('') === 'en' && normaliseLocale('   ') === 'en');
+  // ⚠️ POSITIVE CONTROL — the guard must FIRE, not merely return the default by luck.
+  check('⚠️ guard: `isLocale` rejects exactly what `normaliseLocale` had to correct',
+    !isLocale('fr') && !isLocale('zh-Hans-SG') && isLocale('zh') && isLocale('en'));
+
+  // ── resolveInitialLocale — the ORDER is the rule ──────────────────────────
+  check('a stored choice WINS over the device', resolveInitialLocale('en', ['zh-Hans-SG']) === 'en');
+  check('⚠️ …even when it disagrees — an English speaker on a Chinese phone asked for English',
+    resolveInitialLocale('en', ['zh']) === 'en');
+  check('no stored value → the DEVICE decides', resolveInitialLocale(null, ['zh-Hans-SG']) === 'zh');
+  check('…and an EMPTY stored value counts as no choice', resolveInitialLocale('', ['zh']) === 'zh');
+  check('…and a whitespace one does too', resolveInitialLocale('   ', ['zh']) === 'zh');
+  check('a device with no opinion → the default', resolveInitialLocale(null, []) === 'en');
+  check('…and an unrecognised device tag does too', resolveInitialLocale(null, ['fr-CA']) === 'en');
+
+  // ⚠️ THE LOCAL TAG WALK MUST AGREE WITH i18n's — a second opinion is a drift waiting to happen.
+  const TAGS: readonly (readonly string[])[] = [['zh-Hans-SG'], ['en-SG'], ['fr-CA'], [], ['zh'], ['en-GB']];
+  const disagreed = TAGS.filter((tags) => detectLocaleFromTags(tags) !== detectLocale(tags));
+  check('⚠️ the local tag walk agrees with `i18n.detectLocale` on every sample',
+    disagreed.length === 0, JSON.stringify(disagreed));
+
+  // ── the switcher's geometry — the board's `set · lang pill` ───────────────
+  check('the pill is the board\'s 118×32, r16',
+    LOCALE_PILL.w === 118 && LOCALE_PILL.h === 32 && LOCALE_PILL.radius === 16);
+  check('⚠️ the active segment is INSET, so it sits INSIDE the track rather than on it',
+    LOCALE_PILL.inset > 0 && LOCALE_PILL.inset < LOCALE_PILL.h / 2);
+
+  // ── the Settings rows: wired, or visibly disabled — never a dead link ─────
+  check('no Settings row links to a route that does not exist',
+    PROFILE_ROWS.filter((r) => r.route !== null).every((r) => PROFILE_ROUTES.includes(r.route as string)),
+    PROFILE_ROWS.map((r) => `${r.id}→${r.route}`).join(' '));
+  // ⚠️ POSITIVE CONTROL — and it must be a route that really is NOT on the list. ⚠️ This used to be
+  // `/collection`, back when Collection was unbuilt; SCRUM-151 wired it, so the control had to move
+  // to a path nothing serves. A control pointing at a route that HAS landed is no control at all.
+  check('⚠️ …and a route NOT on the list would fail that check (not a tautology)',
+    !PROFILE_ROUTES.includes('/not-a-route'));
+  check('…and `rowIsLive` is the ONE place "is it wired" is decided',
+    rowIsLive('/settings') && !rowIsLive(null));
+
+  // ⚠️ The ROUTE ITSELF — the tab bar and this assertion read the SAME string, so a typo in one
+  // cannot become a dead link that only a device would find.
+  check("the tab bar's Profile tab points at the screen that exists",
+    PROFILE_ROUTES.includes(PROFILE_ROUTE) && PROFILE_ROUTE === '/profile');
+
+  // ── the History helpers (SCRUM-151) ───────────────────────────────────────
+  // ⚠️ "1 days" is not copy. The board draws only the 12-day case, so the singular is ours.
+  check('⚠️ a ONE-day streak gets its own key (never "1 days")',
+    streakDayKey(1) === 'hist.weekStreakOne');
+  check('…and 0 · 2 · 12 take the plural',
+    [0, 2, 12].every((d) => streakDayKey(d) === 'hist.weekStreak'));
+  check('every streak key exists in BOTH locales',
+    ['hist.weekStreak', 'hist.weekStreakOne'].every(keyInBothLocales));
+
+  // ⚠️ The date line is HAND-formatted (Hermes' ICU is partial), so both shapes are assertable.
+  const burnAt = new Date('2026-11-01T20:42:00');
+  const nowAt = new Date('2026-11-01T21:00:00');
+  check('a burn TODAY reads "Today · …"',
+    burnedAtLabel(burnAt.toISOString(), nowAt, 'en').startsWith('Today · '),
+    burnedAtLabel(burnAt.toISOString(), nowAt, 'en'));
+  check('…and in 中文 it reads 今天',
+    burnedAtLabel(burnAt.toISOString(), nowAt, 'zh').startsWith('今天 · '));
+  check('⚠️ EN is 12-hour and 中文 is 24-hour (the board draws 8:42 PM; 中文 reads 20:42)',
+    burnedAtLabel(burnAt.toISOString(), nowAt, 'en').includes('8:42 PM')
+      && burnedAtLabel(burnAt.toISOString(), nowAt, 'zh').includes('20:42'));
+  check('yesterday is named, not dated',
+    burnedAtLabel(new Date('2026-10-31T09:03:00').toISOString(), nowAt, 'en').startsWith('Yesterday · '));
+  check('⚠️ an unparseable timestamp returns EMPTY — never "Invalid Date" on a plaque',
+    burnedAtLabel('not-a-date', nowAt, 'en') === '');
+
+  // ⚠️ The thumb glyph is DERIVED, because the catalogue carries none.
+  check("the thumb glyph is the name's first character",
+    offeringGlyph('Gold Bar') === 'G' && offeringGlyph('金条') === '金');
+  check('⚠️ …and it does not split a surrogate pair',
+    Array.from(offeringGlyph('𠀀x')).length === 1, JSON.stringify(offeringGlyph('𠀀x')));
+  check('an empty name yields an empty glyph (no crash on a blank plaque)',
+    offeringGlyph('   ') === '');
+
+  // ── the screen HUD (Profile · Settings · History) ─────────────────────────
+  /**
+   * ⚠️⚠️ **THE RING MUST NOT TOUCH THE TITLE.** The board puts a 42 circle at x18 with a 2.5 stroke
+   * and starts `hud · screen title` at x60 — so the ring ends exactly where the text begins, and on
+   * glass it reads as covering the `S`. Measured 2026-11-01, filed for the board.
+   */
+  const circleLeft = HUD.touch.x + (HUD.touch.size - HUD.back.size) / 2;
+  const circleRight = circleLeft + HUD.back.size;
+  check('⚠️ the back circle does NOT touch the title (the on-glass defect)',
+    HUD.title.x > circleRight,
+    `circle ends at ${circleRight}, title starts at ${HUD.title.x}`);
+  /**
+   * ⚠️⚠️ **THE BOARD'S OWN NUMBERS ARE PINNED TOO** — the §22 rule: when the board is wrong, assert
+   * BOTH numbers, so neither "copy the board" nor "nudge it back" can pass silently.
+   * `btn · back (ink)` is at x18 and 42 wide, so its ring ends at **60** — exactly where
+   * `hud · screen title` begins. That is the defect, stated as arithmetic.
+   */
+  const BOARD_RING_RIGHT = 18 + 42;
+  check('⚠️ …and the BOARD\'s own numbers WOULD touch (this is why the build deviates)',
+    BOARD_RING_RIGHT >= 60,
+    `board ring ends ${BOARD_RING_RIGHT}, board title starts 60`);
+  // ⚠️ POSITIVE CONTROL — the detector must FIRE when the title is moved back onto the ring.
+  check('⚠️ guard: moving the title onto the ring makes the check FAIL',
+    !(53 > circleRight), `title at 53 vs ring at ${circleRight}`);
+  check('⚠️ …and the TOUCH target is still ≥ 44 — the CIRCLE shrank, not the target',
+    HUD.touch.size >= 44, `${HUD.touch.size}`);
+  check('⚠️ …and the visible circle is SMALLER than the board\'s 42 (a filed deviation)',
+    HUD.back.size < 42, `${HUD.back.size}`);
+  check('…and it is drawn INSIDE the touch target, not beside it',
+    HUD.touch.size > HUD.back.size && circleLeft >= HUD.touch.x);
+  check('…and the title clears the touch target too (not just the circle)',
+    HUD.title.x >= HUD.touch.x + HUD.touch.size);
+
+  /**
+   * ── ⚠️⚠️ THE HUD'S Z-ORDER, ASSERTED IN EVERY SCREEN THAT USES IT ─────────
+   * **A `ScreenHud` declared BEFORE the `ScrollView` DRAWS AND NEVER RECEIVES A TAP.** The scroll
+   * view fills the viewport and is painted last; the HUD's own background is transparent, so it stays
+   * VISIBLE through it — which is exactly why the defect reads as *"the back button is not wired"*
+   * rather than as a layout problem. Measured on `HN615L005386`, 2026-11-01.
+   *
+   * ⚠️ **No pure assertion can see this** — it is a fact about the SOURCE ORDER of two siblings — so
+   * this reads the files, the same way `check:copy` does. ⚠️ And it is worth a gate precisely because
+   * the failure is invisible: the button looks perfect.
+   */
+  const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+  const HUD_SCREENS = [
+    'src/app/league.tsx',
+    'src/app/settings.tsx',
+    'src/app/history.tsx',
+    'src/app/profile.tsx',
+    // ⚠️ Capture has NO ScrollView (it is a full-bleed camera) — only the "is it there" half applies.
+    'src/app/capture.tsx',
+  ];
+  const hudBeforeScroll: string[] = [];
+  const hudMissing: string[] = [];
+  for (const rel of HUD_SCREENS) {
+    const file = join(PROJECT_ROOT, rel);
+    if (!existsSync(file)) {
+      hudMissing.push(rel);
+      continue;
+    }
+    const source = readFileSync(file, 'utf8');
+    const hudAt = source.indexOf('<ScreenHud');
+    if (hudAt < 0) {
+      hudMissing.push(rel);
+      continue;
+    }
+    /**
+     * ⚠️ Only meaningful when the screen HAS a scroll view. A full-bleed screen (Capture) has no
+     * sibling to be painted over, so the order question does not arise — and asserting it there would
+     * be a check that cannot fail.
+     */
+    const scrollEndsAt = source.lastIndexOf('</ScrollView>');
+    if (scrollEndsAt >= 0 && hudAt < scrollEndsAt) hudBeforeScroll.push(rel);
+  }
+  check(`⚠️ every screen renders <ScreenHud /> AFTER its </ScrollView> (${HUD_SCREENS.length} screens)`,
+    hudBeforeScroll.length === 0,
+    `rendered before the scroll view: ${hudBeforeScroll.join(', ')}`);
+  check('…and every screen in that list still renders a <ScreenHud /> (so the gate is not vacuous)',
+    hudMissing.length === 0, `no HUD: ${hudMissing.join(', ')}`);
+  // ⚠️ POSITIVE CONTROL — the detector must FIRE on the source order that shipped the defect.
+  check('⚠️ guard: a HUD declared before the scroll view WOULD fail that check',
+    '<ScreenHud x />\n<ScrollView></ScrollView>'.indexOf('<ScreenHud')
+      < '<ScreenHud x />\n<ScrollView></ScrollView>'.lastIndexOf('</ScrollView>'));
+
+  /**
+   * ⚠️ **THE TWO TONES ARE NOT INTERCHANGEABLE.** A light HUD on the camera is an ink ring on a dark
+   * frame — invisible. `EN · 2 Capture` and `EN · 4 Burn` draw `hud · back circle` (dark); everything
+   * on paper draws `btn · back (ink)` (light).
+   */
+  check('⚠️ the HUD has BOTH board tones, and they differ',
+    HUD_TONES.light.fill !== HUD_TONES.dark.fill
+      && HUD_TONES.light.stroke !== HUD_TONES.dark.stroke);
+  check('⚠️ …and the DARK tone rings in the paper colour, which is what makes it read on a dark frame',
+    HUD_TONES.dark.stroke === '#F5F0E8');
+  // ⚠️ POSITIVE CONTROL — the "they differ" assertion is not a tautology.
+  check('⚠️ guard: identical tones WOULD fail the differ check',
+    !(HUD_TONES.light.fill === HUD_TONES.dark.fill));
+
+  /**
+   * ── ⚠️ THE PIPELINE'S WAY OUT — ONLY ON FAILURE (owner's ruling, 2026-11-01) ──
+   * > *"After the user lassos or trims the picture and sends it into the pipeline, do not have a back
+   * > function unless it fails the pipeline."*
+   *
+   * ⚠️ While `working` or `parked` the offering is **already PAID FOR**, so a back button abandons it
+   * silently. ⚠️ `spent` and `offline` are the two states where nothing more happens without the user.
+   */
+  check('⚠️ a FAILED pipeline offers a way out (spent · offline)',
+    pipelineFailed('spent') && pipelineFailed('offline'));
+  check('⚠️ …and one still IN FLIGHT does NOT (working · parked) — it holds a paid offering',
+    !pipelineFailed('working') && !pipelineFailed('parked'));
+  check('…and `done` does not either (it routes away and renders nothing)',
+    !pipelineFailed('done'));
+  check('⚠️ every preparing phase is classified (none is forgotten)',
+    PREPARING_PHASES.every((phase) => typeof pipelineFailed(phase) === 'boolean'));
+  // ⚠️ POSITIVE CONTROL — the predicate must not answer the same for every phase.
+  check('⚠️ guard: the predicate is not a constant',
+    PREPARING_PHASES.some((phase) => pipelineFailed(phase))
+      && PREPARING_PHASES.some((phase) => !pipelineFailed(phase)));
+
+  /**
+   * ⚠️ **AND THE SCREENS, because the ruling is about WHERE the button is.** ⚠️ `EN · 4 Burn` DRAWS a
+   * back circle and the owner ruled it must not have one — so this is a deliberate board deviation,
+   * and a source scan is the only thing that can hold a rule about absence.
+   */
+  const burnSource = readFileSync(join(PROJECT_ROOT, 'src/app/burn.tsx'), 'utf8');
+  check("⚠️ the BURN screen has NO back button (the owner's ruling; the board draws one)",
+    !burnSource.includes('<ScreenHud'));
+  // ⚠️ …and Transform's IS conditional — an unconditional one would trap a paid offering.
+  const preparingSource = readFileSync(join(PROJECT_ROOT, 'src/app/preparing.tsx'), 'utf8');
+  check('⚠️ the TRANSFORM screen renders its HUD ONLY behind `pipelineFailed`',
+    preparingSource.includes('<ScreenHud') && preparingSource.includes('pipelineFailed('));
+  // ⚠️ POSITIVE CONTROL — the absence check must FIRE where a HUD IS present.
+  check('⚠️ guard: the same absence check FINDS the HUD on a screen that has one',
+    readFileSync(join(PROJECT_ROOT, 'src/app/settings.tsx'), 'utf8').includes('<ScreenHud'));
+
+  /**
+   * ── ⚠️ THE NAV BAR'S ONE RULE — GLOBAL, NOT SHRINE-SPECIFIC (owner's ruling, 2026-11-01) ──
+   * > *"Tapping the tab you are already on should not re-render the page. This is common sense how
+   * > the nav bar should work for all pages."*
+   *
+   * ⚠️ Asserted against **`NAV_TABS` — the real destinations** — so a fifth tab extends the gate
+   * instead of escaping it, and against a **cross-product** of paths so "League on League" is covered
+   * by the same expression as "Shrine on Shrine".
+   */
+  const routedTabs = NAV_TABS.filter((tab) => tab.route !== null);
+  const routedList = routedTabs.map((tab) => `${tab.key}@${tab.route}`).join(' ');
+
+  check('⚠️ EVERY tab that has a screen is a no-op on its OWN path',
+    routedTabs.every((tab) => tabPressIsNoop(tab.route, tab.route as string)),
+    routedList);
+  check('⚠️ …and no tab is a no-op on a DIFFERENT tab\'s path (not a blanket no-op)',
+    routedTabs.every((tab) => routedTabs
+      .filter((other) => other.key !== tab.key)
+      .every((other) => !tabPressIsNoop(tab.route, other.route as string))),
+    routedList);
+  check('⚠️ a tab with NO screen is a no-op from anywhere (Store)',
+    NAV_TABS.filter((tab) => tab.route === null).every((tab) => tabPressIsNoop(null, '/league')));
+  check('…and a trailing slash or a query is the SAME screen, not a new one',
+    tabPressIsNoop('/league', '/league/') && tabPressIsNoop('/league', '/league?ref=1')
+      && isSamePath('/', ''));
+  // ⚠️ POSITIVE CONTROL — the rule must not answer `true` for everything.
+  check('⚠️ guard: the rule is not a constant',
+    tabPressIsNoop('/', '/') && !tabPressIsNoop('/league', '/'));
+
+  check('the active tab is DERIVED from the path — every routed tab names itself',
+    routedTabs.every((tab) => activeTabKey(tab.route as string) === tab.key), routedList);
+  // ⚠️ POSITIVE CONTROL, and it had to be rewritten when SCRUM-150 landed: this used to read
+  // *"Store is never active"*, which stopped being true the moment the storefront existed. ⚠️ A
+  // control that outlives the fact it controls is worse than none, so it now uses a SYNTHETIC
+  // un-routed tab — which is what `route: null` means, whatever the real tabs happen to be.
+  check('⚠️ …and a tab with NO screen is never the active one',
+    activeTabKey('/store', [{ key: 'ghost', icon: '', labelKey: '', route: null, screen: null }]) === null
+      && activeTabKey('/store') === 'store');
+  check('…and a path that is NOT a tab highlights NOTHING, rather than defaulting to the shrine',
+    activeTabKey('/settings') === null && activeTabKey('/history') === null);
+  // ⚠️ POSITIVE CONTROL — `activeTabKey` must not answer `null` for everything.
+  check('⚠️ guard: `activeTabKey` DOES return a key for a real tab',
+    routedTabs.some((tab) => activeTabKey(tab.route as string) !== null));
+
+  /**
+   * ⚠️ **AND THE BAR MUST DERIVE IT, because a prop is an answer the CALLER gives.** It was
+   * `<TabBar active="shrine" …>` — correct on the one screen that rendered it, and wrong the moment
+   * the bar appeared anywhere else, which is precisely how a "global" rule stays shrine-specific.
+   */
+  const tabBarSource = readFileSync(join(PROJECT_ROOT, 'src/components/home/tab-bar.tsx'), 'utf8');
+  check('⚠️ the bar reads the CURRENT PATH and takes NO `active` prop',
+    tabBarSource.includes('usePathname()')
+      && tabBarSource.includes('export function TabBar({ scale }')
+      && !tabBarSource.includes('active: string'));
+  check('⚠️ …and its press goes through the shared rule, not a local comparison',
+    tabBarSource.includes('tabPressIsNoop(') && !tabBarSource.includes('if (isActive ||'));
+  check('the week card is the board\'s 350×64 r14',
+    HISTORY_SPEC.week.w === 350 && HISTORY_SPEC.week.h === 64 && HISTORY_SPEC.week.radius === 14);
+  check('the entry row is 350×88 r12, with a 60 thumb',
+    HISTORY_SPEC.row.w === 350 && HISTORY_SPEC.row.h === 88
+      && HISTORY_SPEC.row.radius === 12 && HISTORY_SPEC.row.thumb === 60);
+  check('the thumb sits INSIDE the row (dx + width < the row width)',
+    HISTORY_SPEC.row.thumbDx + HISTORY_SPEC.row.thumb < HISTORY_SPEC.row.w);
+
+  // ── the copy the switcher needs exists in BOTH locales ───────────────────
+  const SETTINGS_KEYS = [
+    'settings.title', 'settings.general', 'settings.privacy', 'settings.language', 'settings.notBuilt',
+    'settings.deleteAll', 'settings.deleteTitle', 'settings.deleteBody', 'settings.deleteConfirm',
+    'settings.deleting', 'settings.deleteFailed', 'settings.retentionSub',
+  ];
+  const missingCopy = SETTINGS_KEYS.filter((k) => !keyInBothLocales(k));
+  check(`every Settings string exists in BOTH locales (${SETTINGS_KEYS.length})`,
+    missingCopy.length === 0, missingCopy.join(', '));
+}
+
+/**
  * 19 · The altar's offerings sit on their trays (SCRUM-162).
  *
  * ⚠️ WHY THIS EXISTS, in the owner's words: *"the placement of the decorations on the
@@ -1492,6 +1992,17 @@ function altarChecks(): void {
   check('pageStep does not wrap at the end', pageStep(2, 3, 1) === 2);
   check('pageStep moves one', pageStep(1, 3, -1) === 0 && pageStep(1, 3, 1) === 2);
   check('pageStep on an empty altar stays at 0', pageStep(0, 0, 1) === 0);
+
+  // ── ⚠️ THE CAPTION — the defect the owner saw: the EMPTY line over a full altar ───────
+  check('no tablets → the EMPTY caption', altarCaption(0).key === 'home.altarEmpty');
+  check('⚠️ a negative count does NOT fall through to "−1 ancestors"', altarCaption(-3).key === 'home.altarEmpty');
+  check('one tablet → the SINGULAR (the board only draws the 3 case)', altarCaption(1).key === 'home.altarFilledOne');
+  check('…and it carries no placeholder to leave unsubstituted', altarCaption(1).options === undefined);
+  const three = altarCaption(3);
+  check('three tablets → the board\'s filled line', three.key === 'home.altarFilled');
+  check('…with the count interpolated as a STRING (i18n-js `%{count}`)', three.options?.count === '3');
+  check('every caption key exists in BOTH locales',
+    ['home.altarEmpty', 'home.altarFilledOne', 'home.altarFilled'].every(keyInBothLocales));
 }
 
 /**
@@ -1505,6 +2016,9 @@ function altarChecks(): void {
  */
 function tabBarChecks(): void {
   section('22 · The tab bar — geometry, dead links, and the board\'s contrast defect (SCRUM-164)');
+
+  // ⚠️ Re-derived here, not shared: `PROJECT_ROOT` in §26 is scoped to that function.
+  const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
   check('tabs start at x = 12 (board)', TAB_BAR.xs[0] === 12);
   check('there are four tabs, each 86 wide', TAB_BAR.xs.length === 4 && TAB_BAR.tab.w === 86);
@@ -1545,19 +2059,59 @@ function tabBarChecks(): void {
   const builtInk = contrastRatio('#fff8e8', '#c23b22');
   check('…and the ink the build actually uses passes AA', builtInk >= 4.5, `${builtInk.toFixed(2)}:1`);
 
-  // ⚠️ DEAD LINKS. A tab may only point at a route whose screen file exists: `Store` and
-  // `Profile` are disabled for exactly this reason (`SCRUM-150` / `SCRUM-151`), and this check is
-  // what stops a future tab being wired to a screen someone assumed was there.
-  const ROUTES: ReadonlyArray<readonly [string, string]> = [
-    ['/', 'index.tsx'],
-    ['/league', 'league.tsx'],
-  ];
-  for (const [route, file] of ROUTES) {
-    check(
-      `the "${route}" tab points at a screen that exists (${file})`,
-      existsSync(new URL(`../../app/${file}`, import.meta.url)),
-    );
+  /**
+   * ⚠️⚠️ **DEAD LINKS *AND* ONE-WAY PUSHES.** Every tab owes the user two things, and this walks
+   * `NAV_TABS` — the real destinations — so a fifth tab is covered the day it is added.
+   *
+   * 1. **The screen exists.** A tab wired to a route someone assumed was there is a dead link;
+   *    `Store` is disabled for exactly this reason (`SCRUM-150`).
+   * 2. **The screen RENDERS the bar** (owner's ruling, 2026-11-01: *"nav bar should be accessible
+   *    for the 4 options it displays"*). ⚠️ A destination you can reach but cannot leave is a
+   *    **one-way push** — which is what the bar's League and Profile buttons were while the bar
+   *    rendered on the shrine alone.
+   */
+  for (const tab of NAV_TABS) {
+    if (tab.screen === null) {
+      // ⚠️ The two nulls must travel together, or "disabled" and "no screen" stop meaning the same
+      // thing and a tab can end up pointing at a file that is not there.
+      check(`⚠️ "${tab.key}" has NO screen, so it is disabled rather than a dead link`,
+        tab.route === null, tab.key);
+      continue;
+    }
+    const file = join(PROJECT_ROOT, `src/app/${tab.screen}`);
+    // ⚠️ `existsSync` first, so a missing file reports a missing file rather than throwing and
+    // taking the whole section down with it.
+    const exists = existsSync(file);
+    check(`the "${tab.route}" tab points at a screen that exists (${tab.screen})`, exists, tab.key);
+    check(`⚠️ …and that screen RENDERS the bar, so the tab is not a one-way push (${tab.screen})`,
+      exists && readFileSync(file, 'utf8').includes('<TabBarBand'), tab.key);
   }
+  // ⚠️ POSITIVE CONTROL — the scan above must be able to MISS a band as well as find one.
+  check('⚠️ guard: the band scan finds the bar on a destination and misses it on a deeper screen',
+    readFileSync(join(PROJECT_ROOT, 'src/app/league.tsx'), 'utf8').includes('<TabBarBand')
+      && !readFileSync(join(PROJECT_ROOT, 'src/app/settings.tsx'), 'utf8').includes('<TabBarBand'));
+
+  /**
+   * ── ⚠️ THE SHRINE CARRIES NO BOOK ENTRY — A DECISION, NOT AN OMISSION ──
+   * (SCRUM-209 **Option 4**, owner's ruling 2026-11-01.)
+   *
+   * ⚠️ `SCRUM-164`'s original acceptance said *"tapping Book reaches `/clan/book`"*. **No Home board
+   * draws a Book entry** — every Home board was searched for `book` / `簿` / `ledger` / `tribute` /
+   * `entry`, and the only hits are `panel · tribute`. The owner declined to change a signed-off board
+   * and accepted that the Book stays **three taps deep** on the clan-pill path.
+   *
+   * ⚠️ The assertion is here because the decision is about a thing that is **ABSENT**, and absence is
+   * exactly what a future session would helpfully fill in. Same class as §26's *Burn has no back
+   * button* — a rule about a component that must not be rendered.
+   */
+  const shrineSource = readFileSync(join(PROJECT_ROOT, 'src/app/index.tsx'), 'utf8');
+  check('⚠️ the shrine has NO Book entry — the clan pill is the accepted path (SCRUM-209 Option 4)',
+    !shrineSource.includes('/clan/book'));
+  check('…and the Book is still REACHABLE — `/clan/manage` is the one place that pushes it',
+    readFileSync(join(PROJECT_ROOT, 'src/app/clan/manage.tsx'), 'utf8').includes("'/clan/book'"));
+  // ⚠️ POSITIVE CONTROL — the same absence scan must FIND a route where one really is present.
+  check('⚠️ guard: the same scan finds a route link on a screen that has one',
+    shrineSource.includes("'/clan'") && shrineSource.includes("'/capture'"));
 }
 
 /**
@@ -1568,6 +2122,237 @@ function tabBarChecks(): void {
  * asserted against the thing that actually decides — the RPC's ladder, the RLS policies, the
  * `CHECK` constraints and `clans.ancestor_cap`.
  */
+/**
+ * §28 · The Collection screen's rules (SCRUM-151).
+ *
+ * ⚠️ These are the facts `EN · 8 Collection` / `8d` decide and a render cannot assert: **which slot
+ * the items fill, which empty slot carries words, and which words**. The board draws six dashed slots
+ * and puts copy on exactly ONE of them — and the copy CHANGES when the grid is entirely empty. A JSX
+ * branch cannot be read by a gate, so the mapping lives in `lib/collection.ts` and is asserted here.
+ */
+function collectionChecks(): void {
+  section('28 · Collection — the grid, the empty state, and the count (SCRUM-151)');
+
+  // ── the board's geometry ──────────────────────────────────────────────────
+  check('the grid is SIX slots — two columns, three rows (board)',
+    COLLECTION_SLOTS === 6 && COLLECTION.card.xs.length === 2 && COLLECTION.card.ys.length === 3);
+  check('the columns are at x 20 · 197 (board)', COLLECTION.card.xs[0] === 20 && COLLECTION.card.xs[1] === 197);
+  check('…and the rows at y 168 · 350 · 532 (board)',
+    COLLECTION.card.ys[0] === 168 && COLLECTION.card.ys[1] === 350 && COLLECTION.card.ys[2] === 532);
+  check('the card is 165×170, r14 (board)',
+    COLLECTION.card.w === 165 && COLLECTION.card.h === 170 && COLLECTION.card.radius === 14);
+  check('the two stat cards are at x 20 · 205, 165×40 (board)',
+    COLLECTION.stat.xs[0] === 20 && COLLECTION.stat.xs[1] === 205
+      && COLLECTION.stat.w === 165 && COLLECTION.stat.h === 40);
+  // ⚠️ The grid must FIT the 390 canvas: two 165 cards + the 20 gutters + the 12 gap.
+  const gridRight = COLLECTION.card.xs[1] + COLLECTION.card.w;
+  check('⚠️ the second column ends inside the 390 canvas', gridRight === 362 && gridRight <= 390, `${gridRight}`);
+
+  // ── the fill order ────────────────────────────────────────────────────────
+  const three = collectionGrid([
+    { itemCode: 'gold_bar', burned: 5 },
+    { itemCode: 'house', burned: 1 },
+    { itemCode: 'joss_paper_stack', burned: 4 },
+  ]);
+  check('items fill the slots in READING ORDER',
+    three[0]?.itemCode === 'gold_bar' && three[1]?.itemCode === 'house' && three[2]?.itemCode === 'joss_paper_stack',
+    three.slice(0, 3).map((c) => String(c.itemCode)).join(' '));
+  check('…and the rest of the grid is EMPTY slots', three.slice(3).every((c) => c.kind === 'empty'));
+
+  // ── ⚠️ WHICH empty slot speaks, and what it says ──────────────────────────
+  check('⚠️ on a partly-filled grid the FIRST empty slot offers the next one',
+    three[3]?.emptyCopy === 'nextOne');
+  check('⚠️ …and every other empty slot is a bare ＋ (the board words only one)',
+    three.slice(4).every((c) => c.emptyCopy === 'none'),
+    three.slice(4).map((c) => c.emptyCopy).join(' '));
+
+  const none = collectionGrid([]);
+  check('⚠️ on an EMPTY grid all six are slots', none.every((c) => c.kind === 'empty'));
+  check('⚠️ …and the first says "nothing here yet", NOT "offer something new"',
+    none[0]?.emptyCopy === 'firstEver',
+    none[0]?.emptyCopy);
+  check('…with the other five bare', none.slice(1).every((c) => c.emptyCopy === 'none'));
+
+  const full = collectionGrid(
+    ['a', 'b', 'c', 'd', 'e', 'f'].map((code) => ({ itemCode: code, burned: 1 })),
+  );
+  check('a full grid has NO empty slot at all', full.every((c) => c.kind === 'item'));
+  // ⚠️ POSITIVE CONTROL — the two empty-copy words must not be the same value.
+  check('⚠️ guard: "firstEver" and "nextOne" are different, so the check above can fail',
+    none[0]?.emptyCopy !== three[3]?.emptyCopy);
+
+  check('⚠️ SEVEN collected items overflow the six slots (a real limit, not silent)',
+    !collectionOverflows(6) && collectionOverflows(7));
+
+  // ── ⚠️ the count is never ×0 ──────────────────────────────────────────────
+  check('⚠️ a count of 0 renders as 1 — a cell exists because a burn happened',
+    displayBurnCount(0) === 1 && displayBurnCount(-3) === 1);
+  check('a real count passes through, floored', displayBurnCount(5) === 5 && displayBurnCount(2.7) === 2);
+  check('⚠️ a non-number cannot render as NaN', displayBurnCount(Number.NaN) === 1);
+  // ⚠️ POSITIVE CONTROL — the clamp must not flatten every value to 1.
+  check('⚠️ guard: the count is not a constant', displayBurnCount(9) !== displayBurnCount(1));
+
+  // ── the name, never a raw code ────────────────────────────────────────────
+  check('a catalogue code resolves to a NAME, not the code',
+    collectedItemName('gold_bar') === 'Gold Bar', String(collectedItemName('gold_bar')));
+  check('⚠️ …and an unknown code resolves to null, so the screen shows a gap not "nope"',
+    collectedItemName('nope') === null && collectedItemName(null) === null);
+  // ⚠️ POSITIVE CONTROL — the resolver must FIND a name for every catalogue entry.
+  check('⚠️ guard: every catalogue offering resolves (none falls through)',
+    OFFERINGS.every((o) => (collectedItemName(o.code) ?? '').length > 0));
+}
+
+/**
+ * §29 · The Store and the PORTED ART (SCRUM-150).
+ *
+ * ⚠️ The art is a **transcription**, so the gate that matters is that every catalogue code has
+ * some: a new offering would otherwise ship as a blank card, and ⚠️ nothing in `tsc` connects the
+ * catalogue to the illustrations.
+ */
+/**
+ * §30 · The ITEM burn's route contract (SCRUM-149).
+ *
+ * ⚠️⚠️ **THE RULE THE WHOLE TICKET TURNS ON: an item burn carries `item_code` and NOT
+ * `capture_id`.** `submit_burn` refuses a payload with both or neither (*"exactly one of capture_id /
+ * item_code is required"*), so a route that could carry both would be a route that can express a
+ * state the server rejects — and it would make `captureId` OPTIONAL on the photo path, which is the
+ * exact defect `toRewardParams`' doc records. ⚠️ These two readers must never both succeed.
+ */
+function itemBurnChecks(): void {
+  section('30 · The item burn — the route contract (SCRUM-149)');
+  // ⚠️ Re-derived here, not shared: `PROJECT_ROOT` is scoped to the function that makes it.
+  const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+  const item = readItemBurnParams({ itemCode: 'gold_bar' });
+  check('an item burn parses from `itemCode` alone (no uri, no sprite)',
+    item.ok && item.itemCode === 'gold_bar');
+  check('⚠️ …and a MISSING item code is refused by name',
+    !readItemBurnParams({}).ok && !readItemBurnParams({ itemCode: '   ' }).ok);
+
+  /**
+   * ⚠️ **THE CROSS-CHECKS — each reader requires ITS OWN id, and neither accepts the other's.**
+   * This is the property that makes the two paths separable, and it is what the first version of this
+   * section got WRONG: it asserted that a payload carrying BOTH would be refused by the photo reader,
+   * and the suite said otherwise — `readBurnParams` has never heard of `itemCode` and accepts a
+   * capture whenever one is there. ⚠️ That is not a bug in the reader; it is a fact about it, and
+   * asserting the opposite would have been a gate that lies.
+   */
+  check('⚠️ the ITEM reader refuses a photo-only payload (no item_code)',
+    !readItemBurnParams({ captureId: 'abc', uri: 'file://x' }).ok);
+  check('⚠️ …and the PHOTO reader refuses an item-only payload (no capture_id)',
+    !readBurnParams({ itemCode: 'gold_bar' }).ok);
+  const neither = {};
+  check('…and with NEITHER, both readers refuse',
+    !readItemBurnParams(neither).ok && !readBurnParams(neither).ok);
+  /**
+   * ⚠️ **A PAYLOAD CARRYING BOTH IS REFUSED BY THE SERVER, NOT BY THE READERS** —
+   * `submit_burn`: *"exactly one of capture_id / item_code is required"*, and `burns` carries the same
+   * XOR as a constraint. ⚠️ So the CLIENT's job is to never SEND both, and the screen's rule is to
+   * prefer the item when both arrive — which is a fact about `burn.tsx`, so it is scanned, not assumed.
+   */
+  const burnSrc = readFileSync(join(PROJECT_ROOT, 'src/app/burn.tsx'), 'utf8');
+  check('⚠️ `burn.tsx` reads the ITEM params and prefers the item when both are present',
+    burnSrc.includes('readItemBurnParams(') && burnSrc.includes('toItemRewardParams(')
+      && burnSrc.includes('itemCode !== null'));
+  check('⚠️ …and it sends the item code on the ITEM path, never a capture',
+    readFileSync(join(PROJECT_ROOT, 'src/lib/ritual.ts'), 'utf8')
+      .includes("{ item_code: itemCode.trim(), accuracy: accuracyPx, clan_id: clanId }"));
+
+  const reward = readItemRewardParams({ itemCode: 'house', offsetPx: '41.5', throwNumber: '2' });
+  check('the item reward hop carries the code and the SAME accuracy/throw rules',
+    reward.ok && reward.itemCode === 'house' && reward.accuracyPx === 41.5 && reward.throwNumber === 2);
+  check('⚠️ …and a bad accuracy is refused, not rounded to a bullseye',
+    !readItemRewardParams({ itemCode: 'house', offsetPx: '' }).ok
+      && !readItemRewardParams({ itemCode: 'house', offsetPx: '-1' }).ok
+      && !readItemRewardParams({ itemCode: 'house', offsetPx: 'abc' }).ok);
+  check('…and a missing throw number defaults to the FIRST throw',
+    (() => { const r = readItemRewardParams({ itemCode: 'house', offsetPx: '10' });
+      return r.ok && r.throwNumber === 1; })());
+  // ⚠️ POSITIVE CONTROL — the two reward readers must not both accept one param set.
+  check('⚠️ guard: the photo reward reader REJECTS an item-only param set',
+    !readRewardParams({ itemCode: 'house', offsetPx: '10' }).ok);
+}
+
+function storeChecks(): void {
+  section('29 · Store — the catalogue, the featured item, and the ported art (SCRUM-150)');
+  // ⚠️ Re-derived here, not shared: `PROJECT_ROOT` is scoped to the function that makes it.
+  const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+  const { featured, more } = storeList();
+  check('the FEATURED item is the one the board features (Wealth Bundle)', featured.code === 'wealth_bundle');
+  check('…and "More bundles" is every OTHER catalogue item, once each',
+    more.length === OFFERINGS.length - 1 && !more.some((o) => o.code === featured.code));
+  // ⚠️ POSITIVE CONTROL — the two lists must not both be the whole catalogue.
+  check('⚠️ guard: the featured item is NOT also in the list beneath it',
+    !more.some((o) => o.code === FEATURED_CODE));
+
+  check('⚠️ the meta line is the REDEMPTION BASE (1.2×), not the price — see the board: `base 480`',
+    baseMetaValue(getOffering('joss_paper_stack')) === 480,
+    String(baseMetaValue(getOffering('joss_paper_stack'))));
+  check('…and it is the 20% rule, not a hard-coded 480',
+    OFFERINGS.every((o) => baseMetaValue(o) === Math.round(o.price * 1.2)));
+  check('⚠️ a price renders with a unit, and an UNPRICED item renders null (never "0 pts")',
+    pointsPrice(getOffering('gold_bar')) === '600'
+      && pointsPrice({ ...getOffering('gold_bar'), price: Number.NaN }) === null);
+
+  check('⚠️ Decorations is DISABLED — its prices are NULL until the economy pass',
+    STORE_TABS.some((tab) => tab.id === 'decorations' && !tab.enabled)
+      && STORE_TABS.some((tab) => tab.id === 'offerings' && tab.enabled));
+  check('⚠️ there is NO cash chip — no rail and no read, so it is omitted rather than faked',
+    CASH_IS_READABLE === false);
+
+  /**
+   * ⚠️⚠️ **THE SIZES MUST MATCH THE FILES ON DISK.** Since 2026-11-01 the art is five raster
+   * cut-outs, and `ART_BOX` in `lib/offering-art.ts` MIRRORS each PNG's pixel size so the fitting can
+   * happen in a pure module. ⚠️ **A mirror that drifts is worse than no mirror**: re-crop an image
+   * and the box would silently letterbox or overflow it, with `tsc` perfectly happy — both numbers
+   * are legal.
+   *
+   * ⚠️ So this reads each file's **IHDR** — bytes 16–23 of a PNG are width and height, big-endian —
+   * and asserts the mirror agrees. It is the same posture as the HUD's two sets of numbers and the
+   * tab bar's board values: the build's copy and the authority are compared, never assumed equal.
+   */
+  for (const code of artCodes()) {
+    const file = join(PROJECT_ROOT, `assets/offerings/${code}.png`);
+    if (!existsSync(file)) {
+      check(`the art file for "${code}" exists`, false, file);
+      continue;
+    }
+    const png = readFileSync(file);
+    const isPng = png.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    check(`⚠️ "${code}" is a real PNG (magic bytes, not a saved error page)`, isPng, file);
+    const w = png.readUInt32BE(16);
+    const h = png.readUInt32BE(20);
+    const box = artSize(code);
+    check(`⚠️ …and \`ART_BOX\` MATCHES it on disk (${w}×${h})`,
+      box.w === w && box.h === h, `mirror says ${box.w}×${box.h}, file says ${w}×${h}`);
+    // ⚠️ A cropped cut-out must not be square-by-accident: the padding was removed on purpose.
+    check(`…and it is a CROPPED cut-out, not the 1024×1024 original`,
+      !(w === 1024 && h === 1024), `${w}×${h}`);
+  }
+
+  // ── ⚠️ THE ART — every catalogue code must have an illustration ─────────────
+  check('⚠️ EVERY catalogue offering has art (none ships as a blank card)',
+    artCodes().every((c) => { const b = artSize(c); return b.w > 0 && b.h > 0; }),
+    artCodes().map((c) => `${c}:${artSize(c).w}x${artSize(c).h}`).join(' '));
+  check('⚠️ the art aspects DIFFER — so a single fixed box would distort them',
+    new Set(artCodes().map((c) => artSize(c).w / artSize(c).h)).size > 1);
+  check('⚠️ `fitArt` CONTAINS — one scale for both axes, so nothing is stretched',
+    (() => { const f = fitArt('wealth_bundle', 100, 100);
+      return Math.abs(f.width / f.height - artSize('wealth_bundle').w / artSize('wealth_bundle').h) < 1e-9; })());
+  check('…and it never overflows the box it is given',
+    artCodes().every((c) => { const f = fitArt(c, 110, 80); return f.width <= 110.001 && f.height <= 80.001; }));
+  // ⚠️ POSITIVE CONTROL — the fit must actually USE the box, not collapse to zero.
+  check('⚠️ guard: the fit is not degenerate — it TOUCHES the box on the limiting axis',
+    artCodes().every((c) => {
+      const b = artSize(c);
+      const f = fitArt(c, 220, 106);
+      return Math.abs(Math.max(f.width / 220, f.height / 106) - 1) < 1e-9
+        && f.width <= 220.001 && f.height <= 106.001
+        && Math.abs(f.width / f.height - b.w / b.h) < 1e-9;
+    }));
+}
+
 function ancestorSheetChecks(): void {
   section('23 · The tablet sheet — the ladder, the cap, and btrim (SCRUM-168)');
 
@@ -1608,6 +2393,58 @@ function ancestorSheetChecks(): void {
   check('⚠️ 10 IS full — `>=`, not `>` (the 11th insert is what the trigger refuses)', capReached(10));
   check('…and 2 slots remain at 8', slotsRemaining(8) === 2);
   check('…and a legacy over-cap clan does not underflow', slotsRemaining(14) === 0);
+
+  // ── ⚠️ THE RELATIONSHIP CHIPS (the board port, 2026-11-01) ─────────────────────────────
+  check('there are five chips, as the board draws', RELATIONSHIP_CHIPS.length === 5);
+  check('⚠️ the FIRST chip is the "none" chip — it clears the field', RELATIONSHIP_CHIPS[0] === RELATIONSHIP_NONE_CHIP);
+  /**
+   * ⚠️ THE ROW SPLIT IS A LAYOUT CONSTRAINT, NOT COSMETIC. The preview tablet starts at x 288,
+   * so a single wrapping row runs `Father` underneath it — measured on glass 2026-11-01. The
+   * board splits 3 then 2, and this is that number.
+   */
+  check('⚠️ the board splits the chips 3 then 2 — the preview sits at x 288',
+    RELATIONSHIP_CHIP_ROW_BREAK === 3 && RELATIONSHIP_CHIP_ROW_BREAK < RELATIONSHIP_CHIPS.length,
+    `break at ${RELATIONSHIP_CHIP_ROW_BREAK} of ${RELATIONSHIP_CHIPS.length}`);
+  check('every chip key exists in BOTH locales', RELATIONSHIP_CHIPS.every(keyInBothLocales));
+
+  check('the "none" chip matches an EMPTY relationship', chipSelected(RELATIONSHIP_NONE_CHIP, '—', ''));
+  check('…and whitespace counts as empty (the server btrims)', chipSelected(RELATIONSHIP_NONE_CHIP, '—', '   '));
+  check('…but NOT a real relationship', !chipSelected(RELATIONSHIP_NONE_CHIP, '—', 'Father'));
+
+  check('a label chip matches its own label', chipSelected('ancestor.rel.father', 'Father', 'Father'));
+  check('…and ignores surrounding space (btrim, both sides)', chipSelected('ancestor.rel.father', 'Father', '  Father '));
+  /**
+   * ⚠️ THE HONEST CASE. `ancestors.relationship` is free text, so a value typed by hand matches
+   * no chip — and that is correct, not a bug to paper over with a "closest match".
+   */
+  check('⚠️ a HAND-TYPED relationship lights up NO chip', RELATIONSHIP_CHIPS.every(
+    (k) => !chipSelected(k, k === RELATIONSHIP_NONE_CHIP ? '—' : 'Father', 'Grand-uncle')));
+
+  check('the "none" chip WRITES null (not an empty string)', chipValue(RELATIONSHIP_NONE_CHIP, '—') === null);
+  check('a label chip writes its own label', chipValue('ancestor.rel.father', 'Father') === 'Father');
+
+  // ── ⚠️ THE PANEL'S GEOMETRY — the sheet covers the tab bar, and stops at the board's edge ──
+  const panel = HOME_BANDS.sheetPanel;
+  const bar = HOME_BANDS.tabbar;
+  check('the panel reaches the board\'s BOTTOM exactly (400 + 444 = 844)',
+    panel.y + panel.h === REFERENCE_HEIGHT, `${panel.y + panel.h} vs ${REFERENCE_HEIGHT}`);
+  check('⚠️ …so the panel COVERS the tab bar, as the board paints it',
+    panel.y <= bar.y && panel.y + panel.h >= bar.y + bar.h);
+  check('the panel spans the full board width', panel.x === 0 && panel.w === REFERENCE_WIDTH);
+
+  const prev = HOME_BANDS.sheetPreview;
+  check('the preview sits INSIDE the panel', prev.y >= panel.y && prev.y + prev.h <= panel.y + panel.h);
+  check('…and inside its x-range', prev.x >= panel.x && prev.x + prev.w <= panel.x + panel.w);
+  /**
+   * ⚠️ The preview and the altar's centre tablet are the SAME drawing at two scales — the whole
+   * reason `preview · tablet (96)` may reuse `Tablet`. If the aspect ratios ever disagree, one of
+   * them has been redrawn by hand.
+   */
+  const altarRatio = HOME_BANDS.addSlot.w / HOME_BANDS.addSlot.h;
+  const previewRatio = prev.w / prev.h;
+  check('⚠️ the preview is the altar tablet\'s SAME shape, scaled (aspect within 0.5%)',
+    Math.abs(altarRatio - previewRatio) / altarRatio < 0.005,
+    `${altarRatio.toFixed(4)} vs ${previewRatio.toFixed(4)}`);
 }
 
 /**
@@ -1641,6 +2478,42 @@ function tabletNameChecks(): void {
     long < short, `11 chars ${long.toFixed(2)} < 4 chars ${short.toFixed(2)}`);
   check('…and never below zero for a degenerate length',
     rotatedNameSize(box, 0) > 0 && Number.isFinite(rotatedNameSize(box, 400)));
+
+  // ── ⚠️ WHAT IS PAINTED — the board's own rule, and the altar and the preview share it ───
+  check('the limit is the board\'s 3 characters', TABLET_NAME_MAX === 3);
+  check('surname alone → 姓 + 氏, the traditional short form (the board draws 陈氏)',
+    tabletName('陈', null) === '陈氏', tabletName('陈', null));
+  check('…and an EMPTY given name is the same case, not a second rule',
+    tabletName('陈', '') === '陈氏' && tabletName('陈', '   ') === '陈氏');
+  check('surname + given → the first three characters (the board draws 陈大文)',
+    tabletName('陈', '大文') === '陈大文', tabletName('陈', '大文'));
+  check('⚠️ a longer name is TRUNCATED, not refused — the DB caps the surname at 20',
+    tabletName('陈', '大文长') === '陈大文', tabletName('陈', '大文长'));
+  /**
+   * ⚠️ The 姓+氏 clause is its OWN rule, so it is NOT cut to three — the board states the limit
+   * for "surname + given name" and then gives 姓 + 氏 as a separate case.
+   */
+  check('a two-character surname takes 氏 and is NOT cut to three',
+    tabletName('欧阳', null) === '欧阳氏', tabletName('欧阳', null));
+  /**
+   * ⚠️ A LATIN surname takes no 氏. Beyond meaning nothing, 氏 is CJK — appending it would flip
+   * `nameOrientation` to `vertical` and stack `C h e n` one glyph per line, the exact defect the
+   * rotation exists to prevent.
+   */
+  check('⚠️ a LATIN surname with no given name stays bare (氏 would force it VERTICAL)',
+    tabletName('Chen', null) === 'Chen' && nameOrientation(tabletName('Chen', null)) === 'rotated',
+    `${tabletName('Chen', null)} / ${nameOrientation(tabletName('Chen', null))}`);
+  check('no surname → nothing to paint (the caller supplies its own placeholder)',
+    tabletName('', '大文') === '' && tabletName('   ', null) === '');
+  check('the stored name is trimmed before it is painted', tabletName('  陈 ', ' 大文 ') === '陈大文');
+  /**
+   * ⚠️ SURROGATE SAFETY. `Array.from`, not `slice`: a 3-character cut by UTF-16 unit would split
+   * an emoji or a rare ideograph in half and render a replacement glyph on the plaque.
+   */
+  check('⚠️ a 3-character cut never splits a surrogate pair',
+    Array.from(tabletName('陈', '𠀀𠀁')).every((c) => c.codePointAt(0)! > 0xffff || c.length === 1)
+    && Array.from(tabletName('陈', '𠀀𠀁')).length === 3,
+    JSON.stringify(tabletName('陈', '𠀀𠀁')));
 }
 
 async function main(): Promise<void> {
@@ -1717,8 +2590,13 @@ async function main(): Promise<void> {
   homePanelChecks();
   altarChecks();
   tabBarChecks();
+  collectionChecks();
+  storeChecks();
+  itemBurnChecks();
   ancestorSheetChecks();
   tabletNameChecks();
+  shrineGeometryChecks();
+  localeChecks();
 
   check('guard: a 5-character key is NOT valid', !isValidIdempotencyKey('12345'));
   check('guard: junk is NOT a clan code', normaliseClanCode('not-a-code!!') === null);

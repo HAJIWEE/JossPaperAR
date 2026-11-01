@@ -298,9 +298,163 @@
 **Timeline**: No pressure — hobby project with family legacy vision  
 **Priority**: Get cartoonization style right, then build the simple AR burning mechanic  
 
+## 🆕 Open items — added 2026-11-01 (S72)
+
+### ⏳ Needs the PM
+
+- ✅ **RESOLVED 2026-11-01 — `SCRUM-209`, the Book entry's placement: Option 4.** *"Leave it on the
+  clan pill path."* No board change, nothing to build. ⚠️ **`SCRUM-164`'s *"tapping Book reaches
+  `/clan/book`"* acceptance is therefore NOT met — it was AMENDED, not satisfied**, and the ticket's
+  description now says so. ⚠️ **The Book stays three taps deep** (`clan pill → /clan/manage → Book`);
+  that is the accepted cost, not a defect to fix later without a new decision. Verified against the
+  code: `index.tsx` contains **no** `'/clan/book'`, and `clan/manage.tsx:391` is the **only** push to
+  it. ⚠️ §22 now asserts the shrine carries **no** Book affordance — absence is exactly what a future
+  session would helpfully fill in.
+- ✅ **RESOLVED 2026-11-01 — `SCRUM-208`, the board's 1.44:1 active tab: the owner accepted the
+  CURRENT IMPLEMENTATION.** The build renders `onColorCream` `#FFF8E8` on the `#C23B22` pill —
+  **4.90 : 1**, comfortably AA — and §22 pins **both** ratios, so neither copying the board nor
+  "fixing" the build to match it can pass silently. ⚠️ **Still owed, and it is the BOARD's:**
+  `nav · tab <name> icon` / `… label` for the **active** tab are still `#9A2B18` on `#C23B22` on all
+  four Home boards. ⚠️ The same token will recur on **every other active-state surface** — the League
+  screen and the Store are next — until the board is corrected.
+
+### 🔧 Engineering, small
+
+- ✅ **RESOLVED 2026-11-01 — `SCRUM-151` Collection is BUILT and on glass.** It needed a migration
+  (`20261101140000_my_collection.sql`, **applied**): `my_collection()` groups the caller's burns by
+  catalogue item, `my_collection_totals()` returns the two stat cards. ⚠️ **The grid is CATALOGUE
+  ITEMS ONLY** — a burn is either an item or a photo (the XOR), and the board draws item art, not
+  thumbnails, so a photo-only caller sees an empty grid and `items_collected 0`, which is TRUE.
+  ⚠️ **The Profile rows are now ALL live**; `PROFILE_ROWS_PENDING` is empty.
+  ⚠️ **Two defects were caught ON GLASS:** the copy **overflowed** the 170 px card (a flex column where
+  the board uses fixed offsets) and then **truncated** (the board's 145 px box fits its copy; Roboto
+  does not — a recorded font-metric deviation).
+- ⚠️⚠️ **`SCRUM-150` the Store is BIGGER THAN IT LOOKS, and two of its blockers are not code.**
+  Measured 2026-11-01 by reading the boards and the tree:
+  - **It is FOUR boards, not one:** `EN · 7 Store` (an Offerings/Decorations switcher · a FEATURED
+    card · "More bundles" · 4 item cards · two balance chips · a note), `EN · 7d Item detail` (name ·
+    type · description · cash price · points price · balances · state tag · Buy for cash / Redeem pts),
+    `EN · 7e Buy confirm · sheet` (a bottom sheet with Price / Balance-after rows · Confirm · Cancel),
+    plus `EN · 9*` (Buy offerings · Credits · Daily gift). `EN · 7b`/`7c`/`7f` add decoration variants.
+  - ⚠️ **THE CASH RAIL NEEDS GOOGLE PLAY BILLING.** The cards draw `$0.99` / `$1.99` and the confirm
+    sheet's own footnote says *"Google Play will ask you to verify."* That is a **native module**, and
+    ⚠️ **a local native build cannot work here** (`expo run:android` fails — only Java 25 is
+    installed, AGENTS.md), so it needs an **EAS build** *and* Play Console setup. ⚠️ **The POINTS rail
+    already exists server-side** (`purchase_item`), so that half is buildable today.
+  - ⚠️ **THE ITEM ART DOES NOT EXIST IN THE APP.** `EN · 7` draws `art · Cash Bundle` · `art · House` ·
+    `art · Phone` · `art · Gold Bar` · `art · wealth bundle (ingots)` — and `src/` has **no per-item
+    offering art at all** (the catalogue is code-owned names and prices; `components/home/offerings.tsx`
+    is the ALTAR's art). ⚠️ **Same for `EN · 8 Collection`'s cards** — its art well ships **empty and
+    deliberate**, not filled with an invented glyph.
+  - ⚠️ **So the honest split is:** the **points rail + the storefront/item-detail/buy-confirm
+    structure** is one buildable ticket; **the art** is a separate porting job (5+ Penpot
+    illustrations, each many polygon paths); **the cash rail** is a third, native one.
+- ⚠️ **`expo lint` BOOTSTRAPS ESLINT — and the repo has none.** Running it (AGENTS.md asks for lint)
+  added `eslint` + `eslint-config-expo` to `package.json`, a `lint` script, and a new
+  `eslint.config.js`. ⚠️ **None of that is the agent's change** — `git checkout -- package.json
+  package-lock.json` and delete the config, or it ships as an unexplained dependency bump.
+- ✅ **RESOLVED 2026-11-01 — the owner ruled on `Transform` / `Burn` backs.** The boards draw one
+  (`EN · 3 Transform` / `3b` / `3d` → `btn · back (ink)` + `hud · screen title`; `EN · 4 Burn` → the
+  **dark** `hud · back circle`), and the build has none. The ruling:
+  > *"Transform and burn should not have a back button. When entering the ritual after the picture
+  > starts on the pipeline — after the user lassos or trims the picture and sends it into the pipeline
+  > — do not have a back function unless it fails the pipeline."*
+
+  Implemented as `pipelineFailed(phase)` in `domain/slice.ts`: **`spent` and `offline` get a way out,
+  `working` and `parked` do not** (both still hold an offering already PAID FOR). ⚠️ **The predicate is
+  pure so `check:lib` §26 can hold it**, and §26 also scans the two screens: `burn.tsx` must contain
+  **no** `<ScreenHud`, `preparing.tsx`'s must sit behind `pipelineFailed`. Fault-tested both ways on
+  glass — predicate forced `false` → 0 back nodes *while the failure copy stayed on screen*.
+  ⚠️ **Board deviation to file:** `EN · 4 Burn` and `EN · 3` (working) / `3b` (queued) still draw a
+  back the build deliberately does not. ⚠️ `EN · 5 Reward` draws none and the build already matches.
+- ✅ **RESOLVED 2026-11-01 — the bar renders on ALL its own destinations** (owner's ruling:
+  *"Nav bar should be accessible for the 4 options it displays"*). It rendered on the **shrine only**,
+  so the bar's League and Profile buttons were **one-way pushes** — you arrived and the bar was gone.
+  Now `TabBarBand` renders on League and Profile too. ⚠️ **Board deviation to file:** `EN · 6 League`
+  and `EN · 8 Profile` draw `btn · back (ink)` + `hud · screen title` and **no** bar; both now carry
+  the bar as well as the HUD. ⚠️ **Store is still disabled** (no screen, SCRUM-150) — the 4th option
+  becomes reachable the day that screen lands, with no change needed here.
+- ⚠️ **Tapping the tab you are ALREADY ON used to re-render the page.** `TabBar`'s `onPress` was
+  `router.push(tab.route)` unconditionally, so tapping the current tab pushed a **duplicate route**
+  onto the stack — the screen re-mounted and the stack grew one entry per tap. Fixed 2026-11-01.
+  ⚠️ **The rule is global now**: the bar derives its active tab from `usePathname()` and takes **no
+  `active` prop**, so there is no caller that can hand it a wrong answer.
+  Verified on glass by back-stack accounting — on the **League** page, 3 taps of the League tab then
+  one BACK lands on the **shrine**; pre-fix those duplicates would have absorbed the pop.
+- **⚠️ `ScreenHud` is the standard, and `capture` now uses it; the clan screens do not.** ⚠️ Their
+  boards (`EN · 0e*`) draw **no** top back button — they use `clan-ui`'s bottom `GhostButton`, which
+  is a second idiom. That is a board-backed difference, not an oversight, but it is worth one pass.
+- **⚠️ The screen HUD's back circle is 34, not the board's 42.** `EN · 8` / `8b` / `8c` all draw
+  `btn · back (ink)` at **18,40 42×42** with a **2.5** stroke, and `hud · screen title` starts at
+  **x60** — so the ring ends exactly where the text begins. ⚠️ **On glass the ring reads as covering
+  the `S`** and out-weighs the 17 dp title beside it (measured 2026-11-01). The build uses
+  **34 / stroke 2**, title at **66**, and keeps the **44 touch target**. §26 pins **both** the board's
+  numbers and the build's, so neither "copy the board" nor "nudge it back" passes silently.
+  ⚠️ **Filed for the board — the three boards should be updated to match.** The three copies of this
+  header are now one component (`screen-hud.tsx`), which is why the fix could not land in two places.
+- **⚠️ `award_snapshot` is capped at 1650 by a CHECK, and `EN · 8c History` draws a `+1,920` bullseye.**
+  The board is illustrative and the constraint is the authority — noted, not fixed. Worth a look if
+  the award ladder ever moves.
+- **⚠️ A language change RESTARTS navigation at the shrine.** That is the deliberate cost of the
+  `key={locale}` remount — the only reliable way to guarantee every string re-renders (see
+  `locale-provider.tsx`). If the restart is judged too rude, the fix is to capture and restore the
+  pathname around the remount.
+
+- **⚠️ The `＋`/`✕` class, for the third time.** S72 shipped a close button that drew a **plus** —
+  two bars at `0°`/`90°`, where an X needs `±45°`. Two prior occurrences of the same class exist
+  (the SCRUM-145 inert control; the tab bar drawn with no tabs). ⚠️ **A shape that is *almost*
+  right reads as right until someone looks at the phone.** Worth a rendering gate if one can be
+  built cheaply — otherwise it belongs in the on-glass checklist.
+- **`RELATIONSHIP_CHIPS` writes free text.** `ancestors.relationship` has no enum, so a chip
+  stores its own localised label (`Father` / `父亲`). ⚠️ **A clan that switches language keeps
+  the old language's word**, and the chip then lights up for nobody. A `relationship` enum +
+  migration would fix it; it is a schema change, so it is not a drive-by.
+- **⚠️ The `氏` suffix is applied to CJK surnames only.** `tabletName()` returns a bare Latin
+  surname rather than `Chen氏`, because 氏 is CJK and would force the name into the vertical
+  branch (stacking `C h e n`). ⚠️ This is **our** reading of the board's rule — the board is
+  中文-only. Worth a line in the cultural review (doc 16) if the owner disagrees.
+- **`SCRUM-163`** — ✅ **DONE** (2026-11-01, S72). The geometry gate is §25 in `check:lib`:
+  `check:lib` **559 → 581**, fault-tested (the CTA moved into the header band → **7 red**, each
+  naming the pair; restored byte-identical via `sha256sum -c`). ⚠️ §18 could not catch that class —
+  a band dragged into the wrong place still **fits** the canvas — and there is now an assertion
+  that says so. Supersedes the open line that stood here.
+
+### 📱 On-glass checklist additions (from S72)
+
+- Close a sheet with the **✕** and with the **scrim**.
+- Open the sheet with the **keyboard up** and confirm the panel lifts and the fields stay visible.
+- Add a tablet, then **archive** it, and confirm the caption goes empty → ＋ → filled.
+
 ---
 
 *Purpose: track **open** follow-up actions. Completed and superseded items → [[completed-work-archive]].*  
 *Created 2026-09-22 · **Re-scoped 2026-10-02 (Session 26)** — completed items, the duplicated `MVP Architecture` section and the dated change log archived; this file now lists open work only. · **Updated 2026-10-03 (S27)** — SCRUM-14 closed → [[AppDesignConceptBoard/18-mvp-scope-and-timeline|doc 18]]; SCRUM-53/54/55 added; the critical path re-ordered. · **Reconciled 2026-10-03 (S27, post-merge)** — stale Jira-false lines corrected (`SCRUM-42`/`SCRUM-33`/`SCRUM-45` all **Done**), `SCRUM-41` added (due 6 Oct). · **Updated 2026-10-03 (S27b)** — [[AppDesignConceptBoard/19-build-plan-services-api-environments|doc 19]] build plan; **SCRUM-57** (repo bootstrap, startable now) + **SCRUM-56** (PM provisioning) added. · **Updated 2026-10-03 (S27c)** — **SCRUM-57 ✅ Done**; **SCRUM-54 half done** (schema applied to the hosted project); SCRUM-56 progress (link + fal key) + the **new anonymous sign-ins** PM item. · **Updated 2026-10-04 (S28 · S28b)** — **`SCRUM-54` ✅ Done** (PR-2 + PR-3 code-complete; **PR #13** awaiting the PM's merge) and **`SCRUM-59` ✅ BUILT** (the AI-budget stop-rule; **PR #14**, stacked on #13). All four PR-3 decisions ratified and closed; the closed items moved to [[completed-work-archive]] §5. Two new **PR-4-read** items added: the failed-generation re-capture rule and the `shrine_busy` queue state.*  
 *Reconciled 2026-10-08 (S34 wrap) — **the clan system is built end to end on `cline/c1292`, and PR #28 is OPEN (not merged)**.* `SCRUM-46` now covers migrations `0012`/`0013`/`0014` **plus** the five clan screens and the client API layer; **`SCRUM-84` is CLOSED** (answer: *"hand over to a new head if no co-head, co-head if co-head already exists"* — the successor **inherits the departing rank**, which **deliberately reverses `0013`'s** "`head` is the founder's immutable fact" rationale: `clans.created_by` is still never rewritten, but headship now has a **line of succession**); **`SCRUM-85` is built** (the tutorial). ⚠️ Two things are deliberately **not** done and head the list: **no device run** (nothing on glass) and **no `db push`** (hosted last verified at **12/12**, so `0013`/`0014` are probably unapplied there). `SCRUM-50` is `To Do` with **no sprint** — move it in *when* you start it.*  
 *Reconciled 2026-10-08 (S34, **post-merge**) — the merge train is closed: **PRs #24–#27** (the red CI · SCRUM-80 · SCRUM-81 · SCRUM-82) are all on `main` (`a076b88`), so the "PR #27 open" / "gates merging PR #27" lines had gone false and were removed; **SCRUM-82** is now marked merged, **SCRUM-83** is restated as the one open *product* decision (the merge happened without it being answered), and **SCRUM-53**'s remainder is narrowed to the four-band test (`SCRUM-52`).*
+
+### 🆕 Open items — added 2026-11-01 (S72, final)
+
+- ⚠️⚠️ **THE NEW STANDARD-ITEM ART HAS NOT BEEN SEEN ON GLASS.** Five raster cut-outs now replace 82
+  hand-ported SVG shapes (`components/offering-art.tsx` → `assets/offerings/`). ⚠️ **The gate proves the
+  sizes match the files; it cannot prove they LOOK right** at 110×80 (Store · Collection · picker) and
+  in the 72 px burn box. ⚠️ **Expected problem: `smartphone` may read too small** — at 0.50 aspect it is
+  tall and thin, so in a wide box it contains to about half the height. ⚠️ **A fix is a re-crop or a
+  regeneration, not a code change.** `adb reverse` + Metro, then walk Store → Collection → picker → burn.
+- ⚠️⚠️ **THE STORE'S POINTS CHIP READS THE WRONG NUMBER.** The chip reads `home_summary()` →
+  **`sum(tributes.points)`**; `purchase_item` checks **`public.balances`** → **`sum(ledger_events.amount)`**.
+  ⚠️ **Different sources.** Measured: with 5000 in the ledger the chip showed **"Store Points 0"** and
+  the purchase **went through anyway** — a player sees "0 points" beside a working Buy button.
+  ⚠️ **No client read for the ledger balance exists** (`ledger_events` is RLS-on with no policy, like
+  `burns`), so the fix is a **migration** adding a `SECURITY DEFINER` read.
+- ⚠️ **`7d` item detail and `7e`'s own buy sheet are NOT built.** The buy is a `ConfirmCard` on the
+  storefront rather than the board's sheet; `7d`'s balances, state tag and cash rail are absent.
+  ⚠️ **The cash rail is the native piece**: Google Play Billing, an EAS build, Play Console setup — and
+  **there is no read for a cash balance anywhere**. Tracked as **SCRUM-212**.
+- ⚠️ **PRODUCTION DATA WAS WRITTEN on 2026-11-01, on the owner's say-so.** Test account
+  **`a27627ad-d703-4606-87e1-7283a1e57ccc`** was credited **+5000 tribute** via an `adjustment`
+  `ledger_events` row. It now holds **4200 tribute · 80 store points · 1 × joss_paper_stack**. ⚠️ **The
+  ledger is append-only** — a correction is a compensating row with a `reason`, never an `UPDATE`.
+- ✅ **The five standard items are REGENERATED in the pipeline's style and WIRED IN** (option 2, the
+  owner's call). ⚠️ **The trade-off is permanent: the art cannot be recoloured, does not scale
+  losslessly, and costs ~2.4 MB of bundled assets.** If the style changes again these are
+  **regenerated, not edited**. Option 1 (re-trace as `react-native-svg`) was declined.

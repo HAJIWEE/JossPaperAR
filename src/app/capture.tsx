@@ -45,6 +45,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FullBleedCamera } from '@/components/full-bleed-camera';
+import { ScreenHud } from '@/components/screen-hud';
 import { INITIAL_OFFERING, transition, type Offering } from '@/domain/slice';
 import { t } from '@/lib/i18n';
 import { toCropParams } from '@/lib/route-params';
@@ -286,6 +287,8 @@ export default function CaptureScreen() {
         >
           <Text style={styles.buttonLabel}>{t('invite.grantCamera')}</Text>
         </Pressable>
+        {/* ⚠️ `EN · 2g Capture / camera denied` draws the back circle too — the denial is not a trap. */}
+        <ScreenHud tone="dark" backTestID="capture-back" />
       </View>
     );
   }
@@ -463,9 +466,38 @@ export default function CaptureScreen() {
       <Text accessibilityRole="alert" style={styles.srOnly}>
         {offering.state === 'idle' ? 'Ready to photograph' : 'Offering captured'}
       </Text>
+
+      {/**
+        * ⚠️⚠️ **THE OFFERINGS PICKER'S ENTRY POINT (SCRUM-149).** The board's own note says it:
+        * *"Nothing to photograph? Choose a standard offering — it arrives already in joss style."*
+        * ⚠️ It sits HERE, on the camera, because that is the moment the question is asked — the player
+        * has opened the camera and has nothing to point it at. ⚠️ DARK tone for the same reason the
+        * HUD uses it: a paper control is the only thing that reads on a live camera frame.
+        */}
+      <Pressable
+        testID="capture-choose-offering"
+        accessibilityRole="button"
+        onPress={() => router.push('/offerings')}
+        style={styles.chooseOffering}
+      >
+        <Text style={styles.chooseOfferingText} numberOfLines={2}>
+          {t('picker.title')}
+        </Text>
+      </Pressable>
+
+      {/*
+        ⚠️ THE WAY BACK (SCRUM-151). This screen had **none at all**, while `EN · 2 Capture` draws
+        `hud · back circle` — so the only way out was the OS back gesture. ⚠️ **Backing out here is
+        safe**: nothing is captured, nothing is spent, and the shrine is where the offering starts.
+        ⚠️ The DARK tone: the light HUD is an ink ring, which is invisible on a camera frame.
+      */}
+      <ScreenHud tone="dark" backTestID="capture-back" />
     </View>
   );
 }
+
+/** ⚠️ A DARK-tone control: on a camera frame a paper button is the only thing that reads. */
+const CHOOSE = { bottom: 132, height: 44, radius: 22 };
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: surface.camera },
@@ -661,5 +693,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonLabel: { color: onColorCream, fontSize: fontSize.body.at390, fontWeight: '600' },
+  chooseOffering: {
+    position: 'absolute',
+    alignSelf: 'center',
+    bottom: CHOOSE.bottom,
+    minHeight: CHOOSE.height,
+    borderRadius: CHOOSE.radius,
+    paddingHorizontal: 20,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(20,17,15,0.5)',
+    borderWidth: 2,
+    borderColor: surface.paper,
+  },
+  chooseOfferingText: { color: surface.paper, fontSize: 14, fontWeight: '700', textAlign: 'center' },
   srOnly: { position: 'absolute', width: 1, height: 1, opacity: 0 },
 });

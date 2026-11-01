@@ -273,3 +273,26 @@ export const PREPARING_COPY: Record<PreparingPhase, PreparingCopy> = {
 export function preparingCopy(phase: PreparingPhase): PreparingCopy {
   return PREPARING_COPY[phase];
 }
+
+/**
+ * ⚠️ **DID THE PIPELINE FAIL — or is it still working?** (owner's ruling, 2026-11-01.)
+ *
+ * > *"After the user lassos or trims the picture and sends it into the pipeline, do not have a back
+ * > function unless it fails the pipeline."*
+ *
+ * ⚠️ **`working` is IN FLIGHT and `parked` is a QUEUE — neither is a failure**, and both still hold
+ * an offering the user has **PAID FOR**. A back button there abandons it silently, which is why the
+ * screen deliberately has none.
+ *
+ * ⚠️ **`spent` and `offline` are the two states where nothing more will happen without the user** —
+ * one is a lost capture, the other never left the phone. Those get a way out.
+ *
+ * ⚠️ It is a PURE predicate rather than a JSX condition for the project's usual reason: *"a structure
+ * nothing can read is a structure no gate can hold"*. `check:lib` §26 asserts all four phases.
+ *
+ * ⚠️ `'done'` is accepted and answers `false` — that phase routes away immediately and renders
+ * nothing, so a back button would flash on a screen the user is leaving.
+ */
+export function pipelineFailed(phase: PreparingPhase | 'done'): boolean {
+  return phase === 'spent' || phase === 'offline';
+}

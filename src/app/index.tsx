@@ -1,23 +1,42 @@
 import { Fragment, useCallback, useState } from 'react';
-import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { ClanPill } from '@/components/clan-pill';
+import { AncestorSheet, type SheetMode } from '@/components/home/ancestor-sheet';
 import { AltarHalo } from '@/components/home/altar-halo';
 import { AppMark, SettingsGear } from '@/components/home/header-art';
 import { Offerings } from '@/components/home/offerings';
 import { StreakPanel, TributePanel } from '@/components/home/panels';
 import { ShrineBase } from '@/components/home/shrine-base';
 import { ShrineCanvas } from '@/components/home/shrine-canvas';
-import { TabBar } from '@/components/home/tab-bar';
+import { TabBarBand } from '@/components/home/tab-bar-band';
 import { Tablet } from '@/components/home/tablet';
-import { altarView, pageStep } from '@/lib/altar';
-import { canEditTablets } from '@/lib/ancestor-sheet';
-import { clanAncestors, myClans, type Ancestor } from '@/lib/clan-api';
+import { altarCaption, altarView, pageStep } from '@/lib/altar';
+import {
+  ANCESTOR_CAP,
+  GIVEN_NAME_MAX,
+  RELATIONSHIP_MAX,
+  SURNAME_MAX,
+  canEditTablets,
+  capReached,
+  normaliseAncestorForm,
+  sheetProblem,
+  type AncestorForm,
+  type SheetProblem,
+} from '@/lib/ancestor-sheet';
+import {
+  archiveAncestor,
+  clanAncestors,
+  myClans,
+  saveAncestor,
+  type Ancestor,
+} from '@/lib/clan-api';
 import { PILL_X_ON_REFERENCE, type PillClan } from '@/lib/clan-pill';
 import { readFirstRun } from '@/lib/first-run';
 import { fetchHomeSummary } from '@/lib/home-api';
 import { homePanels, type SummaryResult } from '@/lib/home-panels';
+import { tabletName } from '@/lib/tablet-name';
 import {
   HOME_BANDS,
   HOME_REGION_ORDER,
@@ -93,19 +112,135 @@ export default function HomeShrine() {
   const mayEdit = canEditTablets(clans[0]?.role);
 
   /**
+   * ── THE TABLET SHEET LIVES ON THIS SCREEN, NOT ON A ROUTE ──────────────────
+   * ⚠️ `EN · 1s Ancestor sheet` draws the whole SHRINE behind the scrim — the halo, the panels
+   * and the tab bar are all there, dimmed. A pushed route cannot do that: it covers the shrine,
+   * and forcing `presentation: 'transparentModal'` from `_layout.tsx` is the exact declaration
+   * that once made the sheet the stack's INITIAL route on glass. So the sheet is state here.
+   */
+  const [sheet, setSheet] = useState<{
+    readonly mode: SheetMode;
+    /** `null` in ADD. */
+    readonly ancestorId: string | null;
+    readonly initial: AncestorForm;
+  } | null>(null);
+  const [sheetBusy, setSheetBusy] = useState(false);
+  const [sheetIssue, setSheetIssue] = useState<string | null>(null);
+
+  /** Turn a `SheetProblem` into the copy the user reads. ⚠️ `null` = there is no problem. */
+  const problemText = useCallback((p: SheetProblem): string | null => {
+    switch (p) {
+      case 'surname_required':
+        return t('ancestor.problemSurname');
+      case 'surname_too_long':
+        return t('ancestor.problemTooLong', { max: String(SURNAME_MAX) });
+      case 'given_name_too_long':
+        return t('ancestor.problemTooLong', { max: String(GIVEN_NAME_MAX) });
+      case 'relationship_too_long':
+        return t('ancestor.problemTooLong', { max: String(RELATIONSHIP_MAX) });
+      default:
+        return null;
+    }
+  }, []);
+
+  /**
    * Open the tablet sheet. `ancestorId = null` → ADD.
    *
-   * ⚠️ The count travels so the sheet can refuse at the cap without a second round-trip, and the
-   * **role** travels so a refusal can be explained instead of surfacing a raw Postgres code.
+   * ⚠️ The form's initial values come from the ROW, not from the route: the row is already in
+   * `ancestors` (read for the altar), so an edit needs no second fetch and no name in a URL.
    */
   const openSheet = (ancestorId: string | null) => {
     if (!activeClanId || !mayEdit) return;
-    router.push({
-      pathname: '/ancestor',
-      // ⚠️ IDs only. The sheet reads its own role and count — see the note in `ancestor.tsx`.
-      params: { clanId: activeClanId, ...(ancestorId ? { ancestorId } : {}) },
+    const row = ancestorId === null ? null : (ancestors.find((a) => a.id === ancestorId) ?? null);
+    setSheetIssue(null);
+    setSheet({
+      mode: row ? 'edit' : 'add',
+      ancestorId: row ? row.id : null,
+      initial: {
+        surname: row?.surname ?? '',
+        givenName: row?.givenName ?? '',
+        relationship: row?.relationship ?? '',
+      },
     });
   };
+
+  const closeSheet = useCallback(() => {
+    setSheet(null);
+    setSheetIssue(null);
+  }, []);
+
+  /** Re-read the altar. ⚠️ The screen re-reads; it never patches its own state optimistically. */
+  const refreshTablets = useCallback(async (clanId: string) => {
+    const tablets = await clanAncestors(clanId);
+    setAncestors(tablets.ok ? tablets.data : []);
+  }, []);
+
+  /**
+   * ⚠️ A local problem is caught BEFORE the round-trip, but the server still decides: a
+   * `42501` (a member) or the cap arrives as `result.reason` and is shown as-is. The two are
+   * different facts and the user can act on both — "something went wrong" would hide which.
+   */
+  const submitSheet = useCallback(
+    (form: AncestorForm) => {
+      if (!activeClanId) return;
+      const local = sheetProblem(form);
+      if (local) {
+        setSheetIssue(problemText(local));
+        return;
+      }
+      void (async () => {
+        setSheetBusy(true);
+        setSheetIssue(null);
+        const clean = normaliseAncestorForm(form);
+        const result = await saveAncestor({
+          clanId: activeClanId,
+          surname: clean.surname,
+          givenName: clean.givenName,
+          relationship: clean.relationship,
+          ancestorId: sheet?.ancestorId ?? null,
+        });
+        setSheetBusy(false);
+        if (!result.ok) {
+          setSheetIssue(result.reason);
+          return;
+        }
+        await refreshTablets(activeClanId);
+        closeSheet();
+      })();
+    },
+    [activeClanId, sheet?.ancestorId, problemText, refreshTablets, closeSheet],
+  );
+
+  /**
+   * ⚠️ Archive is the only removal path — a hard delete would orphan the ledger row a burn
+   * points at — and it cannot be undone from the app, so it asks first.
+   */
+  const archiveSheet = useCallback(() => {
+    const ancestorId = sheet?.ancestorId ?? null;
+    if (!activeClanId || !ancestorId) return;
+    Alert.alert(t('ancestor.remove'), t('ancestor.archiveConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('ancestor.remove'),
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            setSheetBusy(true);
+            setSheetIssue(null);
+            const result = await archiveAncestor(activeClanId, ancestorId);
+            setSheetBusy(false);
+            if (!result.ok) {
+              setSheetIssue(result.reason);
+              return;
+            }
+            await refreshTablets(activeClanId);
+            closeSheet();
+          })();
+        },
+      },
+    ]);
+  }, [activeClanId, sheet?.ancestorId, refreshTablets, closeSheet]);
+
 
   // The pill must reflect a clan created or joined *after* Home first mounted, so
   // this re-reads on every focus (the `clan/index.tsx` pattern).
@@ -166,33 +301,32 @@ export default function HomeShrine() {
               <ClanPill clans={clans} scale={s} />
             </View>
             {/*
-              ⚠️ DECORATIVE FOR NOW, and deliberately not a `Pressable`. The board draws
-              this as `btn · settings` and the gear belongs here — but the settings screen
-              arrives with SCRUM-151, and ⚠️ **a control that renders and does nothing is
-              the SCRUM-145 defect** (an inert "Throw again" that passed every per-screen
-              gate). It becomes a button the moment it has a destination, not before.
-
-              ⚠️ The BUTTON SURFACE is part of the board and was missing at first: the
-              owner read the bare gear as misaligned, and it was — `btn · settings` is a
-              `#EAE2D2` fill with a **2.5 px ink stroke and r14**, i.e. exactly the clan
-              pill's treatment (`PILL_SPEC.radius` 14 · `borderWidth` 2.5). Without it the
-              icon had nothing to sit in. ⚠️ RN draws the stroke INSIDE the box, so at
-              scale 1 the 2.5 is the right number here — no `CONTENT_PAD_H` correction,
-              because this surface holds no text to inset.
+              ⚠️ NOW A REAL CONTROL. It was **decorative** from SCRUM-160 until now, on purpose:
+              the settings screen arrives with SCRUM-151, and *"a control that renders and does
+              nothing is the SCRUM-145 defect"*. ⚠️ SCRUM-151's screen now exists, so the gear
+              navigates to it — and the surface was never the problem: `btn · settings` is a
+              `#EAE2D2` fill with a **2.5 px ink stroke and r14**, exactly the clan pill's
+              treatment (`PILL_SPEC.radius` 14 · `borderWidth` 2.5).
+              ⚠️ RN draws the stroke INSIDE the box, so at scale 1 the 2.5 is the right number
+              here — no `CONTENT_PAD_H` correction, because this surface holds no text to inset.
             */}
-            <View
-              style={[
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('settings.title')}
+              testID="home-settings-slot"
+              onPress={() => router.push('/settings')}
+              style={({ pressed }) => [
                 styles.abs,
                 bandRect(HOME_BANDS.settings, s),
                 styles.settingsBtn,
                 { borderRadius: 14 * s, borderWidth: 2.5 * s },
+                pressed && styles.pressed,
               ]}
-              testID="home-settings-slot"
             >
               <View style={{ width: 20 * s, height: 20 * s }}>
                 <SettingsGear />
               </View>
-            </View>
+            </Pressable>
           </>
         );
 
@@ -216,6 +350,8 @@ export default function HomeShrine() {
         // (131,285 129×307) — see `altar.ts`. They swap in place; nothing below moves.
         const slot = HOME_BANDS.addSlot;
         const current = view.kind === 'tablet' ? ancestors[view.index] : null;
+        /** ⚠️ The caption is the altar's OWN state, so it is chosen from the count — see `altar.ts`. */
+        const caption = altarCaption(ancestors.length);
         return (
           <>
             <View style={[styles.abs, bandRect(HOME_BANDS.halo, s)]} testID="home-halo-band">
@@ -227,21 +363,21 @@ export default function HomeShrine() {
             <View style={[styles.abs, bandRect(HOME_BANDS.shrineBase, s)]} testID="home-shrine-base">
               <ShrineBase />
             </View>
-            {/* ⚠️ The ALTAR-STATE CAPTION — on the board it is `Your altar is empty — tap ＋ to add
-                a tablet.`, i.e. the EMPTY state's own line. The filled board's caption text is not
-                yet read, so nothing renders here when a tablet exists rather than inventing one. */}
+            {/* ⚠️ The ALTAR-STATE CAPTION — `caption · altar state`. `altarCaption()` chooses the
+                EMPTY line, the board's FILLED line, or the singular; ⚠️ the screen used to render
+                the empty line unconditionally, so a shrine holding three tablets still read
+                *"Your altar is empty"* — exactly the difference the owner saw against the board. */}
             <View
               style={[styles.abs, bandRect(HOME_BANDS.caption, s)]}
               testID="home-caption-band"
             >
-              {view.kind === 'empty' ? (
-                <Text
-                  numberOfLines={1}
-                  style={{ color: text.inkSoft, fontSize: 12 * s }}
-                >
-                  {t('home.altarEmpty')}
-                </Text>
-              ) : null}
+              <Text
+                numberOfLines={1}
+                testID="home-caption"
+                style={{ color: text.inkSoft, fontSize: 12 * s }}
+              >
+                {t(caption.key, caption.options)}
+              </Text>
             </View>
 
             {/* ⚠️ `hint · cta` — the line the board sets above the offer button. */}
@@ -263,12 +399,13 @@ export default function HomeShrine() {
               </Text>
             </View>
 
-            {/* ⚠️ EMPTY → the ＋ slot is RESERVED, not drawn: its art (`slot · ＋ add a tablet`)
-                is un-ported, and the add flow is not built. A tappable ＋ with no destination
-                is the SCRUM-145 defect. It becomes real with the sheet, in this same ticket. */}
+            {/* ⚠️ EMPTY → the ＋ slot. The `＋` is the add affordance the board draws
+                (`slot · ＋ add a tablet`), and since the sheet now lives on THIS screen it has a
+                destination — so it is a real control, not the reserved band it used to be. */}
             {view.kind === 'empty' ? (
               <Pressable
                 accessibilityRole="button"
+                accessibilityLabel={t('ancestor.titleAdd')}
                 accessibilityState={{ disabled: !mayEdit }}
                 disabled={!mayEdit}
                 onPress={() => openSheet(null)}
@@ -284,10 +421,6 @@ export default function HomeShrine() {
                 ]}
                 testID="home-add-slot"
               >
-                {/* ⚠️ The ＋ ITSELF. Without it the empty altar is a dashed rectangle and the
-                    caption's "tap ＋" has nothing to point at — the gap the owner found against
-                    the board. ⚠️ It is still NOT a Pressable: the sheet lands in this ticket
-                    (`SCRUM-168`), and a control with nowhere to go is the `SCRUM-145` defect. */}
                 <Text
                   allowFontScaling={false}
                   style={{ color: text.gold, fontSize: 44 * s, fontWeight: '300' }}
@@ -298,14 +431,18 @@ export default function HomeShrine() {
             ) : (
               <Pressable
                 accessibilityRole="button"
+                accessibilityLabel={t('ancestor.titleEdit')}
                 accessibilityState={{ disabled: !mayEdit }}
                 disabled={!mayEdit}
                 onPress={() => openSheet(current ? current.id : null)}
                 style={[styles.abs, bandRect(slot, s)]}
                 testID="home-tablet"
               >
+                {/* ⚠️ `tabletName()`, NOT `surname + givenName`. The board paints 陈氏 for a
+                    tablet with no given name, and the sheet's preview uses the SAME function —
+                    two call sites building the string is how a preview and its result drift. */}
                 <Tablet
-                  name={current ? `${current.surname}${current.givenName ?? ''}` : ''}
+                  name={current ? tabletName(current.surname, current.givenName) : ''}
                   width={slot.w * s}
                   height={slot.h * s}
                 />
@@ -384,23 +521,18 @@ export default function HomeShrine() {
 
       // ── footer · the tab bar (SCRUM-164) ──────────────────────────────────
       case 'footer':
-        // ⚠️ The bar's own `paperDeep` is stretched over the strip BELOW the board so the bar
-        // reaches the physical bottom edge. That strip is the one place the shrine showed a
-        // SECOND colour (paper under a paperDeep bar) — the most obvious gap on glass.
+        // ⚠️ ONE COMPONENT, TWO PLACEMENTS. The band itself — its height, the bleed that stretches
+        // its `paperDeep` over the strip BELOW the board so the bar reaches the physical bottom edge,
+        // and the bar — is `TabBarBand`. The shrine only supplies the position (`bandRect`).
+        // ⚠️ That strip is the one place the shrine showed a SECOND colour (paper under a paperDeep
+        // bar) — the most obvious gap on glass.
+        // ⚠️ The height used to be recomputed HERE from the same two helpers, which is how the
+        // shrine's band and League's could have drifted apart.
         return (
-          <View
-            style={[
-              styles.abs,
-              bandRect(HOME_BANDS.tabbar, s),
-              { height: HOME_BANDS.tabbar.h * s + shrineBleedDp(screen.height, s) },
-            ]}
+          <TabBarBand
+            style={[styles.abs, bandRect(HOME_BANDS.tabbar, s)]}
             testID="home-tabbar-band"
-          >
-            {/* ⚠️ Store and Profile are DISABLED inside the bar: their screens are
-                SCRUM-150 / SCRUM-151. A dead link or an inert live-looking tab would both be
-                worse than a visibly unavailable one. */}
-            <TabBar active="shrine" scale={s} />
-          </View>
+          />
         );
     }
   };
@@ -413,6 +545,34 @@ export default function HomeShrine() {
         // items have no key and React warns "Each child in a list should have a unique key".
         <Fragment key={name}>{region(name)}</Fragment>
       ))}
+
+      {/*
+        ⚠️ THE SHEET IS PAINTED LAST, ON PURPOSE — after `footer`, so it covers the tab bar, which
+        is what `EN · 1s Ancestor sheet` draws (the panel runs 400→844 and the bar sits at 764).
+        ⚠️ It is a child of the CANVAS, not of the app root: the board draws the shrine behind the
+        scrim, and the canvas is where the shrine's coordinates live.
+        ⚠️ `key` is the ancestor id, so opening EDIT for a different tablet remounts the form
+        rather than leaving the previous person's name in the fields.
+      */}
+      {sheet ? (
+        <AncestorSheet
+          key={sheet.ancestorId ?? 'add'}
+          scale={s}
+          bleed={shrineBleedDp(screen.height, s)}
+          mode={sheet.mode}
+          initial={sheet.initial}
+          busy={sheetBusy}
+          problem={sheetIssue}
+          blockedReason={
+            sheet.mode === 'add' && capReached(ancestors.length)
+              ? t('ancestor.capReached', { cap: String(ANCESTOR_CAP) })
+              : null
+          }
+          onSubmit={submitSheet}
+          onArchive={sheet.mode === 'edit' ? archiveSheet : null}
+          onClose={closeSheet}
+        />
+      ) : null}
     </ShrineCanvas>
   );
 }

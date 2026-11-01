@@ -711,3 +711,561 @@ controls — so the role read works outside the dev client too.
 (`Gwee`, 3,850 tribute, 2-day streak) from the Expo Go test clan (`Ba`, 600, 1-day) where `Chen`
 was added. Not a defect — different data.
 ✅ **And the Expo Go dev FAB is gone**, so the settings gear is finally unobstructed.
+
+---
+
+# 📍 SESSION — 2026-11-01 (S72)
+
+## What this session did
+
+**The tablet sheet now matches the board, and the shrine's League entry has a way back.**
+
+```
+`SCRUM-210` 🔄 In Review   ⚠️ NEW — the sheet rebuilt as the board's bottom sheet (under SCRUM-148)
+`SCRUM-209` ⏳ To Do        ⚠️ NEW — 🎯 Decide: where the Book entry lives (no board draws one)
+`SCRUM-164` 🔄 In Progress  League half DONE · Book half BLOCKED on SCRUM-209
+`SCRUM-163` 🔄 In Review   ⚠️ the geometry gate — §25, and it is fault-tested
+`SCRUM-151` 🔄 In Progress  ✅ switcher · ✅ History (migration) · ✅ Profile + the Profile tab · ⚠️ Collection open
+`SCRUM-148` 🔄 In Progress  the umbrella
+```
+
+### ⚠️ The sheet was a SCREEN; the board draws a SHEET
+
+`SCRUM-146` shipped the tablet sheet as a **full-screen form on `/ancestor`**. `EN · 1s Ancestor
+sheet` draws something else: a **bottom sheet over the shrine**, with the halo, the panels and the
+tab bar all visible behind a scrim.
+
+✅ **So it is state on `src/app/index.tsx`, painted AFTER the footer** — which is why it covers the
+tab bar (the panel runs 400→844, the bar sits at 764). `/ancestor` is **deleted**.
+⚠️ **Not a route, deliberately:** a pushed route covers the shrine, and forcing
+`presentation: 'transparentModal'` from `_layout.tsx` is the exact declaration that once made the
+sheet the stack's **initial route**.
+
+### ⚠️ TWO defects the FIRST build shipped — and NO gate saw either
+
+Both were caught by **looking at the phone**, with `tsc` and 559 checks green:
+
+1. **The close button drew a PLUS.** Two bars at `0°` / `90°` — that is a `＋`. An **X needs ±45°**,
+   and the bars are the *diagonals* of the board's 14×14 box (14√2 ≈ 19.8 long).
+2. **The chips ran underneath the preview.** One wrapping row put `Father` **under the preview
+   tablet** (x 288). The board splits **3 then 2** — `—` · Grandfather · Grandmother / Father ·
+   Mother. That split is now `RELATIONSHIP_CHIP_ROW_BREAK`, asserted.
+
+### New pure rules (all gated, all fault-tested)
+
+| rule | what it decides |
+|---|---|
+| `tabletName()` | the name **PAINTED**: surname+given cut to 3 · no given name → **姓 + 氏** (the board draws `陈氏`) · ⚠️ a **LATIN** surname takes **no 氏** |
+| `altarCaption()` | empty / **singular** / plural — the screen used to render the EMPTY line unconditionally |
+| `RELATIONSHIP_CHIPS` + `chipSelected` / `chipValue` | the first chip clears the field; a hand-typed relationship lights up **no** chip |
+| `HOME_BANDS.sheetPanel` / `sheetPreview` | the sheet's geometry moved into `home-layout.ts` so the gate can hold it |
+
+⚠️ **Why a Latin surname takes no 氏 — and it is not pedantry.** 氏 is a clan suffix, so `Chen氏`
+means nothing; **and 氏 is CJK**, so appending it flips `nameOrientation` to `vertical` and stacks
+`C h e n` one glyph per line — **the exact defect the 90° rotation exists to prevent** (SCRUM-146).
+A bare `Chen` is Latin, so it rotates onto one line. Fault-tested: the first version appended 氏
+unconditionally and `check:lib` caught it.
+
+⚠️ **The two clauses of the board's hint are SEPARATE.** *"Surname + given name paint up to 3
+characters. No given name → 姓 + 氏…"* — the limit is stated for the first clause only, so
+`欧阳` + *(none)* paints `欧阳氏` and is **not** cut to three.
+
+### Gates
+
+`npm run check` **EXIT 0** · **581** lib checks (up from 515) · 17 copy checks · `tsc` 0 ·
+`expo-doctor` **21/21**. Fault-tested: break `tabletName` → **3 red**; `altarCaption` → **3 red**;
+`sheetPanel.h` 444→440 → **2 red**.
+
+### ⚠️ §25 — the geometry gate, and the class §18 could not see (SCRUM-163)
+
+**`check:lib` 559 → 581.** §18 asserts every band **fits the canvas** — ⚠️ **and a band dragged into
+the wrong place still fits.** So §25 asserts **PAIRS**: `a` is above `b`, or two regions do not
+overlap. New pure helpers: `bandAbove` · `bandsOverlap` · `HOME_REGION_TOPS` · `regionsStackDown` ·
+`ALTAR_DISPLAY_SLOTS`.
+
+⚠️ **`bandsOverlap` is deliberately NOT applied inside the altar** — `halo` (160→580) and
+`offerings` (434→604) overlap because the offerings are painted IN FRONT of the halo. A gate
+demanding no overlap there would fight the design.
+
+**Fault-test:** `HOME_BANDS.cta` moved from `y 676` into the header band (`y 54`) → **7 red**, each
+naming the pair (`…altar@152 → cta@54 → footer@764`; `settings ends 98, cta starts 54`). Restored
+from backup, `sha256sum -c` → **OK**, back to 581 green.
+
+⚠️ **The control that proves the gap was real**: `⚠️ guard: …and the FIT check does NOT — which is
+why §18 could not catch it` stays **green** under the corruption. §18 was blind; there is now an
+assertion that says so.
+
+### ✅ Verified on `HN615L005386` (Expo Go over `adb reverse`, port 8082)
+
+EDIT sheet over the shrine · ADD sheet with the board's `姓` placeholder · a chip selecting gold ·
+the **live preview** updating to `Tan` · the **keyboard lift** · **archive → empty altar + ＋ → add**
+→ the caption back on the filled line · **shrine → League → Return → shrine with exactly ONE
+`shrine-canvas`** (no double-push).
+
+⚠️ The test clan `Ba` now holds **`Tan`** — `Chen` was archived to exercise the empty-altar path.
+
+## Next, in order
+
+1. **`SCRUM-151`** — the last gap is **Collection**: the cards need a per-item aggregate
+   (`burned ×N`) that **no RPC returns**, so the row stays **disabled** rather than showing an
+   invented count. It needs a migration. Everything else on the ticket has landed.
+2. **`SCRUM-150`** the store → **149** item burn → **155** seed → **157** demo run. ⚠️ **`157` is the
+   sprint's acceptance gate.** ⚠️ And the store is now the most **visible** gap: the nav bar shows
+   four options with **Store dimmed**, and `SCRUM-143` is blocked on it.
+3. **`SCRUM-147`** onboarding.
+
+✅ **Answered 2026-11-01:** `SCRUM-209` (Book entry → **Option 4**, the clan-pill path) and
+`SCRUM-208` (the board's 1.44:1 active tab → **the current implementation is accepted**). Both closed;
+⚠️ `208` leaves the **board** owed — see this session's section below.
+
+⚠️ `SCRUM-12` is still blocked on the **`SCRUM-159`** decision. ⚠️ `SCRUM-164` and `SCRUM-163` are
+**Done**.
+
+---
+
+# 📍 SESSION — 2026-11-01 (S72, continued)
+
+## ⚠️ The app had NO language switcher — and now it does
+
+Measured: **`setLocale` was called from no screen and no component**, and neither was `detectLocale`.
+Every string was translated and `check:lib` §15/§16 held both tables — **and a reviewer could not
+reach 中文.** That is the kind of defect no gate was looking for: the *translation* was complete, the
+*switch* did not exist.
+
+✅ **On glass:** shrine → gear → Settings · tap 中文 → **every string switched** · force-stop and
+relaunch → **still Chinese** (`神龛` · `联赛` · `商店`, `功德点`, `连续 1 天`) · tap EN → back.
+
+### ⚠️⚠️ THE TRAP: `setLocale` CHANGES NO PIXELS
+
+`t()` reads `i18n.locale` at **call** time, so changing it re-renders **nothing** — React cannot see
+the dependency. ⚠️ **And the obvious fix does not work either**, which is worth remembering:
+
+· screens do not **consume** the context (they call `t()`), so a context change never reaches them;
+· a provider re-rendering with the **same** `children` element makes React **bail out**;
+· react-navigation **memoises its descriptors**, so re-rendering the navigator returns the **same
+  element** for the screen.
+
+✅ So `LocaleProvider` remounts the subtree via **`key={locale}`** — load-bearing, not cosmetic.
+⚠️ **The cost, stated rather than hidden:** a language change restarts navigation at the shrine.
+
+### Rules (pure, `src/lib/locale.ts`)
+
+| rule | decides |
+|---|---|
+| `normaliseLocale` | a stored value is **untrusted**: `ZH`→`zh` · `zh-Hans-SG`→`zh` · `fr`→default |
+| `resolveInitialLocale` | **stored > device > default** — ⚠️ even when the stored choice disagrees with the device |
+| `LOCALE_LABELS` | **endonyms** (`EN` / `中文`), never `t()` keys — a switcher written in a language you cannot read is useless |
+
+### ✅ Delete-all is wired — and the sign-out is the subtle part
+
+`delete_my_data()` existed since PR-2 with **no caller**. It now runs behind the SCRUM-123
+`ConfirmCard`, then clears the tutorial record → **signs out and mints a fresh identity** → lands on
+the shrine.
+
+⚠️ The RPC's own payload says *"the auth.users row is not removed by SQL — that needs the Admin
+API"*, and `ensureAnonymousSession()` only signs in when there is **no session at all** — so without
+the sign-out the device would keep a **profile-less** identity and the next write would fail.
+
+⚠️ **The destructive delete was NOT run** — it would erase the owner's test clan. The confirm path
+(card · consequences · cancel) is verified.
+
+### ⚠️ What is NOT done, and is visible rather than hidden
+
+**History and Collection have no server read** — the RPC surface has none, and `public.tributes` is
+unread. ⚠️ Adding it is a **migration**, so it is not in this pass. Both rows render **disabled**
+(the `tab-bar.tsx` pattern), as do the Settings rows with nothing behind them (notifications ·
+analytics · export · policies · sign out). ⚠️ `Original photos` is a **statement** — its sub IS the
+retention policy, and it has no chevron because it has no destination.
+
+⚠️ **`SCRUM-151` stays In Progress, not Done.**
+
+### Gates
+
+`check:lib` **581 → 603** (§26) · `npm run check` **EXIT 0** · `tsc` 0 · 17 copy checks.
+**Fault-tested:** `normaliseLocale` losing its tag fallback → **1 red**; `resolveInitialLocale`
+letting the device beat the stored choice → **2 red**; restored byte-identical (`sha256sum -c` OK).
+
+---
+
+## 📍 SESSION — 2026-11-01 (S72, continued again) — the migration
+
+### ⚠️ HISTORY COULD NOT BE BUILT FROM THE CLIENT
+
+`EN · 8c History` draws the user's own burns, and **nothing in the RPC surface returned them**.
+`home_summary` returns two aggregates; `clan_book` returns the **clan's** entries. ⚠️ `public.burns`
+and `public.tributes` have RLS enabled with **no policy**, so a plain client select answers `[]`
+with **no error** — and the screen would have read *"Nothing here yet"* over a hundred rows.
+
+✅ **Migration `20261101101000_my_offerings.sql` — APPLIED to the hosted project** (`db push`), and
+applied locally by `supabase db reset` (⚠️ **`supabase start` restores a BACKUP and does NOT apply a
+new migration file — `db reset` is what re-applies from disk**).
+
+| function | returns |
+|---|---|
+| `my_offerings(p_limit)` | the caller's own burns, newest first |
+| `my_offerings_week()` | burns + award over the **trailing 7 days** + the stored streak |
+
+⚠️ Both **`SECURITY DEFINER`**, scoped to `auth.uid()` **in the WHERE clause** — not by a policy the
+caller could widen. That is the board's own footnote: *"Only your offerings — nothing about others."*
+
+⚠️ Both return the burn's **STORED** band and award, never a re-derivation — recomputing the award
+would silently rewrite history the moment a multiplier changes.
+
+⚠️ `my_offerings_week` is a **second function**, not a fold of the first: the client holds a PAGE, so
+a heavy week would report a total **smaller than the list beneath it**.
+
+⚠️ **"Week" is a trailing 7 days** because the league week (Mon–Sun) and the streak period (local
+day) already disagree; picking either would invent a third meaning.
+
+### ⚠️⚠️ THE BUG `check:clanapi` CAUGHT — and `tsc` could not
+
+A `returns table (…)` function comes back from PostgREST as an **ARRAY OF ROWS, even for one row**.
+`myOfferingsWeek` read it as an **object**, so every field was `undefined` and the `?? 0` rendered
+**"0 burned · 0 tribute"** over a real week. ⚠️ **There are no generated DB types, so `tsc` is blind
+to it.** The contract test now asserts the LIST shape explicitly.
+
+### ✅ Verified on glass
+
+**Profile:** the clan · `Clan Head` · 600 tribute · 1-day streak · three rows.
+**History:** `THIS WEEK 0 burned · +0 tribute · 🔥 1 day` · **ALL OFFERINGS with a real burn row**
+(*"Photo offering · 24 Oct · 2:00 PM · Devout ×1.5 · +600"*) · the board's footnote.
+
+⚠️ **`"🔥 1 days"` was caught ON GLASS** — the board draws only the 12-day case, so the singular is
+ours (`streakDayKey`, asserted).
+
+### Gates
+
+`check:lib` **603 → 619** · `check:clanapi` **111 → 122** · `check:sql` **27/27** ·
+`supabase/tests/my_offerings.sql` **O1–O6 all green** · `npm run check` **EXIT 0** · `tsc` 0.
+
+### ⚠️ Still open on SCRUM-151
+
+**Collection** needs a per-item aggregate (`burned ×N`) that no RPC returns — the row stays disabled
+rather than showing an invented count. ⚠️ And the destructive **delete has still never been run**
+(it would erase the owner's test clan).
+
+---
+
+## 📍 SESSION — 2026-11-01 (S72, continued once more) — three nav/ritual corrections
+
+Three things the owner hit on glass, all now fixed and gated.
+
+### ⚠️⚠️ 1. Tapping the tab you are ALREADY ON re-rendered the page
+
+`TabBar`'s press handler was `router.push(tab.route)` **unconditionally**, so tapping **Shrine while
+on the shrine** pushed a **second `/`** onto the stack. The screen re-mounted (a visible re-render)
+and the stack grew **one duplicate per tap** — silently, because the top of the stack looks identical.
+
+⚠️ **The `disabled` prop covered the other half** (`route === null` → Store), which is why the bug
+looked like "Shrine is special" rather than "the handler never checks state":
+
+```tsx
+if (isActive || tab.route === null) return;   // ⚠️ isActive is the new half
+router.push(tab.route);
+```
+
+⚠️ **How it was proved** — not by eye, because a re-render looks the same. **Back-stack accounting:**
+tap Shrine 3×, then press BACK. The app exits to the launcher. ⚠️ **Pre-fix the three duplicates
+would have absorbed those pops and left us on the shrine** — so "we left the app" is the evidence
+that nothing was pushed. The control that makes it meaningful: a **real** push (League) *does*
+survive a BACK and returns to the shrine.
+
+⚠️ **`active` is a hardcoded `"shrine"` prop today** (`<TabBar active="shrine" …>`), so this guard is
+only *exercised* on the shrine until the other tabs share the bar. The guard is correct either way.
+
+### ⚠️ 2. The ritual's way out — and when it must NOT be there
+
+**The owner's ruling:**
+> *"Transform and burn should not have a back button. When entering the ritual after the picture starts
+> on the pipeline — after the user lassos or trims the picture and sends it into the pipeline — do not
+> have a back function unless it fails the pipeline."*
+
+⚠️ **This overrules the boards**, which draw a back on `EN · 3 Transform` / `3b` / `3d` **and**
+`EN · 4 Burn`. The reason it matters: **`working` and `parked` both hold an offering that has already
+been PAID FOR**, so a back there abandons a paid operation with no trace. The two states where nothing
+more happens without the user — **`spent`** (a lost capture) and **`offline`** (never left the phone) —
+are the only ones that get a way out.
+
+Implemented as a **pure predicate**, not a JSX condition, for the project's standing reason — *"a
+structure nothing can read is a structure no gate can hold"*:
+
+```ts
+export function pipelineFailed(phase: PreparingPhase | 'done'): boolean {
+  return phase === 'spent' || phase === 'offline';
+}
+```
+
+⚠️ `'done'` answers `false` deliberately: that phase routes away immediately and renders nothing, so a
+back would flash on a screen the user is leaving.
+
+### ⚠️ 3. And a rule about ABSENCE needs a source scan
+
+⚠️ **A gate cannot see a component that is not rendered** — the only thing that can hold *"Burn has no
+back button"* is reading the file. §26 now does exactly that:
+
+| assertion | why |
+|---|---|
+| `burn.tsx` contains **no** `<ScreenHud` | the owner's ruling; ⚠️ the board draws one |
+| `preparing.tsx` has `<ScreenHud` **and** `pipelineFailed(` | an *unconditional* HUD would trap a paid offering |
+| `settings.tsx` **does** contain `<ScreenHud` | ⚠️ **positive control** — proves the scan can find one |
+
+### ✅ Verified on `HN615L005386` (Expo Go over `adb reverse`, port 8081)
+
+* **Tab fix** — 3 Shrine taps → BACK → launcher (nothing pushed); League → BACK → shrine (a real push
+  still pops). Profile and League both navigate.
+* **The failed pipeline draws the back.** Deep-linking `/preparing` with **no params** lands in
+  `offline` — *"The offering could not reach the shrine." / "Nothing has been used — your offering is
+  safe." / "Check again"* (`prepare_offline: bad_params`), and the **paper back disc** is there.
+  ⚠️ The **LIGHT** tone, matching `EN · 3d`'s `btn · back (ink)` — a paper disc reads on
+  `surface.camera`; the dark tone would not.
+* **⚠️ Fault-tested the negative.** Forcing `pipelineFailed` to `return false` → **0 back nodes while
+  the failure copy stayed on screen** (so the absence was about the button, not a navigation change).
+  Restored → 1 node. ⚠️ **This is the check that proves the button is genuinely conditional** — a
+  gate that only ever sees "present" cannot tell a condition from a constant.
+
+### ⚠️ 1b. …and the fix had to be GLOBAL, not a shrine special-case
+
+The first cut guarded on the `isActive` **prop** — but `active` was a **literal supplied by the
+caller** (`<TabBar active="shrine" scale={s} />`). That is an answer the *caller* gives, and it was
+correct for exactly the one screen that rendered the bar. ⚠️ **The moment the bar appears anywhere
+else the answer is wrong and the rule silently stops holding** — which is how a "global" rule stays
+shrine-specific.
+
+The owner's follow-up: *"it should be global behaviour … this is common sense how the nav bar should
+work for all pages."* So:
+
+* ⚠️ **The bar derives `active` from `usePathname()` and takes NO `active` prop** — there is no
+  longer a caller that *can* get it wrong. §27 scans the source to hold both halves.
+* ⚠️ **The destinations moved to `lib/nav.ts` as DATA** (`NAV_TABS`), so §27 walks the **real routes**
+  and a **cross-product** of paths rather than a fixture that could drift from the component.
+  `Store`'s `route: null` is in that data, so "a tab with no screen is a no-op anywhere" is asserted
+  too.
+* ⚠️ **The rule is one expression over a path** — `tabPressIsNoop(route, currentPath)` — so *League on
+  League* is covered by the same line as *Shrine on Shrine*, with no per-tab branch to forget.
+* `activeTabKey` returns **`null`** for a path that is not a tab (Settings, History), rather than
+  defaulting to the shrine.
+
+### ✅ The bar now renders on ALL its own destinations (owner's ruling, 2026-11-01)
+
+> *"Nav bar should be accessible for the 4 options it displays."*
+
+⚠️ **That was the real defect.** The bar rendered on the **shrine only**, so tapping League landed you
+on a screen with a back arrow and **no bar** — the bar's own League and Profile buttons were
+**one-way pushes**, and *"tap League while on League"* was not even reachable. The bar advertised four
+destinations and three of them were dead ends.
+
+**`TabBarBand`** is the band as a component — height, the `paperDeep` bleed to the physical bottom,
+and the bar. Two placements, one implementation:
+
+| | shrine | League / Profile |
+|---|---|---|
+| placement | absolute (`bandRect(HOME_BANDS.tabbar, s)`) | flex child, below a `flex: 1` ScrollView |
+| band | `TabBarBand` with a `style` | `TabBarBand` |
+| height | **computed inside `TabBarBand`** | **the same** |
+
+⚠️ The shrine used to recompute that height from the same two helpers — the duplication is exactly
+how two placements drift. It passes `testID="home-tabbar-band"` so its id is unchanged.
+
+⚠️ **The boards draw a back button and no bar on `EN · 6 League` / `8 Profile`** — so this is a
+deliberate, owner-directed board deviation. Settings/History/Collection/clan/ritual screens are
+*reached through* a destination and keep `ScreenHud`, which is what the boards draw for them.
+
+⚠️ **Store is still disabled** — it has no screen (`SCRUM-150`), so the 4th option is visibly
+unavailable rather than a dead link. It becomes reachable the day that screen lands, with no change
+here.
+
+### ✅ Verified on `HN615L005386`
+
+* League dumps **`home-tabbar` + `tabbar-band` + `league-*`**; Profile the same.
+* **The active tab is derived, not passed:** `home-tab-league selected="true"` on `/league`,
+  `home-tab-profile selected="true"` on `/profile`, `home-tab-shrine selected="true"` on `/`.
+* **The band is `[0,1410][720,1600]` on every screen** — it does not move or resize when you navigate.
+* ⚠️ **The decisive test:** on the League page, **3 taps of the League tab, then ONE BACK → the
+  shrine.** Pre-fix those three duplicates would have absorbed the pop and left us on League.
+
+### Gates
+
+§22 now walks `NAV_TABS` and asserts, per tab, that **the screen exists** *and* **renders the bar** —
+so a fifth tab is covered the day it is added, and a destination you can reach but not leave fails
+the suite. `NavTab` gained `screen`, so the route→file mapping is data rather than a table in the
+check. Fault-tested by deleting `<TabBarBand` from `league.tsx` → red.
+
+`check:lib` **619 → 640 → 651 → 657** (38 new, incl. 6 positive controls) · `npm run check`
+**EXIT 0** · `tsc` 0.
+
+
+---
+
+## 📍 SESSION — 2026-11-01 (S72) — the two open decisions, answered
+
+Both PM decisions from the previous session's list are now closed. ⚠️ **Neither needed new product
+code — and that is the point of both.**
+
+### ✅ `SCRUM-209` — the Book entry: **Option 4, "leave it on the clan pill path"**
+
+⚠️ **No Home board draws a Book entry.** Every Home board was searched for `book` / `簿` / `ledger` /
+`tribute` / `entry`; the only hits are `panel · tribute`. The four options were: replace a tab · a
+fifth tab · make the tribute panel the entry · **leave it on the clan-pill path**. The owner took the
+fourth and declined to change a signed-off board.
+
+⚠️ **`SCRUM-164`'s acceptance was AMENDED, not met.** It said *"tapping Book reaches `/clan/book`"*.
+That is now **struck** — the ticket's description was edited so a `Done` ticket does not claim a
+control that does not exist, and its scripted pass is **shrine → League → shrine**, not
+`shrine → Book → …`.
+
+⚠️ **The accepted cost, stated so it is not rediscovered as a bug: the Book stays three taps deep**
+(`clan pill → /clan/manage → Book`).
+
+**Verified against the code, not assumed:**
+
+| claim | evidence |
+|---|---|
+| the shrine has no Book entry | `index.tsx` contains **no** `'/clan/book'` — it never did |
+| the Book is still reachable | `clan/manage.tsx:391` is the **only** push to `/clan/book` |
+| nothing to remove | the shrine's routes are `'/capture'`, `'/clan'`, `'/settings'` |
+
+⚠️ **And a gate, because the decision is about an ABSENCE** — which is exactly what a future session
+would helpfully fill in. §22 now asserts the shrine carries no Book affordance, **with a positive
+control** so the scan is proven able to find a route link where one really exists. Same class as §26's
+*"Burn has no back button"*. Fault-tested: appending `const BOOK = '/clan/book'` to `index.tsx` → red.
+
+### ✅ `SCRUM-208` — the board's 1.44:1 active tab: **the current implementation is accepted**
+
+The build renders `onColorCream` `#FFF8E8` on the `#C23B22` pill — **4.90 : 1**, comfortably AA.
+⚠️ **§22 already pins BOTH ratios**, so the decision is enforced in both directions: copying the
+board's `#9A2B18` fails the suite, and so does "fixing" the build to match it.
+
+⚠️ **Still owed, and it is the BOARD's, not the code's:** `nav · tab <name> icon` / `… label` for the
+**active** tab are still `#9A2B18` on `#C23B22` on all four Home boards. ⚠️ **The same token will
+recur on every other active-state surface** — the League screen and the Store are next — until the
+board is corrected. That is the residue this ticket leaves behind, and it is recorded in
+`follow-up-items.md` rather than closed silently.
+
+⚠️ **How it was caught, and why it mattered:** only by **porting it and looking at the phone**. No
+gate compares a Penpot board to a token set — so the *board* has nothing holding it, which is the gap
+this ticket named.
+
+### Board status after this session
+
+| ticket | was | now |
+|---|---|---|
+| `SCRUM-164` | 🔄 In Progress (Book half blocked) | ✅ **Done** — acceptance amended |
+| `SCRUM-208` | ⏳ To Do (PM decision) | ✅ **Done** — implementation accepted, board owed |
+| `SCRUM-209` | ⏳ To Do (PM decision) | ✅ **Done** — Option 4 |
+
+### Gates
+
+`check:lib` **657 → 660** (3 new, incl. a positive control) · `npm run check` **EXIT 0** · `tsc` 0.
+⚠️ **US$0.00** — no AI call, no EAS build.
+
+
+---
+
+# 📍 SESSION — 2026-11-01 (S72, final) — THE STANDARD ITEMS' ART, AND THE ITEM BURN
+
+⚠️ **Read this section before touching `components/offering-art.tsx`, `assets/offerings/`, or the
+burn path.** Three things changed shape in ways that are not obvious from the diff.
+
+## ⚠️⚠️ 1 · THE STANDARD-ITEM ART IS NOW A RASTER, NOT 82 SVG SHAPES
+
+**Owner's finding:** *"the standard items' Art Style is not consistent with the art generated thru
+the pipeline."* **Confirmed** — the five items were hand-ported Penpot vectors (flat fills, hard
+outlines) while a Path C capture is a **very coarse low-poly 3D cartoon**. Two visual languages on
+one screen.
+
+**What was done:**
+
+1. **Regenerated in the pipeline's OWN style** — `fal-ai/nano-banana-2`, the endpoint
+   `_shared/pathc.ts:366` calls, from `STYLE_TEMPLATE_V3` **verbatim** (`_shared/pathtemplate.ts`).
+   Two variants each, **all ten kept** in `design-system/standard-item-art/`.
+2. **The owner picked:** `gold-bar-v1` · `house-v2` · `joss-paper-stack-v1` · `smartphone-v1` ·
+   `wealth-bundle-v1`.
+3. **Cut out with `fal-ai/birefnet/v2`** — the pipeline's **own stage ④** — because a generated image
+   sits on the warm rice-paper background the template *asks for* and the app draws **over the camera**.
+4. **Cropped to the alpha bbox + 2%**, so the subject FILLS its box rather than floating in
+   1024×1024 padding. ⚠️ **This is why the aspects now differ** — 0.50 (phone) against 1.44 (bundle).
+5. **Bundled as `<Image>`** at `assets/offerings/<code>.png` — **option 2**, the owner's call.
+
+⚠️⚠️ **THE TRADE-OFF IS NOW PERMANENT AND ACCEPTED:** the art **cannot be recoloured** and **does not
+scale losslessly**, and it costs **~2.4 MB of bundled assets**. ⚠️ **If the style changes again these
+are REGENERATED, not edited.** Option 1 (re-trace as `react-native-svg`, which is what every OTHER
+illustration here does — `fire-art.tsx`, `altar-halo.tsx`) was declined.
+
+⚠️ **Static `require`s, one per code.** Metro resolves those at BUILD time; a computed path
+(`require(\`…/${code}.png\`)`) bundles **nothing** and fails only on a device.
+
+## ⚠️ 2 · THE ITEM BURN EXISTS NOW — and it is TWO route readers, not one
+
+**`submitBurnItem(itemCode, accuracy, throwNo, clanId)`** is the half the client never had.
+`submit_burn` has accepted `item_code` since it was written and `award-service` forwards the payload
+untouched, but the only caller sent a `capture_id` — so an item burn was reachable by **no screen**.
+
+**The chain, all verified on glass except the last step:** buy → own → pick → burn.
+
+| piece | where |
+|---|---|
+| inventory read + purchase | `lib/offerings-api.ts` — ⚠️ **`inventory` is the ONE economy table with a client SELECT policy** (`inventory_select_own`), so this needed **no migration** |
+| the picker | `src/app/offerings.tsx` + `lib/picker.ts` — ⚠️ **an unowned item is DRAWN and drawn as unavailable**, because the board does exactly that (`card · Wealth Bundle (bg)` is `fill=none` with an outline) |
+| the item submit | `lib/ritual.ts` — the shared POST is `postBurn()` so the two paths cannot drift |
+| item mode on the burn screen | `src/app/burn.tsx` — draws the **same `OfferingArt`** the Store and picker draw |
+| the buy flow | `src/app/store.tsx` — a `ConfirmCard`, **one idempotency key per CONFIRM** |
+
+⚠️⚠️ **TWO PARALLEL ROUTE READERS — `readItemBurnParams` / `readItemRewardParams` sit BESIDE
+`readBurnParams` / `readRewardParams`, never widened.** `burns` XOR-enforces which id a burn carries
+and the server refuses a payload with **both or neither**; a single reader accepting either could
+express a state the server rejects, **and would make `captureId` optional on the photo path** — the
+defect `toRewardParams`' doc records.
+
+⚠️ **§30's FIRST VERSION LIED.** It asserted a payload carrying **both** ids would be refused by the
+photo reader. It is not — `readBurnParams` has never heard of `itemCode`. That is a **fact about the
+reader, not a bug in it**, so §30 now asserts the cross-checks that are *true*.
+
+## ⚠️ 3 · THREE TRAPS, ALL REAL, ALL RECORDED IN THE GATES
+
+1. **A COMMENT THAT QUOTES A LOCATOR BECOMES A SECOND OCCURRENCE OF IT.** `check:sprite` finds the
+offering `<Image>` by its literal source attribute; an item-mode comment *quoted* that attribute, so
+`indexOf` found the **comment** first and the `resizeMode` assertion failed **with the element sitting
+right there**. ⚠️ Do not quote a locator in a comment.
+2. **`ItemRewardParams` had to be a TYPE ALIAS, not an `interface`** — TypeScript gives implicit index
+signatures to aliases but not interfaces, and expo-router types `params` as an index-signature record.
+⚠️ **That rule was ALREADY documented in `route-params.ts` and was broken anyway.**
+3. **`check:copy` caught a `t()` call split across lines** — the extractor's blind spot, exactly what
+that check exists for.
+
+## ⚠️ 4 · THE STORE'S POINTS CHIP READS THE WRONG NUMBER — NOT FIXED
+
+* the chip reads `home_summary()` → **`sum(tributes.points)`**
+* `purchase_item` checks **`public.balances`** → **`sum(ledger_events.amount)`**
+
+⚠️ **They are different sources.** With 5000 in the ledger the chip showed **"Store Points 0"** and the
+purchase went through anyway — a player sees "0 points" beside a working Buy button. ⚠️ **There is no
+client read for the ledger balance** (`ledger_events` is RLS-on with no policy, like `burns`), so the
+fix needs a `SECURITY DEFINER` read, i.e. **a migration**. ⚠️ **This is the top of the next session.**
+
+## ⚠️ 5 · PRODUCTION DATA WAS WRITTEN, ON THE OWNER'S SAY-SO
+
+The test account **`a27627ad-d703-4606-87e1-7283a1e57ccc`** — identified from `auth.users` as the only
+identity signed in that day, ⚠️ **not guessed** — was credited with **+5000 tribute** via an
+`adjustment` `ledger_events` row (`seq 1`, reason *"SCRUM-149 and SCRUM-150 test credit…"*). ⚠️ **The
+ledger is APPEND-ONLY — a correction is a compensating row with a `reason`, never an `UPDATE`**, and
+the `ledger_adjustment_needs_reason` CHECK enforces it. The account then bought a Joss Paper Stack
+(−400 tribute, +80 store accrual) and now holds **4200 tribute · 80 store points · 1 × joss_paper_stack**.
+
+## ⚠️ NEXT SESSION — IN ORDER
+
+1. **LOOK AT THE NEW ART ON GLASS.** ⚠️ **This was NOT done.** The gate proves the sizes match the
+   files; it **cannot** prove they *look right* at 110×80 (Store/Collection/picker) and in the 72 px
+   burn box. ⚠️ **Expected problem: `smartphone` may read too small** — at 0.50 aspect it is tall and
+   thin, so in a wide box it contains to about half the height. `adb reverse` + Metro, then Store →
+   Collection → picker → burn, screenshotting each.
+2. **The points chip defect (§4 above)** — a migration + a `SECURITY DEFINER` balance read.
+3. **`7d` item detail and `7e`'s own buy sheet** — the buy is a `ConfirmCard` on the storefront, not
+   the board's shape. ⚠️ **The cash rail remains native**: Google Play Billing, an EAS build, Play
+   Console, with no read for a cash balance anywhere.
+
+## Gates
+
+`check:lib` **697 → 708 → 723** · `check:clanapi` **122 → 134** · `npm run check` **EXIT 0** · `tsc` 0 ·
+`expo-doctor` 21/21 · **US$0.41 spent this session** (US$0.40 of images + US$0.01 of cutouts), all
+**estimates at published rates**, flagged as such in `project-costs.md`. fal.ai ≈ **US$6.39 / S$8.18**
+of the approved US$10–20.
