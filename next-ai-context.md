@@ -1354,6 +1354,25 @@ Bundle** (220×106) and the four cards — Joss Paper Stack · Gold Bar · Smart
 Path C capture now speak ONE visual language. ⚠️ **The predicted `smartphone` problem did NOT appear** —
 at 0.50 aspect it is the narrowest card art, but it reads unambiguously as a phone; no re-crop needed.
 
+⚠️⚠️ **CORRECTION — MY FIRST SCREENSHOT WAS NOT THE NEW ART.** The 19:11 capture showed **flat vector
+shapes with hard outlines**: that is the **OLD 82-SVG build**, because the resumed app was running a
+**stale BUNDLE** as well as stale state (§③). ⚠️ **The authoritative capture is the COLD-LAUNCH one** —
+shaded low-poly paper stacks with red bands, a gold ingot, a blue phone with a camera bump, a
+tiled-roof house. ⚠️ **A resumed Expo Go app can be showing the previous session's CODE, not merely its
+data** — which is why the first shot looked plausible and was wrong. It is the same trap as §③, one layer
+deeper.
+
+**⑤ ⚠️⚠️ IN EXPO GO, BUNDLED IMAGES COME FROM METRO — SO STOPPING THE DEV SERVER BLANKS THEM.** The
+owner reported *"the images for the store items are not rendered"* while looking at the device. ⚠️ **Not
+an app defect.** The Expo docs are explicit: *"Locally stored assets are served over HTTP in development.
+They are **automatically bundled into your app binary at the build time for production apps** and served
+from disk on a device."* ⚠️ So with Metro stopped, **every `require()`d PNG renders BLANK while the text,
+cards and prices still render** — which reads exactly like *"the art is broken"*.
+⚠️ **Reproduced and fixed by A/B:** Metro down → **all five art wells empty**; Metro up → **all five
+render**. ⚠️ **A production/EAS build embeds them, so this cannot ship** — but ⚠️ **leave Metro running
+for any on-glass review of bundled art**, and do not diagnose a blank image as a code defect before
+checking the dev server.
+
 **② The chip is the WALLET, proven on glass.** The same account has a **tributes RECORD of 0** and a
 **wallet of 4600**:
 
@@ -1371,6 +1390,11 @@ fetched *before* the migration. A focus re-read and a **cold launch** (force-sto
 **4,600**. ⚠️ **So a single screenshot of a RESUMED app can show a stale number** — force-stop and
 relaunch before believing one. ⚠️ And the app's own pattern is *re-read on focus*, which is what
 corrected it.
+⚠️⚠️ **AND IT WAS STALE IN TWO DIMENSIONS, NOT ONE.** The same resumed app rendered the **OLD 82-SVG
+art** (§①) — so it was running the **previous session's BUNDLE** as well as holding its data. ⚠️ **A
+resumed Expo Go app can be executing code from before your change**, which is far more dangerous than a
+stale number: the screenshot looks entirely plausible and is of the WRONG BUILD. ⚠️ **Force-stop,
+relaunch, and re-check that what you are looking at is the bundle you just edited.**
 
 **④ Collection's empty state is CORRECT, not a defect.** It reads *"0 offerings burned · 0 items
 collected · Nothing here yet"* — and that is **TRUE**: a burn is either an item or a photo (the XOR), and

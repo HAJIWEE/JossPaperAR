@@ -449,13 +449,25 @@
   **wallet of 4600**; the Store chip read **"Store Points 4600"** and the shrine panel **"TRIBUTE POINTS
   4,600"** — both the **wallet**. ⚠️ **Under the old body BOTH would have read `0`.** So SCRUM-150 AC 1 is
   confirmed on the device, not only in the SQL test.
-- ⚠️⚠️ **A DEVICE-VERIFICATION TRAP FOUND WHILE DOING IT — worth keeping.** The **FIRST** launch showed
-  the shrine at **`0`** and nothing was wrong: **Expo Go had RESUMED the previous session's running app**,
-  still holding the value it fetched *before* the migration. A focus re-read and a **cold launch**
-  (force-stop → relaunch) both show **4,600**. ⚠️ **A single screenshot of a RESUMED app can show a stale
-  number — force-stop and relaunch before believing one.** ⚠️ Also: Expo Go's **LogBox intercepts taps**
-  (the first tab tap opened a log overlay instead of navigating), and **Metro rewrites `tsconfig.json`**
-  on boot (reverted, not committed).
+- ⚠️⚠️ **A DEVICE-VERIFICATION TRAP FOUND WHILE DOING IT — worth keeping, and it bit TWICE.** The
+  **FIRST** launch showed the shrine at **`0`** and nothing was wrong: **Expo Go had RESUMED the previous
+  session's running app**, still holding the value it fetched *before* the migration. A focus re-read and
+  a **cold launch** (force-stop → relaunch) both show **4,600**. ⚠️ **A single screenshot of a RESUMED app
+  can show a stale number — force-stop and relaunch before believing one.**
+  ⚠️⚠️ **AND THE RESUMED APP WAS RUNNING A STALE *BUNDLE* TOO** — its first Store screenshot showed the
+  **OLD 82-SVG art**, not the new raster. ⚠️ **So a resumed app is stale in TWO dimensions: data AND
+  code.** The authoritative art capture is the **cold-launch** one. ⚠️ Also: Expo Go's **LogBox
+  intercepts taps** (the first tab tap opened a log overlay instead of navigating), and **Metro rewrites
+  `tsconfig.json`** on boot (reverted, not committed).
+- ⚠️⚠️ **AND A THIRD TRAP, REPORTED BY THE OWNER: "the images for the store items are not rendered."**
+  ⚠️ **Not an app defect — Metro was stopped.** In Expo Go, `require()`d assets are **served over HTTP by
+  the dev server** (Expo docs: *"Locally stored assets are served over HTTP in development. They are
+  automatically bundled into your app binary at the build time for production apps and served from disk
+  on a device."*). So with Metro down, **every bundled PNG renders BLANK while the text, cards and prices
+  still render** — which reads exactly like *"the art is broken"*. ✅ **Reproduced and fixed by A/B:**
+  Metro down → **all five art wells empty**; Metro up → **all five render**. ⚠️ **A production/EAS build
+  embeds them, so this cannot ship** — but **leave Metro running for any on-glass review of bundled art**,
+  and check the dev server before diagnosing a blank image as a code defect.
 - ✅ **RESOLVED 2026-11-01 (S73) — THE STORE'S POINTS CHIP READ THE WRONG NUMBER.** The chip read
   `home_summary()` → **`sum(tributes.points)`** (the Book of Tributes **record** — lifetime earned,
   never falls); `purchase_item` checks **`public.balances`** → **`sum(ledger_events.amount)`**.
