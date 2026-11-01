@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 import { isValidClanName } from '../clan-rules.ts';
 import { PREPARING_PHASES, pipelineFailed } from '../../domain/slice.ts';
+import { NAV_TABS, activeTabKey, isSamePath, tabPressIsNoop } from '../nav.ts';
 import { bookView, showsBookSectionTitle } from '../clan-roles.ts';
 import {
   CONFIRM_SPEC,
@@ -1769,6 +1770,59 @@ function localeChecks(): void {
   // ⚠️ POSITIVE CONTROL — the absence check must FIRE where a HUD IS present.
   check('⚠️ guard: the same absence check FINDS the HUD on a screen that has one',
     readFileSync(join(PROJECT_ROOT, 'src/app/settings.tsx'), 'utf8').includes('<ScreenHud'));
+
+  /**
+   * ── ⚠️ THE NAV BAR'S ONE RULE — GLOBAL, NOT SHRINE-SPECIFIC (owner's ruling, 2026-11-01) ──
+   * > *"Tapping the tab you are already on should not re-render the page. This is common sense how
+   * > the nav bar should work for all pages."*
+   *
+   * ⚠️ Asserted against **`NAV_TABS` — the real destinations** — so a fifth tab extends the gate
+   * instead of escaping it, and against a **cross-product** of paths so "League on League" is covered
+   * by the same expression as "Shrine on Shrine".
+   */
+  const routedTabs = NAV_TABS.filter((tab) => tab.route !== null);
+  const routedList = routedTabs.map((tab) => `${tab.key}@${tab.route}`).join(' ');
+
+  check('⚠️ EVERY tab that has a screen is a no-op on its OWN path',
+    routedTabs.every((tab) => tabPressIsNoop(tab.route, tab.route as string)),
+    routedList);
+  check('⚠️ …and no tab is a no-op on a DIFFERENT tab\'s path (not a blanket no-op)',
+    routedTabs.every((tab) => routedTabs
+      .filter((other) => other.key !== tab.key)
+      .every((other) => !tabPressIsNoop(tab.route, other.route as string))),
+    routedList);
+  check('⚠️ a tab with NO screen is a no-op from anywhere (Store)',
+    NAV_TABS.filter((tab) => tab.route === null).every((tab) => tabPressIsNoop(null, '/league')));
+  check('…and a trailing slash or a query is the SAME screen, not a new one',
+    tabPressIsNoop('/league', '/league/') && tabPressIsNoop('/league', '/league?ref=1')
+      && isSamePath('/', ''));
+  // ⚠️ POSITIVE CONTROL — the rule must not answer `true` for everything.
+  check('⚠️ guard: the rule is not a constant',
+    tabPressIsNoop('/', '/') && !tabPressIsNoop('/league', '/'));
+
+  check('the active tab is DERIVED from the path — every routed tab names itself',
+    routedTabs.every((tab) => activeTabKey(tab.route as string) === tab.key), routedList);
+  check('⚠️ …and a tab with NO screen is never the active one (Store)',
+    NAV_TABS.some((tab) => tab.key === 'store' && tab.route === null)
+      && routedTabs.every((tab) => activeTabKey(tab.route as string) !== 'store'));
+  check('…and a path that is NOT a tab highlights NOTHING, rather than defaulting to the shrine',
+    activeTabKey('/settings') === null && activeTabKey('/history') === null);
+  // ⚠️ POSITIVE CONTROL — `activeTabKey` must not answer `null` for everything.
+  check('⚠️ guard: `activeTabKey` DOES return a key for a real tab',
+    routedTabs.some((tab) => activeTabKey(tab.route as string) !== null));
+
+  /**
+   * ⚠️ **AND THE BAR MUST DERIVE IT, because a prop is an answer the CALLER gives.** It was
+   * `<TabBar active="shrine" …>` — correct on the one screen that rendered it, and wrong the moment
+   * the bar appeared anywhere else, which is precisely how a "global" rule stays shrine-specific.
+   */
+  const tabBarSource = readFileSync(join(PROJECT_ROOT, 'src/components/home/tab-bar.tsx'), 'utf8');
+  check('⚠️ the bar reads the CURRENT PATH and takes NO `active` prop',
+    tabBarSource.includes('usePathname()')
+      && tabBarSource.includes('export function TabBar({ scale }')
+      && !tabBarSource.includes('active: string'));
+  check('⚠️ …and its press goes through the shared rule, not a local comparison',
+    tabBarSource.includes('tabPressIsNoop(') && !tabBarSource.includes('if (isActive ||'));
   check('the week card is the board\'s 350×64 r14',
     HISTORY_SPEC.week.w === 350 && HISTORY_SPEC.week.h === 64 && HISTORY_SPEC.week.radius === 14);
   check('the entry row is 350×88 r12, with a 60 thumb',

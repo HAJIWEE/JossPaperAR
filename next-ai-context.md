@@ -1019,8 +1019,47 @@ back button"* is reading the file. §26 now does exactly that:
   Restored → 1 node. ⚠️ **This is the check that proves the button is genuinely conditional** — a
   gate that only ever sees "present" cannot tell a condition from a constant.
 
+### ⚠️ 1b. …and the fix had to be GLOBAL, not a shrine special-case
+
+The first cut guarded on the `isActive` **prop** — but `active` was a **literal supplied by the
+caller** (`<TabBar active="shrine" scale={s} />`). That is an answer the *caller* gives, and it was
+correct for exactly the one screen that rendered the bar. ⚠️ **The moment the bar appears anywhere
+else the answer is wrong and the rule silently stops holding** — which is how a "global" rule stays
+shrine-specific.
+
+The owner's follow-up: *"it should be global behaviour … this is common sense how the nav bar should
+work for all pages."* So:
+
+* ⚠️ **The bar derives `active` from `usePathname()` and takes NO `active` prop** — there is no
+  longer a caller that *can* get it wrong. §27 scans the source to hold both halves.
+* ⚠️ **The destinations moved to `lib/nav.ts` as DATA** (`NAV_TABS`), so §27 walks the **real routes**
+  and a **cross-product** of paths rather than a fixture that could drift from the component.
+  `Store`'s `route: null` is in that data, so "a tab with no screen is a no-op anywhere" is asserted
+  too.
+* ⚠️ **The rule is one expression over a path** — `tabPressIsNoop(route, currentPath)` — so *League on
+  League* is covered by the same line as *Shrine on Shrine*, with no per-tab branch to forget.
+* `activeTabKey` returns **`null`** for a path that is not a tab (Settings, History), rather than
+  defaulting to the shrine.
+
+### ⚠️ WHERE the bar appears is a SEPARATE question — and the boards answer it
+
+⚠️ **`TabBar` currently renders on the shrine only.** The boards are unambiguous:
+
+| board | tab bar | back button |
+|---|---|---|
+| `EN · 1` / `1g` / `1h` / `1h2` **Home** | **yes** (`nav · tabbar (bg)` 0,764 390×80) | — |
+| `EN · 6 League` · `7 Store` · `8 Profile` · `8b Settings` · `8c History` | **no** | **yes** (`btn · back (ink)` 18,40 42×42) |
+
+So the board design treats League/Profile/Store as **pushed detail screens**, not as tabs — while the
+bar's own League/Profile buttons *push* exactly those routes. ⚠️ **That inconsistency is the real
+thing the owner is pointing at**, and resolving it is a design change across five boards, so it is
+raised rather than assumed. ⚠️ The rules above are written for **any** page the bar is placed on, so
+the placement can change without touching them.
+
 ### Gates
 
-`check:lib` **619 → 640** (21 new, incl. 3 positive controls) · `npm run check` **EXIT 0** · `tsc` 0.
+`check:lib` **619 → 640 → 651** (32 new, incl. 5 positive controls) · `npm run check` **EXIT 0** ·
+`tsc` 0. Fault-tested three ways: predicate → constant = red; a blanket no-op = red; reverting the
+bar to `if (isActive || …)` = red.
 
 

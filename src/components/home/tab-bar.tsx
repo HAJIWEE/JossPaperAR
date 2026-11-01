@@ -1,5 +1,5 @@
 /**
- * The shrine's tab bar (SCRUM-164).
+ * The navigation bar (SCRUM-164, SCRUM-151).
  *
  * ── PORTED FROM THE BOARD ───────────────────────────────────────────────────
  * `nav · tabbar (bg)` 0,764 390×80 in **`surface.paperDeep`**, a **3 px `brand.ink`** rule along
@@ -11,62 +11,57 @@
  * class `SCRUM-93` closed on a board before. `onColorCream` on that fill is **4.90:1**, so the
  * bar uses it and `check:lib` §22 asserts both ratios. ⚠️ The board itself is filed.
  *
- * ── ⚠️ TWO TABS ARE DISABLED, AND THAT IS THE HONEST STATE ─────────────────
- * **Store** and **Profile** have no screen: the storefront is `SCRUM-150` and Profile/Settings is
- * `SCRUM-151`. ⚠️ Wiring them to a route that does not exist would be a **dead link**, and
- * rendering them as live-looking but inert is the `SCRUM-145` defect. So they render **visibly
- * disabled** (`accessibilityState.disabled`, dimmed) and become tappable the day their screen
- * lands — the bar's geometry does not change.
+ * ⚠️ **WHICH TABS ARE LIVE IS DATA, NOT LOGIC HERE** — `NAV_TABS` in `lib/nav.ts`. **Store** is
+ * disabled (no screen, SCRUM-150) and **Profile** is live (SCRUM-151). ⚠️ Wiring a tab to a route
+ * that does not exist would be a **dead link**, and rendering it live-looking but inert is the
+ * `SCRUM-145` defect — so Store renders **visibly disabled** and becomes tappable the day its screen
+ * lands. The bar's geometry does not change, only the state.
  *
  * ⚠️ The League tab's `#4` subtext is a RANK (`nav · tab League subtext`, `text.gold`); there is
  * no rank read on this screen yet, so it is not drawn — a static "#4" would be a lie about the
  * user's position.
+ *
+ * ⚠️ **WHERE THE BAR APPEARS is a separate question from how it behaves.** Per the boards it is
+ * drawn on the **home** screens only (`EN · 1`, `1g`, `1h`, `1h2`); `EN · 6 League`, `7 Store`,
+ * `8 Profile`, `8b Settings` and `8c History` each draw a **back button** instead. So this component
+ * currently renders on the shrine, and its rules are nonetheless written for **any** page it is
+ * placed on.
  */
 
 import { Pressable, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 
 import { TAB_BAR } from '@/lib/home-layout';
 import { t } from '@/lib/i18n';
-import { PROFILE_ROUTE } from '@/lib/profile';
+import { NAV_TABS, activeTabKey, tabPressIsNoop } from '@/lib/nav';
 import { brand, onColorCream, surface, text } from '@/theme/tokens';
 
-type Tab = {
-  readonly key: string;
-  readonly icon: string;
-  readonly labelKey: string;
-  /** ⚠️ `null` = the screen does not exist yet. */
-  readonly route: string | null;
-};
-
 /**
- * ⚠️ **Store is DISABLED, Profile is LIVE.** Store has no screen (SCRUM-150) and a route that 404s
- * is a defect, not a placeholder — so it renders visibly unavailable. ⚠️ **Profile's screen now
- * exists (SCRUM-151)**, so it became tappable the day it landed — which is exactly what this bar
- * promised: the geometry does not change, only the state.
+ * ⚠️⚠️ **THE BAR DERIVES ITS OWN ACTIVE STATE — IT TAKES NO `active` PROP.**
  *
- * ⚠️ The League tab's `#4` subtext is a RANK (`nav · tab League subtext`, `text.gold`); there is
- * no rank read on this screen yet, so it is not drawn — a static "#4" would be a lie about the
- * user's position.
+ * It used to be `<TabBar active="shrine" scale={s} />`, a literal handed in by the one screen that
+ * rendered it. That is a question the **caller** answered, and it answered it correctly for exactly
+ * one screen — so on any other screen the answer would be wrong and the no-op rule below would
+ * quietly stop holding. ⚠️ **Deriving it from `usePathname()` is what makes the rule GLOBAL**: there
+ * is no longer a caller that *can* get it wrong. `check:lib` §27 asserts the prop is gone.
+ *
+ * ⚠️ The destinations live in `lib/nav.ts` as data, so §27 can walk **every** tab and a
+ * cross-product of paths against the real routes rather than a fixture that could drift.
  */
-const TABS: readonly Tab[] = [
-  { key: 'shrine', icon: '\u{1F3EE}', labelKey: 'nav.shrine', route: '/' },
-  { key: 'league', icon: '\u{1F3C6}', labelKey: 'nav.league', route: '/league' },
-  { key: 'store', icon: '\u{1F6CD}', labelKey: 'nav.store', route: null },
-  // ⚠️ `PROFILE_ROUTE`, not a literal — the tab bar and `check:lib` §26 read the SAME string.
-  { key: 'profile', icon: '\u{1F464}', labelKey: 'nav.profile', route: PROFILE_ROUTE },
-];
-
-export function TabBar({ active, scale }: { active: string; scale: number }) {
+export function TabBar({ scale }: { scale: number }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const active = activeTabKey(pathname);
 
   return (
     <View style={{ flex: 1, backgroundColor: surface.paperDeep }} testID="home-tabbar">
       <View style={{ height: TAB_BAR.topLine * scale, backgroundColor: brand.ink }} />
 
-      {TABS.map((tab, i) => {
+      {NAV_TABS.map((tab, i) => {
         const isActive = tab.key === active;
         const disabled = tab.route === null;
+        // ⚠️ Captured and narrowed once, so the press handler below needs no assertion.
+        const destination = tab.route;
         return (
           <Pressable
             key={tab.key}
@@ -76,14 +71,15 @@ export function TabBar({ active, scale }: { active: string; scale: number }) {
             disabled={disabled}
             onPress={() => {
               /**
-               * ⚠️⚠️ **TAPPING THE TAB YOU ARE ALREADY ON MUST DO NOTHING.**
-               * It was `router.push(tab.route)` unconditionally, so tapping **Shrine while on the
-               * shrine** pushed a SECOND `/` onto the stack — the page re-rendered, and the stack
-               * grew a duplicate entry per tap. Measured on glass 2026-11-01.
-               * ⚠️ The `disabled` prop already covers `route === null`; this covers the other half.
+               * ⚠️⚠️ **TAPPING THE TAB YOU ARE ALREADY ON MUST DO NOTHING — ON EVERY PAGE.**
+               * It was `router.push(tab.route)` unconditionally, so pressing the current tab pushed a
+               * SECOND copy of the route: the screen re-rendered and the stack grew one duplicate per
+               * tap. ⚠️ The rule is the shared `tabPressIsNoop` in `lib/nav.ts`, applied to the
+               * **path this screen is actually on** — not to a prop someone passed in — so it holds
+               * for League on League exactly as it does for Shrine on Shrine.
                */
-              if (isActive || tab.route === null) return;
-              router.push(tab.route);
+              if (destination === null || tabPressIsNoop(destination, pathname)) return;
+              router.push(destination);
             }}
             style={{
               position: 'absolute',

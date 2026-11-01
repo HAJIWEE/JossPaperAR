@@ -536,7 +536,8 @@ export default function HomeShrine() {
             {/* ⚠️ Store and Profile are DISABLED inside the bar: their screens are
                 SCRUM-150 / SCRUM-151. A dead link or an inert live-looking tab would both be
                 worse than a visibly unavailable one. */}
-            <TabBar active="shrine" scale={s} />
+            {/* ⚠️ NO `active` PROP — the bar derives it from the path (`lib/nav.ts`). */}
+            <TabBar scale={s} />
           </View>
         );
     }
