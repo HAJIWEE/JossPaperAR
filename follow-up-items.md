@@ -434,12 +434,28 @@
 
 ### 🆕 Open items — added 2026-11-01 (S72, final)
 
-- ⚠️⚠️ **THE NEW STANDARD-ITEM ART HAS NOT BEEN SEEN ON GLASS.** Five raster cut-outs now replace 82
-  hand-ported SVG shapes (`components/offering-art.tsx` → `assets/offerings/`). ⚠️ **The gate proves the
-  sizes match the files; it cannot prove they LOOK right** at 110×80 (Store · Collection · picker) and
-  in the 72 px burn box. ⚠️ **Expected problem: `smartphone` may read too small** — at 0.50 aspect it is
-  tall and thin, so in a wide box it contains to about half the height. ⚠️ **A fix is a re-crop or a
-  regeneration, not a code change.** `adb reverse` + Metro, then walk Store → Collection → picker → burn.
+- ✅ **RESOLVED 2026-11-01 (S73) — THE NEW STANDARD-ITEM ART HAS BEEN SEEN ON GLASS.** Five raster
+  cut-outs now replace 82 hand-ported SVG shapes (`components/offering-art.tsx` → `assets/offerings/`).
+  ⚠️ **Expo Go + Metro over `adb reverse`**, hosted project, the real account — **US$0.00, no generation**.
+  ✅ **The Store draws the featured Wealth Bundle (220×106) and all four cards in the pipeline's own
+  low-poly style** — the storefront and a Path C capture now speak ONE visual language, which was the
+  point of the regeneration. ⚠️ **The predicted `smartphone` problem did NOT appear:** at 0.50 aspect it is
+  the narrowest card art, but it reads unambiguously as a phone. **No re-crop needed.**
+  ⚠️ **Still unseen: the offerings PICKER and the 72 px BURN box** — the Store's card size is verified,
+  those two are not. ⚠️ And the **Collection did NOT exercise the art** — this account has bought but
+  never burned, so its grid is correctly empty (`0 offerings burned · 0 items collected` is TRUE: a burn
+  is either an item or a photo, the XOR).
+- ✅ **AND THE CHIP WAS PROVEN ON GLASS IN THE SAME RUN.** The account has a **tributes RECORD of 0** and a
+  **wallet of 4600**; the Store chip read **"Store Points 4600"** and the shrine panel **"TRIBUTE POINTS
+  4,600"** — both the **wallet**. ⚠️ **Under the old body BOTH would have read `0`.** So SCRUM-150 AC 1 is
+  confirmed on the device, not only in the SQL test.
+- ⚠️⚠️ **A DEVICE-VERIFICATION TRAP FOUND WHILE DOING IT — worth keeping.** The **FIRST** launch showed
+  the shrine at **`0`** and nothing was wrong: **Expo Go had RESUMED the previous session's running app**,
+  still holding the value it fetched *before* the migration. A focus re-read and a **cold launch**
+  (force-stop → relaunch) both show **4,600**. ⚠️ **A single screenshot of a RESUMED app can show a stale
+  number — force-stop and relaunch before believing one.** ⚠️ Also: Expo Go's **LogBox intercepts taps**
+  (the first tab tap opened a log overlay instead of navigating), and **Metro rewrites `tsconfig.json`**
+  on boot (reverted, not committed).
 - ✅ **RESOLVED 2026-11-01 (S73) — THE STORE'S POINTS CHIP READ THE WRONG NUMBER.** The chip read
   `home_summary()` → **`sum(tributes.points)`** (the Book of Tributes **record** — lifetime earned,
   never falls); `purchase_item` checks **`public.balances`** → **`sum(ledger_events.amount)`**.

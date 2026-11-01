@@ -1343,6 +1343,46 @@ which is `SECURITY DEFINER` and keeps execute as its owner.
    `row.balance_after`, but `purchase_item` returns the key **`balance`** — so `balanceAfter` was
    **always 0**. Nothing rendered it, which is why it survived. Fixed.
 
+## ✅ 4 · ON GLASS, 2026-11-01 — THE ART RENDERS, AND THE WALLET IS PROVEN LIVE
+
+⚠️ **Expo Go + Metro over `adb reverse`**, on the **hosted** project with the **real** account
+(`a27627ad-…`, clan "gwee"). ⚠️ US$0.00 — `demo=1` was **not** needed: no generation was run.
+
+**① The new standard-item art IS on glass and reads correctly.** The Store draws the **featured Wealth
+Bundle** (220×106) and the four cards — Joss Paper Stack · Gold Bar · Smartphone · House — all in the
+**pipeline's own low-poly style**, which is the whole point of the S72 regeneration: the storefront and a
+Path C capture now speak ONE visual language. ⚠️ **The predicted `smartphone` problem did NOT appear** —
+at 0.50 aspect it is the narrowest card art, but it reads unambiguously as a phone; no re-crop needed.
+
+**② The chip is the WALLET, proven on glass.** The same account has a **tributes RECORD of 0** and a
+**wallet of 4600**:
+
+| surface | reads | which is |
+|---|---|---|
+| the Store chip | **"Store Points 4600"** | the **wallet** ✅ |
+| the shrine panel | **"TRIBUTE POINTS 4,600"** | the **wallet** ✅ |
+
+⚠️ **Under the old body BOTH would have read `0`** — this account's credit is an `adjustment` row, which
+writes no `tributes` row. **This is SCRUM-150 AC 1 confirmed on the device, not just in a test.**
+
+**③ ⚠️⚠️ A DEVICE-VERIFICATION TRAP WORTH KEEPING.** The **FIRST** launch showed the shrine at **`0`**.
+Nothing was wrong: **Expo Go had RESUMED the previous session's running app**, still holding the value it
+fetched *before* the migration. A focus re-read and a **cold launch** (force-stop → relaunch) both show
+**4,600**. ⚠️ **So a single screenshot of a RESUMED app can show a stale number** — force-stop and
+relaunch before believing one. ⚠️ And the app's own pattern is *re-read on focus*, which is what
+corrected it.
+
+**④ Collection's empty state is CORRECT, not a defect.** It reads *"0 offerings burned · 0 items
+collected · Nothing here yet"* — and that is **TRUE**: a burn is either an item or a photo (the XOR), and
+this account has only ever **bought**, never **burned**. ⚠️ So the Collection did **not** exercise
+`OfferingArt`; the **Store** is what proves the art.
+
+⚠️ **Two Expo Go artefacts, not app bugs:** the grey gear bubble is **Expo Go's own dev FAB**, and
+Expo Go's **LogBox intercepts taps** — the first tap on the tab bar opened a log overlay instead of
+navigating (`zoom_ceiling: assumed max=8 (native said undefined)` is SCRUM-132's designed fallback,
+correct in Expo Go). Dismiss it before navigating. ⚠️ Metro also **rewrites `tsconfig.json`** on boot —
+reverted, not committed.
+
 ## Gates
 
 `check:sql` **29 → 30** migrations · `check:lib` **723** · `npm run check` **EXIT 0** · `tsc` 0 ·
@@ -1355,9 +1395,11 @@ trusting a suite run remains the rule.
 
 ## Next, in order
 
-1. ⚠️⚠️ **STILL OWED, AND STILL FIRST: LOOK AT THE NEW STANDARD-ITEM ART ON GLASS** (S72-final §1 —
-   untouched again this session). The gate proves the sizes match the files; it cannot prove they
-   *look* right at 110×80 and in the 72 px burn box.
+1. ✅ **DONE 2026-11-01 (S73) — the new art IS on glass** (S72-final §1). The Store draws the featured
+   Wealth Bundle and all four cards in the pipeline's low-poly style, and the predicted `smartphone`
+   problem did **not** appear. ⚠️ **Still unseen: the picker and the 72 px burn box** — the Store's card
+   size is verified, those two are not. ⚠️ And the Collection did **not** exercise the art (this account
+   has bought but never burned, so its grid is correctly empty).
 2. **`7d` item detail and `7e`'s own buy sheet** — the cash rail is native (Play Billing · EAS · Play
    Console). `SCRUM-212`.
 3. ⚠️ **Correct the stale "no policy" sentence** in `history.tsx` and `my_offerings.sql` (§3.1).
