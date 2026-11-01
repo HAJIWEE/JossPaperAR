@@ -10,7 +10,7 @@ import { Offerings } from '@/components/home/offerings';
 import { StreakPanel, TributePanel } from '@/components/home/panels';
 import { ShrineBase } from '@/components/home/shrine-base';
 import { ShrineCanvas } from '@/components/home/shrine-canvas';
-import { TabBar } from '@/components/home/tab-bar';
+import { TabBarBand } from '@/components/home/tab-bar-band';
 import { Tablet } from '@/components/home/tablet';
 import { altarCaption, altarView, pageStep } from '@/lib/altar';
 import {
@@ -521,24 +521,18 @@ export default function HomeShrine() {
 
       // ── footer · the tab bar (SCRUM-164) ──────────────────────────────────
       case 'footer':
-        // ⚠️ The bar's own `paperDeep` is stretched over the strip BELOW the board so the bar
-        // reaches the physical bottom edge. That strip is the one place the shrine showed a
-        // SECOND colour (paper under a paperDeep bar) — the most obvious gap on glass.
+        // ⚠️ ONE COMPONENT, TWO PLACEMENTS. The band itself — its height, the bleed that stretches
+        // its `paperDeep` over the strip BELOW the board so the bar reaches the physical bottom edge,
+        // and the bar — is `TabBarBand`. The shrine only supplies the position (`bandRect`).
+        // ⚠️ That strip is the one place the shrine showed a SECOND colour (paper under a paperDeep
+        // bar) — the most obvious gap on glass.
+        // ⚠️ The height used to be recomputed HERE from the same two helpers, which is how the
+        // shrine's band and League's could have drifted apart.
         return (
-          <View
-            style={[
-              styles.abs,
-              bandRect(HOME_BANDS.tabbar, s),
-              { height: HOME_BANDS.tabbar.h * s + shrineBleedDp(screen.height, s) },
-            ]}
+          <TabBarBand
+            style={[styles.abs, bandRect(HOME_BANDS.tabbar, s)]}
             testID="home-tabbar-band"
-          >
-            {/* ⚠️ Store and Profile are DISABLED inside the bar: their screens are
-                SCRUM-150 / SCRUM-151. A dead link or an inert live-looking tab would both be
-                worse than a visibly unavailable one. */}
-            {/* ⚠️ NO `active` PROP — the bar derives it from the path (`lib/nav.ts`). */}
-            <TabBar scale={s} />
-          </View>
+          />
         );
     }
   };

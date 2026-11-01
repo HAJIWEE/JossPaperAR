@@ -3,6 +3,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Body } from '@/components/clan-ui';
 import { LeagueBoardView } from '@/components/league-board';
+import { TabBarBand } from '@/components/home/tab-bar-band';
 import { ScreenHud } from '@/components/screen-hud';
 import { t } from '@/lib/i18n';
 import {
@@ -61,7 +62,11 @@ export default function LeagueScreen() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         {failed ? (
           <Body>{t('league.unreachable')}</Body>
         ) : board === null ? (
@@ -72,6 +77,15 @@ export default function LeagueScreen() {
           <LeagueBoardView board={board} />
         )}
       </ScrollView>
+
+      {/*
+        ⚠️ **LEAGUE IS ONE OF THE BAR'S OWN DESTINATIONS, SO THE BAR IS HERE** (owner's ruling,
+        2026-11-01). It used to be the shrine only, which made the bar's League button a one-way
+        push: you arrived and the bar was gone, so *"tap League while on League"* was unreachable.
+        ⚠️ The band sits AFTER the ScrollView (which is `flex: 1`, so it shrinks to make room) and
+        BEFORE the HUD, so the HUD is still painted last and still receives its taps.
+      */}
+      <TabBarBand />
 
       {/*
         ⚠️ THE WAY BACK (SCRUM-164 · standardized in SCRUM-151). It was a `GhostButton` reading
@@ -88,5 +102,7 @@ export default function LeagueScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: surface.paper },
+  /** ⚠️ `flex: 1` so the ScrollView yields room to the tab band instead of being overlaid by it. */
+  scroll: { flex: 1 },
   content: { paddingTop: HUD.touch.y + HUD.touch.size + 15, paddingHorizontal: space.lg, paddingBottom: 40 },
 });

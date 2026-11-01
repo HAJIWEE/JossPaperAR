@@ -24,6 +24,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { myClans } from '@/lib/clan-api';
 import { fetchHomeSummary } from '@/lib/home-api';
 import { homePanels } from '@/lib/home-panels';
+import { TabBarBand } from '@/components/home/tab-bar-band';
 import { ScreenHud } from '@/components/screen-hud';
 import { t } from '@/lib/i18n';
 import { HUD, PROFILE_CARD, PROFILE_ROWS, PROFILE_ROW, rowIsLive } from '@/lib/profile';
@@ -121,7 +122,11 @@ export default function ProfileScreen() {
   return (
     <View style={styles.screen}>
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* ── the header card ──────────────────────────────────────────────── */}
         <View style={styles.card} testID="profile-header">
           <View style={styles.avatar}>
@@ -165,6 +170,14 @@ export default function ProfileScreen() {
         ))}
       </ScrollView>
 
+      {/*
+        ⚠️ **PROFILE IS ONE OF THE BAR'S OWN DESTINATIONS, SO THE BAR IS HERE** (owner's ruling,
+        2026-11-01) — otherwise the bar's Profile button was a one-way push and *"tap Profile while
+        on Profile"* could not happen. ⚠️ AFTER the ScrollView (`flex: 1`, so it yields room) and
+        BEFORE the HUD, so the HUD stays last and keeps its taps.
+      */}
+      <TabBarBand />
+
       <ScreenHud titleKey="profile.title" backTestID="profile-back" titleTestID="profile-title" />
     </View>
   );
@@ -172,6 +185,8 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: surface.paper },
+  /** ⚠️ `flex: 1` so the ScrollView yields room to the tab band instead of being overlaid by it. */
+  scroll: { flex: 1 },
   content: { paddingTop: HUD.touch.y + HUD.touch.size + 15, paddingHorizontal: PROFILE_CARD.x, paddingBottom: 40 },
   card: {
     minHeight: PROFILE_CARD.headerH,

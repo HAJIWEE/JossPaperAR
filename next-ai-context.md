@@ -1041,25 +1041,52 @@ work for all pages."* So:
 * `activeTabKey` returns **`null`** for a path that is not a tab (Settings, History), rather than
   defaulting to the shrine.
 
-### ⚠️ WHERE the bar appears is a SEPARATE question — and the boards answer it
+### ✅ The bar now renders on ALL its own destinations (owner's ruling, 2026-11-01)
 
-⚠️ **`TabBar` currently renders on the shrine only.** The boards are unambiguous:
+> *"Nav bar should be accessible for the 4 options it displays."*
 
-| board | tab bar | back button |
+⚠️ **That was the real defect.** The bar rendered on the **shrine only**, so tapping League landed you
+on a screen with a back arrow and **no bar** — the bar's own League and Profile buttons were
+**one-way pushes**, and *"tap League while on League"* was not even reachable. The bar advertised four
+destinations and three of them were dead ends.
+
+**`TabBarBand`** is the band as a component — height, the `paperDeep` bleed to the physical bottom,
+and the bar. Two placements, one implementation:
+
+| | shrine | League / Profile |
 |---|---|---|
-| `EN · 1` / `1g` / `1h` / `1h2` **Home** | **yes** (`nav · tabbar (bg)` 0,764 390×80) | — |
-| `EN · 6 League` · `7 Store` · `8 Profile` · `8b Settings` · `8c History` | **no** | **yes** (`btn · back (ink)` 18,40 42×42) |
+| placement | absolute (`bandRect(HOME_BANDS.tabbar, s)`) | flex child, below a `flex: 1` ScrollView |
+| band | `TabBarBand` with a `style` | `TabBarBand` |
+| height | **computed inside `TabBarBand`** | **the same** |
 
-So the board design treats League/Profile/Store as **pushed detail screens**, not as tabs — while the
-bar's own League/Profile buttons *push* exactly those routes. ⚠️ **That inconsistency is the real
-thing the owner is pointing at**, and resolving it is a design change across five boards, so it is
-raised rather than assumed. ⚠️ The rules above are written for **any** page the bar is placed on, so
-the placement can change without touching them.
+⚠️ The shrine used to recompute that height from the same two helpers — the duplication is exactly
+how two placements drift. It passes `testID="home-tabbar-band"` so its id is unchanged.
+
+⚠️ **The boards draw a back button and no bar on `EN · 6 League` / `8 Profile`** — so this is a
+deliberate, owner-directed board deviation. Settings/History/Collection/clan/ritual screens are
+*reached through* a destination and keep `ScreenHud`, which is what the boards draw for them.
+
+⚠️ **Store is still disabled** — it has no screen (`SCRUM-150`), so the 4th option is visibly
+unavailable rather than a dead link. It becomes reachable the day that screen lands, with no change
+here.
+
+### ✅ Verified on `HN615L005386`
+
+* League dumps **`home-tabbar` + `tabbar-band` + `league-*`**; Profile the same.
+* **The active tab is derived, not passed:** `home-tab-league selected="true"` on `/league`,
+  `home-tab-profile selected="true"` on `/profile`, `home-tab-shrine selected="true"` on `/`.
+* **The band is `[0,1410][720,1600]` on every screen** — it does not move or resize when you navigate.
+* ⚠️ **The decisive test:** on the League page, **3 taps of the League tab, then ONE BACK → the
+  shrine.** Pre-fix those three duplicates would have absorbed the pop and left us on League.
 
 ### Gates
 
-`check:lib` **619 → 640 → 651** (32 new, incl. 5 positive controls) · `npm run check` **EXIT 0** ·
-`tsc` 0. Fault-tested three ways: predicate → constant = red; a blanket no-op = red; reverting the
-bar to `if (isActive || …)` = red.
+§22 now walks `NAV_TABS` and asserts, per tab, that **the screen exists** *and* **renders the bar** —
+so a fifth tab is covered the day it is added, and a destination you can reach but not leave fails
+the suite. `NavTab` gained `screen`, so the route→file mapping is data rather than a table in the
+check. Fault-tested by deleting `<TabBarBand` from `league.tsx` → red.
+
+`check:lib` **619 → 640 → 651 → 657** (38 new, incl. 6 positive controls) · `npm run check`
+**EXIT 0** · `tsc` 0.
 
 

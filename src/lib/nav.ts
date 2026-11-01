@@ -28,6 +28,17 @@ export interface NavTab {
    * unavailable rather than as a link that 404s.
    */
   readonly route: string | null;
+  /**
+   * The file that serves `route`, so a gate can check the two things a tab owes the user:
+   * **the screen exists**, and **the screen renders the bar**.
+   *
+   * ⚠️ That second one is the owner's ruling of 2026-11-01 — *"nav bar should be accessible for the
+   * 4 options it displays"*. A destination you can reach but cannot leave is a **one-way push**,
+   * which is what the bar's League and Profile buttons were while the bar rendered on the shrine
+   * alone. ⚠️ `null` here must travel with `route: null`: a tab with a screen but no file is a dead
+   * link, and a file but no bar is the one-way push.
+   */
+  readonly screen: string | null;
 }
 
 /**
@@ -40,11 +51,11 @@ export interface NavTab {
  * position.
  */
 export const NAV_TABS: readonly NavTab[] = [
-  { key: 'shrine', icon: '\u{1F3EE}', labelKey: 'nav.shrine', route: SHRINE_ROUTE },
-  { key: 'league', icon: '\u{1F3C6}', labelKey: 'nav.league', route: LEAGUE_ROUTE },
-  { key: 'store', icon: '\u{1F6CD}', labelKey: 'nav.store', route: null },
+  { key: 'shrine', icon: '\u{1F3EE}', labelKey: 'nav.shrine', route: SHRINE_ROUTE, screen: 'index.tsx' },
+  { key: 'league', icon: '\u{1F3C6}', labelKey: 'nav.league', route: LEAGUE_ROUTE, screen: 'league.tsx' },
+  { key: 'store', icon: '\u{1F6CD}', labelKey: 'nav.store', route: null, screen: null },
   // ⚠️ `PROFILE_ROUTE`, not a literal — the tab bar and `check:lib` §26 read the SAME string.
-  { key: 'profile', icon: '\u{1F464}', labelKey: 'nav.profile', route: PROFILE_ROUTE },
+  { key: 'profile', icon: '\u{1F464}', labelKey: 'nav.profile', route: PROFILE_ROUTE, screen: 'profile.tsx' },
 ];
 
 /** A path without its query, hash, or a trailing slash. `/` stays `/`. */

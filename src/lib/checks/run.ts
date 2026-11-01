@@ -2005,6 +2005,9 @@ function altarChecks(): void {
 function tabBarChecks(): void {
   section('22 · The tab bar — geometry, dead links, and the board\'s contrast defect (SCRUM-164)');
 
+  // ⚠️ Re-derived here, not shared: `PROJECT_ROOT` in §26 is scoped to that function.
+  const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
   check('tabs start at x = 12 (board)', TAB_BAR.xs[0] === 12);
   check('there are four tabs, each 86 wide', TAB_BAR.xs.length === 4 && TAB_BAR.tab.w === 86);
 
@@ -2044,19 +2047,37 @@ function tabBarChecks(): void {
   const builtInk = contrastRatio('#fff8e8', '#c23b22');
   check('…and the ink the build actually uses passes AA', builtInk >= 4.5, `${builtInk.toFixed(2)}:1`);
 
-  // ⚠️ DEAD LINKS. A tab may only point at a route whose screen file exists: `Store` and
-  // `Profile` are disabled for exactly this reason (`SCRUM-150` / `SCRUM-151`), and this check is
-  // what stops a future tab being wired to a screen someone assumed was there.
-  const ROUTES: ReadonlyArray<readonly [string, string]> = [
-    ['/', 'index.tsx'],
-    ['/league', 'league.tsx'],
-  ];
-  for (const [route, file] of ROUTES) {
-    check(
-      `the "${route}" tab points at a screen that exists (${file})`,
-      existsSync(new URL(`../../app/${file}`, import.meta.url)),
-    );
+  /**
+   * ⚠️⚠️ **DEAD LINKS *AND* ONE-WAY PUSHES.** Every tab owes the user two things, and this walks
+   * `NAV_TABS` — the real destinations — so a fifth tab is covered the day it is added.
+   *
+   * 1. **The screen exists.** A tab wired to a route someone assumed was there is a dead link;
+   *    `Store` is disabled for exactly this reason (`SCRUM-150`).
+   * 2. **The screen RENDERS the bar** (owner's ruling, 2026-11-01: *"nav bar should be accessible
+   *    for the 4 options it displays"*). ⚠️ A destination you can reach but cannot leave is a
+   *    **one-way push** — which is what the bar's League and Profile buttons were while the bar
+   *    rendered on the shrine alone.
+   */
+  for (const tab of NAV_TABS) {
+    if (tab.screen === null) {
+      // ⚠️ The two nulls must travel together, or "disabled" and "no screen" stop meaning the same
+      // thing and a tab can end up pointing at a file that is not there.
+      check(`⚠️ "${tab.key}" has NO screen, so it is disabled rather than a dead link`,
+        tab.route === null, tab.key);
+      continue;
+    }
+    const file = join(PROJECT_ROOT, `src/app/${tab.screen}`);
+    // ⚠️ `existsSync` first, so a missing file reports a missing file rather than throwing and
+    // taking the whole section down with it.
+    const exists = existsSync(file);
+    check(`the "${tab.route}" tab points at a screen that exists (${tab.screen})`, exists, tab.key);
+    check(`⚠️ …and that screen RENDERS the bar, so the tab is not a one-way push (${tab.screen})`,
+      exists && readFileSync(file, 'utf8').includes('<TabBarBand'), tab.key);
   }
+  // ⚠️ POSITIVE CONTROL — the scan above must be able to MISS a band as well as find one.
+  check('⚠️ guard: the band scan finds the bar on a destination and misses it on a deeper screen',
+    readFileSync(join(PROJECT_ROOT, 'src/app/league.tsx'), 'utf8').includes('<TabBarBand')
+      && !readFileSync(join(PROJECT_ROOT, 'src/app/settings.tsx'), 'utf8').includes('<TabBarBand'));
 }
 
 /**
