@@ -304,6 +304,8 @@ The CI habit is **plain Node scripts with no `npm install`** (`.github/workflows
 | **9** | **GitHub repo secrets** *(optional)* | lets CI run DB lint against a throwaway project | free | nice-to-have |
 | **10** | **Google Play Console** — **defer** | submission only | $25 | M4 — not now |
 | ~~**11**~~ ✅ | **Anonymous sign-ins on the hosted project** — Dashboard → Authentication → Providers. **Set 2026-10-03 (S27c) and VERIFIED by a real sign-in.** | **ADR-004** locks anonymous device identity first, so a user burns *before* any signup wall. Locally this is `enable_anonymous_sign_ins = true` in `config.toml` (the `supabase init` default is `false` and contradicts the ADR) — on the hosted project it is a Dashboard toggle with **no** migration/SQL equivalent. **Verified:** `POST /auth/v1/signup` → **HTTP 200**, `is_anonymous: true`, `role: authenticated`, a full session issued | free | - |
+| **12** | **Hosted email delivery** — **Auth → SMTP** (Google Workspace: `smtp.gmail.com:587` + an App Password, or `smtp-relay.gmail.com`), **paste the two `{{ .Token }}` templates**, **`Secure email change` = OFF** (`double_confirm_changes=false`), raise the email rate limit | **`SCRUM-215`** — the account's 6-digit code is emailed, and the built-in mailer **refuses non-team addresses** + caps at `over_email_send_rate_limit` (measured) | **free** (Workspace already held) | the account screen's sign-up/sign-in success path · runbook = [[24-hosted-email-delivery-runbook\|doc 24]] · ticket **`SCRUM-222`** |
+
 
 > **All three one-time decisions that are expensive to reverse are now made — #7 package id · #8 region · #6 domain (registered 2026-10-10).** ✅ The rest are logins.
 

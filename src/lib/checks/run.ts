@@ -21,6 +21,20 @@ import { NAV_TABS, activeTabKey, isSamePath, tabPressIsNoop } from '../nav.ts';
 import { COLLECTION, COLLECTION_SLOTS, collectionGrid, collectionOverflows, collectedItemName, displayBurnCount } from '../collection.ts';
 import { CASH_IS_READABLE, FEATURED_CODE, STORE_TABS, baseMetaValue, pointsPrice, storeList } from '../store.ts';
 import { ART_BOX, artCodes, artSize, fitArt } from '../offering-art.ts';
+import { pickerGrid } from '../picker.ts';
+import {
+  ACCOUNT_CODE_LENGTH,
+  ACCOUNT_GATE,
+  ACCOUNT_MODES,
+  AFTER_ACCOUNT_ROUTE,
+  EMAIL_TAKEN_MEANS_SIGN_IN,
+  emailProblem,
+  isCompleteCode,
+  issueKeyFor,
+  meansSignInInstead,
+  nextAccountStep,
+  normaliseEmail,
+} from '../account-flow.ts';
 import { readBurnParams, readItemBurnParams, readItemRewardParams, readRewardParams } from '../route-params.ts';
 import { getOffering } from '../../domain/catalogue.ts';
 import { bookView, showsBookSectionTitle } from '../clan-roles.ts';
@@ -198,6 +212,7 @@ import { CHINESE_SCRIPT_PAIRS, toSimplified, traditionalCharsIn } from '../zh-sc
 import { DESIGN_REFERENCE_WIDTH, TOUCH_TARGET, radius } from '../../theme/tokens.ts';
 import {
   AFTER_TUTORIAL_ROUTE,
+  DEMO_ITEM_CODE,
   TUTORIAL_CONSEQUENCES,
   TUTORIAL_WAIT_MS,
   demoReceipt,
@@ -916,6 +931,45 @@ function serviceChecks(): void {
   check('every consequence is asserted, not just the convenient ones',
     Object.values(TUTORIAL_CONSEQUENCES).every((v) => v === false));
 
+  /**
+   * ⚠️⚠️ **THE DEMO NEVER OPENS THE CAMERA (SCRUM-216, owner's ruling 2026-11-01).** Until this landed the
+   * demo still photographed the room — free only because four screens each ALSO skipped the upload on
+   * `demo`. ⚠️ **A chain of four guards is not a wall:** one falling through is the ≈US$0.09-per-user Path
+   * C bill, spent on users who **never sign up**. So the camera is GONE, and this flag is what says so.
+   */
+  check('⚠️ a tutorial OPENS NO CAMERA — the demo never photographs (SCRUM-216)',
+    TUTORIAL_CONSEQUENCES.capturesPhoto === false);
+  // ⚠️ …and the demo OFFERS a standard catalogue offering (the same `OfferingArt` the Store, the picker
+  // and `/burn` draw) — and it must NOT be a bundle, because a bundle is not an item.
+  const demoOffering = OFFERINGS.find((o) => o.code === DEMO_ITEM_CODE);
+  check('⚠️ …and the demo offers a real STANDARD offering, never a bundle (SCRUM-216)',
+    demoOffering !== undefined && demoOffering.composedOf === undefined);
+  /**
+   * ⚠️ **THE COPY NAMES IT** — the acceptance's *"the same one is named in the demo's own copy (no
+   * invented item)"*. The copy interpolates `%{item}` from `collectedItemName(DEMO_ITEM_CODE)`, so the
+   * name can only ever be the CATALOGUE's. Asserted in BOTH locales (parity is enforced).
+   */
+  const enIntro = (MESSAGES.en as unknown as Record<string, string>)['tutorial.intro'] ?? '';
+  const zhIntro = (MESSAGES.zh as unknown as Record<string, string>)['tutorial.intro'] ?? '';
+  check('⚠️ …and the demo copy NAMES the item through the catalogue, in BOTH locales',
+    enIntro.includes('%{item}') && zhIntro.includes('%{item}'));
+
+  /**
+   * ⚠️⚠️ **AND THE CODE, NOT JUST THE FLAG.** ⚠️ `capturesPhoto: false` is a **STATEMENT** — a flag that
+   * could read `false` while the camera is still mounted, which is the exact trap the ticket names
+   * (*"a gate that passes while the code does the opposite"*). ⚠️ So the SOURCE is asserted too:
+   * **`capture.tsx` must RETURN EARLY on `demo`, before the camera is mounted**, and the demo branch must
+   * draw the catalogue offering. ⚠️ Putting the camera back on the demo's path turns THIS red.
+   */
+  const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+  const captureSrc = readFileSync(join(ROOT, 'src/app/capture.tsx'), 'utf8');
+  const demoGuardAt = captureSrc.indexOf('if (demo)');
+  const cameraAt = captureSrc.indexOf('<FullBleedCamera');
+  check('⚠️⚠️ capture.tsx returns EARLY on `demo` — the camera is NEVER reached in a demo (SCRUM-216)',
+    demoGuardAt > 0 && cameraAt > demoGuardAt);
+  check('⚠️ …and the demo branch draws the catalogue offering, not a photo',
+    /if \(demo\)[\s\S]{0,900}?<OfferingArt/.test(captureSrc));
+
   // the first-run decision
   check('a missing record means the tutorial is still owed', needsTutorial(null));
   check('an empty record means the tutorial is still owed', needsTutorial({ tutorialDone: false }));
@@ -923,9 +977,14 @@ function serviceChecks(): void {
   check('⚠️ anything other than an explicit true replays the tutorial',
     needsTutorial({ tutorialDone: undefined as unknown as boolean }));
 
-  // option C, after it
-  check('⚠️ the tutorial hands off to the FORK, not an auto-created altar',
-    AFTER_TUTORIAL_ROUTE === '/clan');
+  // ⚠️ **THE HANDOFF MOVED (SCRUM-215 · ADR-004 Amendment 1).** It used to run straight to the clan
+  // FORK. The amendment made an account REQUIRED to create or join a clan, so the demo's last beat is
+  // the ACCOUNT screen, which then hands off to the fork. ⚠️ Both hops are asserted, because the chain
+  // is only coherent as a chain: **demo → account → fork**.
+  check('⚠️ the tutorial hands off to the ACCOUNT, not straight to the fork (SCRUM-215)',
+    AFTER_TUTORIAL_ROUTE === '/account');
+  check('⚠️ …and the ACCOUNT hands off to the FORK — the next required step (SCRUM-215)',
+    AFTER_ACCOUNT_ROUTE === '/clan');
 
   // the demo receipt
   const devoutDemo = demoReceipt(20);
@@ -2273,6 +2332,98 @@ function itemBurnChecks(): void {
     !readRewardParams({ itemCode: 'house', offsetPx: '10' }).ok);
 }
 
+function pickerChecks(): void {
+  section('31 · The offerings picker — a BUNDLE is not an item, so it is NOT offered (SCRUM-221)');
+  /**
+   * ⚠️ **AN EMPTY INVENTORY, so `owned`/`qty` are all zero and ONLY the LIST is under test.** The
+   * owner's rule (2026-11-07): the Wealth Bundle must not appear in the picker **at all** — ⚠️ not
+   * even as a disabled card — because buying it grants one of each of its parts and the SERVER never
+   * writes a `wealth_bundle` row, so it could only ever render permanently unavailable.
+   */
+  const cells = pickerGrid({});
+  check('⚠️ the picker offers every STANDARD item — the four, in catalogue order',
+    cells.map((c) => c.code).join(',') === 'joss_paper_stack,gold_bar,smartphone,house');
+  check('⚠️⚠️ …and NEVER the Wealth Bundle — not even disabled (owner, 2026-11-07)',
+    !cells.some((c) => c.code === 'wealth_bundle'));
+  check('⚠️ …and the exclusion is the COMPOSED rule, not a hard-coded name',
+    cells.length === OFFERINGS.filter((o) => o.composedOf === undefined).length
+      && OFFERINGS.filter((o) => o.composedOf !== undefined).every((o) => !cells.some((c) => c.code === o.code)));
+  // ⚠️ POSITIVE CONTROL — a filter that returned NOTHING would "pass" the exclusion above.
+  check('⚠️ guard: the picker is NOT empty — it renders the four items, each unowned',
+    cells.length === 4 && cells.every((c) => !c.owned && c.qty === 0));
+  // ⚠️ And the bundle is STILL in the catalogue — the exclusion is the PICKER's, not a deletion of the
+  // item: the Store must keep featuring + selling it.
+  check('⚠️ guard: the bundle is still IN the catalogue — only excluded from the picker',
+    OFFERINGS.some((o) => o.code === 'wealth_bundle' && o.composedOf !== undefined));
+}
+
+function accountChecks(): void {
+  section('32 · The account — the UPGRADE is a LINK, not a second user (SCRUM-215 · ADR-004)');
+  /**
+   * ⚠️⚠️ **THE ASSERTION THIS SECTION EXISTS FOR.** ADR-004 rule 4: converting an anonymous session must
+   * carry the ledger, the ancestors and the streak with it — so it must **keep the `auth.users` id**.
+   * ⚠️ A second user is a **failure** of the ticket, and the difference is one line: `updateUser` vs
+   * `signInWithOtp`. That is a fact about which call is made, so it is asserted, not commented.
+   */
+  check('⚠️⚠️ SIGN UP keeps the user id — it is the in-place UPGRADE (ADR-004 rule 4)',
+    ACCOUNT_MODES.signUp.keepsUserId === true);
+  check('⚠️ …confirmed with `email_change`, the type that verifies an ATTACHED email',
+    ACCOUNT_MODES.signUp.verifyType === 'email_change');
+  check('⚠️ …and SIGN IN does NOT claim to keep it — it is a different user, and that is correct',
+    ACCOUNT_MODES.signIn.keepsUserId === false && ACCOUNT_MODES.signIn.verifyType === 'email');
+  check('⚠️ …and the two flows never share a verify type (sharing one is how they would collapse)',
+    ACCOUNT_MODES.signUp.verifyType !== ACCOUNT_MODES.signIn.verifyType);
+  // ⚠️ THE SOURCE — the table above is a STATEMENT; `account.ts` is the CALL. A `signInWithOtp` on the
+  // sign-up road is the second-user bug, so the METHOD CHOICE is asserted too.
+  const accountSrc = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'account.ts'), 'utf8');
+  check('⚠️ …and the DEVICE half makes the upgrade call with `updateUser`, not `signInWithOtp`',
+    accountSrc.includes('auth.updateUser({ email })')
+      && accountSrc.includes('auth.signInWithOtp({ email })'));
+  check('⚠️ …and it reads the verify type from the TABLE, never hard-coding one',
+    accountSrc.includes('ACCOUNT_MODES[mode].verifyType'));
+
+  // ⚠️ THE WALL RULE (ADR-004 · SCRUM-147 · its Amendment 1): never before the first burn, offered after.
+  check('⚠️ the account is NEVER reachable before the first burn — and IS offered after it',
+    ACCOUNT_GATE.reachableBeforeFirstBurn === false && ACCOUNT_GATE.offeredAfterFirstBurn === true);
+  // ⚠️ And the one case the upgrade cannot do: an email that is already an account means SIGN IN, never
+  // the documented data-reassignment workaround — that would be the second user ADR-004 forbids.
+  check('⚠️ an email that already has an account means SIGN IN, never a data reassignment',
+    EMAIL_TAKEN_MEANS_SIGN_IN === true);
+  // ⚠️ **AND THE DECISION IS APPLIED, NOT JUST DECLARED.** Measured on glass 2026-11-07: a failed
+  // `verifyOtp` printed the RAW `sign_in_failed` in the issue line — so an unmapped reason IS what a
+  // player would have read. `issueKeyFor` is the mapping that stands between the two.
+  check('⚠️ a raw provider reason is NEVER the copy a player reads (issueKeyFor)',
+    issueKeyFor('sign_in_failed', 'code') === 'account.codeWrong' &&
+      issueKeyFor('no_at') === 'account.emailInvalid' &&
+      issueKeyFor('weird_unknown_thing') === 'account.genericIssue');
+  check('…and every key it can return is one the table actually defines, in BOTH locales',
+    [
+      issueKeyFor('invalid token'),
+      issueKeyFor('no_dot'),
+      issueKeyFor('?'),
+      issueKeyFor('sign_in_failed', 'code'),
+      issueKeyFor('otp_expired', 'code'),
+    ].every((k) => MESSAGES.en[k] !== undefined && MESSAGES.zh[k] !== undefined));
+  check('⚠️ EMAIL-ALREADY-TAKEN means SIGN IN — and ONLY on the sign-up road',
+    meansSignInInstead('signUp', 'A user with this email address has already been registered') === true &&
+      meansSignInInstead('signIn', 'already registered') === false &&
+      meansSignInInstead('signUp', 'network timeout') === false);
+
+  check('⚠️ the code is SIX digits, and only digits (a partial code must not be sent)',
+    ACCOUNT_CODE_LENGTH === 6 && isCompleteCode('123456') && !isCompleteCode('12345')
+      && !isCompleteCode('1234567') && !isCompleteCode('12345a'));
+  check('an empty or malformed email is refused by name',
+    emailProblem('') === 'empty' && emailProblem('nope') === 'no_at'
+      && emailProblem('a@b') === 'no_dot' && emailProblem('a b@c.d') === 'spaces');
+  // ⚠️ POSITIVE CONTROL — the validator must NOT refuse addresses the server would accept.
+  check('⚠️ guard: a legitimate address is not refused by a clever client regex',
+    emailProblem('a+tag@sub.domain.example') === null && emailProblem('x@y.co') === null);
+  check('⚠️ the email is normalised (trim + lower), so one address is one key',
+    normaliseEmail('  A@B.COM ') === 'a@b.com');
+  check('the form steps are email → code, and the code is last',
+    nextAccountStep('email') === 'code' && nextAccountStep('code') === null);
+}
+
 function storeChecks(): void {
   section('29 · Store — the catalogue, the featured item, and the ported art (SCRUM-150)');
   // ⚠️ Re-derived here, not shared: `PROJECT_ROOT` is scoped to the function that makes it.
@@ -2285,6 +2436,42 @@ function storeChecks(): void {
   // ⚠️ POSITIVE CONTROL — the two lists must not both be the whole catalogue.
   check('⚠️ guard: the featured item is NOT also in the list beneath it',
     !more.some((o) => o.code === FEATURED_CODE));
+
+  // ⚠️ THE BUNDLE IS A BUNDLE, NOT AN ITEM (device report, 2026-11-07). `purchase_item` now reads
+  // `offerings_catalog.composed_of` — the SQL twin of this code field — and grants one of each
+  // component, never the bundle itself. The SERVER behaviour is asserted in
+  // `supabase/tests/purchase_bundle.sql`; THIS holds the code mirror the server was copied from, so a
+  // change here that is not mirrored there is at least visible.
+  check('⚠️ the Wealth Bundle COMPOSES the other four — it is not an item by itself',
+    (() => {
+      const bundle = getOffering('wealth_bundle');
+      const others = OFFERINGS.filter((o) => o.code !== 'wealth_bundle').map((o) => o.code);
+      return bundle.composedOf !== undefined
+        && bundle.composedOf.length === others.length
+        && others.every((c) => bundle.composedOf?.includes(c));
+    })());
+  check('…and it does NOT list itself — a bundle of one is not a bundle',
+    !(getOffering('wealth_bundle').composedOf ?? []).includes('wealth_bundle'));
+  check('⚠️ …and no PLAIN offering carries a composition (only the bundle does)',
+    OFFERINGS.filter((o) => o.code !== 'wealth_bundle').every((o) => o.composedOf === undefined));
+
+  /**
+   * ⚠️ **THE FEATURED CARD MUST STAY PURCHASABLE** (SCRUM-221, owner 2026-11-07). It was a plain
+   * `<View>`, so the Wealth Bundle **could not be bought at all** — only the four "More bundles"
+   * cards were `Pressable` (found on the SCRUM-220 device run). ⚠️ Asserted STRUCTURALLY — *the
+   * nearest opener before the featured `testID` must be a `<Pressable`* — so a tidy-up back to a
+   * `<View>` goes red, and re-tuning the card's style cannot break the check.
+   */
+  const storeSrc = readFileSync(join(PROJECT_ROOT, 'src/app/store.tsx'), 'utf8');
+  const featAt = storeSrc.indexOf('testID="store-featured"');
+  const openerAt = Math.max(
+    storeSrc.lastIndexOf('<Pressable', featAt),
+    storeSrc.lastIndexOf('<View', featAt),
+  );
+  check('⚠️ the FEATURED card is PURCHASABLE — a `<Pressable`, not a bare `<View` (SCRUM-221)',
+    featAt > 0 && openerAt > 0 && storeSrc.startsWith('<Pressable', openerAt));
+  check('⚠️ …and a COMPOSED buy gets its OWN confirm body — never one that promises a bundle OBJECT',
+    storeSrc.includes('store.buyBodyBundle') && /buyingOffering\?\.composedOf/.test(storeSrc));
 
   check('⚠️ the meta line is the REDEMPTION BASE (1.2×), not the price — see the board: `base 480`',
     baseMetaValue(getOffering('joss_paper_stack')) === 480,
@@ -2593,6 +2780,8 @@ async function main(): Promise<void> {
   collectionChecks();
   storeChecks();
   itemBurnChecks();
+  pickerChecks();
+  accountChecks();
   ancestorSheetChecks();
   tabletNameChecks();
   shrineGeometryChecks();

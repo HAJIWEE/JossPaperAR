@@ -221,6 +221,26 @@ export function toBurnParams(
   };
 }
 
+/**
+ * ⚠️ **THE DEMO'S OWN HOP (SCRUM-216).** The first-run demo **no longer photographs the room**, so it no
+ * longer travels the `captureId` / `uri` road: it burns a **standard offering**, and that offering is a
+ * catalogue `itemCode`. ⚠️ `demo` rides it exactly as it rides the photo hops — a flag dropped here would
+ * turn the demo into a REAL, paying item burn (`submit_burn`), the same failure class `demo` exists to
+ * prevent. ⚠️ Asserted in `check:wire` §5.
+ */
+export type ItemBurnParams = {
+  readonly itemCode: string;
+  /** SCRUM-85 / SCRUM-216 — `DEMO_VALUE` when this hop belongs to the first-run TUTORIAL. */
+  readonly demo?: string;
+};
+
+export function toItemBurnParams(itemCode: string, demo = false): ItemBurnParams {
+  return {
+    itemCode,
+    ...(demo ? { demo: DEMO_VALUE } : {}),
+  };
+}
+
 export type RewardParamProblem = 'missing_capture_id' | 'bad_accuracy' | 'bad_throw_number';
 
 export type RewardParamRead =

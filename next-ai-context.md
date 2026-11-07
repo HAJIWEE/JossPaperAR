@@ -9,6 +9,17 @@
 ## 📌 Quick Reference
 
 - **Project** — Joss Paper AR, an AR app that replaces physical joss-paper burning with a digital ritual
+- **Session S78 · 2026-11-07 — 📧 THE ACCOUNT'S EMAIL DELIVERY IS HALF-BUILT AND PROVEN END-TO-END LOCALLY: the two templates that carry `{{ .Token }}` now exist and BOTH roads complete (`SCRUM-215` · commit `d8b7e74` on `cline/b5206` — PR #79). ⚠️ US$0.00 — local stack only, no AI call.**
+  - ⚠️ **THE ROOT CAUSE WAS TWO LOCAL FLAGS THAT HID THE WHOLE FLOW** (they were UNCOMMITTED, left by the previous session): `double_confirm_changes` was `true` — an **ANONYMOUS** user has no OLD address, so GoTrue answers **200**, writes a pending token and **sends NOTHING**; and `enable_confirmations` was `false` — GoTrue **auto-confirms**, so no mail is sent and `verifyOtp` can only ever fail. Both are now fixed and committed.
+  - ⚠️ **AND THE SHIPPED TEMPLATES CARRY A LINK, NOT A CODE.** Measured on the stack: the default `email_change` body was *"Confirm your new email address"* → **one URL, no `{{ .Token }}`** — which the six-box code entry can never match. Two templates now surface the code: `supabase/templates/email_change.html` (sign-up road) · `magic_link.html` (sign-in road), wired in `supabase/config.toml`.
+  - ✅ **PROVEN END-TO-END on the local stack (Mailpit), BOTH roads:** sign-up → `PUT /user` **200**, SAME user id (the in-place UPGRADE), `email_change_sent_at` set → email code **`915649`** → `verifyOtp(email_change)` **200**, session, **email confirmed**; sign-in → `POST /otp` **200** → email code **`323470`** → `verifyOtp(email)` **200**, session. `tsc` **0** · `npm run check` **EXIT 0** (framing 241 · lib 755 · copy 19 · sprite 9).
+  - ✅ **Also pushed `20261107120000_wealth_bundle_composition.sql`** — hosted was still minting the `wealth_bundle` instead of its four contents.
+  - ⚠️ **STILL BLOCKED ON HOSTED, and it is CONFIG ONLY — no code left:** ① a **custom SMTP** (the built-in mailer **refuses addresses that are not project-team members** and hard-caps at **`over_email_send_rate_limit`** — measured live: `POST /auth/v1/otp` to the owner's own address → **200**, a non-team alias → **429**); ② the SAME two template bodies pasted into **Dashboard → Authentication → Email Templates**; ③ **`double_confirm_changes = false`** on hosted. The owner has **Google Workspace SMTP** ready.
+  - ⚠️ **The template copy is a DRAFT for PM review** — `SCRUM-217` owns the account strings, and these two are new copy.
+  - 📄 **Runbook:** [[AppDesignConceptBoard/24-hosted-email-delivery-runbook|doc 24]] (the four Dashboard steps A→D, the Google Workspace SMTP routes, how to verify) · **the PM action is `SCRUM-222`** (🎯, in Sprint 3).
+  - 🔜 **PLAN — NEXT SESSION, in order:** ① **the owner does `SCRUM-222`** — the four steps in **doc 24** (SMTP → paste the two templates → `Secure email change` OFF → raise the rate limit); ② **re-run the hosted flow to a REAL inbox** and mark `SCRUM-215`'s success path (⚠️ use a **fresh** address — `hajiwee94.11@gmail.com` is now taken by a test user, and that address correctly routes to **sign-in**); ③ **`SCRUM-217`** — the account + email-template **copy** wording (PM); ④ **`SCRUM-214(A)`** — the `FAMILY NAME` field; ⑤ **`SCRUM-219`** — `delete_my_data` must erase the email + the Play data-safety declaration. ⚠️ AI budget untouched this session (local stack only).
+
+
 - **Session S67+13 · 2026-10-31 — 🎯 `SCRUM-144` ANSWERED (option A): the Book's empty-state copy is **SIGNED OFF**, **doc 15 §8 gains row `C18`**, and `check:copy` rule 4 now holds the two together (`check:copy` **15 → 30**). ✅ **`SCRUM-122` → `Done`** — so **Sprint 34 has no open work left**. ⚠️ US$0.00.**
   - ✅ **The decision**: the proposed wording ships **exactly as written** — ⚠️ **not one character changed**. What option A bought is that the strings moved from *"my proposal"* to *"the signed-off copy"*; ⚠️ **no generation, no device run, no EAS build.**
   - ✅ **`SCRUM-122` was parked `In Review` on precisely this answer** — its AC 3 says the copy is doc 15 §8's and *"do not invent the ZH string"*, and §8 had **no empty-state row** (C14 · C15 · C16 only). **C18** closes it, so the ticket is **`Done`**.
@@ -1596,14 +1607,146 @@ stack **and** hosted, verified by read-back. ⚠️ `league_bootstrap.sql` faile
 a **dirty** local DB and passes on a clean one — residue, not order-sensitivity; a `db reset` before
 trusting a suite run remains the rule.
 
+## ✅ S74 (2026-11-07) — TWO DEVICE-RUN DEFECTS FIXED: the picker CTA covered the zoom presets, and the Wealth Bundle minted itself
+
+The owner ran the standalone APK on the floor device and reported two things. Both are fixed on
+**`cline/b5206`**, tracked as **`SCRUM-220`** (sprint 3, id 67, `In Review`). ⚠️ **US$0.00** — no AI
+call, no device run.
+
+1. ⚠️ **THE PICKER CTA SAT ON THE ZOOM PRESETS.** `src/app/capture.tsx` positioned
+   `capture-choose-offering` at `position:'absolute', bottom:132` — a number written **before** the zoom
+   strip moved to the thumb (S64). The cluster (read-out · track · presets) now fills the bottom
+   **~120–164 dp** and **rises with `insets.bottom`**; the button's fixed `bottom` did not, so on glass it
+   landed **on** the preset pills. ⚠️ **A fixed `bottom` cannot be correct on every device — only the
+   FLOW can.** ✅ It is now a **flex child above the read-out** (the HUD's `flex:1` pins it there) and
+   `CHOOSE` carries no `bottom`. 🔒 **3 new `check:framing` assertions** (source order · not-absolute ·
+   no `bottom` constant), **fault-tested**. `check:framing` **238 → 241**.
+
+2. ⚠️ **THE WEALTH BUNDLE WAS AN ITEM, NOT A BUNDLE.** `purchase_item` always wrote the **purchased**
+   `item_code` into `inventory`, so buying `wealth_bundle` minted one `wealth_bundle` row. The catalogue
+   already knew better in TypeScript (`composedOf`), but the **SQL mirror had no such column** — the
+   server had nothing to act on. ✅ Migration **`20261107120000_wealth_bundle_composition.sql`** adds
+   `offerings_catalog.composed_of text[]`, marks the bundle **`burnable = false`**, and rewrites
+   `purchase_item` to grant **one of each of the other four** and **never the bundle**. `seed.sql`
+   mirrors it (and its sanity check now asserts the composition). 🔒 New
+   **`supabase/tests/purchase_bundle.sql` (B1–B5)** — green, and **fault-tested** (breaking the
+   composition → **B1 RED** `granted:["wealth_bundle"]` → restore → green).
+
+**Gates:** `tsc` 0 · `check:framing` **241** · `check:lib` **726** · `check:sql` **31 migrations** · the
+new SQL test green.
+
+**✅ ON GLASS, 2026-11-07 (S74).** Both fixes ran on the floor device (**720×1600 · Android 15**) via
+**Expo Go + Metro** (`adb reverse 8081`) against the **LOCAL Supabase stack** (`adb reverse 54321`) —
+pointed there **because the new migration is not deployed to hosted**, so the hosted server would still
+mint the bundle itself.
+
+* ① **Picker CTA** — `uiautomator` bounds: `capture-choose-offering` **[196,935][524,1023]** sits ABOVE
+  `zoom-readout` **[343,1087]** and the presets `zoom-stop-*` **[…,1240][…,1328]** — **217 px** of
+  clearance, no overlap (the old `bottom:132` would have placed it at ~1468, ON the pills). Screenshot
+  confirms it reads on the live camera.
+* ② **Wealth Bundle** — the app's own `purchase_item` for the device user returned
+  `granted:["joss_paper_stack","gold_bar","smartphone","house"]`; `inventory` held **exactly those four,
+  no `wealth_bundle` row**; tribute **5000 → 3000** (−2000). The app **rendered** it: the picker showed
+  all four **`×1`** and the **Wealth Bundle "Not owned"**; the Store chip read **3000**.
+* ②b **THE FULL APP FLOW — tap → confirm → Buy → grant (after the owner's SCRUM-221 answer).**
+  Relaunched on the new bundle: the featured card read
+  `FEATURED, Wealth Bundle, base value 2400, 2000 pts`, `clickable="true"`; the confirm read *"Wealth
+  Bundle — 2000 Store Points. It lands as one of each standard offering, ready to burn."*; after **Buy**,
+  Store Points **3000 → 1000** and `inventory` held **2 of each** of the four with **0 `wealth_bundle`
+  rows** (two bundle buys on the ledger, both `actor: store`). The picker rendered all four **`×2`**.
+* ⚠️ **FINDING → FIXED the same day (owner, 2026-11-07).** The **featured** card was a plain `<View>` —
+  tapping it did nothing, so **the bundle could not be bought from the UI at all** (only the four
+  "More bundles" cards were `Pressable`). ⚠️ **The owner settled it:** the bundle **IS buyable** —
+  *"it can be bought with both points and cash… when bought it gives one of each of the rest of the
+  standard offerings, NOT a Wealth Bundle object."* ✅ So `store-featured` is now a **`Pressable`**
+  opening the same buy confirm, with an **added points-price pill** (`2000 pts`), and a
+  **composed-specific confirm body** (`store.buyBodyBundle`: *"…It lands as one of each standard
+  offering…"*) so the confirm cannot promise a bundle OBJECT. 🔒 **2 new `check:lib` assertions** (the
+  featured opener must be a `<Pressable`; a composed buy must use the bundle body), **fault-tested**
+  (View→red, generic body→red; restored→green). ⚠️ **The CASH rail is NOT built** — it is Google Play
+  Billing, a native module this build lacks, with **no read for a cash balance**; so the card draws
+  **no cash price** (inventing one is a product decision). Tracked with **`SCRUM-212`**.
+  ⚠️ **The new `store.buyBodyBundle` ZH string is MY translation** — flagged for the owner's review.
+* ④ **THE PICKER NO LONGER OFFERS THE BUNDLE — the owner's follow-up (2026-11-07).** *"the wealth bundle
+  should not show up at all NOT Disabled"* — it is **not an item**, and the picker was drawing it as a
+  permanently-unavailable card. `pickerGrid` now filters to **standard items** (`composedOf === undefined`),
+  so the grid is **the four**; ⚠️ the bundle is **absent, not disabled**. ⚠️ This **overrides the board's
+  own six-item drawing** (which includes a `card · Wealth Bundle` in the unavailable state) and
+  **retires** `picker.ts`'s old rationale (*"no migration has ever set `burnable` false, so filtering
+  would be a client-side copy"*) — migration `20261107120000` **did**. 🔒 New **§31** in `check:lib`
+  (+5), fault-tested (filter removed → **4 red**; restored → green). ✅ On glass: the picker listed
+  **only** `joss_paper_stack · gold_bar · smartphone · house` — **no `wealth_bundle` testID at all**. ⚠️
+  The only surface the bundle still appears on is the **Store**, where it is purchasable — by design.
+* ⑤ **`SCRUM-216` — THE FIRST BURN NO LONGER OPENS THE CAMERA (owner's ruling 2026-11-01, now BUILT).**
+  The demo offers a **standard catalogue offering** (`DEMO_ITEM_CODE = joss_paper_stack`) instead of
+  photographing the room. ⚠️ **WHY IT MATTERS:** the old demo was free only because **four** screens each
+  branched on `demo` — *a chain of four guards, not a wall* — and one falling through was the
+  ≈US$0.09-per-user Path C bill, spent on users who **never sign up**. A demo that takes no photo has
+  nothing to send. ✅ `capture.tsx` returns **EARLY** on `demo` and mounts no camera — it shows the
+  catalogue art and the copy **names the item** (from the catalogue, so no invented one); `/crop` is
+  **skipped**; `preparing.tsx` **keeps its `TUTORIAL_WAIT_MS` beat** (deliberate — the fake wait is what
+  makes the demo feel like the ritual); `burn.tsx` draws the catalogue art and its `demoOffering` /
+  `nativeLoaderUriFromAnyForm` photo block is **deleted**. 🔒 New **`toItemBurnParams`** carries the
+  itemCode + the `demo` flag (`check:wire` §5, **+3**) · **5 new `check:lib` §12 assertions** — the
+  `capturesPhoto` flag **and, crucially, the SOURCE** (capture returns early on `demo`; the demo branch
+  draws `OfferingArt`), because a flag alone *"passes while the code does the opposite"* (the ticket's own
+  trap) · 3 §③ framing assertions **updated** (they pinned the old flow). **Fault-tested:** flag→`true` →
+  2 red; demo guard removed → 2 red; restored → green. ✅ **On glass** (Expo Go + Metro, `/capture?demo=1`):
+  the demo screen shows **no camera feed**, the Joss Paper Stack art, and *"…you offer a Joss Paper
+  Stack…"*; **Offer it** → *"The offering is being prepared…"* → `/burn` drawing the catalogue art.
+  ✅ **THE ONE QUESTION IS ANSWERED (owner, 2026-11-07):** *"the 'never opens the camera' is only for the
+  capture phase of the demo, the burn stage should still be what it is currently."* So the `/burn`
+  backdrop camera **STAYS** — the acceptance's *"never opens the camera"* is scoped to the **CAPTURE**
+  phase, and the build is correct **as-is**. ⚠️ No change, and the ticket's acceptance is fully met.
+
+
+
+
+## 2026-11-07 (S77) — the ACCOUNT is built, and the chain is demo → ACCOUNT → clan fork
+
+**`SCRUM-215`'s screen is on glass** (`src/app/account.tsx`), built to `EN · 0d6` / `0d7` / `0c` and their
+ZH twins. ⚠️ **The chain moved**: `AFTER_TUTORIAL_ROUTE` is now `/account` (`/clan` before) and the
+account hands off to `/clan` — both hops asserted in `check:lib`, because a chain is only coherent as a
+chain. The account screen also carries the **real `LocaleToggle`** under the board's `LANGUAGE` caption
+(SCRUM-218), so 中文 is now reachable without a probe.
+
+**Proven, not assumed** (HN615L005386 · local stack, so mail lands in Inbucket and never an inbox):
+
+- all **8 testIDs** render, board-faithful to ~1% — title 276 px, field 521, button 1246, link 1383;
+- ⚠️ **`PUT /user` answered 200 and the SAME `auth.users` id gained `demo@example.com`** — the in-place
+  **UPGRADE** the ADR-004 rule requires, **not** a second user. `POST /otp` 200 on the same id is the
+  returning-user road. This is the one thing the ticket calls a failure if broken, and it holds;
+- the code step, the six boxes and the confirm path all ran.
+
+**Two defects the glass caught** (every gate was green, again): `AppMark` is
+`Svg width/height="100%"`, so an unsized parent let it **fill the screen** and pushed every element below
+the fold; and a failed `verifyOtp` printed the raw **`sign_in_failed`** — a reason is not copy, so
+`issueKeyFor(reason, step)` now maps it to the board's sentence.
+
+⚠️ **NOT done, and not claimable:** the **SUCCESS path** needs SMTP plus two templates that carry
+`{{ .Token }}` — the local stack runs confirmations **disabled**, which is exactly why Inbucket stayed
+empty — and `20261107120000` is still **unpushed**, so hosted mints `wealth_bundle`.
+
+⚠️ **Two deviations from the board, recorded rather than guessed:** `field · name` (FAMILY NAME, `0d6`
+@20,250) is **omitted** — SCRUM-214(A) is open and `profiles.display_label` is the natural column, but no
+write path is agreed; and `0c`'s `Use a password instead` / `Forgot or need help?` are omitted because
+phase 1 is code-only.
+
+⚠️ **And `check:copy` was flagging CORRECT code**: it could not read object **shorthand** (`{ email }` has
+no colon), so every shorthand placeholder read as unsubstituted — the mirror of the blind first
+`check:copy`. Fixed, with two controls (one that is quiet on shorthand, one that still bites).
+
 ## Next, in order
 
-1. ✅ **DONE 2026-11-01 (S73) — the new art IS on glass** (S72-final §1). The Store draws the featured
+1. **`SCRUM-215`'s remaining half** — the SMTP provider + the two templates carrying `{{ .Token }}`, then
+   `supabase db push` for `20261107120000` (**hosted still mints `wealth_bundle`**). ⚠️ Both are blockers,
+   not polish: the success path cannot be verified without them.
+2. ⚠️ **SCRUM-214(A)** — FAMILY NAME: include the field (writing `profiles.display_label`) or drop it
+   from the boards? The account screen currently omits it, which is a **deviation**.
+3. ✅ **DONE 2026-11-01 (S73) — the new art IS on glass** (S72-final §1). The Store draws the featured
    Wealth Bundle and all four cards in the pipeline's low-poly style, and the predicted `smartphone`
-   problem did **not** appear. ⚠️ **Still unseen: the picker and the 72 px burn box** — the Store's card
-   size is verified, those two are not. ⚠️ And the Collection did **not** exercise the art (this account
-   has bought but never burned, so its grid is correctly empty).
-2. **`7d` item detail and `7e`'s own buy sheet** — the cash rail is native (Play Billing · EAS · Play
+   problem did **not** appear. ⚠️ **Still unseen: the picker and the 72 px burn box**.
+4. **`7d` item detail and `7e`'s own buy sheet** — the cash rail is native (Play Billing · EAS · Play
    Console). `SCRUM-212`.
-3. ⚠️ **Correct the stale "no policy" sentence** in `history.tsx` and `my_offerings.sql` (§3.1).
+5. ⚠️ **Correct the stale "no policy" sentence** in `history.tsx` and `my_offerings.sql` (§3.1).
 

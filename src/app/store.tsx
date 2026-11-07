@@ -29,7 +29,7 @@ import { TabBarBand } from '@/components/home/tab-bar-band';
 import { ScreenHud } from '@/components/screen-hud';
 import { t } from '@/lib/i18n';
 import { fetchHomeSummary } from '@/lib/home-api';
-import type { OfferingCode } from '@/domain/catalogue';
+import { getOffering, type OfferingCode } from '@/domain/catalogue';
 import { collectedItemName } from '@/lib/collection';
 import { purchaseItem } from '@/lib/offerings-api';
 import { HUD } from '@/lib/profile';
@@ -88,13 +88,16 @@ export default function StoreScreen() {
   }, [buying, buyKey, load]);
 
   /**
-   * ⚠️ **BUILT ON ONE LINE, ON PURPOSE.** `check:copy` fails a `t()` call that is SPLIT ACROSS
-   * LINES, because the extractor that finds untranslated copy cannot follow one — the check's own
-   * name is *"no t() call is split across lines"*. ⚠️ So the arguments are computed here and
-   * passed as one call, rather than formatted inline inside the JSX.
+   * ⚠️ **A COMPOSED item gets its OWN body.** The generic one would promise the WRONG thing: buying
+   * the Wealth Bundle grants **one of each of the other four**, never a "Wealth Bundle" object
+   * (owner, 2026-11-07). ⚠️ Each `t()` call is on ONE LINE — `check:copy` fails a call split across
+   * lines, because the extractor that hunts untranslated copy cannot follow one.
    */
+  const buyingOffering = buying === null ? null : getOffering(buying.code);
   const buyBody =
-    buying === null ? '' : t('store.buyBody', { name: String(collectedItemName(buying.code)), points: String(buying.price) });
+    buying === null ? '' : (buyingOffering?.composedOf?.length ?? 0) > 0
+      ? t('store.buyBodyBundle', { name: String(collectedItemName(buying.code)), points: String(buying.price) })
+      : t('store.buyBody', { name: String(collectedItemName(buying.code)), points: String(buying.price) });
 
   const { featured, more } = storeList();
 
@@ -157,8 +160,26 @@ export default function StoreScreen() {
             </View>
             </View>
 
-            {/* ── the FEATURED card ─────────────────────────────────────────── */}
-            <View
+            {/* ── the FEATURED card — ⚠️ PURCHASABLE (owner, 2026-11-07) ────────
+                 ⚠️ It WAS a plain `<View>`, so the Wealth Bundle could not be bought AT ALL —
+                 only the four "More bundles" cards were `Pressable` (found on the SCRUM-220
+                 device run). ⚠️ The owner settled SCRUM-221: **the bundle IS buyable** (points
+                 now; the cash rail needs Play Billing — SCRUM-212), and buying it grants **one of
+                 each of the other four** — **never a "Wealth Bundle" object**. ⚠️ The GRANT is the
+                 SERVER's (`purchase_item` reads `offerings_catalog.composed_of`); this card only
+                 has to reach it.
+                 ⚠️ The points-price pill is ADDED here: the board's `card · featured` draws a
+                 name + a value and NO pill, but a card you can buy must show what it costs.
+                 ⚠️ No CASH price is drawn: there is no cash rail and **no read for a cash balance**
+                 (`CASH_IS_READABLE`), and inventing a price is a product decision. */}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                /** ⚠️ Mint the key HERE — opening the card is the intent, not the tap on Confirm. */
+                setBuyKey(`buy:${featured.code}:${Date.now()}`);
+                setBuyIssue(null);
+                setBuying({ code: featured.code, price: featured.price });
+              }}
               style={[styles.featured, { borderRadius: STORE.featuredFrame.radius * s, borderWidth: STORE.featuredFrame.stroke * s, paddingHorizontal: 12 * s, paddingTop: 12 * s }]}
               testID="store-featured"
             >
@@ -174,7 +195,14 @@ export default function StoreScreen() {
               <Text style={[styles.featuredValue, { fontSize: 12 * s }]} numberOfLines={1}>
                 {t('store.featuredValue', { value: String(baseMetaValue(featured)) })}
               </Text>
-            </View>
+              {pointsPrice(featured) === null ? null : (
+                <View style={[styles.pricePill, { width: STORE.pricePill.w * s, height: STORE.pricePill.h * s, borderRadius: STORE.pricePill.radius * s, borderWidth: STORE.pricePill.stroke * s }]}>
+                  <Text style={[styles.priceText, { fontSize: 11 * s }]} numberOfLines={1}>
+                    {t('store.price', { points: pointsPrice(featured) as string })}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
 
             {/* ── More bundles ──────────────────────────────────────────────── */}
             <Text style={[styles.moreHead, { fontSize: 15 * s }]}>{t('store.more')}</Text>

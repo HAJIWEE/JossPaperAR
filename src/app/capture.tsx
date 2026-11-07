@@ -44,12 +44,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { OfferingArt } from '@/components/offering-art';
 import { FullBleedCamera } from '@/components/full-bleed-camera';
 import { ScreenHud } from '@/components/screen-hud';
 import { INITIAL_OFFERING, transition, type Offering } from '@/domain/slice';
+import { collectedItemName } from '@/lib/collection';
 import { t } from '@/lib/i18n';
-import { toCropParams } from '@/lib/route-params';
-import { isDemo } from '@/lib/tutorial';
+import { toCropParams, toItemBurnParams } from '@/lib/route-params';
+import { DEMO_ITEM_CODE, isDemo } from '@/lib/tutorial';
 import {
   ASSUMED_MAX_ZOOM_RATIO,
   DEFAULT_ZOOM_STOP,
@@ -84,6 +86,9 @@ type Phase =
  * with the style below or the thumb sits half its width off the finger.
  */
 const ZOOM_THUMB_RADIUS = 14;
+
+/** ⚠️ The demo panel's art box (dp) — the catalogue illustration the demo OFFERS (SCRUM-216). */
+const DEMO_ART_SIZE = 180;
 
 /**
  * The VISIBLE preset pill's box (dp) — half the touch target.
@@ -293,6 +298,45 @@ export default function CaptureScreen() {
     );
   }
 
+  /**
+   * ⚠️⚠️ **THE DEMO NEVER OPENS THE CAMERA (SCRUM-216 — the owner's ruling, 2026-11-01).**
+   *
+   * *"the FIRST BURN should be JUST A DEMO and use standard offerings to prevent cost runoff from people
+   * just doing the demo and not signing up after."*
+   *
+   * ⚠️ **WHY THE CAMERA IS BYPASSED RATHER THAN BRANCHED INSIDE.** Before this change the demo still
+   * mounted the full-bleed camera, took a real photo, and pushed it to `/crop` — free only because four
+   * screens each ALSO skipped the upload on `demo`. ⚠️ **A chain of four guards is not a wall**, and one
+   * falling through is the ≈US$0.09-per-user Path C bill. A demo that never takes a photo has nothing to
+   * send, so the guarantee stops depending on that chain. ⚠️ So the camera is not rendered at all, and
+   * **`/crop` is skipped** (`/preparing` is pushed directly — there is no photo to frame) — and the demo
+   * offers the catalogue's `DEMO_ITEM_CODE`, drawn with the SAME `OfferingArt` the Store, the picker and
+   * `/burn` use. ⚠️ The item's name in the copy comes from the CATALOGUE, so there is no invented item.
+   */
+  if (demo) {
+    return (
+      <View style={[styles.screen, styles.demoRoot]}>
+        <Text style={styles.demoBadge}>{t('tutorial.badge')}</Text>
+        <View style={styles.demoArt}>
+          <OfferingArt code={DEMO_ITEM_CODE} boxW={DEMO_ART_SIZE} boxH={DEMO_ART_SIZE} />
+        </View>
+        <Text style={styles.demoIntro}>
+          {t('tutorial.intro', { item: String(collectedItemName(DEMO_ITEM_CODE)) })}
+        </Text>
+        <Pressable
+          testID="demo-begin"
+          accessibilityRole="button"
+          onPress={() =>
+            router.replace({ pathname: '/preparing', params: toItemBurnParams(DEMO_ITEM_CODE, true) })
+          }
+          style={styles.button}
+        >
+          <Text style={styles.buttonLabel}>{t('tutorial.demoStart')}</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.screen}>
       {/*
@@ -325,6 +369,35 @@ export default function CaptureScreen() {
       <View style={[styles.hud, { paddingTop: insets.top + space.md }]} pointerEvents="none">
         <Text style={styles.hint}>{t('capture.photoHint')}</Text>
       </View>
+
+      {/**
+        * ⚠️⚠️ **THE OFFERINGS PICKER'S ENTRY POINT (SCRUM-149) — NOW A FLEX CHILD, NOT AN ABSOLUTE
+        * ONE (device report, 2026-11-07).** The board's own note says it: *"Nothing to photograph?
+        * Choose a standard offering — it arrives already in joss style."* It sits on the camera
+        * because that is the moment the question is asked — the player has opened the camera and
+        * has nothing to point it at.
+        *
+        * ⚠️ **THE DEFECT THIS MOVED OUT OF.** It used to be `position:'absolute', bottom:132` — a
+        * number written BEFORE the zoom strip moved to the thumb (S64). The zoom cluster (read-out ·
+        * track · presets) now fills the bottom ~120–164 dp and RISES with `insets.bottom`, while the
+        * button's fixed `bottom` did not — so on glass it landed ON the preset pills. ⚠️ A fixed
+        * `bottom` cannot be right on every device; only the FLOW can.
+        *
+        * ⚠️ As a flex child ABOVE the read-out the HUD (`flex: 1`) pushes it down to the top of the
+        * cluster, and the two can never share a pixel however the safe area moves. ⚠️ DARK tone for
+        * the same reason the HUD uses it: a paper control is the only thing that reads on a live
+        * camera frame.
+        */}
+      <Pressable
+        testID="capture-choose-offering"
+        accessibilityRole="button"
+        onPress={() => router.push('/offerings')}
+        style={styles.chooseOffering}
+      >
+        <Text style={styles.chooseOfferingText} numberOfLines={2}>
+          {t('picker.title')}
+        </Text>
+      </Pressable>
 
       {/*
         THE ZOOM — the read-out, the analogue track, and the presets (S64).
@@ -467,24 +540,6 @@ export default function CaptureScreen() {
         {offering.state === 'idle' ? 'Ready to photograph' : 'Offering captured'}
       </Text>
 
-      {/**
-        * ⚠️⚠️ **THE OFFERINGS PICKER'S ENTRY POINT (SCRUM-149).** The board's own note says it:
-        * *"Nothing to photograph? Choose a standard offering — it arrives already in joss style."*
-        * ⚠️ It sits HERE, on the camera, because that is the moment the question is asked — the player
-        * has opened the camera and has nothing to point it at. ⚠️ DARK tone for the same reason the
-        * HUD uses it: a paper control is the only thing that reads on a live camera frame.
-        */}
-      <Pressable
-        testID="capture-choose-offering"
-        accessibilityRole="button"
-        onPress={() => router.push('/offerings')}
-        style={styles.chooseOffering}
-      >
-        <Text style={styles.chooseOfferingText} numberOfLines={2}>
-          {t('picker.title')}
-        </Text>
-      </Pressable>
-
       {/*
         ⚠️ THE WAY BACK (SCRUM-151). This screen had **none at all**, while `EN · 2 Capture` draws
         `hud · back circle` — so the only way out was the OS back gesture. ⚠️ **Backing out here is
@@ -496,8 +551,12 @@ export default function CaptureScreen() {
   );
 }
 
-/** ⚠️ A DARK-tone control: on a camera frame a paper button is the only thing that reads. */
-const CHOOSE = { bottom: 132, height: 44, radius: 22 };
+/**
+ * ⚠️ A DARK-tone control: on a camera frame a paper button is the only thing that reads.
+ * ⚠️ NO `bottom` — the button is a flex child now (device report, 2026-11-07), so its position
+ * comes from the layout, never a magic number a moving zoom strip can outgrow.
+ */
+const CHOOSE = { height: 44, radius: 22 };
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: surface.camera },
@@ -693,10 +752,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonLabel: { color: onColorCream, fontSize: fontSize.body.at390, fontWeight: '600' },
+  /**
+   * ⚠️ **A FLEX CHILD ABOVE THE ZOOM CLUSTER, NOT AN ABSOLUTE-`bottom` FLOAT (device report,
+   * 2026-11-07).** The old `position:'absolute', bottom:132` predated the zoom strip's move to the
+   * thumb (S64) and landed the button ON the preset pills — the cluster RISES with `insets.bottom`,
+   * a fixed `bottom` does not. `alignSelf: 'center'` keeps it centred; `marginBottom` separates it
+   * from the read-out below. Nothing here can overlap the strip.
+   */
   chooseOffering: {
-    position: 'absolute',
     alignSelf: 'center',
-    bottom: CHOOSE.bottom,
+    marginBottom: space.lg,
     minHeight: CHOOSE.height,
     borderRadius: CHOOSE.radius,
     paddingHorizontal: 20,
@@ -707,4 +772,30 @@ const styles = StyleSheet.create({
   },
   chooseOfferingText: { color: surface.paper, fontSize: 14, fontWeight: '700', textAlign: 'center' },
   srOnly: { position: 'absolute', width: 1, height: 1, opacity: 0 },
+  /**
+   * ⚠️ **THE DEMO PANEL (SCRUM-216).** It reuses `styles.screen` (`surface.camera` — the dark surface the
+   * camera normally fills) so the demo sits on the SAME background as the ritual, then centres the
+   * catalogue offering, the demo copy and the start button. ⚠️ Minimal on purpose: the layout is
+   * provisional pending a board, so it invents no geometry beyond tokens.
+   */
+  demoRoot: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: space.xl },
+  demoBadge: {
+    color: onColorCream,
+    fontSize: fontSize.caption.at390,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    opacity: 0.85,
+    marginBottom: space.lg,
+  },
+  demoArt: { alignItems: 'center', justifyContent: 'center' },
+  demoIntro: {
+    color: onColorCream,
+    fontSize: fontSize.bodyLg.at390,
+    textAlign: 'center',
+    lineHeight: 22,
+    opacity: 0.92,
+    marginTop: space.lg,
+    marginBottom: space.xl,
+  },
 });

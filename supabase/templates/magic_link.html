@@ -1,0 +1,63 @@
+<!--
+  magic_link.html — "Magic link or OTP" template (SCRUM-215).
+
+  ⚠️ WHY THIS FILE EXISTS: the SIGN-IN road (`signInWithOtp`, a returning user) uses this
+  template, and GoTrue's SHIPPED one carries only `{{ .ConfirmationURL }}` (a LINK). The
+  account screen confirms with a SIX-DIGIT CODE, so the 6-digit `{{ .Token }}` must be here.
+
+  Wired in `supabase/config.toml` ([auth.email.template.magic_link]). ⚠️ LOCAL only — the
+  SAME HTML must be pasted into the HOSTED Dashboard (Auth → Email Templates). See SCRUM-215.
+
+  ⚠️ COPY IS A DRAFT (PM review) — see `email_change.html`.
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <body style="margin:0;padding:0;background:#EAE2D2;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EAE2D2;">
+      <tr>
+        <td align="center" style="padding:24px 12px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#F5F0E8;border:2px solid #D9CFBA;border-radius:14px;">
+            <tr>
+              <td style="padding:28px 32px 8px 32px;font-family:Georgia,'Times New Roman',serif;">
+                <div style="color:#A8862A;font-size:18px;font-weight:700;letter-spacing:1px;">Joss Paper AR</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 32px 0 32px;font-family:Georgia,'Times New Roman',serif;">
+                <h1 style="margin:0;color:#1A1A1A;font-size:22px;line-height:1.3;">Your sign-in code</h1>
+                <p style="margin:12px 0 0 0;color:#4A463F;font-size:15px;line-height:1.5;">
+                  Enter this code to sign in to Joss Paper AR and return to your shrine.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:20px 32px 4px 32px;">
+                <div style="display:inline-block;padding:14px 22px;background:#F5F0E8;border:2px solid #C23B22;border-radius:12px;color:#1A1A1A;font-family:'Courier New',Courier,monospace;font-size:30px;font-weight:700;letter-spacing:8px;">
+                  {{ .Token }}
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 32px 0 32px;font-family:Georgia,'Times New Roman',serif;">
+                <p style="margin:0;color:#4A463F;font-size:14px;line-height:1.5;">
+                  The code expires in 1 hour. Prefer a link?
+                  <a href="{{ .ConfirmationURL }}" style="color:#31506F;font-weight:700;">Sign in with one tap</a>.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 32px 28px 32px;font-family:Georgia,'Times New Roman',serif;">
+                <p style="margin:0;color:#4A463F;font-size:13px;line-height:1.5;">
+                  If you didn’t request this, you can safely ignore this email.
+                </p>
+              </td>
+            </tr>
+          </table>
+          <div style="max-width:520px;margin-top:12px;color:#4A463F;font-size:12px;font-family:Georgia,'Times New Roman',serif;text-align:center;">
+            Joss Paper AR · you received this because someone entered your address in the app.
+          </div>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
