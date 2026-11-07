@@ -29,12 +29,12 @@
  * ⚠️ **A demo that never takes a photo has NOTHING TO SEND**, so the guarantee stops depending on four
  * `if (demo)` branches agreeing with each other.
  *
- * ⚠️ **STATUS: THE RULING IS NOT YET BUILT — RECORDED HERE SO IT CANNOT BE FORGOTTEN.** The shipped demo
- * still opens the camera (`capture.tsx`), crops (`crop.tsx`) and draws the player's own photograph
- * (`burn.tsx`'s `demoOffering`). ⚠️ **`TUTORIAL_CONSEQUENCES` deliberately does NOT carry a
- * `capturesPhoto: false` flag yet** — adding one before the behaviour lands would be a gate that passes
- * while the code does the opposite, which is worse than no gate. ⚠️ **Add the flag and its assertion in
- * the same change that removes the camera from the demo.**
+ * ✅ **BUILT — SCRUM-216 (2026-11-07).** The camera is GONE from the demo: `capture.tsx` renders no
+ * `<FullBleedCamera>` in demo mode and offers the catalogue's `DEMO_ITEM_CODE` instead, `/crop` is
+ * skipped entirely (there is no photo to frame), `preparing.tsx` keeps its `TUTORIAL_WAIT_MS` beat on the
+ * item hop, and `burn.tsx` draws the catalogue art (its `demoOffering` / photo block is deleted).
+ * ⚠️ **`capturesPhoto: false` now rides `TUTORIAL_CONSEQUENCES`** — the flag and the behaviour landed
+ * TOGETHER, so the gate can no longer pass while the code does the opposite.
  *
  * PURE on purpose: no React, no storage, no network — so `check:lib` can hold
  * the rule without a device.
@@ -42,6 +42,7 @@
 
 import { computeAward } from '../domain/award.ts';
 import type { BandId } from '../domain/aim.ts';
+import type { OfferingCode } from '../domain/catalogue.ts';
 
 /** The device-local first-run record. */
 export interface FirstRunState {
@@ -88,6 +89,23 @@ export function isDemo(value: unknown): boolean {
 }
 
 /**
+ * ⚠️⚠️ **THE ONE OFFERING THE DEMO USES (owner's ruling, 2026-11-01; SCRUM-216).**
+ *
+ * *"the FIRST BURN should be JUST A DEMO and use standard offerings to prevent cost runoff from people
+ * just doing the demo and not signing up after."*
+ *
+ * ⚠️ **WHY A STANDARD OFFERING, AND WHY THE CAMERA GOES.** A demo that photographs the room makes a real
+ * local file and pushes it through `/capture` → `/crop` → `/preparing` → `/burn`. That was free only
+ * because FOUR screens each ALSO branched on `demo` — ⚠️ **a CHAIN of guards, not a wall**, and one
+ * falling through is the ≈US$0.09-per-user Path C bill, spent on users who **never sign up**. A demo that
+ * never takes a photo **has nothing to send**, so the guarantee stops depending on four branches agreeing.
+ *
+ * ⚠️ **THE DEMO'S COPY MUST NAME THIS SAME ITEM.** The screen renders the catalogue's own name through
+ * `collectedItemName(DEMO_ITEM_CODE)`, so there is no invented item and no second source of truth.
+ */
+export const DEMO_ITEM_CODE: OfferingCode = 'joss_paper_stack';
+
+/**
  * What a tutorial run must NOT do, as data.
  *
  * ⚠️ A gate asserts every one of these is `false`, so a future change that wires
@@ -100,6 +118,13 @@ export const TUTORIAL_CONSEQUENCES = {
   writesLedger: false,
   callsServer: false,
   callsAi: false,
+  /**
+   * ⚠️ **SCRUM-216 — THE DEMO NEVER OPENS THE CAMERA, so it can never make a local photo file.** This is
+   * the flag the ticket says must land WITH the behaviour, never before it: a `capturesPhoto: false`
+   * asserted while the camera still opens would be a gate that passes while the code does the opposite.
+   * ⚠️ Fault-tested — putting a camera back on the demo's path turns the assertion red.
+   */
+  capturesPhoto: false,
 } as const;
 
 /** The demo receipt. Deliberately NOT the server's shape. */

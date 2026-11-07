@@ -199,6 +199,7 @@ import { CHINESE_SCRIPT_PAIRS, toSimplified, traditionalCharsIn } from '../zh-sc
 import { DESIGN_REFERENCE_WIDTH, TOUCH_TARGET, radius } from '../../theme/tokens.ts';
 import {
   AFTER_TUTORIAL_ROUTE,
+  DEMO_ITEM_CODE,
   TUTORIAL_CONSEQUENCES,
   TUTORIAL_WAIT_MS,
   demoReceipt,
@@ -916,6 +917,45 @@ function serviceChecks(): void {
     TUTORIAL_CONSEQUENCES.callsAi === false);
   check('every consequence is asserted, not just the convenient ones',
     Object.values(TUTORIAL_CONSEQUENCES).every((v) => v === false));
+
+  /**
+   * ⚠️⚠️ **THE DEMO NEVER OPENS THE CAMERA (SCRUM-216, owner's ruling 2026-11-01).** Until this landed the
+   * demo still photographed the room — free only because four screens each ALSO skipped the upload on
+   * `demo`. ⚠️ **A chain of four guards is not a wall:** one falling through is the ≈US$0.09-per-user Path
+   * C bill, spent on users who **never sign up**. So the camera is GONE, and this flag is what says so.
+   */
+  check('⚠️ a tutorial OPENS NO CAMERA — the demo never photographs (SCRUM-216)',
+    TUTORIAL_CONSEQUENCES.capturesPhoto === false);
+  // ⚠️ …and the demo OFFERS a standard catalogue offering (the same `OfferingArt` the Store, the picker
+  // and `/burn` draw) — and it must NOT be a bundle, because a bundle is not an item.
+  const demoOffering = OFFERINGS.find((o) => o.code === DEMO_ITEM_CODE);
+  check('⚠️ …and the demo offers a real STANDARD offering, never a bundle (SCRUM-216)',
+    demoOffering !== undefined && demoOffering.composedOf === undefined);
+  /**
+   * ⚠️ **THE COPY NAMES IT** — the acceptance's *"the same one is named in the demo's own copy (no
+   * invented item)"*. The copy interpolates `%{item}` from `collectedItemName(DEMO_ITEM_CODE)`, so the
+   * name can only ever be the CATALOGUE's. Asserted in BOTH locales (parity is enforced).
+   */
+  const enIntro = (MESSAGES.en as unknown as Record<string, string>)['tutorial.intro'] ?? '';
+  const zhIntro = (MESSAGES.zh as unknown as Record<string, string>)['tutorial.intro'] ?? '';
+  check('⚠️ …and the demo copy NAMES the item through the catalogue, in BOTH locales',
+    enIntro.includes('%{item}') && zhIntro.includes('%{item}'));
+
+  /**
+   * ⚠️⚠️ **AND THE CODE, NOT JUST THE FLAG.** ⚠️ `capturesPhoto: false` is a **STATEMENT** — a flag that
+   * could read `false` while the camera is still mounted, which is the exact trap the ticket names
+   * (*"a gate that passes while the code does the opposite"*). ⚠️ So the SOURCE is asserted too:
+   * **`capture.tsx` must RETURN EARLY on `demo`, before the camera is mounted**, and the demo branch must
+   * draw the catalogue offering. ⚠️ Putting the camera back on the demo's path turns THIS red.
+   */
+  const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+  const captureSrc = readFileSync(join(ROOT, 'src/app/capture.tsx'), 'utf8');
+  const demoGuardAt = captureSrc.indexOf('if (demo)');
+  const cameraAt = captureSrc.indexOf('<FullBleedCamera');
+  check('⚠️⚠️ capture.tsx returns EARLY on `demo` — the camera is NEVER reached in a demo (SCRUM-216)',
+    demoGuardAt > 0 && cameraAt > demoGuardAt);
+  check('⚠️ …and the demo branch draws the catalogue offering, not a photo',
+    /if \(demo\)[\s\S]{0,900}?<OfferingArt/.test(captureSrc));
 
   // the first-run decision
   check('a missing record means the tutorial is still owed', needsTutorial(null));

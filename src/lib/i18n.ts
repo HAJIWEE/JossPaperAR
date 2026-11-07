@@ -384,7 +384,8 @@ export const MESSAGES = {
     // A demo the player mistakes for a real award is worse than no demo at all.
     'tutorial.badge': 'Demo',
     'tutorial.intro':
-      'This first offering is a demonstration. Nothing is recorded and no points are earned.',
+      'This first offering is a demonstration — you offer a %{item}. Nothing is recorded and no points are earned.',
+    'tutorial.demoStart': 'Offer it',
     'tutorial.preparing': 'Preparing a demo offering…',
     'tutorial.preparingNote':
       'In the real ritual this is where your photo becomes a paper offering.',
@@ -735,7 +736,8 @@ export const MESSAGES = {
 
     // the FIRST-RUN TUTORIAL (SCRUM-85) — parity is enforced, so BOTH locales
     'tutorial.badge': '示范',
-    'tutorial.intro': '首次供奉为示范。不会留下纪录，也不会获得点数。',
+    'tutorial.intro': '首次供奉为示范——您将供奉一份%{item}。不会留下纪录，也不会获得点数。',
+    'tutorial.demoStart': '供奉',
     'tutorial.preparing': '正在制作示范供品…',
     'tutorial.preparingNote': '在正式仪式中，您的照片会在此化为纸扎供品。',
     'tutorial.receiptNote': '仅为示范——未获得点数，也未涉及任何宗族。',

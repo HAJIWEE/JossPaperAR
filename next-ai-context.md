@@ -1666,6 +1666,26 @@ mint the bundle itself.
   (+5), fault-tested (filter removed → **4 red**; restored → green). ✅ On glass: the picker listed
   **only** `joss_paper_stack · gold_bar · smartphone · house` — **no `wealth_bundle` testID at all**. ⚠️
   The only surface the bundle still appears on is the **Store**, where it is purchasable — by design.
+* ⑤ **`SCRUM-216` — THE FIRST BURN NO LONGER OPENS THE CAMERA (owner's ruling 2026-11-01, now BUILT).**
+  The demo offers a **standard catalogue offering** (`DEMO_ITEM_CODE = joss_paper_stack`) instead of
+  photographing the room. ⚠️ **WHY IT MATTERS:** the old demo was free only because **four** screens each
+  branched on `demo` — *a chain of four guards, not a wall* — and one falling through was the
+  ≈US$0.09-per-user Path C bill, spent on users who **never sign up**. A demo that takes no photo has
+  nothing to send. ✅ `capture.tsx` returns **EARLY** on `demo` and mounts no camera — it shows the
+  catalogue art and the copy **names the item** (from the catalogue, so no invented one); `/crop` is
+  **skipped**; `preparing.tsx` **keeps its `TUTORIAL_WAIT_MS` beat** (deliberate — the fake wait is what
+  makes the demo feel like the ritual); `burn.tsx` draws the catalogue art and its `demoOffering` /
+  `nativeLoaderUriFromAnyForm` photo block is **deleted**. 🔒 New **`toItemBurnParams`** carries the
+  itemCode + the `demo` flag (`check:wire` §5, **+3**) · **5 new `check:lib` §12 assertions** — the
+  `capturesPhoto` flag **and, crucially, the SOURCE** (capture returns early on `demo`; the demo branch
+  draws `OfferingArt`), because a flag alone *"passes while the code does the opposite"* (the ticket's own
+  trap) · 3 §③ framing assertions **updated** (they pinned the old flow). **Fault-tested:** flag→`true` →
+  2 red; demo guard removed → 2 red; restored → green. ✅ **On glass** (Expo Go + Metro, `/capture?demo=1`):
+  the demo screen shows **no camera feed**, the Joss Paper Stack art, and *"…you offer a Joss Paper
+  Stack…"*; **Offer it** → *"The offering is being prepared…"* → `/burn` drawing the catalogue art.
+  ⚠️ **OPEN, flagged not fixed:** `/burn` still mounts a camera as the ritual **backdrop** (by design —
+  ticket node 4 — it takes no photo), so a *literal* reading of the acceptance's *"never opens the
+  camera"* is **not** met; the backdrop is a separate design element the ticket did not ask to remove.
 
 
 

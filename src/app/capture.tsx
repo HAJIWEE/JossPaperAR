@@ -44,12 +44,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { OfferingArt } from '@/components/offering-art';
 import { FullBleedCamera } from '@/components/full-bleed-camera';
 import { ScreenHud } from '@/components/screen-hud';
 import { INITIAL_OFFERING, transition, type Offering } from '@/domain/slice';
+import { collectedItemName } from '@/lib/collection';
 import { t } from '@/lib/i18n';
-import { toCropParams } from '@/lib/route-params';
-import { isDemo } from '@/lib/tutorial';
+import { toCropParams, toItemBurnParams } from '@/lib/route-params';
+import { DEMO_ITEM_CODE, isDemo } from '@/lib/tutorial';
 import {
   ASSUMED_MAX_ZOOM_RATIO,
   DEFAULT_ZOOM_STOP,
@@ -84,6 +86,9 @@ type Phase =
  * with the style below or the thumb sits half its width off the finger.
  */
 const ZOOM_THUMB_RADIUS = 14;
+
+/** ⚠️ The demo panel's art box (dp) — the catalogue illustration the demo OFFERS (SCRUM-216). */
+const DEMO_ART_SIZE = 180;
 
 /**
  * The VISIBLE preset pill's box (dp) — half the touch target.
@@ -289,6 +294,45 @@ export default function CaptureScreen() {
         </Pressable>
         {/* ⚠️ `EN · 2g Capture / camera denied` draws the back circle too — the denial is not a trap. */}
         <ScreenHud tone="dark" backTestID="capture-back" />
+      </View>
+    );
+  }
+
+  /**
+   * ⚠️⚠️ **THE DEMO NEVER OPENS THE CAMERA (SCRUM-216 — the owner's ruling, 2026-11-01).**
+   *
+   * *"the FIRST BURN should be JUST A DEMO and use standard offerings to prevent cost runoff from people
+   * just doing the demo and not signing up after."*
+   *
+   * ⚠️ **WHY THE CAMERA IS BYPASSED RATHER THAN BRANCHED INSIDE.** Before this change the demo still
+   * mounted the full-bleed camera, took a real photo, and pushed it to `/crop` — free only because four
+   * screens each ALSO skipped the upload on `demo`. ⚠️ **A chain of four guards is not a wall**, and one
+   * falling through is the ≈US$0.09-per-user Path C bill. A demo that never takes a photo has nothing to
+   * send, so the guarantee stops depending on that chain. ⚠️ So the camera is not rendered at all, and
+   * **`/crop` is skipped** (`/preparing` is pushed directly — there is no photo to frame) — and the demo
+   * offers the catalogue's `DEMO_ITEM_CODE`, drawn with the SAME `OfferingArt` the Store, the picker and
+   * `/burn` use. ⚠️ The item's name in the copy comes from the CATALOGUE, so there is no invented item.
+   */
+  if (demo) {
+    return (
+      <View style={[styles.screen, styles.demoRoot]}>
+        <Text style={styles.demoBadge}>{t('tutorial.badge')}</Text>
+        <View style={styles.demoArt}>
+          <OfferingArt code={DEMO_ITEM_CODE} boxW={DEMO_ART_SIZE} boxH={DEMO_ART_SIZE} />
+        </View>
+        <Text style={styles.demoIntro}>
+          {t('tutorial.intro', { item: String(collectedItemName(DEMO_ITEM_CODE)) })}
+        </Text>
+        <Pressable
+          testID="demo-begin"
+          accessibilityRole="button"
+          onPress={() =>
+            router.replace({ pathname: '/preparing', params: toItemBurnParams(DEMO_ITEM_CODE, true) })
+          }
+          style={styles.button}
+        >
+          <Text style={styles.buttonLabel}>{t('tutorial.demoStart')}</Text>
+        </Pressable>
       </View>
     );
   }
@@ -728,4 +772,30 @@ const styles = StyleSheet.create({
   },
   chooseOfferingText: { color: surface.paper, fontSize: 14, fontWeight: '700', textAlign: 'center' },
   srOnly: { position: 'absolute', width: 1, height: 1, opacity: 0 },
+  /**
+   * ⚠️ **THE DEMO PANEL (SCRUM-216).** It reuses `styles.screen` (`surface.camera` — the dark surface the
+   * camera normally fills) so the demo sits on the SAME background as the ritual, then centres the
+   * catalogue offering, the demo copy and the start button. ⚠️ Minimal on purpose: the layout is
+   * provisional pending a board, so it invents no geometry beyond tokens.
+   */
+  demoRoot: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: space.xl },
+  demoBadge: {
+    color: onColorCream,
+    fontSize: fontSize.caption.at390,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    opacity: 0.85,
+    marginBottom: space.lg,
+  },
+  demoArt: { alignItems: 'center', justifyContent: 'center' },
+  demoIntro: {
+    color: onColorCream,
+    fontSize: fontSize.bodyLg.at390,
+    textAlign: 'center',
+    lineHeight: 22,
+    opacity: 0.92,
+    marginTop: space.lg,
+    marginBottom: space.xl,
+  },
 });

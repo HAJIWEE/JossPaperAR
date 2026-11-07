@@ -686,8 +686,15 @@ check('…and the thumb is placed by the INVERSE of the drag mapping',
   captureSrc.includes('zoomTrackOffset(zoomFraction, trackWidth)'));
 check('the shutter screen hops to /crop, with the id and the size',
   captureSrc.includes("pathname: '/crop'") && captureSrc.includes('toCropParams('));
-check('⚠️ …and no longer pushes the whole frame straight at /preparing',
-  !captureSrc.includes("pathname: '/preparing'"));
+/*
+ * ⚠️ **SCRUM-216 CHANGED WHAT THIS MEANS.** The old assertion was simply *"the shutter never pushes
+ * `/preparing`"* — true while the demo went through `/crop` like a real capture. ⚠️ The demo now SKIPS
+ * the crop step (there is no photo to frame) and pushes `/preparing` directly, so the rule is no longer
+ * *"never"* but **"exactly once, and only from the DEMO branch"**: the PHOTO path must still frame first.
+ */
+check('⚠️ …so the ONLY /preparing push is the DEMO’s — the photo path always frames first (SCRUM-216)',
+  (captureSrc.match(/pathname: '\/preparing'/g) ?? []).length === 1
+    && captureSrc.indexOf("pathname: '/preparing'") > captureSrc.indexOf('if (demo)'));
 
 /*
  * ⚠️ THE CLAN SCREEN'S HALF OF SCRUM-123. The card's geometry is asserted in
@@ -716,8 +723,14 @@ check('…so a raw route param is never handed to a native decoder',
   !cropSrc.includes('manipulate(uri)') && !cropSrc.includes('uri: uri'));
 check('⚠️ …and the screen never picks an encoding branch itself (S64\'s black screen)',
   !cropSrc.includes('nativeLoaderUriFromDecoded(') && !cropSrc.includes('escapeForNativeLoader('));
-check('⚠️ …and the burn screen\'s tutorial offering uses the same helper, not the S60 branch',
-  burnSrc.includes('nativeLoaderUriFromAnyForm(photoUri)')
+/*
+ * ⚠️ **SCRUM-216: THE BURN SCREEN NO LONGER DRAWS A PHOTO.** The demo used to reach `/burn` with the
+ * player's own photograph and draw it through `nativeLoaderUriFromAnyForm`; it is now an ITEM burn, so
+ * the offering is the catalogue's `OfferingArt` and that helper (and its `photoUri`) is gone.
+ */
+check('⚠️ the burn screen NO LONGER draws a photo — the demo’s offering is the CATALOGUE art (SCRUM-216)',
+  !burnSrc.includes('nativeLoaderUriFromAnyForm(') && !burnSrc.includes('photoUri')
+    && burnSrc.includes('collectedItemCode(itemCode)')
     && !burnSrc.includes('nativeLoaderUriFromDecoded('));
 check('⚠️ the mask view is drawn by the pure path, with the even-odd rule it requires',
   cropSrc.includes('dimPathPolygon(region, polygon)')
@@ -762,10 +775,11 @@ check('the lasso\'s behaviour is stated in the UI, not only in a comment',
 check('every failure path out of the screen is free (skip is always reachable)',
   cropSrc.includes('onPress={skip}') && cropSrc.includes("t('crop.skip')"));
 
-// ⚠️ NEGATIVE CONTROL — the assertion must be able to fail. Same shape, wrong text.
-const blind = (source: string): boolean => source.includes("pathname: '/preparing'");
+// ⚠️ NEGATIVE CONTROL — the assertion must be able to fail. Same shape, a route the shutter screen
+// never pushes (it hops to /crop; only the DEMO pushes /preparing, and nothing here pushes /reward).
+const blind = (source: string): boolean => source.includes("pathname: '/reward'");
 check('⚠️ the source assertions are not vacuous (a negative control fires)',
-  blind(captureSrc) === false && blind("router.push({ pathname: '/preparing' })") === true);
+  blind(captureSrc) === false && blind("router.push({ pathname: '/reward' })") === true);
 
 // ── ④ the copy exists in BOTH locales (a missing translation is a bug) ───────
 section('④ the frame step\'s copy is localised');
