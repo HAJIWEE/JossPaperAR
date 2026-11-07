@@ -3,11 +3,17 @@
 --
 -- ⚠️ THE GAP THIS CLOSES. `EN · 8c History` draws the user's own burn history, and until
 -- now **nothing in the RPC surface could return it**: `home_summary` returns two aggregates
--- and `clan_book` returns the CLAN's entries. `public.burns` and `public.tributes` both have
--- RLS enabled with **no policy** (server-written by design — 0001's RLS header calls that
--- "the correct posture"), so a plain client read returns zero rows and no error. ⚠️ That is
--- the failure mode this project has already been bitten by: an empty list that LOOKS like
--- "you have burned nothing" when it actually means "you are not allowed to see it".
+-- and `clan_book` returns the CLAN's entries. So this is a `SECURITY DEFINER` read scoped to
+-- `auth.uid()` in the WHERE clause — not by a policy the caller could widen.
+--
+-- ⚠️⚠️ CORRECTION 2026-11-01 (S73) — a claim originally written here was WRONG and is
+-- corrected by measurement. It said `public.burns` and `public.tributes` "have RLS enabled
+-- with **no policy** … so a plain client read returns zero rows and no error". The live
+-- database says otherwise: **both carry a SELECT policy** (`burns_select_own` ·
+-- `tributes_select_member`) **and `authenticated` holds the SELECT grant**
+-- (`has_table_privilege('authenticated','public.burns','SELECT')` is true). A client CAN read
+-- its own rows. ⚠️ The RPC is still the right shape — one round trip, an aggregate the screen
+-- actually draws, no ids it does not need — but NOT because the tables were unreadable.
 --
 -- ⚠️ SO IT IS A `SECURITY DEFINER` READ, and it is scoped to `auth.uid()` in the WHERE
 -- clause — not by a policy the caller could widen. It returns the caller's OWN burns only,

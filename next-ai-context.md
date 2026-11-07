@@ -1232,7 +1232,7 @@ signatures to aliases but not interfaces, and expo-router types `params` as an i
 3. **`check:copy` caught a `t()` call split across lines** — the extractor's blind spot, exactly what
 that check exists for.
 
-## ⚠️ 4 · THE STORE'S POINTS CHIP READS THE WRONG NUMBER — NOT FIXED
+## ⚠️ 4 · THE STORE'S POINTS CHIP READ THE WRONG NUMBER — ✅ FIXED 2026-11-01 (S73)
 
 * the chip reads `home_summary()` → **`sum(tributes.points)`**
 * `purchase_item` checks **`public.balances`** → **`sum(ledger_events.amount)`**
@@ -1241,6 +1241,17 @@ that check exists for.
 purchase went through anyway — a player sees "0 points" beside a working Buy button. ⚠️ **There is no
 client read for the ledger balance** (`ledger_events` is RLS-on with no policy, like `burns`), so the
 fix needs a `SECURITY DEFINER` read, i.e. **a migration**. ⚠️ **This is the top of the next session.**
+
+> ✅ **RESOLVED 2026-11-01 (S73) — see the S73 section at the foot of this file.** `home_summary()` now
+> reads the **`balances` view** — *the same read `purchase_item` makes* — so the number shown and the
+> number enforced cannot drift. Migration `20261101150000_home_summary_tribute_wallet.sql`, applied to
+> the local stack **and** hosted, with `supabase/tests/tribute_wallet.sql` fault-tested.
+> ⚠️ **AND THE "no policy" REASON ABOVE IS WRONG — corrected by measurement:** `pg_policies` carries
+> **`ledger_select_own`** for `authenticated`, and `has_table_privilege('authenticated',
+> 'public.ledger_events','SELECT')` is **true**. A client *could* read its own ledger rows. The RPC is
+> still the right fix — it returns ONE **aggregate** row and is the same source the spend uses — but not
+> for the reason written here. ⚠️ `burns` carries `burns_select_own` too, so the same sentence in
+> `history.tsx` and `my_offerings.sql` is likewise stale.
 
 ## ⚠️ 5 · PRODUCTION DATA WAS WRITTEN, ON THE OWNER'S SAY-SO
 
@@ -1258,7 +1269,9 @@ the `ledger_adjustment_needs_reason` CHECK enforces it. The account then bought 
    burn box. ⚠️ **Expected problem: `smartphone` may read too small** — at 0.50 aspect it is tall and
    thin, so in a wide box it contains to about half the height. `adb reverse` + Metro, then Store →
    Collection → picker → burn, screenshotting each.
-2. **The points chip defect (§4 above)** — a migration + a `SECURITY DEFINER` balance read.
+2. ✅ **DONE 2026-11-01 (S73)** — the points chip defect (§4 above). Migration
+   `20261101150000_home_summary_tribute_wallet.sql`, applied and read back on the local stack **and**
+   hosted; `supabase/tests/tribute_wallet.sql` fault-tested (old body → **RED**).
 3. **`7d` item detail and `7e`'s own buy sheet** — the buy is a `ConfirmCard` on the storefront, not
    the board's shape. ⚠️ **The cash rail remains native**: Google Play Billing, an EAS build, Play
    Console, with no read for a cash balance anywhere.
@@ -1269,3 +1282,328 @@ the `ledger_adjustment_needs_reason` CHECK enforces it. The account then bought 
 `expo-doctor` 21/21 · **US$0.41 spent this session** (US$0.40 of images + US$0.01 of cutouts), all
 **estimates at published rates**, flagged as such in `project-costs.md`. fal.ai ≈ **US$6.39 / S$8.18**
 of the approved US$10–20.
+
+# 📍 SESSION — 2026-11-01 (S73) — THE TRIBUTE WALLET, AND A RED GATE FOUND IN THE SUITE
+
+⚠️ **Two defects closed, both by measurement, both with a gate. US$0.00** — no fal.ai call, no device
+run, no EAS build.
+
+## ⚠️⚠️ 1 · `home_summary()` READ THE RECORD WHERE THE SPEND READS THE WALLET
+
+**SCRUM-150 AC 1** is *"Balance shown; a purchase **drops it** by the documented price."* It did not.
+
+| who | source | what it is |
+|---|---|---|
+| the Store chip | `home_summary()` → **`sum(tributes.points)`** | the **Book of Tributes** record of offerings MADE (doc 15 §7.1) — **lifetime earned, never falls** |
+| `purchase_item` | **`public.balances`** → `sum(ledger_events.amount)` | the ledger — the view's own comment: *"the ONLY thing a balance is"* |
+
+⚠️ **TWO SOURCES FOR ONE FACT.** Measured on glass 2026-11-01: with **5000** tribute in the ledger the
+chip read **"Store Points 0"** — that account's credit was an `adjustment` row, which writes **no**
+`tributes` row — and the purchase **went through anyway**.
+
+✅ **THE FIX: one source.** `home_summary()` now reads `balances`, `where user_id = v_uid and
+currency = 'tribute'` — **character for character the read `purchase_item` makes before it refuses a
+purchase** (`20261004094000:86`). The number shown and the number enforced cannot drift.
+
+⚠️ **WHY THE WALLET IS RIGHT FOR EVERY SURFACE, not just the chip.** Doc 10 defines `tribute` as a
+**WALLET** — *"in: burn awards … out: store redemption"* — and the ZH label is **identical** on both
+surfaces (shrine panel and store chip are both **功德点**). So the **shrine panel and the Profile row
+track the wallet too**; they were reading a record. ⚠️ **Product-visible: the shrine's number now FALLS
+when tribute is spent.** That is what a balance does — recorded here so a future session does not read
+it as a regression.
+
+## ⚠️ 2 · `stale_job_grace()` WAS EXECUTABLE BY `anon` — AND `pr3_verification.sql` WAS RED ON THE TREE
+
+⚠️ **Found by RUNNING the suite, not by reading it.** `pr3_verification.sql`'s trap-#1 assertion —
+*"NOTHING in public is executable by anon"* — **failed on the tree as this session opened**, and
+**still failed with the old `home_summary` restored**, so it was not mine.
+
+`20261024160000_stale_job_sweep.sql` revoked its **sweep** from `public`/`anon`/`authenticated`
+(that file's lines 134-136) and **omitted the same three lines for the helper beside it**. So
+`stale_job_grace()` kept the default `EXECUTE TO PUBLIC`, and ⚠️ **PostgREST exposes every executable
+function in `public` as an RPC endpoint** — `POST /rest/v1/rpc/stale_job_grace` answered with no JWT.
+
+⚠️ **MEASURED 2026-11-01, local stack AND hosted, identical:** `stale_job_grace` anon=**t** ·
+`reconcile_stale_cartoonize_jobs` anon=**f**. Fixed by
+`20261101160000_stale_job_grace_revoke.sql`, re-measured **anon=f** on both.
+
+⚠️ **The blast radius was small and that is not the point.** The body is `select interval '15 minutes'`
+— immutable, no table access, nothing to leak. The defect is the **posture**: a rule with one silent
+exception is a rule the next function is written against by accident. ✅ Its only caller is the sweep,
+which is `SECURITY DEFINER` and keeps execute as its owner.
+
+## ⚠️ 3 · TWO MEASURED CORRECTIONS TO THE S72 NOTES
+
+1. ⚠️ **"`ledger_events` is RLS-on with no policy, like `burns`" is FALSE — measured.** Both tables
+   carry a SELECT policy (`ledger_select_own` · `burns_select_own`) **and** `authenticated` holds the
+   grant (`has_table_privilege(...) = true`). A client *can* read its own rows. The RPC is still the
+   right fix — an **aggregate**, and the same source the spend uses — but not for that reason.
+   ⚠️ The same stale sentence sits in `history.tsx` and `my_offerings.sql`; **not** corrected there yet.
+2. ⚠️ **A second, silent defect on the same read path:** `offerings-api.ts` asked for
+   `row.balance_after`, but `purchase_item` returns the key **`balance`** — so `balanceAfter` was
+   **always 0**. Nothing rendered it, which is why it survived. Fixed.
+
+## ✅ 4 · ON GLASS, 2026-11-01 — THE ART RENDERS, AND THE WALLET IS PROVEN LIVE
+
+⚠️ **Expo Go + Metro over `adb reverse`**, on the **hosted** project with the **real** account
+(`a27627ad-…`, clan "gwee"). ⚠️ US$0.00 — `demo=1` was **not** needed: no generation was run.
+
+**① The new standard-item art IS on glass and reads correctly.** The Store draws the **featured Wealth
+Bundle** (220×106) and the four cards — Joss Paper Stack · Gold Bar · Smartphone · House — all in the
+**pipeline's own low-poly style**, which is the whole point of the S72 regeneration: the storefront and a
+Path C capture now speak ONE visual language. ⚠️ **The predicted `smartphone` problem did NOT appear** —
+at 0.50 aspect it is the narrowest card art, but it reads unambiguously as a phone; no re-crop needed.
+
+⚠️⚠️ **CORRECTION — MY FIRST SCREENSHOT WAS NOT THE NEW ART.** The 19:11 capture showed **flat vector
+shapes with hard outlines**: that is the **OLD 82-SVG build**, because the resumed app was running a
+**stale BUNDLE** as well as stale state (§③). ⚠️ **The authoritative capture is the COLD-LAUNCH one** —
+shaded low-poly paper stacks with red bands, a gold ingot, a blue phone with a camera bump, a
+tiled-roof house. ⚠️ **A resumed Expo Go app can be showing the previous session's CODE, not merely its
+data** — which is why the first shot looked plausible and was wrong. It is the same trap as §③, one layer
+deeper.
+
+**⑤ ⚠️⚠️ IN EXPO GO, BUNDLED IMAGES COME FROM METRO — SO STOPPING THE DEV SERVER BLANKS THEM.** The
+owner reported *"the images for the store items are not rendered"* while looking at the device. ⚠️ **Not
+an app defect.** The Expo docs are explicit: *"Locally stored assets are served over HTTP in development.
+They are **automatically bundled into your app binary at the build time for production apps** and served
+from disk on a device."* ⚠️ So with Metro stopped, **every `require()`d PNG renders BLANK while the text,
+cards and prices still render** — which reads exactly like *"the art is broken"*.
+⚠️ **Reproduced and fixed by A/B:** Metro down → **all five art wells empty**; Metro up → **all five
+render**. ⚠️ **A production/EAS build embeds them, so this cannot ship** — but ⚠️ **leave Metro running
+for any on-glass review of bundled art**, and do not diagnose a blank image as a code defect before
+checking the dev server.
+
+**② The chip is the WALLET, proven on glass.** The same account has a **tributes RECORD of 0** and a
+**wallet of 4600**:
+
+| surface | reads | which is |
+|---|---|---|
+| the Store chip | **"Store Points 4600"** | the **wallet** ✅ |
+| the shrine panel | **"TRIBUTE POINTS 4,600"** | the **wallet** ✅ |
+
+⚠️ **Under the old body BOTH would have read `0`** — this account's credit is an `adjustment` row, which
+writes no `tributes` row. **This is SCRUM-150 AC 1 confirmed on the device, not just in a test.**
+
+**③ ⚠️⚠️ A DEVICE-VERIFICATION TRAP WORTH KEEPING.** The **FIRST** launch showed the shrine at **`0`**.
+Nothing was wrong: **Expo Go had RESUMED the previous session's running app**, still holding the value it
+fetched *before* the migration. A focus re-read and a **cold launch** (force-stop → relaunch) both show
+**4,600**. ⚠️ **So a single screenshot of a RESUMED app can show a stale number** — force-stop and
+relaunch before believing one. ⚠️ And the app's own pattern is *re-read on focus*, which is what
+corrected it.
+⚠️⚠️ **AND IT WAS STALE IN TWO DIMENSIONS, NOT ONE.** The same resumed app rendered the **OLD 82-SVG
+art** (§①) — so it was running the **previous session's BUNDLE** as well as holding its data. ⚠️ **A
+resumed Expo Go app can be executing code from before your change**, which is far more dangerous than a
+stale number: the screenshot looks entirely plausible and is of the WRONG BUILD. ⚠️ **Force-stop,
+relaunch, and re-check that what you are looking at is the bundle you just edited.**
+
+**④ Collection's empty state is CORRECT, not a defect.** It reads *"0 offerings burned · 0 items
+collected · Nothing here yet"* — and that is **TRUE**: a burn is either an item or a photo (the XOR), and
+this account has only ever **bought**, never **burned**. ⚠️ So the Collection did **not** exercise
+`OfferingArt`; the **Store** is what proves the art.
+
+⚠️ **Two Expo Go artefacts, not app bugs:** the grey gear bubble is **Expo Go's own dev FAB**, and
+Expo Go's **LogBox intercepts taps** — the first tap on the tab bar opened a log overlay instead of
+navigating (`zoom_ceiling: assumed max=8 (native said undefined)` is SCRUM-132's designed fallback,
+correct in Expo Go). Dismiss it before navigating. ⚠️ Metro also **rewrites `tsconfig.json`** on boot —
+reverted, not committed.
+
+## ⚠️ 6 · THE OWNER'S FINDING — THE "PROFILE NAME" IS THE **CLAN** NAME, AND A DESIGNED LOGIN FLOW WAS NEVER BUILT
+
+**Reported from the device:** *"in the tutorial flow, we are taking the clan name as my profile name as well. Check if this is just for the demo version, or did we neglect to include a sign in flow?"* → **`SCRUM-214`** (🎯 Decide, in sprint 3). ⚠️ **No code changed.**
+
+⚠️ **IT IS NOT THE DEMO.** The tutorial (`SCRUM-85`) is a deliberate no-cost demo — `TUTORIAL_CONSEQUENCES`
+is `createsClan:false · awardsPoints:false · callsServer:false` — and its own copy says *"The demo needs no
+clan."* It never touches a clan. The clan name is the profile name for **every** user, always.
+
+⚠️ **THE BUILD MATCHES THE BOARD — checked in Penpot, not inferred.** `EN · 8 Profile` draws the name slot
+as **"The Song Family"**. And ⚠️ **the design has NO personal name anywhere**: `EN · 0d Sign-up` asks for
+**FAMILY NAME · PHONE OR EMAIL · LANGUAGE**, and nothing else. So *"your profile name is the family name"*
+is the **design's** answer, not a build omission. ⚠️ And the app has no name for a person at all —
+`profiles.display_label` is auto-generated (`'devotee-' + first 6 hex of the uuid`) and shown **only** on
+the league board.
+
+⚠️⚠️ **BUT THE REAL FINDING: A FULL LOGIN + SIGN-UP FLOW IS DESIGNED, SIGNED OFF, AND UNBUILT.** The Penpot
+file carries `EN · 0c Login` (*"Sign in to return to your shrine." · "Send code" · "Use a password
+instead"*), `EN · 0d Sign-up` (*"Create your account" · FAMILY NAME · PHONE OR EMAIL · "Your number is only
+used to sign you in — never for ads or messages."*) **plus their error states** (code sent · verifying ·
+wrong code · no network · validation · account exists), in **both locales**. `SCRUM-28` (Login) and
+`SCRUM-29` (Create account) are both **`Done` — as DESIGN tickets**.
+⚠️ **NEITHER HAS A BUILD TICKET.** `SCRUM-147` (build onboarding) is `To Do` and its own acceptance ends at
+the **clan fork** — *"splash → panels → permission → fork"* — with no account step; it also states the rule
+outright: *"Anonymous-first (ADR-004). **No sign-in wall before the first burn — nothing in onboarding may
+introduce one.**"*
+⚠️ So the position is: the account is **deferred by design** (ADR-004, *"anonymous device identity first,
+optional account later"*) and the *"later"* half is **unbuilt and untracked**. The visible marker is
+Settings' **"Sign out"** row, which renders **disabled** with the sub-line *"Not built yet"* — there is no
+sign-in to sign out of.
+⚠️ **ADR-004 names the natural prompt itself:** *"Clan and invite flows are the first place this hurts — an
+anonymous device cannot be shared across a family's phones, so doc 15's shared altar genuinely wants an
+account."*
+
+### ✅ THE DRAFT — SIX BOARDS ON PENPOT, APPROVED 2026-11-01 (S73)
+
+⚠️ **The owner answered (B):** *"first build a email based account sign up, then expand it to google
+services later."* Then, on seeing the draft: *"Yes its fine."* → **`SCRUM-215`** is the BUILD.
+⚠️ **(A) is still open** (the profile name), and it blocks the sign-up board's `FAMILY NAME` field.
+
+**Added — nothing signed off was touched, all at x −320:**
+| board | y | phase |
+|---|---|---|
+| `EN · 0d6 Sign-up · email` | 9320 | 1 |
+| `EN · 0d7 Sign-up · email / verify code` | 10200 | 1 |
+| `EN · 0d8 Sign-up · email + Google (phase 2)` | 11080 | 2 |
+| `ZH · 0d6 注册 · 邮箱` | 11960 | 1 |
+| `ZH · 0d7 注册 · 邮箱 / 输入验证码` | 12840 | 1 |
+| `ZH · 0d8 注册 · 邮箱 + Google（第二阶段）` | 13720 | 2 |
+| `EN · 0e13 Clan fork · account required` | 14600 | **1 — the GATE** |
+| `ZH · 0e13 宗族入口 · 需要账号` | 15480 | **1 — the GATE** |
+
+⚠️⚠️ **ADR-004 WAS AMENDED, 2026-11-01 — THE ACCOUNT IS NOW REQUIRED FOR CLAN CREATE/JOIN.** Owner's words:
+*"The user has to make an account to create or join a Clan, It will not be optional, The 'Account is
+optional' rule is only for the MVP. Now that we are building out the App we should be clear about that."*
+→ `## Amendment 1` now sits in `ADR-004`, the register row is updated, and **`check:adrs` passes 34/34**.
+
+**⚠️ WHAT THE AMENDMENT CHANGES — rules 2, 3 and 6; rules 1, 4 and 5 stand:**
+- **Rule 2** NARROWED — the ritual, quotas, streaks, ledger, league and Book of Tributes still work
+  anonymously; **clan create/join** now requires an account.
+- **Rule 3** NARROWED — the clan flow is a **gate**, not an in-context offer. *"No screen nags, no banner,
+  no interstitial"* still governs **the ritual**.
+- ⚠️⚠️ **Rule 6 AMENDED — THE CLAUSE WITH TEETH.** It said *"no NRIC, no phone, no contact list — the
+  identity data class is the device/session id alone"*. **The app now collects an EMAIL**, which is a
+  **contact identifier**: it identifies a person and can reach them. ⚠️ **This is the first data class in
+  this product that identifies a PERSON rather than a device** — a real posture change, not paperwork.
+- **Rule 4** moves from convenience to **LOAD-BEARING** — the user burns anonymously first, so the upgrade
+  must **LINK the same `user_id`**. ⚠️ **A second user orphans the wallet, streak and history.**
+- ✅ **RULE 1 STANDS, DELIBERATELY:** the first burn (the tutorial) still needs **no account**. The ruling
+  names clan create/join, not the ritual. ⚠️ Gating the ritual would need its own ruling.
+
+**✅ doc 13 IS UPDATED WITH IT:** row 7 and the *"Never collected"* line (which read *"NRIC/phone (no
+account wall — ADR-004)"*), **plus a new `Account email` row in §2's retention table** — doc 13's own rule
+of thumb is *"no new data class ships without a window"*.
+
+### ⚠️⚠️ AND A SECOND RULING THE SAME DAY — THE FIRST BURN IS **JUST A DEMO**, ON A **STANDARD OFFERING**
+
+Owner, 2026-11-01: *"the FIRST BURN should be JUST A DEMO and use standard offerings to prevent cost runoff
+from people just doing the demo and not signing up after."* → **`SCRUM-216`**. Recorded in
+**`ADR-004 Amendment 1`** (a *"WHAT THE FIRST BURN IS"* section) **and** `src/lib/tutorial.ts` — the file
+that owns the demo's invariants.
+
+1. **It is JUST a demo** — no clan, no points, no ledger, no server call, no AI.
+2. ⚠️ **It uses a STANDARD OFFERING — the bundled catalogue art — NOT the player's photograph.**
+3. **It ENDS with the account creation workflow**, which then hands off to the clan fork.
+
+⚠️⚠️ **WHY (2) IS A COST RULE, NOT A STYLE CHOICE.** The demo is free **today** — but only because
+**four screens each branch on `demo`** (`/capture` → `/crop` → `/preparing` → `/burn`) and skip the upload
+and the generation. ⚠️ **That is a CHAIN of four guards, not a wall:** one falling through is the
+**≈US$0.09-per-user** Path C bill, spent on the people who do the demo and **never sign up**.
+⚠️ **A demo that takes no photo has NOTHING TO SEND** — the guarantee stops depending on four branches
+agreeing with each other. ⚠️ Strictly stronger, and it is the owner's call.
+
+⚠️ **NOT YET BUILT.** The shipped demo still opens the camera, crops, and draws the player's own photo
+(`burn.tsx`'s `demoOffering` — whose three-form URI encoding trap exists *only* because of the photo).
+⚠️ **AND NO LYING FLAG WAS ADDED:** `TUTORIAL_CONSEQUENCES` deliberately does **not** carry
+`capturesPhoto: false` yet — a flag asserted before the behaviour lands is a gate that passes while the code
+does the opposite, which is worse than no gate. The flag goes in **with** the change that removes the camera.
+
+### 📋 END-OF-SESSION — JIRA (all in **sprint 3, id 67**, each verified by read-back)
+
+| ticket | what | status |
+|---|---|---|
+| **`SCRUM-214`** | 🎯 the identity decision — the account, the profile name, the demo, the entry point | **In Progress** ⚠️ *(A) the profile name is STILL OPEN* |
+| **`SCRUM-215`** | 📧 build the email-first sign-up + sign-in (phase 1); Google is phase 2 | To Do |
+| **`SCRUM-216`** | 🎬 the first burn is JUST A DEMO on a STANDARD OFFERING — remove the camera | To Do |
+| **`SCRUM-217`** | 🎯 Decide: **three copy strings** need the owner's wording | To Do |
+| **`SCRUM-218`** | 🌐 the sign-up boards' `LANGUAGE` caption has **no control** (EN + ZH) | To Do |
+| **`SCRUM-219`** | 🔒 the email's privacy knock-ons — `delete_my_data` + the Play declaration | To Do |
+| **`SCRUM-213`** | the anon-executable `stale_job_grace` (fixed earlier today) | In Review |
+| **`SCRUM-150`** | the Store — AC 1 met (the wallet fix), `7d`/`7e` still owed → `SCRUM-212` | **In Review** |
+
+⚠️ **Order that matters:** `217` (copy) blocks `215` (the build); `216` and `215` touch the same
+demo→account handoff, so agree that seam before either lands; `219` lands with `215`.
+⚠️ **Sprint gate** (`In Progress` outside the sprint) returned **EMPTY** before and after all of today's
+Jira writes.
+
+### 📱 THE APK IS ON THE DEVICE — and it runs STANDALONE (2026-11-01)
+
+| | |
+|---|---|
+| build | **`a1e226db-f7f5-42a6-8d60-811f83453773`** · profile `preview` · **FINISHED** in **19 m 51 s** |
+| commit | `24560c6` — read off the build record, so it is provably the tree that was built |
+| artifact | `https://expo.dev/artifacts/eas/3s7H0MRNvH-4HwXbPRDtyh9d74-7K5SpSsV3kV3hQTk.apk` (**142 MB**) |
+| install | `adb install -r` → **Success**, and ⚠️ **verified ON THE DEVICE**: `dumpsys package app.josspaperar` moved `lastUpdateTime` **08:26:31 → 21:43:13** |
+| standalone | ✅ **Metro was STOPPED**, then the app was launched — `app.josspaperar/.MainActivity` is top-resumed and the shrine renders |
+
+⚠️ **`app.josspaperar` IS A SECOND INSTALL, NOT EXPO GO.** The device now carries **both**: Expo Go
+(`host.exp.exponent`) with the account it has held all session, and the standalone APK with its **own**
+anonymous session (a different clan, a different wallet). ⚠️ **`adb install -r` keeps app data**, so the
+standalone app kept the session it already had — which is why it shows state rather than a first run.
+
+⚠️⚠️ **THE TRAP I HIT, WORTH KEEPING: `eas build` PRINTS THE BUILD PAGE, NOT THE ARTIFACT.**
+My first watcher grepped `/tmp/eas.log` for `expo.dev/artifacts/*.apk` and **never fired** — the CLI prints
+`…/projects/joss-paper-ar/builds/<id>` and nothing else. The artifact URL only comes from the **EAS API**
+(`build_info` → `artifacts.applicationArchiveUrl`). ⚠️ **A watcher that greps for the wrong string fails
+silently and looks like a slow build** — it sat "waiting" for 25 minutes after the build had finished.
+⚠️ **Poll `build_info`, not the CLI's stdout.**
+
+⚠️ **And the build is ~142 MB / ~20 min because the archive is 178 MB** — EAS's own log says so and points
+at `.easignore`. Not a problem today; worth knowing before the next one.
+
+⚠️ **THE ENTRY-POINT BOARDS WERE REWORKED, because the earlier shape was wrong.** They were drafted as a
+tappable **offer row** — but a *required* account is not an offer, and ADR-004 rule 3's own reasoning
+rejects a soft wall (*"a hard wall with worse manners"*). So the row is **gone**; the two boards are now
+clones of the signed-off fork with the **note stating the gate**: `An account and a clan are required to
+tend this altar together.` / `需要账号与宗族，才能共同打理这座祭坛。`
+⚠️ **Both are PROPOSALS** — doc 15 §8 carries neither.
+⚠️ **Still the PM's call: WHERE the account sits** — before the fork (one gate) or after the choice
+(the fork's value explained first). The amendment is written placement-neutral.
+
+⚠️ **All six built by CLONING** `EN · 0d` / `ZH · 0d` / `EN · 0d3` / `ZH · 0d3` — geometry, tokens, type
+scale and the app-mark header are identical to what was signed off.
+
+**⚠️ COPY CHANGED — the signed-off flow is PHONE-first, so this is not a one-field reskin:**
+`PHONE OR EMAIL` → `EMAIL` · `Phone or email` → `you@example.com` · `手机号或邮箱` → `邮箱` · the privacy
+notes reworded for email · `Sent to +65 9123 4567 by SMS` → `Sent to you@example.com` ·
+`Wrong number? Edit` → `Wrong email? Edit` · `号码有误？修改` → `邮箱有误？修改`.
+⚠️ **TWO ZH STRINGS ARE PROPOSALS, NOT SIGNED-OFF WORDS** (doc 15 §8 owns copy): the note's
+`邮件推送` half (SMS cannot be carried over verbatim) and `使用 Google 账号继续`.
+
+⚠️ **PHASE 2 IS ONLY TWO SHAPES:** an `or`/`或` divider and `Continue with Google` as a **secondary**
+button (paper `#f5f0e8`, ink stroke 2.5, r18 — the file's own secondary style). ⚠️ **But the primary
+button MOVES, 690 → 560**, to make room — phase 1 does *not* reserve the space.
+
+⚠️⚠️ **FOUND IN THE SIGNED-OFF BOARDS: a `LANGUAGE` caption with NO control under it** — on **`EN · 0d`
+AND `ZH · 0d`** (both checked). A label with nothing to label. ⚠️ Not invented into the draft: a control
+that no board specifies would be the same class as inventing a store price.
+
+⚠️ **GEOMETRY-VERIFIED, NOT EYEBALLED:** a collision sweep over all six boards found **no off-board shape
+and no unintended overlap**, and caught **one real bug of mine** — the phase-2 right rule overlapped the
+`or` label by 8px (fixed: 20..172 · 180..210 · 218..370).
+⚠️ **I cannot render a Penpot PNG export in this session** — the tool returns base64 inside a text block,
+so there is no image for me to look at. **The aesthetic call is the PM's**, which is this file's
+established division of labour.
+
+⚠️ **AND THE ENTRY POINT IS UNDRAWN.** The boards exist, but *where* the account is offered is not on any
+of them. ADR-004 and SCRUM-147 both forbid a sign-in wall before the first burn and name the **clan /
+invite flow** as the natural prompt — so `SCRUM-215` needs that decided before the screens can be placed.
+
+## Gates
+
+`check:sql` **29 → 30** migrations · `check:lib` **723** · `npm run check` **EXIT 0** · `tsc` 0 ·
+⚠️ **the full local SQL suite is 14/14 GREEN — it was 13/14 before** (`pr3_verification` RED).
+New `supabase/tests/tribute_wallet.sql` (**W1–W5**), **fault-tested**: restoring the old body turns
+**W1 RED** (the record reads 1000 where the wallet reads 6000). Both migrations applied to the local
+stack **and** hosted, verified by read-back. ⚠️ `league_bootstrap.sql` failed once mid-session against
+a **dirty** local DB and passes on a clean one — residue, not order-sensitivity; a `db reset` before
+trusting a suite run remains the rule.
+
+## Next, in order
+
+1. ✅ **DONE 2026-11-01 (S73) — the new art IS on glass** (S72-final §1). The Store draws the featured
+   Wealth Bundle and all four cards in the pipeline's low-poly style, and the predicted `smartphone`
+   problem did **not** appear. ⚠️ **Still unseen: the picker and the 72 px burn box** — the Store's card
+   size is verified, those two are not. ⚠️ And the Collection did **not** exercise the art (this account
+   has bought but never burned, so its grid is correctly empty).
+2. **`7d` item detail and `7e`'s own buy sheet** — the cash rail is native (Play Billing · EAS · Play
+   Console). `SCRUM-212`.
+3. ⚠️ **Correct the stale "no policy" sentence** in `history.tsx` and `my_offerings.sql` (§3.1).
+

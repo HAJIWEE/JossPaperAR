@@ -10,8 +10,11 @@
  * can produce or spend is the class of defect this project treats as worse than an absent control.
  *
  * ⚠️ The points rail is real: `EN · 7`'s *400 pts* for the Joss Paper Stack is exactly
- * `offerings_catalog.price`, which `purchase_item` checks against the **tribute** balance — so the
- * chip reads `home_summary()`'s `tribute` and needs no second currency.
+ * `offerings_catalog.price`, which `purchase_item` checks against the **`tribute`** balance — so the
+ * chip reads `home_summary()`'s `tribute` and needs no second currency. ⚠️ **That figure is the
+ * WALLET, the same `balances` read the purchase makes**, so the chip falls by the price charged
+ * (SCRUM-150 AC 1). ⚠️ The chip is re-read after every successful buy (`load()` in `confirmBuy`) —
+ * the server is the authority, and a client-side subtraction would drift the moment a price changed.
  *
  * ⚠️ **Decorations is disabled**, and honestly so: `decorations_catalog.price` is **NULL until the
  * economy pass prices them** (*"inventing a store price is a product decision, not a build one"*).

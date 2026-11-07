@@ -13,7 +13,7 @@
 | [[ADR-001-option-a-expo-rn-supabase-hosted-ai]] | §6.1 platform · §6.4 backend · §6.3 direction (hosted day one) | ✅ **Accepted 2026-09-26** |
 | [[ADR-002-path-c-describe-then-generate]] | §6.3 cartoonization runtime — provider + pipeline (the provider half of ADR-001) | ✅ **Accepted 2026-09-26** |
 | [[ADR-003-non-ar-ar-mvp-ar-framework]] | §6.2 AR mode — *non-AR AR* for the MVP (camera + fixed overlay; true AR post-MVP) | ✅ **Accepted 2026-10-02** |
-| [[ADR-004-anonymous-identity-first-optional-account-later]] | §6.5 identity — anonymous device first, optional account later (no signup wall before the first burn) | ✅ **Accepted 2026-10-05** |
+| [[ADR-004-anonymous-identity-first-optional-account-later]] | §6.5 identity — anonymous device first, optional account later (no signup wall before the first burn) · ⚠️ **Amended 2026-11-01: an ACCOUNT IS REQUIRED to create or join a clan · and the FIRST BURN is a DEMO on a STANDARD OFFERING, ending with the account step** | ✅ **Accepted 2026-10-05** · ⚠️ **Amended 2026-11-01** |
 | [[ADR-005-honest-client-caps-append-only-ledger]] | §6.6 integrity posture — honest client + caps vs server verification | ✅ **Accepted 2026-09-27** |
 | [[ADR-006-burn-limit-semantics-daily-quota-cost-per-burn]] | §6.7 burn-limit semantics — daily quota · cost per burn · no cooldown · hard global stop-rule | ✅ **Accepted 2026-10-05** |
 | [[ADR-007-privacy-minimal-windowed-one-tap]] | §6.8 privacy & retention — collect minimal · windowed · coarse location · one-tap delete | ✅ **Accepted 2026-09-27** |

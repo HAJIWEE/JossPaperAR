@@ -3,10 +3,16 @@
  *
  * ── ⚠️ WHY THIS SCREEN NEEDED A MIGRATION ───────────────────────────────────
  * Until 2026-11-01 nothing in the RPC surface could return a user's own burns: `home_summary`
- * returns two aggregates and `clan_book` returns the CLAN's entries. `public.burns` and
- * `public.tributes` have RLS on with **no policy**, so a plain client select answers `[]` with **no
- * error** — and this screen would have rendered *"Nothing here yet"* over a hundred rows. So it
- * reads `my_offerings()` / `my_offerings_week()`, both `SECURITY DEFINER` and scoped to `auth.uid()`.
+ * returns two aggregates and `clan_book` returns the CLAN's entries. So this screen reads
+ * `my_offerings()` / `my_offerings_week()`, both `SECURITY DEFINER` and scoped to `auth.uid()`.
+ *
+ * ⚠️⚠️ **CORRECTION 2026-11-01 (S73) — the reason originally written here was WRONG, and it was
+ * measured.** It claimed `burns` and `tributes` have RLS with **no policy**, so a client select
+ * answers `[]` with no error. The live database says otherwise: **both carry a SELECT policy**
+ * (`burns_select_own` · `tributes_select_member`) **and `authenticated` holds the SELECT grant**
+ * (`has_table_privilege(...) = true`), so a client *can* read its own rows. ⚠️ **The RPC is still
+ * the right shape** — one round trip joining burns, tributes and the week window, returning no ids
+ * this screen does not need — but **not** because the tables were unreadable.
  *
  * ── ⚠️ A FAILED READ IS NOT THE EMPTY STATE ─────────────────────────────────
  * Three states, and they are different facts: **loading** (nothing yet), **failed** (`hist.unreachable`

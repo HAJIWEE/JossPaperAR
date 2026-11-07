@@ -24,7 +24,15 @@
 
 /** What the server returns. Raw integers — no formatting, no UI decisions. */
 export interface HomeSummary {
-  /** `sum(tributes.points)` for this user. */
+  /**
+   * ⚠️⚠️ **THE TRIBUTE WALLET, not the tributes record.** `home_summary()` reads the
+   * `balances` view (`sum(ledger_events.amount)`) — **the same source `purchase_item`
+   * spends** — so this figure **FALLS when tribute is spent**. ⚠️ It is **not**
+   * `sum(tributes.points)`: `tributes` is the Book of Tributes, a record of offerings
+   * MADE (doc 15 §7.1), so its sum is lifetime-earned and never falls. Reading that
+   * made the Store chip show *"Store Points 0"* beside a working Buy button
+   * (**SCRUM-150 AC 1**, closed 2026-11-01).
+   */
   readonly tribute: number;
   /** `streaks.current_days`, as the server has it. */
   readonly streakDays: number;

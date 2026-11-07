@@ -1,9 +1,13 @@
 /**
  * home-api.ts — the shrine's data read (SCRUM-161).
  *
- * ⚠️ `home_summary()` exists because `tributes` and `streaks` are **server-written with no
+ * ⚠️ `home_summary()` exists because `ledger_events` and `streaks` are **server-written with no
  * client policy** (the RLS header calls that the correct posture for server-written
  * tables). The function is SECURITY DEFINER and returns the caller's own aggregate only.
+ *
+ * ⚠️⚠️ **Its `tribute_total` is the WALLET — the same `balances` read `purchase_item`
+ * spends — NOT `sum(tributes.points)`.** The record reading made the Store chip show
+ * *"Store Points 0"* beside a working Buy button (SCRUM-150 AC 1); see `home-panels.ts`.
  *
  * ⚠️ Follows `clan-api.ts`'s contract exactly: **every call resolves** — a thrown error on
  * the shrine is a dead end — and a failure carries a reason rather than a zero.

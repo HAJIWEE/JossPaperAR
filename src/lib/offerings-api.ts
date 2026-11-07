@@ -80,7 +80,14 @@ export async function purchaseItem(
     data: {
       itemCode: typeof row.item_code === 'string' ? row.item_code : itemCode,
       price: num('price'),
-      balanceAfter: num('balance_after'),
+      /**
+       * ⚠️ **`balance`, not `balance_after`.** `purchase_item` returns the key
+       * **`balance`** (`20261004094000_purchase_item_balances_fix.sql:124`) — this read
+       * used to ask for `balance_after`, a key the RPC has never sent, so
+       * `balanceAfter` was **always 0**. Nothing renders it yet, which is why it went
+       * unnoticed; it would have read as *"you have nothing left"* the moment something did.
+       */
+      balanceAfter: num('balance'),
     },
   };
 }

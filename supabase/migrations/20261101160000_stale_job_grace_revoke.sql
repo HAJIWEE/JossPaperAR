@@ -1,0 +1,41 @@
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 0026 · `stale_job_grace()` was EXECUTABLE BY `anon` — revoke it
+--
+-- ⚠️ FOUND BY `supabase/tests/pr3_verification.sql`'s trap-#1 assertion, which was
+-- **RED on the tree** when this session opened:
+--
+--   ✗ FAIL: NOTHING in public is executable by anon
+--           (trap #1: revoke PUBLIC *and* the explicit grant)
+--
+-- `20261024160000_stale_job_sweep.sql` revoked its SWEEP — `reconcile_stale_cartoonize_jobs`
+-- — from `public`, `anon` and `authenticated` (that file's lines 134-136) and
+-- ⚠️ **omitted the same lines for the helper beside it**. So `stale_job_grace()` kept
+-- the default `EXECUTE TO PUBLIC`, and ⚠️ **PostgREST exposes every executable
+-- function in `public` as an RPC endpoint** — `POST /rest/v1/rpc/stale_job_grace`
+-- answered for a caller with no JWT at all.
+--
+-- ⚠️ MEASURED 2026-11-01, local stack AND hosted project, identical:
+--   stale_job_grace                 anon=t  authenticated=t   ← the defect
+--   reconcile_stale_cartoonize_jobs anon=f  authenticated=f   ← its sibling, correct
+--
+-- ⚠️ THE BLAST RADIUS IS SMALL AND THAT IS NOT THE POINT. The body is
+-- `select interval '15 minutes'` — `immutable`, no table access, nothing to leak.
+-- The defect is the POSTURE: this project's rule is that nothing in `public` is
+-- anon-callable, and a rule with one silent exception is a rule the next function can
+-- be written against by accident.
+--
+-- ✅ NOTHING NEEDS THE GRANT. `stale_job_grace()` is called from exactly ONE place —
+-- `reconcile_stale_cartoonize_jobs` (this file's line 76) — which is `SECURITY DEFINER`
+-- and therefore runs as its OWNER, keeping execute implicitly. No client role is a
+-- caller: verified with no reference anywhere in `src/`, `supabase/functions/` or
+-- `supabase/tests/`.
+--
+-- A new migration rather than an edit to 20261024160000: that one is APPLIED. Same
+-- rule as 0002 / 0003 / 0007 / 0008 / 0025.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- ⚠️ BOTH halves, for the reason trap #1 names: `revoke … from public` removes the
+-- default grant, and the explicit `anon, authenticated` revoke is what survives a
+-- future `grant … to public`. Same pair the sibling already carries.
+revoke all on function public.stale_job_grace() from public;
+revoke all on function public.stale_job_grace() from anon, authenticated;
