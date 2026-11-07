@@ -22,6 +22,16 @@ import { COLLECTION, COLLECTION_SLOTS, collectionGrid, collectionOverflows, coll
 import { CASH_IS_READABLE, FEATURED_CODE, STORE_TABS, baseMetaValue, pointsPrice, storeList } from '../store.ts';
 import { ART_BOX, artCodes, artSize, fitArt } from '../offering-art.ts';
 import { pickerGrid } from '../picker.ts';
+import {
+  ACCOUNT_CODE_LENGTH,
+  ACCOUNT_GATE,
+  ACCOUNT_MODES,
+  EMAIL_TAKEN_MEANS_SIGN_IN,
+  emailProblem,
+  isCompleteCode,
+  nextAccountStep,
+  normaliseEmail,
+} from '../account-flow.ts';
 import { readBurnParams, readItemBurnParams, readItemRewardParams, readRewardParams } from '../route-params.ts';
 import { getOffering } from '../../domain/catalogue.ts';
 import { bookView, showsBookSectionTitle } from '../clan-roles.ts';
@@ -2339,6 +2349,54 @@ function pickerChecks(): void {
     OFFERINGS.some((o) => o.code === 'wealth_bundle' && o.composedOf !== undefined));
 }
 
+function accountChecks(): void {
+  section('32 · The account — the UPGRADE is a LINK, not a second user (SCRUM-215 · ADR-004)');
+  /**
+   * ⚠️⚠️ **THE ASSERTION THIS SECTION EXISTS FOR.** ADR-004 rule 4: converting an anonymous session must
+   * carry the ledger, the ancestors and the streak with it — so it must **keep the `auth.users` id**.
+   * ⚠️ A second user is a **failure** of the ticket, and the difference is one line: `updateUser` vs
+   * `signInWithOtp`. That is a fact about which call is made, so it is asserted, not commented.
+   */
+  check('⚠️⚠️ SIGN UP keeps the user id — it is the in-place UPGRADE (ADR-004 rule 4)',
+    ACCOUNT_MODES.signUp.keepsUserId === true);
+  check('⚠️ …confirmed with `email_change`, the type that verifies an ATTACHED email',
+    ACCOUNT_MODES.signUp.verifyType === 'email_change');
+  check('⚠️ …and SIGN IN does NOT claim to keep it — it is a different user, and that is correct',
+    ACCOUNT_MODES.signIn.keepsUserId === false && ACCOUNT_MODES.signIn.verifyType === 'email');
+  check('⚠️ …and the two flows never share a verify type (sharing one is how they would collapse)',
+    ACCOUNT_MODES.signUp.verifyType !== ACCOUNT_MODES.signIn.verifyType);
+  // ⚠️ THE SOURCE — the table above is a STATEMENT; `account.ts` is the CALL. A `signInWithOtp` on the
+  // sign-up road is the second-user bug, so the METHOD CHOICE is asserted too.
+  const accountSrc = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'account.ts'), 'utf8');
+  check('⚠️ …and the DEVICE half makes the upgrade call with `updateUser`, not `signInWithOtp`',
+    accountSrc.includes('auth.updateUser({ email })')
+      && accountSrc.includes('auth.signInWithOtp({ email })'));
+  check('⚠️ …and it reads the verify type from the TABLE, never hard-coding one',
+    accountSrc.includes('ACCOUNT_MODES[mode].verifyType'));
+
+  // ⚠️ THE WALL RULE (ADR-004 · SCRUM-147 · its Amendment 1): never before the first burn, offered after.
+  check('⚠️ the account is NEVER reachable before the first burn — and IS offered after it',
+    ACCOUNT_GATE.reachableBeforeFirstBurn === false && ACCOUNT_GATE.offeredAfterFirstBurn === true);
+  // ⚠️ And the one case the upgrade cannot do: an email that is already an account means SIGN IN, never
+  // the documented data-reassignment workaround — that would be the second user ADR-004 forbids.
+  check('⚠️ an email that already has an account means SIGN IN, never a data reassignment',
+    EMAIL_TAKEN_MEANS_SIGN_IN === true);
+
+  check('⚠️ the code is SIX digits, and only digits (a partial code must not be sent)',
+    ACCOUNT_CODE_LENGTH === 6 && isCompleteCode('123456') && !isCompleteCode('12345')
+      && !isCompleteCode('1234567') && !isCompleteCode('12345a'));
+  check('an empty or malformed email is refused by name',
+    emailProblem('') === 'empty' && emailProblem('nope') === 'no_at'
+      && emailProblem('a@b') === 'no_dot' && emailProblem('a b@c.d') === 'spaces');
+  // ⚠️ POSITIVE CONTROL — the validator must NOT refuse addresses the server would accept.
+  check('⚠️ guard: a legitimate address is not refused by a clever client regex',
+    emailProblem('a+tag@sub.domain.example') === null && emailProblem('x@y.co') === null);
+  check('⚠️ the email is normalised (trim + lower), so one address is one key',
+    normaliseEmail('  A@B.COM ') === 'a@b.com');
+  check('the form steps are email → code, and the code is last',
+    nextAccountStep('email') === 'code' && nextAccountStep('code') === null);
+}
+
 function storeChecks(): void {
   section('29 · Store — the catalogue, the featured item, and the ported art (SCRUM-150)');
   // ⚠️ Re-derived here, not shared: `PROJECT_ROOT` is scoped to the function that makes it.
@@ -2696,6 +2754,7 @@ async function main(): Promise<void> {
   storeChecks();
   itemBurnChecks();
   pickerChecks();
+  accountChecks();
   ancestorSheetChecks();
   tabletNameChecks();
   shrineGeometryChecks();
