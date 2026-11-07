@@ -62,8 +62,13 @@ export function needsTutorial(state: FirstRunState | null | undefined): boolean 
   return state?.tutorialDone !== true;
 }
 
-/** Option C, after the tutorial: the fork, not an auto-created altar. */
-export const AFTER_TUTORIAL_ROUTE = '/clan';
+/**
+ * ⚠️ **Where the TUTORIAL hands off — the ACCOUNT, not the fork** (SCRUM-215 · ADR-004 Amendment 1).
+ * The first-run chain is **demo → account → clan fork**: the amendment made an account REQUIRED to
+ * create or join a clan, so the demo's last beat is the account screen, which then hands off to the
+ * fork (`AFTER_ACCOUNT_ROUTE` in `account-flow.ts`).
+ */
+export const AFTER_TUTORIAL_ROUTE = '/account';
 
 /**
  * How long the tutorial's "preparing" beat lasts.

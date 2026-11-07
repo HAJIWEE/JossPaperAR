@@ -26,9 +26,12 @@ import {
   ACCOUNT_CODE_LENGTH,
   ACCOUNT_GATE,
   ACCOUNT_MODES,
+  AFTER_ACCOUNT_ROUTE,
   EMAIL_TAKEN_MEANS_SIGN_IN,
   emailProblem,
   isCompleteCode,
+  issueKeyFor,
+  meansSignInInstead,
   nextAccountStep,
   normaliseEmail,
 } from '../account-flow.ts';
@@ -974,9 +977,14 @@ function serviceChecks(): void {
   check('⚠️ anything other than an explicit true replays the tutorial',
     needsTutorial({ tutorialDone: undefined as unknown as boolean }));
 
-  // option C, after it
-  check('⚠️ the tutorial hands off to the FORK, not an auto-created altar',
-    AFTER_TUTORIAL_ROUTE === '/clan');
+  // ⚠️ **THE HANDOFF MOVED (SCRUM-215 · ADR-004 Amendment 1).** It used to run straight to the clan
+  // FORK. The amendment made an account REQUIRED to create or join a clan, so the demo's last beat is
+  // the ACCOUNT screen, which then hands off to the fork. ⚠️ Both hops are asserted, because the chain
+  // is only coherent as a chain: **demo → account → fork**.
+  check('⚠️ the tutorial hands off to the ACCOUNT, not straight to the fork (SCRUM-215)',
+    AFTER_TUTORIAL_ROUTE === '/account');
+  check('⚠️ …and the ACCOUNT hands off to the FORK — the next required step (SCRUM-215)',
+    AFTER_ACCOUNT_ROUTE === '/clan');
 
   // the demo receipt
   const devoutDemo = demoReceipt(20);
@@ -2381,6 +2389,25 @@ function accountChecks(): void {
   // the documented data-reassignment workaround — that would be the second user ADR-004 forbids.
   check('⚠️ an email that already has an account means SIGN IN, never a data reassignment',
     EMAIL_TAKEN_MEANS_SIGN_IN === true);
+  // ⚠️ **AND THE DECISION IS APPLIED, NOT JUST DECLARED.** Measured on glass 2026-11-07: a failed
+  // `verifyOtp` printed the RAW `sign_in_failed` in the issue line — so an unmapped reason IS what a
+  // player would have read. `issueKeyFor` is the mapping that stands between the two.
+  check('⚠️ a raw provider reason is NEVER the copy a player reads (issueKeyFor)',
+    issueKeyFor('sign_in_failed', 'code') === 'account.codeWrong' &&
+      issueKeyFor('no_at') === 'account.emailInvalid' &&
+      issueKeyFor('weird_unknown_thing') === 'account.genericIssue');
+  check('…and every key it can return is one the table actually defines, in BOTH locales',
+    [
+      issueKeyFor('invalid token'),
+      issueKeyFor('no_dot'),
+      issueKeyFor('?'),
+      issueKeyFor('sign_in_failed', 'code'),
+      issueKeyFor('otp_expired', 'code'),
+    ].every((k) => MESSAGES.en[k] !== undefined && MESSAGES.zh[k] !== undefined));
+  check('⚠️ EMAIL-ALREADY-TAKEN means SIGN IN — and ONLY on the sign-up road',
+    meansSignInInstead('signUp', 'A user with this email address has already been registered') === true &&
+      meansSignInInstead('signIn', 'already registered') === false &&
+      meansSignInInstead('signUp', 'network timeout') === false);
 
   check('⚠️ the code is SIX digits, and only digits (a partial code must not be sent)',
     ACCOUNT_CODE_LENGTH === 6 && isCompleteCode('123456') && !isCompleteCode('12345')
