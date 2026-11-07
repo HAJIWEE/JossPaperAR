@@ -11,6 +11,10 @@
  *
  * ⚠️ The DECISION (which method, which verify type) is in `account-flow.ts` so `check:lib` can hold it
  * without a device — the same split as `session-map.ts` (pure) and `session.ts` (device).
+ *
+ * ⚠️ **NOT `account-api.ts`.** That file holds the account's SERVER RPCs (`delete_my_data`,
+ * `my_offerings`, `my_collection`) — the data. THIS file holds the AUTH calls that create the identity
+ * that data belongs to.
  */
 
 import { ACCOUNT_MODES, type AccountMode } from './account-flow.ts';
