@@ -253,9 +253,21 @@ web3 = 30
 enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
-double_confirm_changes = true
+# ⚠️ **FALSE — and this is a HARD REQUIREMENT of the anonymous → email upgrade, not a preference
+# (SCRUM-215 · ADR-004, measured 2026-11-07.)** With it TRUE, GoTrue mails the *old* address FIRST and
+# only codes the new one afterwards. ⚠️ **An ANONYMOUS user has no old address**, so there is no
+# recipient: GoTrue answers **200**, writes a pending `email_change` + token — and **sends NOTHING**,
+# forever. Measured exactly that: `PUT /user` → 200, `auth.users.email_change` set, a real
+# `email_change_token_new`, and Inbucket empty. ⚠️ Supabase's DEFAULT is `true`, so this must be set on
+# the HOSTED project too or the sign-up road cannot deliver a code.
+double_confirm_changes = false
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# ⚠️ **TRUE locally (SCRUM-215, 2026-11-07 — this flag was FALSE and it HID the whole flow.)** With it
+# FALSE, GoTrue **auto-confirms** an email change: no mail is sent, **no pending token exists**, and
+# `verifyOtp({ type: 'email_change' })` can only ever fail. Measured that day: `PUT /user` → **200**,
+# Inbucket **empty**, and the confirm step answering `sign_in_failed`. ⚠️ So the email-OTP path is
+# UNTESTABLE locally while this is false — the stack reports success and sends nothing.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -274,6 +286,23 @@ otp_expiry = 3600
 # pass = "env(SENDGRID_API_KEY)"
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
+
+# ═══ Email templates (SCRUM-215) ═══════════════════════════════════════════
+# ⚠️ **THESE CARRY `{{ .Token }}`, AND THAT IS THE POINT.** GoTrue's SHIPPED templates render
+# a LINK (`{{ .ConfirmationURL }}`) — but the account screen is a SIX-BOX CODE ENTRY, so a
+# template with no `{{ .Token }}` sends an email that `verifyOtp(...)` can never match.
+# ⚠️ Measured on the local stack 2026-11-07: the default `email_change` body was a bare link
+# ("Confirm your new email address" → one URL, no code).
+# ⚠️ **LOCAL ONLY.** `content_path` is read by `supabase start`. On the HOSTED project the SAME
+# HTML must be pasted into Dashboard → Authentication → Email Templates or the code never
+# reaches a real inbox (SCRUM-215).
+[auth.email.template.email_change]
+subject = "Confirm your Joss Paper AR email"
+content_path = "./supabase/templates/email_change.html"
+
+[auth.email.template.magic_link]
+subject = "Your Joss Paper AR sign-in code"
+content_path = "./supabase/templates/magic_link.html"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
