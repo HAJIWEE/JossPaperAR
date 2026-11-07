@@ -1637,12 +1637,26 @@ mint the bundle itself.
   `granted:["joss_paper_stack","gold_bar","smartphone","house"]`; `inventory` held **exactly those four,
   no `wealth_bundle` row**; tribute **5000 → 3000** (−2000). The app **rendered** it: the picker showed
   all four **`×1`** and the **Wealth Bundle "Not owned"**; the Store chip read **3000**.
-* ⚠️ **FINDING, NOT FIXED — the featured card has no buy affordance.** `store-featured` is a plain
-  `<View>`; tapping it does nothing, so **the bundle cannot be bought from the UI at all** (only the four
-  "More bundles" cards are `Pressable`). The grant is correct, but the owner's flow *"buying the wealth
-  bundle"* is **unreachable**. ⚠️ Went to the board first: `card · featured` draws a name and a **value**
-  — **no price pill** — so wiring a *points* buy is a **product call, not a build one**; it is entangled
-  with the store rail question (**`SCRUM-212`**).
+* ②b **THE FULL APP FLOW — tap → confirm → Buy → grant (after the owner's SCRUM-221 answer).**
+  Relaunched on the new bundle: the featured card read
+  `FEATURED, Wealth Bundle, base value 2400, 2000 pts`, `clickable="true"`; the confirm read *"Wealth
+  Bundle — 2000 Store Points. It lands as one of each standard offering, ready to burn."*; after **Buy**,
+  Store Points **3000 → 1000** and `inventory` held **2 of each** of the four with **0 `wealth_bundle`
+  rows** (two bundle buys on the ledger, both `actor: store`). The picker rendered all four **`×2`**.
+* ⚠️ **FINDING → FIXED the same day (owner, 2026-11-07).** The **featured** card was a plain `<View>` —
+  tapping it did nothing, so **the bundle could not be bought from the UI at all** (only the four
+  "More bundles" cards were `Pressable`). ⚠️ **The owner settled it:** the bundle **IS buyable** —
+  *"it can be bought with both points and cash… when bought it gives one of each of the rest of the
+  standard offerings, NOT a Wealth Bundle object."* ✅ So `store-featured` is now a **`Pressable`**
+  opening the same buy confirm, with an **added points-price pill** (`2000 pts`), and a
+  **composed-specific confirm body** (`store.buyBodyBundle`: *"…It lands as one of each standard
+  offering…"*) so the confirm cannot promise a bundle OBJECT. 🔒 **2 new `check:lib` assertions** (the
+  featured opener must be a `<Pressable`; a composed buy must use the bundle body), **fault-tested**
+  (View→red, generic body→red; restored→green). ⚠️ **The CASH rail is NOT built** — it is Google Play
+  Billing, a native module this build lacks, with **no read for a cash balance**; so the card draws
+  **no cash price** (inventing one is a product decision). Tracked with **`SCRUM-212`**.
+  ⚠️ **The new `store.buyBodyBundle` ZH string is MY translation** — flagged for the owner's review.
+
 
 
 

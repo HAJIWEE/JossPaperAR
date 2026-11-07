@@ -2304,6 +2304,24 @@ function storeChecks(): void {
   check('⚠️ …and no PLAIN offering carries a composition (only the bundle does)',
     OFFERINGS.filter((o) => o.code !== 'wealth_bundle').every((o) => o.composedOf === undefined));
 
+  /**
+   * ⚠️ **THE FEATURED CARD MUST STAY PURCHASABLE** (SCRUM-221, owner 2026-11-07). It was a plain
+   * `<View>`, so the Wealth Bundle **could not be bought at all** — only the four "More bundles"
+   * cards were `Pressable` (found on the SCRUM-220 device run). ⚠️ Asserted STRUCTURALLY — *the
+   * nearest opener before the featured `testID` must be a `<Pressable`* — so a tidy-up back to a
+   * `<View>` goes red, and re-tuning the card's style cannot break the check.
+   */
+  const storeSrc = readFileSync(join(PROJECT_ROOT, 'src/app/store.tsx'), 'utf8');
+  const featAt = storeSrc.indexOf('testID="store-featured"');
+  const openerAt = Math.max(
+    storeSrc.lastIndexOf('<Pressable', featAt),
+    storeSrc.lastIndexOf('<View', featAt),
+  );
+  check('⚠️ the FEATURED card is PURCHASABLE — a `<Pressable`, not a bare `<View` (SCRUM-221)',
+    featAt > 0 && openerAt > 0 && storeSrc.startsWith('<Pressable', openerAt));
+  check('⚠️ …and a COMPOSED buy gets its OWN confirm body — never one that promises a bundle OBJECT',
+    storeSrc.includes('store.buyBodyBundle') && /buyingOffering\?\.composedOf/.test(storeSrc));
+
   check('⚠️ the meta line is the REDEMPTION BASE (1.2×), not the price — see the board: `base 480`',
     baseMetaValue(getOffering('joss_paper_stack')) === 480,
     String(baseMetaValue(getOffering('joss_paper_stack'))));

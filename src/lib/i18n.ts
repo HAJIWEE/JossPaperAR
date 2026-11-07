@@ -224,6 +224,7 @@ export const MESSAGES = {
     // ── Buying (SCRUM-150) ────────────────────────────────────────
     'store.buyTitle': 'Buy this offering?',
     'store.buyBody': '%{name} — %{points} Store Points. It lands in your offerings, ready to burn.',
+    'store.buyBodyBundle': '%{name} — %{points} Store Points. It lands as one of each standard offering, ready to burn.',
     'store.buyConfirm': 'Buy',
     'store.unreachable': 'The store could not be loaded just now.',
     'collection.title': 'Collection',
@@ -601,6 +602,7 @@ export const MESSAGES = {
     // ── 购买（SCRUM-150）───────────────────────────────────────────
     'store.buyTitle': '购买这份供品？',
     'store.buyBody': '%{name} —— %{points} 功德点。它会进入你的供品，随时可以焚烧。',
+    'store.buyBodyBundle': '%{name} —— %{points} 功德点。它会变成每件标准供品各一份，随时可以焚烧。',
     'store.buyConfirm': '购买',
     'store.unreachable': '暂时无法载入商店。',
     'collection.title': '收藏',
