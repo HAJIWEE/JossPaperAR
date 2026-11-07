@@ -1656,6 +1656,16 @@ mint the bundle itself.
   Billing, a native module this build lacks, with **no read for a cash balance**; so the card draws
   **no cash price** (inventing one is a product decision). Tracked with **`SCRUM-212`**.
   ⚠️ **The new `store.buyBodyBundle` ZH string is MY translation** — flagged for the owner's review.
+* ④ **THE PICKER NO LONGER OFFERS THE BUNDLE — the owner's follow-up (2026-11-07).** *"the wealth bundle
+  should not show up at all NOT Disabled"* — it is **not an item**, and the picker was drawing it as a
+  permanently-unavailable card. `pickerGrid` now filters to **standard items** (`composedOf === undefined`),
+  so the grid is **the four**; ⚠️ the bundle is **absent, not disabled**. ⚠️ This **overrides the board's
+  own six-item drawing** (which includes a `card · Wealth Bundle` in the unavailable state) and
+  **retires** `picker.ts`'s old rationale (*"no migration has ever set `burnable` false, so filtering
+  would be a client-side copy"*) — migration `20261107120000` **did**. 🔒 New **§31** in `check:lib`
+  (+5), fault-tested (filter removed → **4 red**; restored → green). ✅ On glass: the picker listed
+  **only** `joss_paper_stack · gold_bar · smartphone · house` — **no `wealth_bundle` testID at all**. ⚠️
+  The only surface the bundle still appears on is the **Store**, where it is purchasable — by design.
 
 
 

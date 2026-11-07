@@ -6,14 +6,17 @@
  * ever sent a capture (`reward.tsx` calls `submitBurn(captureId, …)`). So `item_code` was a field the
  * client *rendered* and never *produced*: an item burn was reachable by no screen at all.
  *
- * ⚠️ **An unowned item is DRAWN, and drawn as unavailable** — the board does exactly that
- * (`card · Wealth Bundle (bg)` is `fill=none` with an outline stroke where the other five are
- * filled). ⚠️ A picker built from the inventory alone would show a NEW player an empty grid and say
- * nothing about what exists; this shows what exists and what is missing.
+ * ⚠️ **An unowned ITEM is DRAWN, and drawn as unavailable.** ⚠️ The board's own example of that state
+ * was `card · Wealth Bundle (bg)` — but the bundle **is not an item**, and the owner's rule
+ * (2026-11-07) is that it must **not appear at all**, not even disabled. So it is **excluded** from
+ * the grid (see `lib/picker.ts`); the unavailable state now applies to the unowned **standard items**
+ * — which is exactly what a new player sees, all of them. A picker built from the inventory alone
+ * would show a NEW player an empty grid and say nothing about what exists; this shows what exists and
+ * what is missing.
  *
- * ⚠️ **The list is the CATALOGUE, not the board's six.** See `lib/picker.ts`: the board's bases are
- * the catalogue's shifted by one and it carries a *Joss Stack* no catalogue entry has. The catalogue
- * is code-owned and the SERVER re-reads it on every burn.
+ * ⚠️ **The list is the CATALOGUE's items, not the board's six.** See `lib/picker.ts`: the board's
+ * bases are the catalogue's shifted by one and it carries a *Joss Stack* no catalogue entry has. The
+ * catalogue is code-owned and the SERVER re-reads it on every burn.
  */
 
 import { useCallback, useEffect, useState } from 'react';

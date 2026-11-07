@@ -21,6 +21,7 @@ import { NAV_TABS, activeTabKey, isSamePath, tabPressIsNoop } from '../nav.ts';
 import { COLLECTION, COLLECTION_SLOTS, collectionGrid, collectionOverflows, collectedItemName, displayBurnCount } from '../collection.ts';
 import { CASH_IS_READABLE, FEATURED_CODE, STORE_TABS, baseMetaValue, pointsPrice, storeList } from '../store.ts';
 import { ART_BOX, artCodes, artSize, fitArt } from '../offering-art.ts';
+import { pickerGrid } from '../picker.ts';
 import { readBurnParams, readItemBurnParams, readItemRewardParams, readRewardParams } from '../route-params.ts';
 import { getOffering } from '../../domain/catalogue.ts';
 import { bookView, showsBookSectionTitle } from '../clan-roles.ts';
@@ -2273,6 +2274,31 @@ function itemBurnChecks(): void {
     !readRewardParams({ itemCode: 'house', offsetPx: '10' }).ok);
 }
 
+function pickerChecks(): void {
+  section('31 · The offerings picker — a BUNDLE is not an item, so it is NOT offered (SCRUM-221)');
+  /**
+   * ⚠️ **AN EMPTY INVENTORY, so `owned`/`qty` are all zero and ONLY the LIST is under test.** The
+   * owner's rule (2026-11-07): the Wealth Bundle must not appear in the picker **at all** — ⚠️ not
+   * even as a disabled card — because buying it grants one of each of its parts and the SERVER never
+   * writes a `wealth_bundle` row, so it could only ever render permanently unavailable.
+   */
+  const cells = pickerGrid({});
+  check('⚠️ the picker offers every STANDARD item — the four, in catalogue order',
+    cells.map((c) => c.code).join(',') === 'joss_paper_stack,gold_bar,smartphone,house');
+  check('⚠️⚠️ …and NEVER the Wealth Bundle — not even disabled (owner, 2026-11-07)',
+    !cells.some((c) => c.code === 'wealth_bundle'));
+  check('⚠️ …and the exclusion is the COMPOSED rule, not a hard-coded name',
+    cells.length === OFFERINGS.filter((o) => o.composedOf === undefined).length
+      && OFFERINGS.filter((o) => o.composedOf !== undefined).every((o) => !cells.some((c) => c.code === o.code)));
+  // ⚠️ POSITIVE CONTROL — a filter that returned NOTHING would "pass" the exclusion above.
+  check('⚠️ guard: the picker is NOT empty — it renders the four items, each unowned',
+    cells.length === 4 && cells.every((c) => !c.owned && c.qty === 0));
+  // ⚠️ And the bundle is STILL in the catalogue — the exclusion is the PICKER's, not a deletion of the
+  // item: the Store must keep featuring + selling it.
+  check('⚠️ guard: the bundle is still IN the catalogue — only excluded from the picker',
+    OFFERINGS.some((o) => o.code === 'wealth_bundle' && o.composedOf !== undefined));
+}
+
 function storeChecks(): void {
   section('29 · Store — the catalogue, the featured item, and the ported art (SCRUM-150)');
   // ⚠️ Re-derived here, not shared: `PROJECT_ROOT` is scoped to the function that makes it.
@@ -2629,6 +2655,7 @@ async function main(): Promise<void> {
   collectionChecks();
   storeChecks();
   itemBurnChecks();
+  pickerChecks();
   ancestorSheetChecks();
   tabletNameChecks();
   shrineGeometryChecks();
