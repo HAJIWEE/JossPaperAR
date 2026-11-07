@@ -847,6 +847,13 @@ check('the zoom a11y label interpolates the numeral (and announces it)',
  *   · the idle breath no longer multiplied into the reaction's scale → 1 red;
  *   · `rotate: idleSway` added to the ember bed → 1 red.
  * 12 breaks, 12 reds, 0 survivors. Restored → 205/205 green.
+ *
+ * ⚠️ AND THE S74 ADDITIONS (2026-11-07) — the picker CTA's placement. THREE checks, each
+ * fault-tested against the green baseline of **241**:
+ *   · `styles.chooseOffering` returned to `position:'absolute'` → **1 red** (the not-absolute check);
+ *   · a `bottom` restored to `const CHOOSE` → **1 red**;
+ *   · the button reordered to AFTER the zoom strip → **1 red**.
+ * 3 breaks, 3 reds, 0 survivors. Restored → **241/241 green**.
  */
 section('⑤ the S64 polish — where the controls sit and what the fire does');
 
@@ -866,6 +873,22 @@ check('⚠️ the zoom strip renders BETWEEN the hint and the shutter (S64 — t
 check('⚠️ …and the HUD is the box that absorbs the slack — NOT the shutter',
   /hud: \{ flex: 1, alignItems: 'center' \}/.test(captureSrc)
     && !/shutterRow: \{[^}]*flex: 1/.test(captureSrc));
+
+/*
+ * ⚠️ THE PICKER CTA MUST NOT SIT ON THE ZOOM STRIP (device report, 2026-11-07).
+ * `capture-choose-offering` was `position:'absolute', bottom:132` — a fixed number written BEFORE
+ * the zoom strip moved to the thumb (S64). The strip occupies the bottom ~120–164 dp and RISES with
+ * `insets.bottom`; the button's `bottom` did not. On glass it landed ON the preset pills.
+ * ⚠️ Asserted by ORDER and by the ABSENCE of absolute positioning — never a pixel: a fixed `bottom`
+ * can be re-tuned to pass a pixel test on one device and still cover the pills on the next.
+ */
+const chooseAt = captureSrc.indexOf('styles.chooseOffering');
+check('⚠️ the picker CTA renders BETWEEN the hint and the zoom strip — never ON it (device report)',
+  chooseAt > hudAt && chooseAt < zoomAt);
+check('⚠️ …and it is NOT absolutely positioned — only the FLOW can clear a strip that moves with the safe area',
+  !/chooseOffering: \{[^}]*position: 'absolute'/.test(captureSrc));
+check('⚠️ …and `CHOOSE` carries no `bottom` — the magic number that caused the overlap is gone',
+  !/const CHOOSE = \{[^}]*bottom/.test(captureSrc));
 
 /*
  * THE PILL. The relationship is the assertion: the visible pill is half the target,

@@ -1596,6 +1596,35 @@ stack **and** hosted, verified by read-back. ⚠️ `league_bootstrap.sql` faile
 a **dirty** local DB and passes on a clean one — residue, not order-sensitivity; a `db reset` before
 trusting a suite run remains the rule.
 
+## ✅ S74 (2026-11-07) — TWO DEVICE-RUN DEFECTS FIXED: the picker CTA covered the zoom presets, and the Wealth Bundle minted itself
+
+The owner ran the standalone APK on the floor device and reported two things. Both are fixed on
+**`cline/b5206`**, tracked as **`SCRUM-220`** (sprint 3, id 67, `In Review`). ⚠️ **US$0.00** — no AI
+call, no device run.
+
+1. ⚠️ **THE PICKER CTA SAT ON THE ZOOM PRESETS.** `src/app/capture.tsx` positioned
+   `capture-choose-offering` at `position:'absolute', bottom:132` — a number written **before** the zoom
+   strip moved to the thumb (S64). The cluster (read-out · track · presets) now fills the bottom
+   **~120–164 dp** and **rises with `insets.bottom`**; the button's fixed `bottom` did not, so on glass it
+   landed **on** the preset pills. ⚠️ **A fixed `bottom` cannot be correct on every device — only the
+   FLOW can.** ✅ It is now a **flex child above the read-out** (the HUD's `flex:1` pins it there) and
+   `CHOOSE` carries no `bottom`. 🔒 **3 new `check:framing` assertions** (source order · not-absolute ·
+   no `bottom` constant), **fault-tested**. `check:framing` **238 → 241**.
+
+2. ⚠️ **THE WEALTH BUNDLE WAS AN ITEM, NOT A BUNDLE.** `purchase_item` always wrote the **purchased**
+   `item_code` into `inventory`, so buying `wealth_bundle` minted one `wealth_bundle` row. The catalogue
+   already knew better in TypeScript (`composedOf`), but the **SQL mirror had no such column** — the
+   server had nothing to act on. ✅ Migration **`20261107120000_wealth_bundle_composition.sql`** adds
+   `offerings_catalog.composed_of text[]`, marks the bundle **`burnable = false`**, and rewrites
+   `purchase_item` to grant **one of each of the other four** and **never the bundle**. `seed.sql`
+   mirrors it (and its sanity check now asserts the composition). 🔒 New
+   **`supabase/tests/purchase_bundle.sql` (B1–B5)** — green, and **fault-tested** (breaking the
+   composition → **B1 RED** `granted:["wealth_bundle"]` → restore → green).
+
+**Gates:** `tsc` 0 · `check:framing` **241** · `check:lib` **726** · `check:sql` **31 migrations** · the
+new SQL test green. ⚠️ **Not on glass yet** — a device pass (Expo Go + Metro) is the next step.
+
+
 ## Next, in order
 
 1. ✅ **DONE 2026-11-01 (S73) — the new art IS on glass** (S72-final §1). The Store draws the featured

@@ -2286,6 +2286,24 @@ function storeChecks(): void {
   check('⚠️ guard: the featured item is NOT also in the list beneath it',
     !more.some((o) => o.code === FEATURED_CODE));
 
+  // ⚠️ THE BUNDLE IS A BUNDLE, NOT AN ITEM (device report, 2026-11-07). `purchase_item` now reads
+  // `offerings_catalog.composed_of` — the SQL twin of this code field — and grants one of each
+  // component, never the bundle itself. The SERVER behaviour is asserted in
+  // `supabase/tests/purchase_bundle.sql`; THIS holds the code mirror the server was copied from, so a
+  // change here that is not mirrored there is at least visible.
+  check('⚠️ the Wealth Bundle COMPOSES the other four — it is not an item by itself',
+    (() => {
+      const bundle = getOffering('wealth_bundle');
+      const others = OFFERINGS.filter((o) => o.code !== 'wealth_bundle').map((o) => o.code);
+      return bundle.composedOf !== undefined
+        && bundle.composedOf.length === others.length
+        && others.every((c) => bundle.composedOf?.includes(c));
+    })());
+  check('…and it does NOT list itself — a bundle of one is not a bundle',
+    !(getOffering('wealth_bundle').composedOf ?? []).includes('wealth_bundle'));
+  check('⚠️ …and no PLAIN offering carries a composition (only the bundle does)',
+    OFFERINGS.filter((o) => o.code !== 'wealth_bundle').every((o) => o.composedOf === undefined));
+
   check('⚠️ the meta line is the REDEMPTION BASE (1.2×), not the price — see the board: `base 480`',
     baseMetaValue(getOffering('joss_paper_stack')) === 480,
     String(baseMetaValue(getOffering('joss_paper_stack'))));

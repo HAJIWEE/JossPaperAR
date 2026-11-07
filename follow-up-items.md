@@ -516,3 +516,14 @@
   owner's call). ⚠️ **The trade-off is permanent: the art cannot be recoloured, does not scale
   losslessly, and costs ~2.4 MB of bundled assets.** If the style changes again these are
   **regenerated, not edited**. Option 1 (re-trace as `react-native-svg`) was declined.
+
+- ✅ **FIXED 2026-11-07 (S74) — the picker CTA covered the zoom presets, and the Wealth Bundle minted
+  itself instead of its contents** (`SCRUM-220`, both from the owner's device run). ⚠️ The layout defect
+  was a **magic number** (`absolute, bottom:132`) written before the zoom strip moved to the thumb (S64)
+  — the strip rises with `insets.bottom`, a fixed `bottom` cannot; the button is now a **flex child**
+  above the cluster, pinned by **3 new `check:framing` assertions**. ⚠️ The economy defect was a
+  **missing SQL mirror**: the catalogue's `composedOf` had no `offerings_catalog` column, so
+  `purchase_item` granted the bundle itself. Now **`composed_of`** exists, the bundle is
+  **non-burnable**, and a purchase grants **one of each component** — pinned by the new
+  **`supabase/tests/purchase_bundle.sql` (B1–B5)**, fault-tested. ⚠️ **US$0.00 AI spend.**
+

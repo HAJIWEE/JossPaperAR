@@ -18,18 +18,26 @@
 -- Mirrors OFFERINGS in src/domain/catalogue.ts. Prices 400 · 600 · 800 · 1200
 -- · 2000. The House price is DERIVED from its documented base of 1,440
 -- (1440 / 1.2) and is flagged `derived` in the code — confirm before launch.
-insert into public.offerings_catalog (code, name_en, name_zh, tier, price, burnable) values
-  ('joss_paper_stack', 'Joss Paper Stack', null, 1,  400, true),
-  ('gold_bar',         'Gold Bar',         null, 2,  600, true),
-  ('smartphone',       'Smartphone',       null, 3,  800, true),
-  ('house',            'House',            null, 4, 1200, true),
-  ('wealth_bundle',    'Wealth Bundle',    null, 5, 2000, true)
+--
+-- ⚠️ `wealth_bundle` is a BUNDLE, NOT an item (device report, 2026-11-07): its
+-- `composed_of` is the other four codes, and it is `burnable = false`. Buying it
+-- grants one of each component and NEVER a `wealth_bundle` inventory row — the
+-- behaviour lives in `purchase_item` (migration 20261107120000). `composed_of` is
+-- the SQL twin of `Offering.composedOf` in the code catalogue.
+insert into public.offerings_catalog (code, name_en, name_zh, tier, price, burnable, composed_of) values
+  ('joss_paper_stack', 'Joss Paper Stack', null, 1,  400, true,  null),
+  ('gold_bar',         'Gold Bar',         null, 2,  600, true,  null),
+  ('smartphone',       'Smartphone',       null, 3,  800, true,  null),
+  ('house',            'House',            null, 4, 1200, true,  null),
+  ('wealth_bundle',    'Wealth Bundle',    null, 5, 2000, false,
+     array['joss_paper_stack', 'gold_bar', 'smartphone', 'house'])
 on conflict (code) do update set
   name_en = excluded.name_en,
   name_zh = excluded.name_zh,
   tier    = excluded.tier,
   price   = excluded.price,
-  burnable = excluded.burnable;
+  burnable = excluded.burnable,
+  composed_of = excluded.composed_of;
 
 -- ── Decorations — permanent, NEVER burn (a points SINK) ────────────────────
 -- Names are locked (S14). `price` stays NULL: no doc states a decoration price,
@@ -64,6 +72,16 @@ begin
       or (code = 'wealth_bundle'    and base_value <> 2400);
   if bad > 0 then
     raise exception 'seed: % offering(s) have a base_value that is not 1.2 x price', bad;
+  end if;
+  -- ⚠️ the bundle is a BUNDLE: composed of the other four, and NOT burnable (2026-11-07)
+  select count(*) into bad from public.offerings_catalog
+   where code = 'wealth_bundle'
+     and (burnable
+          or composed_of is null
+          or (select array_agg(x order by x) from unnest(composed_of) x)
+             <> array['gold_bar', 'house', 'joss_paper_stack', 'smartphone']);
+  if bad > 0 then
+    raise exception 'seed: wealth_bundle must be non-burnable and composed of the other four';
   end if;
   raise notice 'seed ok — % offerings · % decorations · every base_value = 1.2 x price', n_offer, n_decor;
 end;
