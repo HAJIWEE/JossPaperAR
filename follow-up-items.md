@@ -15,6 +15,13 @@
   - ⚠️⚠️ **Four defects found only on glass** (every gate was green): a `<Stack.Screen>` declaration **became the initial route**; a **route param arrived empty** and told a clan HEAD it could not edit; tabs at board `top:774` **rendered no tabs at all**; a **Latin name stacked one letter per line**.
   - ⏳ **Still open on the parent `SCRUM-148`** — do **not** read the commits as closing it:
 
+- 📱 **S77 (2026-11-07) — the ACCOUNT screen is built, and the first-run chain is `demo → ACCOUNT → clan fork` (`SCRUM-215`). ⚠️ US$0.00 AI spend; Expo Go over `adb reverse` against a LOCAL stack.**
+  - ✅ **On glass (`HN615L005386`):** all **8 testIDs** render, board-faithful to ~1% (title 276 px, field 521, button 1246, link 1383); the code step, the six boxes and the confirm path all ran; and the `LANGUAGE` caption now carries the **real `LocaleToggle`** (**SCRUM-218**), so 中文 is reachable without a probe.
+  - ✅ **⚠️ THE ONE THING THAT MATTERS — PROVEN, NOT ASSUMED:** the local auth log shows **`PUT /user` status 200** and the **SAME `auth.users` id** (`8c9cd9d7-…`) gaining `demo@example.com` — the **in-place UPGRADE**, **not** a second user. `POST /otp` 200 on the same id is the returning-user road.
+  - ⚠️⚠️ **BOTH BLOCKERS ARE STILL OPEN, and the success path cannot be verified without them:** (1) **SMTP + two email templates carrying `{{ .Token }}`** — the local stack runs confirmations **disabled**, which is why **Inbucket stayed empty**; (2) **`20261107120000` is unpushed**, so **hosted still mints `wealth_bundle`**.
+  - ⚠️ **Two recorded DEVIATIONS from the board, not guesses:** `field · name` (**FAMILY NAME**, `0d6` @20,250) is **omitted** — **SCRUM-214(A)** is open and `profiles.display_label` is the natural column, but no write path is agreed; and `0c`'s `Use a password instead` / `Forgot or need help?` are omitted because **phase 1 is code-only**.
+  - ⚠️ **`check:copy` was flagging CORRECT code** — it could not read object **shorthand** (`{ email }` has no colon), so every shorthand placeholder read as unsubstituted; the mirror of the blind first `check:copy`. Fixed, **+2 controls** (quiet on shorthand · still bites when shorthand omits one).
+
 - 🧭 **`SCRUM-163` (To Do) — the geometry gate, incl. the 360 dp assertions.** Cheap. It is what stops the **absolute-vs-board-relative** class that has now shipped **four** times.
 - 🧭 **`SCRUM-164` (In Progress) — the tab bar is built, but the ticket asks for a **Book** entry and **a way back** from each destination.** Neither exists.
 - 🎯 **`SCRUM-208` (To Do) — ⚠️ YOURS, not mine: the Home board's active tab is `#9A2B18` on `#C23B22` = **1.44:1**. The build ships 4.90:1 and §22 pins both, but the **board** still needs the fix.**

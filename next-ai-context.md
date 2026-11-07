@@ -1691,14 +1691,51 @@ mint the bundle itself.
 
 
 
+## 2026-11-07 (S77) — the ACCOUNT is built, and the chain is demo → ACCOUNT → clan fork
+
+**`SCRUM-215`'s screen is on glass** (`src/app/account.tsx`), built to `EN · 0d6` / `0d7` / `0c` and their
+ZH twins. ⚠️ **The chain moved**: `AFTER_TUTORIAL_ROUTE` is now `/account` (`/clan` before) and the
+account hands off to `/clan` — both hops asserted in `check:lib`, because a chain is only coherent as a
+chain. The account screen also carries the **real `LocaleToggle`** under the board's `LANGUAGE` caption
+(SCRUM-218), so 中文 is now reachable without a probe.
+
+**Proven, not assumed** (HN615L005386 · local stack, so mail lands in Inbucket and never an inbox):
+
+- all **8 testIDs** render, board-faithful to ~1% — title 276 px, field 521, button 1246, link 1383;
+- ⚠️ **`PUT /user` answered 200 and the SAME `auth.users` id gained `demo@example.com`** — the in-place
+  **UPGRADE** the ADR-004 rule requires, **not** a second user. `POST /otp` 200 on the same id is the
+  returning-user road. This is the one thing the ticket calls a failure if broken, and it holds;
+- the code step, the six boxes and the confirm path all ran.
+
+**Two defects the glass caught** (every gate was green, again): `AppMark` is
+`Svg width/height="100%"`, so an unsized parent let it **fill the screen** and pushed every element below
+the fold; and a failed `verifyOtp` printed the raw **`sign_in_failed`** — a reason is not copy, so
+`issueKeyFor(reason, step)` now maps it to the board's sentence.
+
+⚠️ **NOT done, and not claimable:** the **SUCCESS path** needs SMTP plus two templates that carry
+`{{ .Token }}` — the local stack runs confirmations **disabled**, which is exactly why Inbucket stayed
+empty — and `20261107120000` is still **unpushed**, so hosted mints `wealth_bundle`.
+
+⚠️ **Two deviations from the board, recorded rather than guessed:** `field · name` (FAMILY NAME, `0d6`
+@20,250) is **omitted** — SCRUM-214(A) is open and `profiles.display_label` is the natural column, but no
+write path is agreed; and `0c`'s `Use a password instead` / `Forgot or need help?` are omitted because
+phase 1 is code-only.
+
+⚠️ **And `check:copy` was flagging CORRECT code**: it could not read object **shorthand** (`{ email }` has
+no colon), so every shorthand placeholder read as unsubstituted — the mirror of the blind first
+`check:copy`. Fixed, with two controls (one that is quiet on shorthand, one that still bites).
+
 ## Next, in order
 
-1. ✅ **DONE 2026-11-01 (S73) — the new art IS on glass** (S72-final §1). The Store draws the featured
+1. **`SCRUM-215`'s remaining half** — the SMTP provider + the two templates carrying `{{ .Token }}`, then
+   `supabase db push` for `20261107120000` (**hosted still mints `wealth_bundle`**). ⚠️ Both are blockers,
+   not polish: the success path cannot be verified without them.
+2. ⚠️ **SCRUM-214(A)** — FAMILY NAME: include the field (writing `profiles.display_label`) or drop it
+   from the boards? The account screen currently omits it, which is a **deviation**.
+3. ✅ **DONE 2026-11-01 (S73) — the new art IS on glass** (S72-final §1). The Store draws the featured
    Wealth Bundle and all four cards in the pipeline's low-poly style, and the predicted `smartphone`
-   problem did **not** appear. ⚠️ **Still unseen: the picker and the 72 px burn box** — the Store's card
-   size is verified, those two are not. ⚠️ And the Collection did **not** exercise the art (this account
-   has bought but never burned, so its grid is correctly empty).
-2. **`7d` item detail and `7e`'s own buy sheet** — the cash rail is native (Play Billing · EAS · Play
+   problem did **not** appear. ⚠️ **Still unseen: the picker and the 72 px burn box**.
+4. **`7d` item detail and `7e`'s own buy sheet** — the cash rail is native (Play Billing · EAS · Play
    Console). `SCRUM-212`.
-3. ⚠️ **Correct the stale "no policy" sentence** in `history.tsx` and `my_offerings.sql` (§3.1).
+5. ⚠️ **Correct the stale "no policy" sentence** in `history.tsx` and `my_offerings.sql` (§3.1).
 
