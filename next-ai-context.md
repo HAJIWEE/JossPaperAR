@@ -1622,7 +1622,28 @@ call, no device run.
    composition → **B1 RED** `granted:["wealth_bundle"]` → restore → green).
 
 **Gates:** `tsc` 0 · `check:framing` **241** · `check:lib` **726** · `check:sql` **31 migrations** · the
-new SQL test green. ⚠️ **Not on glass yet** — a device pass (Expo Go + Metro) is the next step.
+new SQL test green.
+
+**✅ ON GLASS, 2026-11-07 (S74).** Both fixes ran on the floor device (**720×1600 · Android 15**) via
+**Expo Go + Metro** (`adb reverse 8081`) against the **LOCAL Supabase stack** (`adb reverse 54321`) —
+pointed there **because the new migration is not deployed to hosted**, so the hosted server would still
+mint the bundle itself.
+
+* ① **Picker CTA** — `uiautomator` bounds: `capture-choose-offering` **[196,935][524,1023]** sits ABOVE
+  `zoom-readout` **[343,1087]** and the presets `zoom-stop-*` **[…,1240][…,1328]** — **217 px** of
+  clearance, no overlap (the old `bottom:132` would have placed it at ~1468, ON the pills). Screenshot
+  confirms it reads on the live camera.
+* ② **Wealth Bundle** — the app's own `purchase_item` for the device user returned
+  `granted:["joss_paper_stack","gold_bar","smartphone","house"]`; `inventory` held **exactly those four,
+  no `wealth_bundle` row**; tribute **5000 → 3000** (−2000). The app **rendered** it: the picker showed
+  all four **`×1`** and the **Wealth Bundle "Not owned"**; the Store chip read **3000**.
+* ⚠️ **FINDING, NOT FIXED — the featured card has no buy affordance.** `store-featured` is a plain
+  `<View>`; tapping it does nothing, so **the bundle cannot be bought from the UI at all** (only the four
+  "More bundles" cards are `Pressable`). The grant is correct, but the owner's flow *"buying the wealth
+  bundle"* is **unreachable**. ⚠️ Went to the board first: `card · featured` draws a name and a **value**
+  — **no price pill** — so wiring a *points* buy is a **product call, not a build one**; it is entangled
+  with the store rail question (**`SCRUM-212`**).
+
 
 
 ## Next, in order
