@@ -1683,9 +1683,10 @@ mint the bundle itself.
   2 red; demo guard removed → 2 red; restored → green. ✅ **On glass** (Expo Go + Metro, `/capture?demo=1`):
   the demo screen shows **no camera feed**, the Joss Paper Stack art, and *"…you offer a Joss Paper
   Stack…"*; **Offer it** → *"The offering is being prepared…"* → `/burn` drawing the catalogue art.
-  ⚠️ **OPEN, flagged not fixed:** `/burn` still mounts a camera as the ritual **backdrop** (by design —
-  ticket node 4 — it takes no photo), so a *literal* reading of the acceptance's *"never opens the
-  camera"* is **not** met; the backdrop is a separate design element the ticket did not ask to remove.
+  ✅ **THE ONE QUESTION IS ANSWERED (owner, 2026-11-07):** *"the 'never opens the camera' is only for the
+  capture phase of the demo, the burn stage should still be what it is currently."* So the `/burn`
+  backdrop camera **STAYS** — the acceptance's *"never opens the camera"* is scoped to the **CAPTURE**
+  phase, and the build is correct **as-is**. ⚠️ No change, and the ticket's acceptance is fully met.
 
 
 
