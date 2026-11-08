@@ -39,7 +39,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHud } from '@/components/screen-hud';
 import { pipelineFailed, preparingCopy } from '@/domain/slice';
 import { t } from '@/lib/i18n';
-import { toBurnParams } from '@/lib/route-params';
+import { toBurnParams, toItemBurnParams } from '@/lib/route-params';
 import {
   probeVerdict,
   registerCapture,
@@ -76,9 +76,11 @@ const PROBE_DELAY_MS = 3000;
 export default function Preparing(): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { captureId, uri, demo: demoParam } = useLocalSearchParams<{
+  const { captureId, uri, itemCode, demo: demoParam } = useLocalSearchParams<{
     captureId: string;
     uri: string;
+    /** ⚠️ SCRUM-216 — the DEMO carries an `itemCode`, not a capture: it never photographs. */
+    itemCode: string;
     demo?: string;
   }>();
   /** SCRUM-85 — a demo skips the upload and the generation entirely. */
@@ -107,29 +109,32 @@ export default function Preparing(): React.JSX.Element {
   }, []);
 
   const run = useCallback(async () => {
+    // ── SCRUM-216 · THE TUTORIAL: no server, no AI, no camera, no spend ─────
+    // ⚠️ The demo is an ITEM burn now, not a photo one: it arrives with an `itemCode` and **neither a
+    // `captureId` nor a `uri`** (the camera is never opened). ⚠️ So its guard is checked FIRST — a demo
+    // that fell into the photo guard below would `goOffline('bad_params')`.
+    //
+    // ⚠️ Nothing is uploaded and nothing is generated, so the wait is a LOCAL timer. The demo is honest
+    // because the SCREENS are real; only the network is not.
+    if (demo) {
+      if (typeof itemCode !== 'string' || itemCode.length === 0) {
+        goOffline('bad_params');
+        return;
+      }
+      setPhase({ kind: 'working' });
+      await new Promise((resolve) => setTimeout(resolve, TUTORIAL_WAIT_MS));
+      setPhase({ kind: 'done' });
+      // ⚠️ `toItemBurnParams` keeps the DEMO flag riding the hop (SCRUM-85/216): without it `/burn`
+      // would submit a REAL item burn (`submit_burn`), the exact spend this exists to stop.
+      router.push({ pathname: '/burn', params: toItemBurnParams(itemCode, true) });
+      return;
+    }
+
     if (typeof captureId !== 'string' || typeof uri !== 'string') {
       goOffline('bad_params');
       return;
     }
     setPhase({ kind: 'working' });
-
-    // ── SCRUM-85 · THE TUTORIAL: no server, no AI, no spend ────────────────
-    // ⚠️ This branch is the whole point of the demo. Letting it fall through to
-    // the real pipeline would upload the photo and request a Path C generation
-    // for EVERY new user — ≈ US$0.09 each, invisible, because it happens before
-    // any quota, clan or `app_config` budget row exists to catch it.
-    //
-    // So the offering passes through untouched and the wait is a local timer.
-    // The demo is honest because the SCREENS are real; only the network is not.
-    if (demo) {
-      await new Promise((resolve) => setTimeout(resolve, TUTORIAL_WAIT_MS));
-      setPhase({ kind: 'done' });
-      // ⚠️ `null`, not a guessed path: the tutorial never contacts the
-      // orchestrator, so there IS no sprite in the `styled` bucket. Inventing a
-      // key here would make `/burn` sign an object that was never uploaded.
-      router.push({ pathname: '/burn', params: toBurnParams(captureId, uri, null, true) });
-      return;
-    }
 
     // ── 0 · a session the server will accept (ADR-004 / SCRUM-80) ───────────
     // Every step below is an authenticated call; with no session `registerCapture`
@@ -266,7 +271,7 @@ export default function Preparing(): React.JSX.Element {
       // the provider.
       await new Promise((resolve) => setTimeout(resolve, PROBE_DELAY_MS));
     }
-  }, [captureId, uri, demo, router, goOffline]);
+  }, [captureId, uri, itemCode, demo, router, goOffline]);
 
   // `started` guards against React 18 StrictMode double-invoking effects, which
   // would upload twice and — because `unique(capture_id)` makes the job

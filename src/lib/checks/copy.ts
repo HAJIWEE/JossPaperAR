@@ -184,7 +184,19 @@ const placeholdersIn = (message: string | undefined): string[] =>
 function literalArgKeys(rest: string): string[] | null {
   const m = /^\s*\{\s*([^}]*)\}\s*\)/.exec(rest);
   if (m === null || m[1].includes('...')) return null; // not an object literal / a spread
-  return [...m[1].matchAll(/(?:^|,)\s*([A-Za-z0-9_]+)\s*:/g)].map((k) => k[1]);
+  /**
+   * ⚠️ **SHORTHAND COUNTS** (`{ email }` supplies `email`). The first version matched `key:` only, so a
+   * shorthand object yielded NO keys and every declared placeholder looked unsubstituted — ⚠️ a check
+   * flagging CORRECT code, the mirror of the blind first `check:copy` this file's header records.
+   */
+  return m[1]
+    .split(',')
+    .map((entry) => {
+      const colon = entry.indexOf(':');
+      const name = (colon === -1 ? entry : entry.slice(0, colon)).trim();
+      return /^[A-Za-z0-9_]+$/.test(name) ? name : '';
+    })
+    .filter((k) => k.length > 0);
 }
 
 /**
@@ -252,6 +264,18 @@ check('no t() call is split across lines (the stated blind spot is empty)',
 check('the detector fires on a no-arg call whose message HAS placeholders (positive control)',
   unsubstitutedIn("const x = t('clan_preview');").length > 0,
   'the placeholder rule is blind — check T_CALL');
+/**
+ * ⚠️ **AND IT MUST BE QUIET ON SHORTHAND** (`{ email }`), because shorthand DOES substitute — the first
+ * version of `literalArgKeys` read only `key:` and so flagged correct code. ⚠️ The second control is
+ * what stops the fix from becoming "accept anything": a shorthand object that omits the placeholder
+ * must STILL fire.
+ */
+check('…but it is QUIET on a SHORTHAND object that supplies the key (the false positive)',
+  unsubstitutedIn("const x = t('account.verifySub', { email });").length === 0,
+  'shorthand is being read as an empty object again');
+check('…and it still BITES when a shorthand object omits the placeholder',
+  unsubstitutedIn("const x = t('account.verifySub', { address });").length > 0,
+  'the shorthand fix made the detector accept anything');
 check('…and on an inline object that omits one',
   unsubstitutedIn("const x = t('clan_preview', { name: 'Tan', ancestors: 0 });").length > 0,
   'the object-key reader is blind');

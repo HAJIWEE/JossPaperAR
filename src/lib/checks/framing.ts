@@ -686,8 +686,15 @@ check('…and the thumb is placed by the INVERSE of the drag mapping',
   captureSrc.includes('zoomTrackOffset(zoomFraction, trackWidth)'));
 check('the shutter screen hops to /crop, with the id and the size',
   captureSrc.includes("pathname: '/crop'") && captureSrc.includes('toCropParams('));
-check('⚠️ …and no longer pushes the whole frame straight at /preparing',
-  !captureSrc.includes("pathname: '/preparing'"));
+/*
+ * ⚠️ **SCRUM-216 CHANGED WHAT THIS MEANS.** The old assertion was simply *"the shutter never pushes
+ * `/preparing`"* — true while the demo went through `/crop` like a real capture. ⚠️ The demo now SKIPS
+ * the crop step (there is no photo to frame) and pushes `/preparing` directly, so the rule is no longer
+ * *"never"* but **"exactly once, and only from the DEMO branch"**: the PHOTO path must still frame first.
+ */
+check('⚠️ …so the ONLY /preparing push is the DEMO’s — the photo path always frames first (SCRUM-216)',
+  (captureSrc.match(/pathname: '\/preparing'/g) ?? []).length === 1
+    && captureSrc.indexOf("pathname: '/preparing'") > captureSrc.indexOf('if (demo)'));
 
 /*
  * ⚠️ THE CLAN SCREEN'S HALF OF SCRUM-123. The card's geometry is asserted in
@@ -716,8 +723,14 @@ check('…so a raw route param is never handed to a native decoder',
   !cropSrc.includes('manipulate(uri)') && !cropSrc.includes('uri: uri'));
 check('⚠️ …and the screen never picks an encoding branch itself (S64\'s black screen)',
   !cropSrc.includes('nativeLoaderUriFromDecoded(') && !cropSrc.includes('escapeForNativeLoader('));
-check('⚠️ …and the burn screen\'s tutorial offering uses the same helper, not the S60 branch',
-  burnSrc.includes('nativeLoaderUriFromAnyForm(photoUri)')
+/*
+ * ⚠️ **SCRUM-216: THE BURN SCREEN NO LONGER DRAWS A PHOTO.** The demo used to reach `/burn` with the
+ * player's own photograph and draw it through `nativeLoaderUriFromAnyForm`; it is now an ITEM burn, so
+ * the offering is the catalogue's `OfferingArt` and that helper (and its `photoUri`) is gone.
+ */
+check('⚠️ the burn screen NO LONGER draws a photo — the demo’s offering is the CATALOGUE art (SCRUM-216)',
+  !burnSrc.includes('nativeLoaderUriFromAnyForm(') && !burnSrc.includes('photoUri')
+    && burnSrc.includes('collectedItemCode(itemCode)')
     && !burnSrc.includes('nativeLoaderUriFromDecoded('));
 check('⚠️ the mask view is drawn by the pure path, with the even-odd rule it requires',
   cropSrc.includes('dimPathPolygon(region, polygon)')
@@ -762,10 +775,11 @@ check('the lasso\'s behaviour is stated in the UI, not only in a comment',
 check('every failure path out of the screen is free (skip is always reachable)',
   cropSrc.includes('onPress={skip}') && cropSrc.includes("t('crop.skip')"));
 
-// ⚠️ NEGATIVE CONTROL — the assertion must be able to fail. Same shape, wrong text.
-const blind = (source: string): boolean => source.includes("pathname: '/preparing'");
+// ⚠️ NEGATIVE CONTROL — the assertion must be able to fail. Same shape, a route the shutter screen
+// never pushes (it hops to /crop; only the DEMO pushes /preparing, and nothing here pushes /reward).
+const blind = (source: string): boolean => source.includes("pathname: '/reward'");
 check('⚠️ the source assertions are not vacuous (a negative control fires)',
-  blind(captureSrc) === false && blind("router.push({ pathname: '/preparing' })") === true);
+  blind(captureSrc) === false && blind("router.push({ pathname: '/reward' })") === true);
 
 // ── ④ the copy exists in BOTH locales (a missing translation is a bug) ───────
 section('④ the frame step\'s copy is localised');
@@ -847,6 +861,13 @@ check('the zoom a11y label interpolates the numeral (and announces it)',
  *   · the idle breath no longer multiplied into the reaction's scale → 1 red;
  *   · `rotate: idleSway` added to the ember bed → 1 red.
  * 12 breaks, 12 reds, 0 survivors. Restored → 205/205 green.
+ *
+ * ⚠️ AND THE S74 ADDITIONS (2026-11-07) — the picker CTA's placement. THREE checks, each
+ * fault-tested against the green baseline of **241**:
+ *   · `styles.chooseOffering` returned to `position:'absolute'` → **1 red** (the not-absolute check);
+ *   · a `bottom` restored to `const CHOOSE` → **1 red**;
+ *   · the button reordered to AFTER the zoom strip → **1 red**.
+ * 3 breaks, 3 reds, 0 survivors. Restored → **241/241 green**.
  */
 section('⑤ the S64 polish — where the controls sit and what the fire does');
 
@@ -866,6 +887,22 @@ check('⚠️ the zoom strip renders BETWEEN the hint and the shutter (S64 — t
 check('⚠️ …and the HUD is the box that absorbs the slack — NOT the shutter',
   /hud: \{ flex: 1, alignItems: 'center' \}/.test(captureSrc)
     && !/shutterRow: \{[^}]*flex: 1/.test(captureSrc));
+
+/*
+ * ⚠️ THE PICKER CTA MUST NOT SIT ON THE ZOOM STRIP (device report, 2026-11-07).
+ * `capture-choose-offering` was `position:'absolute', bottom:132` — a fixed number written BEFORE
+ * the zoom strip moved to the thumb (S64). The strip occupies the bottom ~120–164 dp and RISES with
+ * `insets.bottom`; the button's `bottom` did not. On glass it landed ON the preset pills.
+ * ⚠️ Asserted by ORDER and by the ABSENCE of absolute positioning — never a pixel: a fixed `bottom`
+ * can be re-tuned to pass a pixel test on one device and still cover the pills on the next.
+ */
+const chooseAt = captureSrc.indexOf('styles.chooseOffering');
+check('⚠️ the picker CTA renders BETWEEN the hint and the zoom strip — never ON it (device report)',
+  chooseAt > hudAt && chooseAt < zoomAt);
+check('⚠️ …and it is NOT absolutely positioned — only the FLOW can clear a strip that moves with the safe area',
+  !/chooseOffering: \{[^}]*position: 'absolute'/.test(captureSrc));
+check('⚠️ …and `CHOOSE` carries no `bottom` — the magic number that caused the overlap is gone',
+  !/const CHOOSE = \{[^}]*bottom/.test(captureSrc));
 
 /*
  * THE PILL. The relationship is the assertion: the visible pill is half the target,

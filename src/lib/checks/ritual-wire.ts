@@ -35,7 +35,7 @@
  * CART_DRAFT arm return `'again'` unconditionally — and confirm it goes RED.
  */
 
-import { readBurnParams, readCropParams, readRewardParams, toBurnParams, toCropParams, toPreparingParams, toRewardParams } from '../route-params.ts';
+import { readBurnParams, readCropParams, readItemBurnParams, readRewardParams, toBurnParams, toCropParams, toItemBurnParams, toPreparingParams, toRewardParams } from '../route-params.ts';
 import { captureStoragePath } from '../storage-path.ts';
 import { DEMO_VALUE } from '../tutorial.ts';
 import {
@@ -283,11 +283,12 @@ const demoTurnRead = readBurnParams(demoTurn);
 check('toBurnParams carries the demo flag', demoTurn.demo === DEMO_VALUE);
 check('readBurnParams reads it back', demoTurnRead.ok && demoTurnRead.demo === true);
 
-// ⚠️ THE TUTORIAL'S OFFERING DEPENDS ON `uri` (2026-10-18). A demo hop never gets
-// a styled sprite — it must not spend — so `/burn` draws the PHOTO the player took
-// instead, and that photo reaches the screen only as the `uri` param. Drop it and
-// the tutorial silently returns to teaching the ritual with an empty place where
-// the offering belongs (the defect this pins; found on glass 2026-10-18).
+// ⚠️ THE PHOTO HOP DEPENDS ON `uri` (2026-10-18). A demo hop never got a styled
+// sprite — it must not spend — so `/burn` drew the PHOTO the player took, which
+// reached the screen only as the `uri` param; drop it and the offering was empty.
+// ⚠️ **SCRUM-216 (2026-11-07): THE DEMO NO LONGER TRAVELS THIS HOP.** It burns a catalogue ITEM (see
+// `toItemBurnParams` below), so it never has a photo. This assertion now pins the BUILDER's shape
+// (uri + spritePath semantics on the demo form of the photo hop), not a live demo journey.
 check(
   '⚠️ the TUTORIAL hop keeps the photo /burn draws as its offering',
   demoTurnRead.ok && demoTurnRead.uri === 'file://x.jpg' && demoTurnRead.spritePath === null,
@@ -324,6 +325,20 @@ check('readCropParams reads the flag AND the photo back',
 check('…and the shutter\'s own size rides along as the fallback',
   demoFrameRead.ok && demoFrameRead.declaredSize?.width === 3000
     && demoFrameRead.declaredSize?.height === 4000);
+
+/*
+ * ⚠️ **SCRUM-216 · THE DEMO'S OWN HOP.** The first-run demo **no longer photographs**: it is an ITEM burn
+ * offering a catalogue standard offering, so `capture → preparing → burn` travels `toItemBurnParams`
+ * instead of `toBurnParams`. ⚠️ The demo flag must ride it exactly as it rides the photo hops — a flag
+ * dropped here turns the demo into a REAL, paying `submit_burn`, the same class of failure as a dropped
+ * `demo` on the camera path.
+ */
+const demoItem = toItemBurnParams('joss_paper_stack', true);
+const demoItemRead = readItemBurnParams(demoItem);
+check('⚠️ toItemBurnParams carries the demo flag (SCRUM-216)', demoItem.demo === DEMO_VALUE);
+check('⚠️ …and the item code rides with it, read back by name',
+  demoItemRead.ok && demoItemRead.itemCode === 'joss_paper_stack' && demoItemRead.demo === true);
+check('⚠️ …and a REAL item hop carries NO demo param at all', toItemBurnParams('house').demo === undefined);
 
 const realFrame = toCropParams('c1', 'file://a.jpg', 3000, 4000);
 check('⚠️ a REAL frame hop carries NO demo param at all', realFrame.demo === undefined);

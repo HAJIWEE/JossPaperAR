@@ -56,7 +56,6 @@ import {
   restingPoint,
 } from '@/domain/throw';
 import { localized, t } from '@/lib/i18n';
-import { nativeLoaderUriFromAnyForm } from '@/lib/native-path';
 import { collectedItemCode } from '@/lib/collection';
 import { readBurnParams, readItemBurnParams, toItemRewardParams, toRewardParams } from '@/lib/route-params';
 import type { OfferingCode } from '@/domain/catalogue';
@@ -245,8 +244,6 @@ export default function BurnScreen() {
    * not, and never was, the sprite.
    */
   const spritePath = burnParams.ok ? burnParams.spritePath : null;
-  /** The photograph the player took — the TUTORIAL's offering (see `offeringUri`). */
-  const photoUri = burnParams.ok ? burnParams.uri : '';
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [preview, setPreview] = useState<Preview | null>(null);
   const [throwNumber, setThrowNumber] = useState(1);
@@ -279,43 +276,20 @@ export default function BurnScreen() {
   const [returning, setReturning] = useState(false);
 
   /**
-   * THE TUTORIAL'S OFFERING — the photo the player just took.
-   *
-   * A **real** hop draws the signed cartoonized sprite. The **tutorial** never
-   * contacts the orchestrator on purpose (`TUTORIAL_CONSEQUENCES`: a first run must
-   * not spend AI money), so it reaches this screen with no `spritePath` — and that
-   * left an EMPTY place where the offering belongs: the player photographed
-   * something and never saw it again. The demo now draws that photograph, which is
-   * already on the device as the `uri` param and costs nothing.
-   *
-   * ⚠️ THE URI NEEDS A NATIVE-LOADER ENCODING, AND WHICH ONE IS NOT FIXED — MEASURED TWICE.
-   * The route param arrives DECODED (`…/ExperienceData/@scope/slug/Camera/a.jpg`) while the
-   * sandbox directory on disk is literally `%40scope%2Fslug`, and every native loader decodes
-   * a URI exactly once. Handing `<Image>` the param as-is draws nothing (a magenta test
-   * background showed through the whole box), and `Image.getSize` answers ENOENT; encoding it
-   * once (`%40…`) also ENOENTs, because the loader decodes it straight back. The
-   * double-encoded form is the one that resolves — `Image.getSize` returned **3000 × 4000**.
-   *
-   * ⚠️ S64: *"the param arrives decoded"* is a property of the ROUTE, not of the photo — a
-   * hop that goes through a URL decodes it, and a sibling screen's `router.push` does not.
-   * The frame step measured the RAW form arriving on exactly this kind of hop this session
-   * and drew a black stage. So the encoding is now `nativeLoaderUriFromAnyForm`, which is
-   * correct whichever of the three forms turns up. ⚠️ Do NOT go back to
-   * `nativeLoaderUriFromDecoded` here: it is a no-op on the raw form, and the failure is
-   * silent — a missing picture, not an error.
-   *
-   * ⚠️ Deliberately demo-only. If signing fails on a REAL hop, drawing the original
-   * photo would present the *unstyled* image as the thing the player paid to have
-   * transformed — a worse lie than no picture. A real failure stays "no offering",
-   * logged as `sprite_sign_failed`.
+   * ⚠️ **THE DEMO NO LONGER DRAWS A PHOTO (SCRUM-216 — owner's ruling, 2026-11-01).** The first-run demo
+   * used to arrive here with the player's own photograph as the `uri` param and draw it, because the
+   * tutorial never contacts the orchestrator. ⚠️ **It no longer photographs at all** — it is an ITEM burn
+   * offering a catalogue standard offering — so the demo draws the catalogue art through the `itemCode`
+   * branch below, on the same `OfferingArt` the Store and the picker use.
+   * ⚠️ Removed with it: `demoOffering` and the `nativeLoaderUriFromAnyForm` encoding dance, which existed
+   * ONLY because the demo drew a captured photo — and its three-form URI trap with it.
+   * ⚠️ A REAL hop still draws the signed cartoonized sprite, and a signing failure still stays "no
+   * offering" (drawing the *unstyled* original would present it as the thing the player paid to have
+   * transformed — a worse lie than no picture).
    */
-  const demoOffering =
-    spritePath === null && demo && photoUri.length > 0
-      ? nativeLoaderUriFromAnyForm(photoUri)
-      : null;
 
   /** The image to draw, or `null` — derived, never stored, so it cannot go stale. */
-  const offeringUri = spriteUrl ?? demoOffering;
+  const offeringUri = spriteUrl;
 
   /**
    * Sign the sprite so `<Image>` can load it.
