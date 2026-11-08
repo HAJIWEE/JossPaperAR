@@ -167,6 +167,14 @@ jobs:
       - name: Copy checks (no literal outside t() · no unsubstituted placeholder)
         run: npm run check:copy
 
+      # ⚠️ If this is RED and your diff is innocent, read the three "Unexpected error" checks
+      # FIRST — they are NOT about this project (measured 2026-11-08, S79e):
+      #   npm explain @expo/vector-icons|@unimodules/core|expo-cli --json exited with a non-zero code
+      # ⚠️ Those packages are **correctly ABSENT**. `npm explain` exits 1 for a package that is not
+      # in the tree ("No dependencies found matching X"), and expo-doctor counts that as a failed
+      # check. ⚠️ Measured on 1.21.6 AND 1.20.0, on a plain `npm ci` tree — so it is an upstream
+      # doctor/npm interaction, not a pinned-version accident, and pinning the doctor does not fix it.
+      # ⚠️ The check that DOES matter reports "packages match versions required by installed Expo SDK".
       - name: Expo doctor
         run: npx expo-doctor
 
@@ -184,4 +192,4 @@ jobs:
       - name: Expo doctor — what to do about it
         if: failure()
         run: |
-          echo "::error title=expo-doctor failed::If it reports 'packages match versions required by installed Expo SDK' with an OLDER patch than expected, nothing you wrote is at fault - Expo published a patch. Run 'npx expo install --fix', commit the lockfile, confirm 21/21 with 'npm run check:doctor', then push. See AGENTS.md -> Known traps (SCRUM-120)."
+          echo "::error title=expo-doctor failed::If it reports 'packages match versions required by installed Expo SDK' with an OLDER patch than expected, nothing you wrote is at fault - Expo published a patch. Run 'npx expo install --fix', commit the lockfile, confirm with 'npm run check:doctor', then push. See AGENTS.md -> Known traps (SCRUM-120)."
