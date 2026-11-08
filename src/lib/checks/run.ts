@@ -3135,6 +3135,37 @@ function storeChecks(): void {
   // ⚠️ POSITIVE CONTROL — the two lists must not both be the whole catalogue.
   check('⚠️ guard: the featured item is NOT also in the list beneath it',
     !more.some((o) => o.code === FEATURED_CODE));
+  /**
+   * ⚠️⚠️ **THE CASH RAIL IS ABSENT, NOT DISABLED** (owner, 2026-11-08 · SCRUM-212).
+   *
+   * *"but disable the cash portions for now. I want to see the UI first. The google pay and everything related to
+   * google console is estimated to only come online in mid to end of this month."*
+   *
+   * ⚠️ So the cash price, the cash balance chip and `Buy for cash` must be **rendered nowhere** — not greyed out.
+   * A greyed-out "Buy for cash" advertises a purchase with no path to a receipt, and Play Billing does not exist
+   * in this build; that is the SCRUM-145 rule (a control that cannot do what it promises is worse than none).
+   *
+   * ⚠️ **ASSERTED ON THE CODE, NOT THE COMMENT.** `store.tsx`'s header DISCUSSES the cash rail at length — prose
+   * naming `cash` is exactly the false positive this project has been bitten by twice — so comments are stripped
+   * first and only executable JSX is searched.
+   */
+  const stripComments = (src: string): string =>
+    src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const STORE_SCREEN_JS = stripComments(
+    readFileSync(join(PROJECT_ROOT, 'src', 'app', 'store.tsx'), 'utf8'),
+  );
+  check('⚠️⚠️ the store renders NO cash affordance — points is the only price and the only balance',
+    // ⚠️ `/\$/` alone is WRONG and this check proved it: `${…}` template literals in `testID` and `setBuyKey`
+    // matched it. What a cash price actually looks like is a DOLLAR AMOUNT (`$0.99`, `$12.50`).
+    !/\bcash\b/i.test(STORE_SCREEN_JS) && !/\$\s?\d/.test(STORE_SCREEN_JS),
+    STORE_SCREEN_JS.match(/[^\n]*\bcash\b[^\n]*/i)?.[0]?.trim() ?? '');
+  check('⚠️ …the points chip is the ONE balance on the screen',
+    STORE_SCREEN_JS.includes('store-points-chip') && !/store-cash/i.test(STORE_SCREEN_JS));
+  // ⚠️ POSITIVE CONTROL — the strip must not be so aggressive that it hides a real affordance.
+  check('⚠️ guard: the comment-stripper keeps executable JSX, so the check above can fail',
+    stripComments('/* cash $1 */ <Btn label="Buy for cash" />').includes('Buy for cash')
+      && !stripComments('/* cash $1 */ <Btn />').includes('cash'));
+
 
   // ⚠️ THE BUNDLE IS A BUNDLE, NOT AN ITEM (device report, 2026-11-07). `purchase_item` now reads
   // `offerings_catalog.composed_of` — the SQL twin of this code field — and grants one of each
