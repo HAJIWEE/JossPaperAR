@@ -576,6 +576,26 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 > **`scope: 'global'` is explicit, and it was read from the installed types, not memory:** `signOut(options?: SignOut)` defaults to **global**, and `SIGN_OUT_SCOPES = readonly ['global','local','others']`. Global revokes the refresh tokens — ADR-007's posture. ⚠️ **If a multi-device story lands, revisit it:** `'local'` signs out only this device, whereas global would sign the user out of their **other** one too.
 >
 > **Gate status.** `check:lib` **761** green, and the new gates were each **fault-tested red** rather than assumed: dropping `ensureAnonymousSession()` from the function failed the RE-MINTS check **1 of 761**, and a `clearFirstRun` placed in the sign-out handler failed the ERASES-NOTHING check **1 of 761**. ⚠️ `tsc` reports **3** errors — `expo-image-manipulator` and `expo-blob` are absent from the local `node_modules`, in files this session never touched; the other **20** `npm run check` steps are green. ⚠️ **A fresh worktree has no `node_modules` at all** (the documented trap), borrowed here with `cp -al` from the main checkout. **US$0.00** — no fal.ai call, no dependency installed.
+>
+> ### ✅ ON GLASS — measured 2026-11-08, `HN615L005386`, Expo Go + Metro over `adb reverse` against **HOSTED**
+>
+> `Android Bundled 5524 ms (2141 modules)` from the worktree. Then, via **Profile → Settings** (the header gear is covered by **Expo Go's own dev FAB**, which opened its dev menu — see below):
+>
+> | step | measured |
+> |---|---|
+> | the row | `settings-signout` **`enabled=true` `clickable=true`**, sub *"This device goes back to anonymous"*, chevron drawn — it was `enabled=false` / *"Not built yet"* on the cached bundle |
+> | the confirm | `confirm-card` + `confirm-card-primary` + `confirm-card-cancel`; title **"Sign out?"**, the body verbatim, buttons **Sign out** / **Cancel** |
+> | **Cancel** | card dismissed, **still on Settings**, identity unchanged — the negative test |
+> | **Confirm** | left Settings → shrine, and **the device is a NEW anonymous identity**: the *Gwee / Clan Head* pill **gone**, altar **"Your altar is empty — tap ＋ to add a tablet."** (was *"One ancestor enshrined"*), tribute **0**, streak **0-day**, and the CTA changed from *Begin an offering* to **Clan** — the clan-less first-run fork |
+> | ⚠️ **no `42501`** | Profile then rendered its three rows and its tribute card with **no error copy**, so the re-minted anonymous session really authenticates. That is the whole reason sign-out is two steps, and it is now measured rather than argued |
+>
+> ⚠️⚠️ **TWO TRAPS THIS RUN CAUGHT, both of which would have produced a FALSE NEGATIVE.**
+>
+> 1. **Expo Go resumed a CACHED bundle.** The first launch after `adb shell am start … exp://127.0.0.1:8081` showed the **old** code — `settings-signout` `enabled=false`, *"Not built yet"* — while Metro logged **no bundle request at all**. It reads exactly like "the change did not work". ⚠️ **`adb shell am force-stop host.exp.exponent` before relaunching**, and confirm `Android Bundled …` in the Metro log before believing any on-glass result.
+> 2. **The borrowed `node_modules` was INCOMPLETE** — `expo-blob` and `expo-image-manipulator` are declared in `package.json` but absent from the main checkout's install, so Metro answered **`Unable to resolve "expo-blob" from "src/lib/blob-polyfill.ts"`** and *every* bundle failed. (This is also the source of the 3 `tsc` errors above — same two packages.) ⚠️ **Reinstalling them takes `--no-save` and an EXACT version:** `npm install expo-image-manipulator@~57.0.21` resolves to **57.0.22** and **rewrites `package-lock.json`**, which is unrelated churn; `npm install --no-save --no-audit expo-image-manipulator@57.0.21 expo-blob@57.0.2` leaves the lock byte-identical and the installed versions equal to it (verified).
+>
+> ⏳ **Still open, and the open half is the interesting one:** the **sign-back-in**. The account's tributes/ancestors/clan are on the server, but that is **asserted by the copy, not yet observed** — signing in with the email and watching the altar refill is what closes it, and it needs the email (SCRUM-222 / doc 24).
+
 
 
 ### 12.38 · S59b — THE DEVICE RUN: the whole capture path ran on glass, and it found a THIRD upload defect (2026-10-17)

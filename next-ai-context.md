@@ -1767,9 +1767,31 @@ SignOut)` defaults to global; `SIGN_OUT_SCOPES = ['global','local','others']`. �
 local `node_modules`, in files this session never touched. ⚠️ **A fresh worktree has no `node_modules` at
 all**; borrowed here with `cp -al` from the main checkout. **US$0.00** — no fal.ai call, no install.
 
-⚠️ **NOT done, and not claimable:** no **device pass** yet. The code path is proven by the gates; that the
-fresh anonymous device is really **clan-less**, and that the **email signs back into the same account**,
-is a glass fact and stays open until it is run.
+✅ **ON GLASS — measured 2026-11-08 (`HN615L005386`, Expo Go + Metro over `adb reverse`, HOSTED).**
+`Android Bundled 5524 ms (2141 modules)` from the worktree; reached via **Profile → Settings** because the
+header gear sits under **Expo Go's own dev FAB** (tapping it opened the dev menu). The row is
+**`enabled=true` `clickable=true`** with sub *"This device goes back to anonymous"*; the card draws
+**"Sign out?"** + the body verbatim + **Sign out / Cancel**; **Cancel** dismisses and stays on Settings;
+**Confirm** leaves Settings for the shrine as a **genuinely new anonymous identity** — clan pill **gone**,
+altar *"Your altar is empty"*, tributes **0**, streak **0-day**, CTA flipped to **Clan** — and **Profile
+renders with no error copy**, so the re-minted session really authenticates (no `42501`). That last row is
+the whole reason sign-out is two steps, now **measured** instead of argued.
+
+⚠️⚠️ **Two traps, each of which nearly produced a FALSE NEGATIVE:**
+
+1. **Expo Go resumed a CACHED bundle.** The first launch showed the **old** code (`enabled=false`,
+   *"Not built yet"*) while Metro logged **no bundle request** — it reads exactly like "the change did not
+   work". ⚠️ **`adb shell am force-stop host.exp.exponent` before relaunching**, and confirm
+   `Android Bundled …` in the Metro log before believing any on-glass result.
+2. **The borrowed `node_modules` was INCOMPLETE** — `expo-blob` and `expo-image-manipulator` are declared
+   in `package.json` but absent from the main checkout's install, so Metro answered **`Unable to resolve
+   "expo-blob"`** and every bundle failed (same cause as the 3 `tsc` errors). ⚠️ Fixing it takes
+   **`--no-save` and an EXACT version**: `expo-image-manipulator@~57.0.21` resolves to **57.0.22** and
+   **rewrites `package-lock.json`**; `--no-save … @57.0.21` leaves the lock byte-identical.
+
+⏳ **Still open — the sign-back-in.** That the account's tributes/clan/ancestors survived is asserted by
+the card's copy, **not yet observed**: signing in with the email and watching the altar refill is what
+closes it, and it needs the email (SCRUM-222 / doc 24).
 
 
 ## Next, in order
