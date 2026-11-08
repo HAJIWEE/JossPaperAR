@@ -143,9 +143,25 @@ is the second user ADR-004 rule 4 forbids). Use a fresh address to test sign-up.
   email templates are **new copy** in the same family and need the owner's wording/approval. They are
   English-only; a **中文** variant (the app is EN/中文) is a follow-up — Supabase does not switch template
   language by recipient locale.
-- **`{{ .ConfirmationURL }}` one-tap links** appear in both templates as a convenience, but the app has
+- ~~**`{{ .ConfirmationURL }}` one-tap links** appear in both templates as a convenience, but the app has
   **no deep-link handler** for them (scheme `josspaperar`; the only intent filter is `/join`). They open
-  the Supabase verify endpoint, not the app. Building that is separate.
+  the Supabase verify endpoint, not the app. Building that is separate.~~
+  ⚠️⚠️ **REMOVED FROM BOTH TEMPLATES, 2026-11-08 — A PLAYER TAPPED IT AND IT DID NOT WORK.** The note above
+  was accurate and the link shipped anyway, which is the same defect class this project already refuses for
+  dead rows and dead toggles: **a control that cannot do what it promises is worse than an absent one.**
+  The email now offers **only the six-digit code**, which is what the app can actually receive.
+  ⚠️ **What a real one-tap road needs — ALL THREE, and no two of them are enough:**
+  1. `emailRedirectTo` in `sendAccountCode()` (`emailRedirectTo` appears **nowhere** in `src/` today), so
+     `.ConfirmationURL` has an app-shaped destination;
+  2. a **handler for the return** — parse `#access_token=…&refresh_token=…` and `setSession` — because
+     `detectSessionInUrl: false` and the only intent filter is `https://josspaperar.app/join`;
+  3. the **hosted Redirect URLs allowlist** entry for the scheme (a Dashboard setting, §4), or Supabase
+     silently falls back to the Site URL and the browser dead-ends exactly as it did.
+  ⚠️ **And it cannot be verified in Expo Go** — Expo Go does not route a `josspaperar://` link, so proving
+  it needs an **EAS build** (a local native build is impossible here: only Java 25 is installed). Recorded
+  as a follow-up, `⏳ one-tap`.
+  ⚠️ **`check:lib` now asserts both templates carry `{{ .Token }}` and NO `{{ .ConfirmationURL }}`** — and it
+  strips HTML comments first, because the note explaining the removal has to name the tag.
 - **Email-address erasure** — `delete_my_data` must also erase the email and the Play data-safety form
   must declare it: **`SCRUM-219`**.
 - **The `FAMILY NAME` field** the sign-up board draws (`0d6`) is **omitted** — **`SCRUM-214(A)`** is open.

@@ -1795,6 +1795,41 @@ closes it, and it needs the email (SCRUM-222 / doc 24).
 
 
 ## 2026-11-08 (S79b) — ANONYMOUS IS FIRST-INSTALL ONLY: the sign-out is a WALL, and the device broke the first design
+## 2026-11-08 (S79c) — THE EMAIL'S "ONE TAP" LINK WAS A PROMISE THE APP COULD NOT KEEP — removed, and gated
+
+**The report.** *"The link in the email for the one tap log in does not work."* ⚠️ It never could, and
+**doc 24 §6 had already said so** — *"one-tap links appear in both templates as a convenience, but the app has
+no deep-link handler for them… They open the Supabase verify endpoint, not the app."* ⚠️ The note was accurate
+and the link shipped anyway, which is the defect class this project already refuses for dead rows and dead
+toggles.
+
+**Three causes, and all three are needed for a fix — no two are enough:**
+
+1. `sendAccountCode()` sends **no `emailRedirectTo`** (`emailRedirectTo` appears **nowhere** in `src/`), so
+   `{{ .ConfirmationURL }}` targets the project's **Site URL** — a web address, never the app.
+2. **Nothing handles the return.** `app.json` declares the `josspaperar` scheme, but the only intent filter is
+   `https://josspaperar.app/join`, and no code parses `#access_token=…&refresh_token=…`;
+   `detectSessionInUrl: false` means the SDK will not either.
+3. The **hosted Redirect URLs allowlist** must contain the scheme — a Dashboard setting only the owner can
+   change; without it Supabase silently falls back to the Site URL and the browser dead-ends.
+
+**What was done.** ⚠️ **The link is removed from both templates** — the email now offers exactly what works,
+the six-digit code — with the three blockers written into the template header, doc 24 §6, and
+`follow-up-items.md`. **`check:lib` (781) now asserts both templates carry `{{ .Token }}` and NO
+`{{ .ConfirmationURL }}`**, fault-tested by putting the link back (**1 of 781**).
+
+⚠️ **And the new gate caught the same trap as last session's:** the note explaining the removal has to *name*
+`{{ .ConfirmationURL }}`, so a raw `includes` failed on the very file that fixed it. It **strips HTML comments
+first**. ⚠️ **The rule, now twice earned: assert on what RENDERS, not on what EXPLAINS.**
+
+⚠️ **The hosted emails keep the dead link until the templates are pasted into the Dashboard** (doc 24 §B) —
+that is the owner's step, and the reason a repo-only fix does not change the next email received.
+
+⏳ **One-tap is a ticket, not a tweak:** (1)+(2) are code, (3) is the Dashboard, and ⚠️ **it cannot be verified
+in Expo Go** — Expo Go will not route `josspaperar://`, so proving it needs an **EAS build**.
+**US$0.00** — no AI call.
+
+
 
 **The owner reversed the MODEL, not the button.** *"Anonymous shrine is only for the MVP demo. Now that we are
 building the actual app, the Demo should only be on first install of the App and signing out does not return

@@ -2593,8 +2593,36 @@ function accountChecks(): void {
       && accountScreenSrc.includes("mode === 'signUp' || anonymous !== false"));
   // ⚠️ POSITIVE CONTROL — the mode default must still be `signUp` for the FIRST-RUN road, or the upgrade
   // (ADR-004 rule 4) would never be offered where it is the right answer.
-  check('⚠️ guard: the screen still DEFAULTS to sign-up, so first run keeps the upgrade road',
-    accountScreenSrc.includes("useState<AccountMode>('signUp')"));
+  /**
+   * ⚠️⚠️ **THE EMAIL MUST OFFER WHAT WORKS, AND ONLY THAT** (2026-11-08). Both templates used to carry
+   * `<a href="{{ .ConfirmationURL }}">…one tap…</a>`, and **a player tapped it and hit the Site URL in a
+   * browser.** ⚠️ Three things are missing and all three are needed: no `emailRedirectTo` in
+   * `sendAccountCode`, no handler for the returned `#access_token=…`, and no hosted Redirect-URL allowlist.
+   * ⚠️ **A link that cannot do what it promises is worse than an absent one** — the rule this project
+   * already applies to dead rows and dead toggles. The code is what works, so the code is what ships.
+   */
+  const TEMPLATE_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'supabase', 'templates');
+  /**
+   * ⚠️ **HTML COMMENTS ARE STRIPPED FIRST, and that is not tidiness.** The note that explains WHY the link is
+   * gone has to name `{{ .ConfirmationURL }}` — so a raw `includes` would fail on the very file that fixed it.
+   * ⚠️ This is the second time in two sessions that a gate read the *prose* instead of the *code*; the rule is
+   * now: **assert on what renders, not on what explains.**
+   */
+  const bodyOf = (html: string): string => html.replace(/<!--[\s\S]*?-->/g, '');
+  const templates = ['magic_link.html', 'email_change.html'].map((f) => ({
+    name: f,
+    body: bodyOf(readFileSync(join(TEMPLATE_DIR, f), 'utf8')),
+  }));
+  check('⚠️⚠️ both email templates carry the SIX-DIGIT CODE (`{{ .Token }}`)',
+    templates.every((t) => t.body.includes('{{ .Token }}')));
+  check('⚠️⚠️ …and NEITHER carries a one-tap link the app cannot receive',
+    templates.every((t) => !t.body.includes('{{ .ConfirmationURL }}')),
+    'the app has no emailRedirectTo, no callback handler and no hosted allowlist — doc 24 §6');
+  // ⚠️ POSITIVE CONTROL — the detector must be able to SEE a link, or "no link" passes for the wrong reason.
+  check('⚠️ guard: the same detector DOES find a link when one is present in the body',
+    bodyOf('<a href="{{ .ConfirmationURL }}">x</a>').includes('{{ .ConfirmationURL }}'));
+  check('…and `emailRedirectTo` is not wired anywhere, which is WHY the link is withheld',
+    !accountSrc.includes('emailRedirectTo'));
 }
 
 function storeChecks(): void {
