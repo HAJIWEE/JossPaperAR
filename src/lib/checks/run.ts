@@ -2859,6 +2859,108 @@ function accountChecks(): void {
   // ⚠️ The source art is kept in the repo, so a future size can be regenerated instead of re-traced.
   check('⚠️ the mark is kept as SVG — the icon was generated from it, not hand-drawn',
     ['app-mark.svg', 'app-mark-on-dark.svg'].every((f) => existsSync(join(ASSETS, f))));
+
+  /**
+   * ⚠️⚠️ **THE IN-APP MARK MUST KEEP THE BOARD'S STROKE-TO-EDGE RATIO — the ratio is the invariant, the
+   * raw numbers are not.** Measured 2026-11-08: `AppMark` in `header-art.tsx` used the board's
+   * `strokeWidth` **8 · 9 · 5** verbatim inside a **53.012** box, while the board draws them in **170** —
+   * so at any shared rendered size the tablet's border was **22.9%** of its own edge instead of **9.0%**.
+   * ⚠️ It rendered as a **black slab** (the gold was swallowed), and it survived because nothing compared
+   * the two coordinate systems: the x/y/width/height had been scaled correctly, so the file *looked* right.
+   *
+   * ✅ So this evaluates the **expressions** `AppMark` actually renders (not the comment prose) and compares
+   * each stroke to its own shape's edge, then to the board's ratio. ⚠️ Reverting to a literal `8` fails here
+   * even though it is numerically the board's own number — that is the whole point.
+   */
+  const BOARD_MARK_SVG = readFileSync(join(ASSETS, 'app-mark.svg'), 'utf8');
+  // ⚠️ Resolved the same way `ASSETS` is, never through a path constant that only some functions scope.
+  const HEADER_ART_TSX = readFileSync(
+    join(ASSETS, '..', 'src', 'components', 'home', 'header-art.tsx'),
+    'utf8',
+  );
+  // The board's three stroked shapes, as [shape edge, stroke width] — the diamond's edge from its own path.
+  const boardPairs = [
+    (() => {
+      const m = /<rect x="40\.8"[^>]*width="([\d.]+)"[^>]*stroke-width="([\d.]+)"/.exec(BOARD_MARK_SVG);
+      return m ? [Number(m[1]), Number(m[2])] : null;
+    })(),
+    (() => {
+      const m = /<rect x="62\.9"[^>]*width="([\d.]+)"[^>]*stroke-width="([\d.]+)"/.exec(BOARD_MARK_SVG);
+      return m ? [Number(m[1]), Number(m[2])] : null;
+    })(),
+    (() => {
+      const m = /d="M73\.1,85L85,73\.1L([\d.]+),85[^"]*" fill="#f0c75e" stroke="#1a1a1a" stroke-width="([\d.]+)"/.exec(
+        BOARD_MARK_SVG,
+      );
+      // the diamond's edge = its x span: 73.1 -> the captured far corner (96.9) = 23.8
+      return m ? [Number(m[1]) - 73.1, Number(m[2])] : null;
+    })(),
+  ];
+  check('⚠️ the board mark parses into 3 stroked shapes — the ratio comparison has a real reference',
+    boardPairs.every((p) => p !== null && p[0] > 0 && p[1] > 0), JSON.stringify(boardPairs));
+
+  // ⚠️ Evaluate what the component RENDERS: the `strokeWidth={…}` on each element, plus the constants it
+  // may reference. ⚠️ Reading only the `const` declarations was the first attempt and it was **wrong** —
+  // a fault test that replaced `strokeWidth={TABLET_STROKE}` with the literal `8` left the constants
+  // pristine and the gate green while the app drew a slab. Assert on the element, never on the declaration.
+  const MARK_ENV = [...HEADER_ART_TSX.matchAll(/const ([A-Z][A-Z_]+) = ([^;]+);/g)]
+    .map(([, name, expr]) => `const ${name} = ${expr};`)
+    .join('\n')
+    // MARK_SCALE references both of its operands as bare numbers already, so the definitions evaluate in order.
+    .replace(/const MARK_SCALE = ([\d.]+) \/ ([\d.]+);/, (_m, a, b) => `const MARK_SCALE = ${Number(a) / Number(b)};`);
+  const evalInEnv = (expr: string): number => {
+    try {
+      return Number(new Function(`${MARK_ENV}; return (${expr});`)());
+    } catch {
+      return NaN;
+    }
+  };
+  const SCALE = evalInEnv('MARK_SCALE');
+  // Split `AppMark`'s body into its rendered elements, then pair each stroke with its own shape's edge.
+  const appMarkBody = /export function AppMark\(\)[\s\S]*?\n\}/.exec(HEADER_ART_TSX)?.[0] ?? '';
+  const rendered = appMarkBody
+    .split(/<(?:Rect|Path)/)
+    .slice(1)
+    .map((el) => {
+      const sw = /strokeWidth=\{([^}]+)\}/.exec(el)?.[1];
+      if (!sw) return null;
+      const w = /width=\{([\d.]+)\}/.exec(el)?.[1];
+      let edge = w ? Number(w) : NaN;
+      if (!w) {
+        // the diamond: its edge is the x span of its own path
+        const xs = [...(/d="([^"]+)"/.exec(el)?.[1] ?? '').matchAll(/([\d.]+),([\d.]+)/g)].map((m) => Number(m[1]));
+        if (xs.length) edge = Math.max(...xs) - Math.min(...xs);
+      }
+      return { sw: sw.trim(), stroke: evalInEnv(sw), edge };
+    })
+    .filter((e): e is { sw: string; stroke: number; edge: number } => e !== null);
+
+  check('⚠️ `AppMark` renders 3 stroked shapes — the check reads the ELEMENTS, not the constants',
+    rendered.length === 3 && rendered.every((r) => Number.isFinite(r.stroke) && r.edge > 0),
+    JSON.stringify(rendered));
+
+  const mismatch = rendered
+    .map((r, i) => {
+      const board = boardPairs[i];
+      if (!board) return `pair${i}:nopair`;
+      const want = board[1] / board[0];
+      const got = r.stroke / r.edge;
+      return Math.abs(want - got) / want > 0.01
+        ? `pair${i} (${r.sw}): ${(got * 100).toFixed(1)}% of its edge vs board ${(want * 100).toFixed(1)}%`
+        : null;
+    })
+    .filter(Boolean);
+  check('⚠️⚠️ the in-app mark keeps the BOARD\'s stroke-to-edge ratio — a black slab is a ratio bug',
+    mismatch.length === 0, mismatch.join(' · '));
+
+  // ⚠️ POSITIVE CONTROL — the numbers that actually shipped must FAIL the comparison, or it proves nothing.
+  const slabStrokes = [8, 9, 5]; // the unscaled literals, in the 53.012 box
+  const slabViolations = slabStrokes.filter((s, i) => {
+    const board = boardPairs[i];
+    return board ? Math.abs(board[1] / board[0] - s / rendered[i].edge) / (board[1] / board[0]) > 0.01 : false;
+  });
+  check('⚠️ guard: the pre-fix slab (8 · 9 · 5 unscaled) WOULD fail the ratio check',
+    slabViolations.length === 3, `violations=${slabViolations.length}/3`);
 }
 
 function storeChecks(): void {

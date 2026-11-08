@@ -30,6 +30,26 @@ import Svg, { Ellipse, G, Path, Rect } from 'react-native-svg';
 
 import { brand, surface } from '@/theme/tokens';
 
+/**
+ * ⚠️⚠️ **THE STROKES AND TWO CORNER RADII MUST BE SCALED — AND THEY WERE NOT (fixed 2026-11-08).**
+ *
+ * The board draws the mark in **170 units**; this header export is that board divided by `MARK_SCALE`
+ * into a **53.012** box. The x/y/width/height and the frame bars' `rx` were converted correctly — but
+ * the tablet and ring **stroke widths (8 · 9)** and their **`rx` (8 · 3)** were copied **verbatim**,
+ * i.e. ~3.2× too thick in a canvas 3.2× smaller.
+ *
+ * ⚠️ That is why the in-app mark read as a **black slab** while `assets/app-mark.svg` (built from the
+ * 170 board, and the source of the launcher icon) reads as a clean gold tablet: at the same rendered
+ * size the tablet's border in the app was **26%** of its own edge instead of **9%**. The ratio is the
+ * thing that matters, so every size-derived value here goes through `MARK_SCALE` rather than being
+ * written as a literal that can silently stop matching the board.
+ */
+const MARK_SCALE = 53.012 / 170; // 0.31184 — the board's 170 box, reduced to this export's 53.012
+
+const TABLET_STROKE = 8 * MARK_SCALE; // 2.495 (the board's 8)
+const RING_STROKE = 9 * MARK_SCALE; // 2.807 (the board's 9)
+const DIAMOND_STROKE = 5 * MARK_SCALE; // 1.559 (the board's 5)
+
 export function AppMark() {
   return (
     <Svg width="100%" height="100%" viewBox="0 0 53.012 53.012">
@@ -45,12 +65,12 @@ export function AppMark() {
         <Rect x={4.506} y={45.855} width={10.337} height={2.651} rx={1.325} />
       </G>
       {/* the gold tablet, its ink border, the cinnabar ring, the diamond */}
-      <Rect x={12.723} y={12.723} width={27.566} height={27.566} rx={8}
-        fill={brand.goldBright} stroke={brand.ink} strokeWidth={8} />
-      <Rect x={19.614} y={19.614} width={13.783} height={13.783} rx={3}
-        fill={brand.gold} stroke={brand.cinnabar} strokeWidth={9} />
+      <Rect x={12.723} y={12.723} width={27.566} height={27.566} rx={8 * MARK_SCALE}
+        fill={brand.goldBright} stroke={brand.ink} strokeWidth={TABLET_STROKE} />
+      <Rect x={19.614} y={19.614} width={13.783} height={13.783} rx={3 * MARK_SCALE}
+        fill={brand.gold} stroke={brand.cinnabar} strokeWidth={RING_STROKE} />
       <Path d="M22.795,26.506L26.506,22.795L30.217,26.506L26.506,30.217Z"
-        fill={brand.goldBright} stroke={brand.ink} strokeWidth={5} strokeLinejoin="round" />
+        fill={brand.goldBright} stroke={brand.ink} strokeWidth={DIAMOND_STROKE} strokeLinejoin="round" />
     </Svg>
   );
 }

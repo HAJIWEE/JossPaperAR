@@ -2038,6 +2038,28 @@ The icon is built from the board so it is right; ⚠️ **the in-app mark is sti
 red on: adaptive colour → `#E6F4FE` (1 of 814), splash plugin deleted (1). **US$0.00.**
 
 
+## 2026-11-08 (S79j) — the in-app mark was a BLACK SLAB; the strokes were never scaled
+
+⚠️ Building the launcher icon at 1024 exposed it: `AppMark` rendered a black slab, `assets/app-mark.svg` (from the
+170 board) a clean gold tablet.
+
+**Cause:** the header export is the 170 board in **53.012**. x/y/width/height were divided correctly, but the tablet
+and ring **stroke widths `8 · 9`** and their **`rx 8 · 3`** were copied **verbatim** → the tablet's border was
+**22.9 %** of its own edge instead of **9.0 %**.
+
+⚠️ **Nothing could see it:** the numbers WERE the board's, and a stroke has no invariant except relative to its own
+shape. **Measured by rendering** all three at 512 px: old **61 px (22.9 %)** · new **24 px (9.0 %)** · board **24 px
+(9.0 %)**.
+
+**Fix:** `MARK_SCALE = 53.012 / 170`, every size-derived value expressed through it.
+
+⚠️⚠️ **The first gate was WRONG** — it evaluated the `const` declarations, so replacing `strokeWidth={TABLET_STROKE}`
+with a literal `8` left it green while the app drew a slab. It now parses the **rendered elements** and compares
+stroke ÷ its own edge against the ratio parsed from the board SVG. Fault-tested red: `pair0 (8): 29.0 % vs 9.0 %`.
+
+**Gates 821** (+4) · `tsc` 0 · 20/20. **US$0.00.**
+
+
 ## Next, in order
 
 1. **`SCRUM-215`'s remaining half** — the SMTP provider + the two templates carrying `{{ .Token }}`, then

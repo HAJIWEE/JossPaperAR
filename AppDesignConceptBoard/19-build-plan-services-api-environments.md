@@ -533,6 +533,33 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **SCRUM-59 was the one that changed the code**, and it was kept out of PR-3 on purpose — it edits `request_cartoonize`, which was already applied, so it belongs in its own migration + PR with its own tests. **It is built: see §12.5.**
 
+### 12.54 · S79j — the in-app mark was a BLACK SLAB: strokes (and two radii) were never scaled (2026-11-08)
+
+> ⚠️⚠️ **The launcher icon and the in-app header mark were drawing the same design at different weights**, and the
+> icon build is what exposed it: rendering `AppMark` at 1024 produced a black slab, while `assets/app-mark.svg`
+> (from the 170 board) produced a clean gold tablet.
+>
+> **The cause, value by value.** The board draws in **170 units**; the header export is that board in **53.012**. The
+> port divided x/y/width/height correctly — frame bars `8.5 × 33.15 → 2.651 × 10.337`, `rx 4.25 → 1.325` — but the
+> tablet and ring **stroke widths `8 · 9`** and their **`rx 8 · 3`** were copied **verbatim**. So at any shared
+> rendered size the tablet's border was **22.9 %** of its own edge instead of **9.0 %**, and the gold vanished.
+>
+> ⚠️ **Nothing could see it**: the numbers were the board's own, the file "looked" like a faithful port, and a
+> stroke has no numeric invariant except *relative to its own shape*. **Measured by rendering** all three at 512 px
+> and scanning the tablet's border at its vertical centre: **old 61 px (22.9 %) · new 24 px (9.0 %) · board 24 px
+> (9.0 %)** — the fix restores the board exactly.
+>
+> **The fix is structural, not numeric:** `MARK_SCALE = 53.012 / 170` and every size-derived value is expressed
+> through it (`8 * MARK_SCALE`), so it cannot drift again.
+>
+> **Gates: 821** (from 817) · `tsc` **0** · 20/20. ⚠️ The gate compares **stroke ÷ its own shape's edge** against
+> the **same ratio parsed out of `assets/app-mark.svg`** — a proportional invariant, not a magic number.
+> ⚠️⚠️ **And the first version of that gate was WRONG:** it evaluated the `const` declarations, so a fault test
+> that replaced `strokeWidth={TABLET_STROKE}` with a literal `8` left the constants pristine and the gate **green**
+> while the app drew a slab. It now parses the **rendered elements**. Fault-tested red — `pair0 (8): 29.0 % of its
+> edge vs board 9.0 %` (1 of 821).
+
+
 ### 12.53 · S79i — THE ICON AND THE SPLASH: the boards were there, the APK shipped Expo's defaults (2026-11-08)
 
 > ⚠️⚠️ **The owner spotted it on the installed APK: a generic icon.** `app.json` pointed at Expo's template assets and
