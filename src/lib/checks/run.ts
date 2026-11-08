@@ -3155,6 +3155,33 @@ function storeChecks(): void {
    */
   const stripComments = (src: string): string =>
     src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  /**
+   * ⚠️️ **SHRINE CUSTOMISATION — THE HALF `tsc` CANNOT SEE** (SCRUM-204).
+   *
+   * ⚠️ The client has NO generated DB types, so nothing static checks that an RPC's ARGUMENT NAMES match the
+   * database: `rpc('equip_decoration', { p_slot, p_item_code })` would compile and then fail only on a device if
+   * either name drifted. The migration is the authority, so the two are asserted together here.
+   *
+   * ⚠⚠ And the rule is asserted to live SERVER-SIDE ONLY — the client must not re-implement the
+   * slot-category check, or the day they disagree the screen refuses what the server allows.
+   */
+  const DECOR_LIB = readFileSync(join(PROJECT_ROOT, 'src', 'lib', 'decorations.ts'), 'utf8');
+  const EQUIP_SQL = readFileSync(
+    join(PROJECT_ROOT, 'supabase', 'migrations', '20261004091500_rpc_app_surface.sql'), 'utf8');
+  check('⚠️️ the client calls `equip_decoration` with the argument names the SQL declares',
+    DECOR_LIB.includes("rpc('equip_decoration', { p_slot: slot, p_item_code: code })")
+      && /function public\.equip_decoration\(p_slot text, p_item_code text\)/.test(EQUIP_SQL));
+  check('⚠️⚠️ …and does NOT re-implement the slot/category rule client-side — the server owns it',
+    !/slot_category/.test(stripComments(DECOR_LIB)));
+  check('⚠️ reads are RLS reads of the caller’s own rows, not a privileged RPC',
+    DECOR_LIB.includes("from('inventory')") && DECOR_LIB.includes("from('equipped_decorations')"));
+  // ⚠️ POSITIVE CONTROL — the prices that unblock the whole flow are really in the DB migration.
+  const PRICE_SQL = readFileSync(
+    join(PROJECT_ROOT, 'supabase', 'migrations', '20261108160000_decoration_prices.sql'), 'utf8');
+  check('⚠️⚠️ all FIVE decorations are priced server-side — without it nothing can be owned',
+    ['festive_set', 'spring_couplets', 'zhong_kui', 'door_gods', 'lanterns']
+      .every((c) => new RegExp(`code = '${c}'`).test(PRICE_SQL)));
+
   const STORE_SCREEN_JS = stripComments(
     readFileSync(join(PROJECT_ROOT, 'src', 'app', 'store.tsx'), 'utf8'),
   );
