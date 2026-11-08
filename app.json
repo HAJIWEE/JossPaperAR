@@ -9,7 +9,9 @@
     "ios": {
       "bundleIdentifier": "app.josspaperar",
       "supportsTablet": true,
-      "associatedDomains": ["applinks:josspaperar.app"]
+      "associatedDomains": [
+        "applinks:josspaperar.app"
+      ]
     },
     "android": {
       "package": "app.josspaperar",
@@ -24,17 +26,21 @@
               "pathPrefix": "/join"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#F5F0E8",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": ["android.permission.CAMERA"]
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "scheme": "josspaperar",
     "plugins": [
@@ -50,6 +56,15 @@
           "microphonePermission": false,
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": true
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 190,
+          "resizeMode": "contain",
+          "backgroundColor": "#1b1613"
         }
       ]
     ],

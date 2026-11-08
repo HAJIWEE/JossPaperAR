@@ -1,0 +1,71 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# .easignore — WHAT IS UPLOADED TO EAS BUILD (SCRUM-… S79g)
+#
+# ── ⚠️⚠️ READ THIS BEFORE EDITING: .easignore REPLACES .gitignore ──────────────
+# When this file exists, EAS uses it **instead of** `.gitignore` to decide what
+# leaves the machine. ⚠️ That means every secret `.gitignore` was protecting
+# becomes **uploadable** the moment this file appears — the ignore list has to be
+# a SUPERSET of `.gitignore`, not a supplement to it. That is why the secrets come
+# first: a rule lost here is a key sent to a build server, and nothing fails.
+#
+# ⚠️ And the reverse: anything excluded that the build NEEDS fails ~2 minutes into
+# a ~20-minute cloud build. Verified with
+#   rsync -a --dry-run --exclude-from=.easignore ./ /tmp/out/ --itemize-changes
+# before the first build — `src/ · assets/ · modules/ · app.json · package.json ·
+# package-lock.json · eas.json · tsconfig.json` must all still appear.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── 1 · SECRETS — MUST stay excluded, and MUST come first ────────────────────
+.env
+.env.*
+!.env.example
+# ⚠️ THIS ONE HOLDS A LIVE `FAL_KEY` (≈72 chars) — the orchestrator's paid-path credential.
+supabase/functions/.env
+!.env.example
+# ⚠️ `supabase link` state: carries the project ref and a POOLER URL with credentials.
+supabase/.temp/
+supabase/.branches/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# ── 2 · Dependencies & build output — EAS installs from the lockfile itself ───
+node_modules/
+.expo/
+dist/
+web-build/
+build/
+# ⚠️⚠️ ANCHORED WITH A LEADING `/`, AND THAT IS LOAD-BEARING (fixed 2026-11-08).
+# A bare `android/` matches at ANY depth, so it silently stripped
+# `modules/zoom-range/android` and `modules/zoom-range/ios` — the native source of a REAL local Expo
+# module — out of every build archive. ⚠️ `git` never saw it (`.gitignore` has no such rule), so the repo
+# looked clean: `expo-doctor`'s "common project setup issues" check was the only thing that noticed, and it
+# failed CI. ⚠️ These patterns must exclude ONLY the generated top-level CNG trees.
+/android/
+/ios/
+
+# ── 3 · Editors · OS · agent state ──────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+.cline/
+*.log
+
+# ── 4 · NOT SHIPPED IN THE APP — the 178 MB was almost all of this ──────────
+# ⚠️ Measured before: `spike/` 73 MB and `design-system/` 14 MB were the bulk; the
+# whole mobile payload is `src/` 1.7 MB + `assets/` 3.0 MB + `modules/` 44 KB.
+# ⚠️ Metro bundles ONLY what `src/app` imports, and these are never imported.
+spike/
+design-system/
+AppDesignConceptBoard/
+penpot-sweeps/
+prototype/
+.github/
+*.md
+# ⚠️ The server side is deployed separately (`supabase functions deploy`), never
+# bundled — no `src/` module imports it. ⚠️ Its `.env` is excluded twice, above and here.
+supabase/

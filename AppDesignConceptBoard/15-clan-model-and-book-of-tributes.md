@@ -23,8 +23,8 @@ The [[13-privacy-and-retention]] §4 rule is unchanged and now load-bearing twic
 | Field | Rule |
 |---|---|
 | `name` | user-set at creation (e.g., 陈氏 · *Gwee Clan*), 2–20 characters — **not globally unique** |
-| `id` | **UUID v4** — backend-only; never typed by a user, never shown in full |
-| `#suffix` | disambiguator — **4–5 chars of the UUID**, shown only when needed (§2.1) |
+| `id` | **UUID v4** — backend-only; never typed by a user, never shown in full. ⚠️ **This is the clan's identity**: every call carries it, and it is the ONLY thing that tells two same-named clans apart |
+| ~~`#suffix`~~ | ⚠️ **WITHDRAWN — SCRUM-48 rev 2 (2026-10-02)**, see §2.1. Names display **plain**; there is **no suffix and no collision prompt**. The row is kept, struck through, so the old boards do not read as current |
 | `code` | short human-typable code (~8 chars) — what invitations carry (§5.1) |
 | `created_by` | the founding user → becomes **Clan Head** |
 | `created_at` | shown as the founding date on the clan card |
@@ -77,6 +77,16 @@ Entry: **required** in first-run, straight after account creation (SCRUM-29 boar
 
 * **加入宗族 · Join a Clan** — *a family member sent you a link? Enter the code.* → §4.3
 * **创建宗族 · Create a Clan** — *start your family's altar.* → §4.2
+
+> ⚠️⚠️ **WHEN THE FORK MAY APPEAR — AND WHEN IT MUST NOT (PM, 2026-11-08).** *"the log in for existing users
+> should not go into the create/join clan workflow if they already are part of one."*
+> The fork is a **first-run** step. ⚠️ A user who is **already in a clan** (any clan — §5.2 allows several) must
+> land on **their altar**, not be asked to create or join one. Asked anyway, they create a second clan they did
+> not want — ⚠️ **and the second clan is not itself a fault: duplicate clans and duplicate names are both
+> allowed (§2.1, §5.2). The fault is the PROMPT**, which manufactures one unasked.
+> Built as `routeAfterAccount(hasClan)` in `src/lib/account-flow.ts`: **in ≥1 clan → `/`** · in none → the fork ·
+> ⚠️ **membership unreadable → the fork** (the documented first-run chain), because a new user must not be
+> stranded on an altar they do not have. Asserted by `check:lib`.
 
 ### 4.2 Create — four taps to head
 
@@ -199,7 +209,7 @@ One active `code` per clan (Head can re-roll it): **link · QR · copyable code*
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `clans` | `id` uuid PK, `name`, `code`, `created_by`, `created_at`, `archived_at?`, `ancestor_cap` (default **10**) | `name` not unique; server composes `display_name` (suffix on collision); `ancestor_cap` is raised later by **slot purchases** (monetization hook) |
+| `clans` | `id` uuid PK, `name`, `code`, `created_by`, `created_at`, `archived_at?`, `ancestor_cap` (default **10**) | `name` **not unique — duplicates are allowed and display plain** (§2.1); the **`id` UUID is the identity**. ⚠️ *(This row used to say "server composes `display_name` (suffix on collision)" — **withdrawn by SCRUM-48 rev 2**, 2026-10-02.)* `ancestor_cap` is raised later by **slot purchases** (monetization hook) |
 | `clan_members` | `clan_id`, `user_id`, `role` (`head`\|`co_head`\|`elder`\|`member`), `joined_at` | PK(`clan_id`,`user_id`); **≥1 head-power** enforced by a **`DEFERRABLE INITIALLY DEFERRED` constraint trigger** (migration `0012`), so it fires at COMMIT and never blocks a same-transaction succession |
 
 **Changed tables:**

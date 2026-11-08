@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 170 170" width="1024" height="1024">
+  <!--
+    THE APP MARK — the DARK variant of from Penpot board `ICON · app mark + tile`,
+    shape `icon · mark (170)`, exported as SVG on 2026-11-08. Every coordinate below is the
+    board's own; nothing is estimated.
+    ⚠️ NOTE THE STROKE WIDTHS: the tablet is 88.4 wide with stroke-width 8 — i.e. ~9% of its
+    own edge, in a 170-unit space. ⚠️ `src/components/home/header-art.tsx` (AppMark) uses the
+    SAME numbers in a 53-unit viewBox, which makes its strokes ~3.2x too thick — that is why
+    the in-app mark reads as a black slab and the board does not. Recorded, not fixed here.
+  -->
+  <g fill="#f5f0e8">
+    <rect x="14.45" y="14.45" width="8.5" height="33.15" rx="4.25"/>
+    <rect x="14.45" y="14.45" width="33.15" height="8.5" rx="4.25"/>
+    <rect x="147.05" y="14.45" width="8.5" height="33.15" rx="4.25"/>
+    <rect x="122.40" y="14.45" width="33.15" height="8.5" rx="4.25"/>
+    <rect x="147.05" y="122.40" width="8.5" height="33.15" rx="4.25"/>
+    <rect x="122.40" y="147.05" width="33.15" height="8.5" rx="4.25"/>
+    <rect x="14.45" y="122.40" width="8.5" height="33.15" rx="4.25"/>
+    <rect x="14.45" y="147.05" width="33.15" height="8.5" rx="4.25"/>
+  </g>
+  <!-- the three small diamonds above the tablet — goldDeep, ink outline -->
+  <path d="M79.05,25.5L85,19.55L90.95,25.5L85,31.45Z" fill="#a8862a" stroke="#f5f0e8" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M62.05,17.85L66.3,13.6L70.55,17.85L66.3,22.1Z" fill="#a8862a" stroke="#f5f0e8" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M100.3,20.4L104.55,16.15L108.8,20.4L104.55,24.65Z" fill="#a8862a" stroke="#f5f0e8" stroke-width="3" stroke-linejoin="round"/>
+  <!-- tablet -> ring -> centre diamond -->
+  <rect x="40.8" y="40.8" width="88.4" height="88.4" rx="8" fill="#f0c75e" stroke="#f5f0e8" stroke-width="8"/>
+  <rect x="62.9" y="62.9" width="44.2" height="44.2" rx="3" fill="#d4af37" stroke="#c23b22" stroke-width="9"/>
+  <path d="M73.1,85L85,73.1L96.9,85L85,96.9Z" fill="#f0c75e" stroke="#f5f0e8" stroke-width="5" stroke-linejoin="round"/>
+</svg>

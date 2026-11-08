@@ -46,3 +46,9 @@ Thumbs.db
 
 # ── Logs ────────────────────────────────────────────────────────────────────
 *.log
+
+# ── Icon pipeline intermediates (regenerate from assets/app-mark*.svg) ──────
+# ⚠️ The SVGs are the source of truth; these are 1024 rasters used to compose the
+# launcher assets and must not be committed (they are not shipped either).
+assets/mark-1024.png
+assets/mark-dark-1024.png

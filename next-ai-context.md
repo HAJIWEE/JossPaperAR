@@ -1903,6 +1903,141 @@ follow-up, not a defect). ⚠️ And consider hiding **Sign out** while the sess
 throwaway identity for a wall that user cannot pass without an account.
 
 
+## 2026-11-08 (S79f) — the SIGN-IN road had two defects, and the gates could not see either
+
+**Found by the owner on the installed APK**, minutes after the first build landed. Both are in the road the
+gate suite never walked: the gates test the *functions*, and nothing tested *which route a returning user
+takes* or *what a 429 says*.
+
+**1 · A temporary refusal read as a broken sign-in.** *"when i used the 'resend the code' then 'wrong email?
+edit' it prevents me from logging in with the same email again."* ⚠️ `signInWithOtp` answers **429** when the
+address was mailed moments ago; that maps to `rate_limited`, which fell through to **`account.genericIssue`**
+— so *"wait a minute"* rendered as *"something went wrong"*. ⚠️ And **"Resend a new code" stayed live**,
+inviting the one action that could not succeed.
+**Fix:** `rate_limited` → **`account.tooMany`** (*"A code was just sent… give it a minute"*), ⚠️ **email step
+only** — on the code step a 429 is a different limiter and claiming "we just mailed you" there is a lie — and
+a 429 now **re-arms the 42 s countdown** so the affordance matches the state.
+⚠️ **The other half is not code:** the hosted **email rate limit** is still default (doc 24 §4 step D). The app
+now says *wait* instead of *broken*; the limit is a Dashboard setting.
+
+**2 · Every returning user was sent back to the clan fork.** *"After i re-login, it asked me to create or join a
+clan again, so i created the same clan…"* ⚠️⚠️ **The data was perfect and the workflow was wrong — and the
+workflow is the dangerous one**, because the prompt makes a user create a clan they did not want. ⚠️ **The extra
+clan is not the fault: duplicate clans and duplicate NAMES are allowed by design** (doc 15 §2.1 · §5.2 — clans
+are keyed by **UUID**, names display plain, one person may belong to several). **The fault is the PROMPT.**
+Cause: `confirm()` ended with `router.replace(AFTER_ACCOUNT_ROUTE)` — the **first-run** handoff — for
+**everyone**; the user's clan was never looked at.
+**Fix:** pure **`routeAfterAccount(hasClan)`**; `confirm()` reads `myClans()` → **with a clan, `/`** · clan-less,
+the fork · **unchecked** (`null`, read failed), the fork — preserving the documented chain
+`demo → account → clan fork`. ⚠️ `busy` stays true across the check so a second confirm cannot fire.
+
+✅ **And this report is the proof the project did not have:** *"the tablet i create was still there"* — **the
+sign-back-in returns the account's data.** That was the one claim §S79b and §12.49 both left open.
+
+**Gates: 788** (from 781) · `tsc` **0** · 20/20 suite steps, each new check **fault-tested red**
+(route always fork → 2 of 788 · 429 mapping deleted → 1 · routing blind again → 1).
+**US$0.00** — no AI call.
+
+✅ **CONFIRMED ON GLASS the same day** — the owner: *"yes it lands back at the shrine"*, on the installed APK
+(`ed196c6c…`, commit `7d64b4e`). ⚠️ That is the **sign-back-in end to end**: wall → email code → **shrine**.
+⚠️ **The 429 half stays gate-proven only** — reproducing it live spends the owner's email quota to watch a
+message, and the hosted limit (doc 24 §4 step D) is still unraised.
+
+⚠️ **Also settled here, after I got it wrong:** duplicate clans and duplicate NAMES are **allowed by design**
+(doc 15 §2.1 · §5.2) — the second clan from that report was never the fault; **the prompt was**. The clan model
+is now **gated** in `check:lib` (UUID identity · no unique name · multi-clan membership), because a later
+`unique (name)` or `unique (user_id)` would forbid it in silence.
+
+⏳ **Open for the owner:** ⚠️ **does the account now hold a SECOND clan** from that re-creation? The fix
+prevents the prompt, not a duplicate already made — and it is worth knowing whether duplicate clan **names**
+are even allowed.
+
+
+## 2026-11-08 (S79g) — bilingual emails, a 97 % smaller upload (secrets checked), and 214(A) decided
+
+**1 · Both languages in every email.** *"supabase can't change it per recipient just include both in the email
+templates."* ⚠️ GoTrue renders **one** template for every recipient — no per-user locale — so a single-language
+email guesses. Both templates now carry **EN → divider → 中文**, with the **code once** and described twice.
+⚠️ Uses a CJK-safe serif stack (`'Songti SC'`, `'Noto Serif CJK SC'`) — Latin fonts render 中文 as tofu.
+⚠️ **Needs the Dashboard re-paste again** (doc 24 §B) or the next email is unchanged.
+
+**2 · ⚠️⚠️ `.easignore` — 178 MB → 5.5 MB, and the trap that mattered.** **`.easignore` REPLACES `.gitignore`
+for EAS uploads**, so the moment it exists every secret `.gitignore` protected becomes **uploadable** — and
+⚠️ **nothing fails**: the build succeeds and the key sits on a build server. Secrets therefore come first in the
+file, and a gate holds them there. **Verified both directions** with `rsync --exclude-from=.easignore` (a faithful
+simulator): **164 files / 5.5 MB**; build inputs present; `.env` · `supabase/functions/.env` (the live `FAL_KEY`) ·
+`supabase/.temp/` · `node_modules` · `spike/` (73 MB) · `design-system/` (14 MB) · docs · `android/` · `ios/` all
+absent. **Sweep result: no live secret is committed** — only `.env.example` is tracked, and the key-shaped hits are
+role names in comments or scripts that read keys from `supabase status` at runtime.
+
+**3 · ⚠️ SCRUM-214(A) DECIDED: the FAMILY NAME field is DROPPED.** *"Profile should be a User Profile as we already
+have a Clan page where the Clan details are shown."* A family name is a **clan** concept, named on the Clan page.
+⚠️ **And the column recorded earlier was the wrong one:** `profiles.display_label` is the **league pseudonym**
+(`pseudonym_for(user_id)`), and the schema says *"NEVER the ancestor name"* (doc 13 §4) — a family name there would
+have broken the privacy record. ⏳ **Flagged, not guessed:** a true *user* profile needs a **user-chosen name** and
+the schema has none, so Profile's header still shows the clan name + role (now duplicating the Clan page). Options
+are in `follow-up-items.md`.
+
+**Gates: 800** (from 792) · `tsc` **0** · 20/20 suite steps. Fault-tested red: `.easignore` losing its `.env` rule
+(1 of 800) · a template stripped of all CJK (1 of 800) · controls proving the un-ignore detector fires on `!.env`
+and that an English-only body fails the bilingual check. **US$0.00**, and **no new APK** (templates aren't in the
+bundle, `.easignore` is build-side, the account change is a docblock).
+
+
+## 2026-11-08 (S79h) — the USER's own name, and the split that a crash proved is load-bearing
+
+**SCRUM-214(A) option B** (owner: *"b"*): the Profile is a **user** profile, so it needs a name that is the
+person's own.
+
+**⚠️ NOT `display_label`.** That is auto-generated by `pseudonym_for(user_id)` and its own comment says *"NEVER the
+ancestor name"* (doc 13 §4) — writing a chosen name there would put a real identity into a privacy device built to
+avoid one. So `chosen_name` is a NEW nullable, **non-unique** column (duplicates allowed; identity is `user_id`),
+1–24 after `btrim`, added by `20261108120000_profile_chosen_name.sql` — ⚠️ **PUSHED to hosted**, and it was the only
+pending migration (verified, so no drift rode along).
+
+**⚠️ No RPC, deliberately:** `profiles_select_own` / `profiles_update_own` are `user_id = auth.uid()`, so PostgREST
+reads/writes exactly the caller's row; a `SECURITY DEFINER` function would add privilege where RLS suffices.
+**Verified first:** no RPC selects `p.*` (so it cannot leak) and `delete_my_data` deletes the `profiles` row (so it is
+**erased for free**).
+
+**The screen:** header is now *the user* — their name (or *"Add your name"*) + the signed-in address. ⚠️ The clan
+name + role are **gone** (they duplicated the Clan page) and `myClans()` went with them. A *"Your name"* row opens a
+`Modal` editor with a visible `n/24` counter, and a failed save **keeps the editor open**.
+
+**⚠️⚠️ Two lessons, both paid for.** ① The first version put rules + Supabase calls in ONE file and **`check:lib`
+ died**: `ERR_MODULE_NOT_FOUND: react-native-url-polyfill/auto` — the gate runs under plain Node and the device half
+imports `supabase.ts`. So the pure/device split is **load-bearing, not ceremony**; it is now `user-name.ts` beside
+`user-profile.ts`. ② The import was named **`setChosenName`**, which is ALSO the React state setter — the call
+resolved to the setter and type-checked as *"Property 'ok' does not exist on type 'void'"*, two frames from the
+cause; the import is now aliased `saveChosenName`.
+
+**Gates: 807** (from 800) · `tsc` **0** · 20/20. Fault-tested red: `unique` on the column (1 of 807) · a client
+writing `display_label` (1) · the clan block back in the header (1). **US$0.00**.
+
+
+## 2026-11-08 (S79i) — the ICON and SPLASH ship from the boards (they were Expo's defaults)
+
+⚠️ **The owner caught it on the APK: a generic icon.** `app.json` used Expo's template assets and
+`adaptiveIcon.backgroundColor` was **`#E6F4FE`** (Expo's blue). ⚠️ Nothing failed — a default is not a decision, and
+no gate looked at an image.
+
+**The design was already in Penpot** (`ICON · app mark + tile`, `EN · 0 ZH · 0 Splash`). ⚠️ The splash is **DARK**:
+`#1b1613` ground, a 190 px mark, cinnabar + paper wordmark, a loading bar.
+
+**Shipped:** `assets/app-mark.svg` transcribed from the board's **own SVG export** + a dark-ground recolour, and six
+generated assets — `icon.png` (1024², **RGB no alpha**, Play rejects alpha), adaptive foreground (transparent, inside
+the safe zone), flat background, **monochrome flattened to white** (Android tints the alpha), `splash-icon.png`,
+`favicon.png`. ⚠️ **`expo-splash-screen` was not installed at all** — hence no splash; now a dependency + plugin at
+the board's colours.
+
+⚠️⚠️ **The first render exposed a REAL bug:** building from `header-art.tsx`'s `AppMark` gave a black slab, because
+the board's `strokeWidth 8` is in a **170** space and `AppMark` uses `8` in a **53** space — **~3.2× too thick**.
+The icon is built from the board so it is right; ⚠️ **the in-app mark is still wrong** (follow-up).
+
+**Gates: 814** (+7) · `tsc` 0 · 20/20. They read **PNG headers** (no image lib in CI) + the wiring, and fault-tested
+red on: adaptive colour → `#E6F4FE` (1 of 814), splash plugin deleted (1). **US$0.00.**
+
+
 ## Next, in order
 
 1. **`SCRUM-215`'s remaining half** — the SMTP provider + the two templates carrying `{{ .Token }}`, then

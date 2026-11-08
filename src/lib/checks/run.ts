@@ -36,8 +36,10 @@ import {
   nextAccountStep,
   normaliseEmail,
   NO_ANONYMOUS_SESSION,
+  routeAfterAccount,
 } from '../account-flow.ts';
 import { planBootstrap } from '../session-map.ts';
+import { chosenNameProblem, normaliseChosenName } from '../user-name.ts';
 import { readBurnParams, readItemBurnParams, readItemRewardParams, readRewardParams } from '../route-params.ts';
 import { getOffering } from '../../domain/catalogue.ts';
 import { bookView, showsBookSectionTitle } from '../clan-roles.ts';
@@ -2410,6 +2412,8 @@ function accountChecks(): void {
       issueKeyFor('?'),
       issueKeyFor('sign_in_failed', 'code'),
       issueKeyFor('otp_expired', 'code'),
+      // ⚠️ A 429 is a TEMPORARY refusal, not a broken sign-in — and it is a key, so it must exist twice.
+      issueKeyFor('rate_limited'),
     ].every((k) => MESSAGES.en[k] !== undefined && MESSAGES.zh[k] !== undefined));
   check('⚠️ EMAIL-ALREADY-TAKEN means SIGN IN — and ONLY on the sign-up road',
     meansSignInInstead('signUp', 'A user with this email address has already been registered') === true &&
@@ -2618,11 +2622,243 @@ function accountChecks(): void {
   check('⚠️⚠️ …and NEITHER carries a one-tap link the app cannot receive',
     templates.every((t) => !t.body.includes('{{ .ConfirmationURL }}')),
     'the app has no emailRedirectTo, no callback handler and no hosted allowlist — doc 24 §6');
+  /**
+   * ⚠️ **BOTH LANGUAGES IN EVERY EMAIL** (owner, 2026-11-08): *"supabase can't change it per recipient just
+   * include both in the email templates."* ⚠️ GoTrue renders ONE template for every recipient — there is no
+   * per-user locale — so a single-language email guesses, and gets it wrong for half the audience. ⚠️ And the
+   * **code appears ONCE**: two code blocks would make a reader wonder which one is theirs.
+   */
+  check('⚠️⚠️ both templates carry BOTH languages (GoTrue cannot switch per recipient)',
+    templates.every((t) => /[\u4e00-\u9fff]/.test(t.body) && /[A-Za-z]{4,}/.test(t.body)));
+  check('⚠️ …and the CODE appears exactly once, described twice — never two codes',
+    templates.every((t) => (t.body.match(/\{\{ \.Token \}\}/g) ?? []).length === 1));
+  // ⚠️ POSITIVE CONTROL — a monolingual body must FAIL the both-languages check, or it passes on any text.
+  check('⚠️ guard: an English-only body WOULD fail the both-languages check',
+    !(/[\u4e00-\u9fff]/.test('<p>The code expires in 1 hour</p>')));
   // ⚠️ POSITIVE CONTROL — the detector must be able to SEE a link, or "no link" passes for the wrong reason.
   check('⚠️ guard: the same detector DOES find a link when one is present in the body',
     bodyOf('<a href="{{ .ConfirmationURL }}">x</a>').includes('{{ .ConfirmationURL }}'));
   check('…and `emailRedirectTo` is not wired anywhere, which is WHY the link is withheld',
     !accountSrc.includes('emailRedirectTo'));
+
+  /**
+   * ⚠️⚠️ **TWO BUGS THE OWNER FOUND ON GLASS, 2026-11-08 — both in the SIGN-IN road, both invisible to every
+   * gate that existed.**
+   *
+   * 1. *"when i used the 'resend the code' then 'wrong email? edit' it prevents me from logging in with the
+   *    same email again."* — ⚠️ `signInWithOtp` answers **429** when the address was mailed moments ago. That
+   *    reason fell through to `account.genericIssue`, so a **temporary** refusal read as a broken sign-in.
+   * 2. *"After i re-login, it asked me to create or join a clan again, so i created the same clan, then the
+   *    tablet i create was still there."* — ⚠️ the account data was PERFECT and the **handoff** was wrong:
+   *    `confirm()` sent **everyone** to the first-run fork.
+   */
+  check('⚠️⚠️ a 429 on the EMAIL step says WAIT — it does not read as a broken sign-in',
+    issueKeyFor('rate_limited') === 'account.tooMany');
+  // ⚠️ POSITIVE CONTROL — on the CODE step a 429 comes from a different limiter, so it must NOT borrow the
+  // "we just mailed you" sentence. This is the same step-based discipline `codeWrong` relies on.
+  check('⚠️ …and a 429 on the CODE step does NOT claim a code was just sent',
+    issueKeyFor('rate_limited', 'code') === 'account.codeWrong');
+  check('⚠️⚠️ a RETURNING user with a clan goes to the SHRINE, not the first-run fork',
+    routeAfterAccount(true) === '/');
+  check('⚠️ …but a clan-less user still gets the fork, and so does an UNCHECKED one',
+    routeAfterAccount(false) === AFTER_ACCOUNT_ROUTE
+      && routeAfterAccount(null) === AFTER_ACCOUNT_ROUTE);
+  // ⚠️ POSITIVE CONTROL — the two branches must actually differ, or the function is a constant.
+  check('⚠️ guard: `routeAfterAccount` is not a constant',
+    routeAfterAccount(true) !== routeAfterAccount(false));
+  check('⚠️ …and the SCREEN makes the clan check rather than routing blind',
+    accountScreenSrc.includes('await myClans()')
+      && accountScreenSrc.includes('routeAfterAccount(')
+      && !accountScreenSrc.includes("router.replace(AFTER_ACCOUNT_ROUTE)"));
+  check('⚠️ …and a 429 RE-ARMS the resend countdown instead of re-offering a button that will fail',
+    accountScreenSrc.includes("if (res.reason === 'rate_limited')")
+      && accountScreenSrc.includes('setSecondsLeft(RESEND_SECONDS);\n        setIssue(issueKeyFor(res.reason));'));
+
+  /**
+   * ⚠️⚠️ **THE CLAN MODEL IS A PRODUCT RULE, AND THE SCHEMA IS WHERE IT CAN BE BROKEN IN SILENCE**
+   * (PM, 2026-11-08): *"Clans and accounts are allowed to have duplicate names… the Clans we should have a
+   * UUID… It is ok for someone to be part of multiple clans."*
+   * ⚠️ Nothing would have caught a later `unique (name)` or `unique (user_id)`: the app would simply stop
+   * allowing what doc 15 §2.1 and §5.2 promise, and every screen would keep rendering. So the **SHAPE** is
+   * asserted — a migration that narrows it now has to delete a check, deliberately.
+   */
+  const SCHEMA_SQL = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'supabase', 'migrations', '20261003085500_slice_schema.sql'),
+    'utf8');
+  const tableDdl = (sql: string, name: string): string => {
+    const at = sql.indexOf(`create table public.${name} (`);
+    if (at < 0) return '';
+    const end = sql.indexOf('\n);', at);
+    return end < 0 ? '' : sql.slice(at, end);
+  };
+  const clansDdl = tableDdl(SCHEMA_SQL, 'clans');
+  const membersDdl = tableDdl(SCHEMA_SQL, 'clan_members');
+  const UNIQUE_NAME = /unique\s*\(\s*(?:lower\(\s*)?name\s*\)?/i;
+  const UNIQUE_USER = /unique\s*\(\s*user_id\s*\)/i;
+
+  check('⚠️ a CLAN is identified by a UUID — not by its name',
+    clansDdl.includes('id') && /id\s+uuid\s+primary key/i.test(clansDdl));
+  check('⚠️⚠️ …and its NAME may duplicate: no `unique` on the name, at column or table level',
+    clansDdl.length > 0
+      && !clansDdl.split('\n').filter((l) => /\bname\b/.test(l)).join(' ').match(/unique/i)
+      && !UNIQUE_NAME.test(SCHEMA_SQL));
+  check('⚠️⚠️ …and one person may belong to SEVERAL clans: membership is keyed by (clan_id, user_id)',
+    /primary key \(clan_id, user_id\)/i.test(membersDdl) && !UNIQUE_USER.test(SCHEMA_SQL));
+  // ⚠️ POSITIVE CONTROLS — the two detectors must be able to SEE the constraint they forbid, or "no unique"
+  // passes for the wrong reason. This is the same discipline as every other absence-check here.
+  check('⚠️ guard: the detectors DO fire on the constraints they forbid',
+    UNIQUE_NAME.test('constraint x unique (name)') && UNIQUE_USER.test('unique (user_id)')
+      && !UNIQUE_USER.test('unique (user_id, seq)'));
+
+  /**
+   * ⚠️⚠️ **`.easignore` REPLACES `.gitignore` FOR EAS UPLOADS** (S79g, 2026-11-08). ⚠️ So every secret the
+   * `.gitignore` was quietly protecting becomes **uploadable** the moment that file exists — and **nothing
+   * fails**: the build succeeds and the key has been posted to a build server. ⚠️ Measured: the file took the
+   * archive from **178 MB → 5.5 MB** while keeping every secret out, verified with
+   * `rsync --exclude-from=.easignore` in both directions.
+   */
+  const EASIGNORE_RULES = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '.easignore'), 'utf8')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !l.startsWith('#'));
+  check('⚠️⚠️ `.easignore` still excludes `.env` — the rule that replaced `.gitignore`',
+    EASIGNORE_RULES.includes('.env'));
+  check('⚠️ …and the other two secret vectors: `supabase/.temp/` (pooler URL) and `node_modules/`',
+    EASIGNORE_RULES.includes('supabase/.temp/') && EASIGNORE_RULES.includes('node_modules/'));
+  // ⚠️ A `!` rule can put a secret BACK. The one legitimate un-ignore is `.env.example`, which holds no key.
+  check('⚠️ …and no `!` rule re-includes a real `.env`',
+    !EASIGNORE_RULES.some((l) => l.startsWith('!') && /\.env(?!\.example)/.test(l)));
+  /**
+   * ⚠️⚠️ **AN UNANCHORED `android/` MATCHES AT ANY DEPTH — AND THIS REPO HAS A LOCAL EXPO MODULE.**
+   * Measured 2026-11-08: `.easignore` carried bare `android/` and `ios/`, which silently stripped
+   * `modules/zoom-range/android` and `/ios` — the NATIVE SOURCE of a real module — out of every build
+   * archive. ⚠️ **`git` never saw it** (`.gitignore` has no such rule), so the tree looked clean; the only
+   * thing that noticed was **`expo-doctor`'s "common project setup issues" check**, which failed CI.
+   * ⚠️ So the rule must be `/android/` and `/ios/`: the generated ROOT trees only.
+   */
+  const BARE_NATIVE = EASIGNORE_RULES.filter((l) => /^(android|ios)\/?$/.test(l));
+  check('⚠️⚠️ `.easignore` anchors `/android/` and `/ios/` — a bare one strips a local module\'s native source',
+    BARE_NATIVE.length === 0
+      && EASIGNORE_RULES.includes('/android/')
+      && EASIGNORE_RULES.includes('/ios/'),
+    `unanchored: ${BARE_NATIVE.join(', ')}`);
+  // ⚠️ POSITIVE CONTROL — the detector must fire on the unanchored form, or "none found" is vacuous.
+  check('⚠️ guard: the unanchored-native detector WOULD fire on a bare `android/`',
+    ['android/', 'ios', '/android/'].filter((l) => /^(android|ios)\/?$/.test(l)).length === 2);
+  // ⚠️ And the check is about something REAL: this repo does carry a local module with native dirs.
+  check('⚠️ …and that matters because a local Expo module with native dirs is present',
+    existsSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'modules', 'zoom-range', 'android'))
+      && existsSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'modules', 'zoom-range', 'ios')));
+  // ⚠️ POSITIVE CONTROL — that detector must fire on an un-ignore of `.env`, or "no bad rule" is vacuous.
+  check('⚠️ guard: the un-ignore detector WOULD fire on `!.env`',
+    /\.env(?!\.example)/.test('!.env'));
+
+  /**
+   * ⚠️ **SCRUM-214(A) IS DECIDED, NOT OMITTED** (owner, 2026-11-08): *"Profile should be a User Profile as we
+   * already have a Clan page where the Clan details are shown."* ⚠️ So the sign-up asks for **no family name** —
+   * a family name is a **clan** concept, named on the Clan page — and `profiles.display_label` is **not** the
+   * place for it: it is the auto-generated **league pseudonym**, *"NEVER the ancestor name"* (doc 13 §4).
+   * ⚠️ The check exists so the board's field cannot reappear **silently**, and so the reason stays attached.
+   */
+  check('⚠️ SCRUM-214(A) — sign-up asks for NO family name, and the screen records why',
+    !accountScreenSrc.includes('account-name')
+      && accountScreenSrc.includes('DECIDED 2026-11-08 (SCRUM-214(A))'));
+
+  /**
+   * ⚠️⚠️ **THE USER'S OWN NAME** (SCRUM-214(A) **option B**, owner 2026-11-08). ⚠️ The point of the feature is
+   * that a person's name is **theirs** — so it gets its OWN column and `display_label` (the league pseudonym,
+   * doc 13 §4) is **never written by the client**. ⚠️ And it must never be `unique`: duplicate account names are
+   * allowed, because the identity is `user_id`.
+   */
+  check('⚠️ a name is required and bounded — 1..24 after trimming, and a blank is not a name',
+    chosenNameProblem('') === 'empty'
+      && chosenNameProblem('    ') === 'empty'
+      && chosenNameProblem('A') === null
+      && chosenNameProblem('A'.repeat(24)) === null
+      && chosenNameProblem('A'.repeat(25)) === 'too_long');
+  // ⚠️ POSITIVE CONTROL — trimming is what makes `"  Gwee  "` legal at the limit; without it, padding decides.
+  check('⚠️ guard: padding does not push a legal name over the limit',
+    chosenNameProblem(`  ${'A'.repeat(24)}  `) === null && normaliseChosenName('  Gwee  ') === 'Gwee');
+
+  const NAME_MIGRATION = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'supabase', 'migrations', '20261108120000_profile_chosen_name.sql'),
+    'utf8');
+  check('⚠️ the column is NULLABLE (every existing account has no name yet) and bounded 1..24',
+    /chosen_name\s+text/i.test(NAME_MIGRATION) && /between 1 and 24/i.test(NAME_MIGRATION));
+  check('⚠️⚠️ …and it is NOT unique — duplicate account names are allowed (identity is user_id)',
+    !/unique/i.test(NAME_MIGRATION.replace(/--.*$/gm, '')));
+  /**
+   * ⚠️ **THE PRIVACY LINE.** `display_label` is auto-generated by `pseudonym_for()` on sign-in and its own table
+   * comment says *"NEVER the ancestor name"* (doc 13 §4). ⚠️ So no client file may write it — a single
+   * `.update({ display_label })` would put a real identity into a privacy device, and nothing else would notice.
+   */
+  const CLIENT_FILES = ['app/account.tsx', 'app/profile.tsx', 'lib/account.ts', 'lib/user-profile.ts', 'lib/account-api.ts'];
+  check('⚠️⚠️ …and NO client file writes `display_label` — it is the league pseudonym, never a name',
+    CLIENT_FILES.every((f) => {
+      const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', f), 'utf8');
+      return !/display_label\s*:/.test(src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, ''));
+    }));
+  check('⚠️ …and the PROFILE screen is user-scoped: the clan name/role block is gone from its header',
+    !accountScreenSrc.includes('profile-clan')
+      && !readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'app', 'profile.tsx'), 'utf8')
+        .includes('testID="profile-clan"'));
+  check('…and every new name string exists in BOTH locales',
+    ['profile.namePrompt', 'profile.nameRow', 'profile.nameNotSet', 'profile.nameHint', 'profile.namePlaceholder',
+      'profile.nameSave', 'profile.nameSaving', 'profile.nameEmpty', 'profile.nameTooLong', 'profile.nameFailed']
+      .every((k) => MESSAGES.en[k] !== undefined && MESSAGES.zh[k] !== undefined));
+
+  /**
+   * ⚠️⚠️ **THE LAUNCHER ICON AND SPLASH WERE EXPO'S DEFAULTS UNTIL 2026-11-08.** `app.json` pointed at the
+   * template's assets and its `adaptiveIcon.backgroundColor` was **`#E6F4FE`** — Expo's starter blue — so the
+   * installed APK showed a generic icon while the design sat in Penpot (`ICON · app mark + tile`,
+   * `EN · 0 ZH · 0 Splash`). ⚠️ A default is not a decision: nothing failed, which is why it survived to an
+   * APK. These checks read the PNG headers (no image library needed) and the wiring that points at them.
+   */
+  const ASSETS = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'assets');
+  const pngInfo = (file: string): { w: number; h: number; colourType: number } | null => {
+    try {
+      const d = readFileSync(join(ASSETS, file)).subarray(0, 33);
+      return { w: d.readUInt32BE(16), h: d.readUInt32BE(20), colourType: d[25] };
+    } catch {
+      return null;
+    }
+  };
+  const iconPng = pngInfo('icon.png');
+  const fgPng = pngInfo('android-icon-foreground.png');
+  const monoPng = pngInfo('android-icon-monochrome.png');
+  const splashPng = pngInfo('splash-icon.png');
+
+  check('⚠️ the launcher icon is 1024×1024 and OPAQUE (colour type 2 — Play rejects an alpha source)',
+    iconPng !== null && iconPng.w === 1024 && iconPng.h === 1024 && iconPng.colourType === 2);
+  check('⚠️ the adaptive foreground is 1024² with ALPHA, and the monochrome layer exists too',
+    fgPng !== null && fgPng.w === 1024 && fgPng.colourType === 6
+      && monoPng !== null && monoPng.w === 1024 && monoPng.colourType === 6);
+  check('⚠️ the splash art is present and small enough to sit at the board\'s 190 px',
+    splashPng !== null && splashPng.w >= 190);
+
+  const APP_JSON = JSON.parse(
+    readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'app.json'), 'utf8')).expo;
+  const adaptive = APP_JSON.android?.adaptiveIcon ?? {};
+  const splashPlugin = (APP_JSON.plugins ?? []).find(
+    (p: unknown) => Array.isArray(p) && p[0] === 'expo-splash-screen') as [string, Record<string, unknown>] | undefined;
+
+  // ⚠️ THE LINE THAT CATCHES THE REVERT: #E6F4FE is Expo's starter blue, not this product's paper.
+  check('⚠️⚠️ the adaptive background is the app\'s PAPER (#F5F0E8), not Expo\'s default #E6F4FE',
+    String(adaptive.backgroundColor).toUpperCase() === '#F5F0E8');
+  check('⚠️ …and the icon/foreground/monochrome paths are the generated ones, not the template\'s names left over',
+    APP_JSON.icon === './assets/icon.png'
+      && adaptive.foregroundImage === './assets/android-icon-foreground.png'
+      && adaptive.monochromeImage === './assets/android-icon-monochrome.png');
+  // ⚠️ The splash colours are the BOARD's: #1b1613 ground, a 190 px mark — not invented values.
+  check('⚠️⚠️ the splash is configured from the boards — #1b1613 ground, a 190 px mark',
+    splashPlugin !== undefined
+      && String(splashPlugin[1].backgroundColor).toLowerCase() === '#1b1613'
+      && splashPlugin[1].imageWidth === 190
+      && splashPlugin[1].image === './assets/splash-icon.png');
+  // ⚠️ The source art is kept in the repo, so a future size can be regenerated instead of re-traced.
+  check('⚠️ the mark is kept as SVG — the icon was generated from it, not hand-drawn',
+    ['app-mark.svg', 'app-mark-on-dark.svg'].every((f) => existsSync(join(ASSETS, f))));
 }
 
 function storeChecks(): void {
