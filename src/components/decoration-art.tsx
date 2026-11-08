@@ -18,6 +18,7 @@
  * (`EN · 1e Home / decorated (festive set)`), so it must be composed from the parts rather than traced.
  */
 
+import { View } from 'react-native';
 import Svg, { G, Path, Rect } from 'react-native-svg';
 
 import type { DecorationCode } from '@/domain/catalogue';
@@ -203,7 +204,36 @@ interface Trail {
   readonly sw?: number;
 }
 
+/**
+ * THE FESTIVE SET IS AN AMALGAMATION, NOT A DRAWING OF ITS OWN (owner, 2026-11-08).
+ *
+ * "The festive set ... is just an amalgamation of the rest of the decorations on sale so for that festive set art,
+ * just put all the other decorations's art together."
+ *
+ * That is exactly the `composedOf` relationship the offerings already use: `wealth_bundle` grants one of each of
+ * the other four rather than a bundle object. So the set renders the four motifs it contains instead of a
+ * 52-shape transcription of `art - Festive Set` - one drawing per item, no second copy to drift.
+ */
+const COMPOSED: Record<DecorationCode, readonly DecorationCode[] | undefined> = {
+  festive_set: ['lanterns', 'spring_couplets', 'zhong_kui', 'door_gods'],
+  lanterns: undefined,
+  spring_couplets: undefined,
+  zhong_kui: undefined,
+  door_gods: undefined,
+};
+
 export function DecorationArt({ code, size }: { code: DecorationCode; size: number }) {
+  const parts = COMPOSED[code];
+  if (parts !== undefined) {
+    // The four motifs in a row, scaled to the caller's box - the caller owns the size, the set owns the layout.
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: size }}>
+        {parts.map((part) => (
+          <DecorationArt key={part} code={part} size={size * 0.52} />
+        ))}
+      </View>
+    );
+  }
   const motif = MOTIFS[code];
   if (motif === null) {
     // ⚠️ A placeholder that LOOKS like a placeholder — never a stand-in motif.

@@ -3202,7 +3202,23 @@ function storeChecks(): void {
   const registered = ['lanterns', 'spring_couplets', 'zhong_kui', 'door_gods', 'festive_set'];
   check('⚠️ …and the registry covers all FIVE catalogue codes, with three still null',
     registered.every((c) => new RegExp(`\\b${c}:`).test(DECOR_CODE))
-      && (DECOR_CODE.match(/:\s*null,/g) ?? []).length === 1);  // ⚠️ only festive_set is still unported
+      && (DECOR_CODE.match(/:\s*null,/g) ?? []).length === 1);
+  /**
+   * ⚠️️ **THE FESTIVE SET RENDERS THE FOUR IT CONTAINS** (owner, 2026-11-08: *"just put all the other
+   * decorations's art together"*). ⚠️ It is `null` in MOTIFS on purpose — the composition branch returns
+   * BEFORE the motif lookup — so the null-count check above is not describing a gap.
+   * ⚠️ And the list is asserted to be EXACTLY the other four catalogue codes: a set that silently stopped
+   * containing one of its pieces would still look finished.
+   */
+  const composedLine = /festive_set: \[([^\]]*)\]/.exec(DECOR_CODE)?.[1] ?? '';
+  const composedCodes = composedLine.split(',').map((c) => c.trim().replace(/'/g, '')).filter(Boolean);
+  check('⚠️️ the FESTIVE SET is composed of the other FOUR decorations, not a placeholder',
+    composedCodes.length === 4
+      && ['lanterns', 'spring_couplets', 'zhong_kui', 'door_gods'].every((c) => composedCodes.includes(c)),
+    composedCodes.join(' '));
+  // ⚠️ POSITIVE CONTROL — the four parts must each have real art, or the set composes placeholders.
+  check('⚠️ guard: every part of the set has a ported motif',
+    ['lanterns:', 'spring_couplets:', 'zhong_kui:', 'door_gods:'].every((k) => DECOR_CODE.includes(k)));
   // ⚠️ POSITIVE CONTROL — the DECORATIONS list this registry must mirror really is five long.
   check('⚠️ guard: the catalogue still carries five decorations, so the registry cannot drift silently',
     DECORATIONS.length === 5);
