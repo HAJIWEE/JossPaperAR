@@ -1938,6 +1938,16 @@ sign-back-in returns the account's data.** That was the one claim §S79b and §1
 (route always fork → 2 of 788 · 429 mapping deleted → 1 · routing blind again → 1).
 **US$0.00** — no AI call.
 
+✅ **CONFIRMED ON GLASS the same day** — the owner: *"yes it lands back at the shrine"*, on the installed APK
+(`ed196c6c…`, commit `7d64b4e`). ⚠️ That is the **sign-back-in end to end**: wall → email code → **shrine**.
+⚠️ **The 429 half stays gate-proven only** — reproducing it live spends the owner's email quota to watch a
+message, and the hosted limit (doc 24 §4 step D) is still unraised.
+
+⚠️ **Also settled here, after I got it wrong:** duplicate clans and duplicate NAMES are **allowed by design**
+(doc 15 §2.1 · §5.2) — the second clan from that report was never the fault; **the prompt was**. The clan model
+is now **gated** in `check:lib` (UUID identity · no unique name · multi-clan membership), because a later
+`unique (name)` or `unique (user_id)` would forbid it in silence.
+
 ⏳ **Open for the owner:** ⚠️ **does the account now hold a SECOND clan** from that re-creation? The fix
 prevents the prompt, not a duplicate already made — and it is worth knowing whether duplicate clan **names**
 are even allowed.

@@ -583,6 +583,8 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 >
 > **Gates: 788** (from 781: +7) · `tsc` **0** · all 20 suite steps green. Each new check **fault-tested red**: `routeAfterAccount` always returning the fork (2 of 788), the 429 mapping deleted (1), `confirm()` routing blind again (1). ⚠️ **Both bugs were invisible to every gate that existed** — nothing asserts which route a *returning* user takes, and nothing asserts what a 429 says; that is why they are now asserted.
 >
+> ✅ **CONFIRMED ON GLASS, same day — the owner's words: *"yes it lands back at the shrine great moving on"*.** ⚠️ That is the **sign-back-in end to end**: signed out at the wall → email code → **the shrine**, on the installed APK (`ed196c6c…`, commit `7d64b4e`). ⚠️ The **429 half is gate-proven only** — reproducing it live would spend the owner's email quota to watch a message, and the hosted limit is still the thing to raise (doc 24 §4 step D).
+>
 > ⏳ **Open, for the owner:** ⚠️ **check whether creating "the same clan" left a SECOND clan** on the account (the fix prevents the prompt, not a duplicate already created), and whether duplicate clan **names** are even permitted. **US$0.00** — no AI call.
 
 
