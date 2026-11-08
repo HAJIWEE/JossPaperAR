@@ -31,7 +31,8 @@ import { brand, surface } from '@/theme/tokens';
  * `fill`/`stroke` are token KEYS, never hex — so the art follows `tokens.ts` like every other illustration and
  * cannot drift from the theme.
  */
-type TokenKey = keyof typeof brand;
+/** ⚠️ Both token sets: the board paints paper panels with `#f5f0e8`, which is `surface.paper`, not a brand colour. */
+type TokenKey = keyof typeof brand | keyof typeof surface;
 
 interface Ink {
   readonly x: number;
@@ -45,7 +46,8 @@ interface Ink {
 }
 
 /** ⚠️ Typed on `brand`'s own keys, so a mistyped token is a COMPILE error rather than a silent `undefined` fill. */
-const C = (k: TokenKey) => brand[k];
+const C = (k: TokenKey): string =>
+  Object.prototype.hasOwnProperty.call(brand, k) ? brand[k as keyof typeof brand] : surface[k as keyof typeof surface];
 
 /**
  * `art · Lanterns` — 85.1 × 72, the SEVEN-B card painting: a gold bar above TWO hexagonal lanterns, each traced
@@ -116,11 +118,60 @@ const COUPLET: { box: readonly [number, number]; inks: readonly Ink[]; trails: r
  * the art is pending. ⚠️ Reusing one lantern for four decorations would be worse than a placeholder, because it
  * looks finished.
  */
+/**
+ * `art · Zhong Kui Print` — 85.1 × 72. A gold bar over a framed print: paper panel, cinnabar inner border, a
+ * pale face disc, and the figure traced as four paths (robe, sash, hat, beard). Read off `EN · 7b`, 2026-11-08.
+ * ⚠️ The board draws the small mark at (38, 36.7) as a STROKE-ONLY rect; it is a filled `ink` rect here, because
+ * a no-fill shape would need a bare "none" literal and the token lookup is typed on `brand`'s keys.
+ */
+const ZHONGKUI: { box: readonly [number, number]; inks: readonly Ink[]; trails: readonly Trail[] } = {
+  box: [85.1, 72],
+  inks: [
+    { x: 15.7, y: 3.9, w: 53.7, h: 4.6, rx: 3, fill: 'goldDeep', stroke: 'ink', sw: 2 },
+    { x: 18.3, y: 8.5, w: 48.4, h: 57.6, rx: 3, fill: 'paper', stroke: 'ink', sw: 3 },
+    { x: 20.9, y: 11.1, w: 43.2, h: 52.4, rx: 2, fill: 'paper', stroke: 'cinnabar', sw: 2 },
+    { x: 38, y: 36.7, w: 9.2, h: 3.9, fill: 'ink' },
+    { x: 36.7, y: 25.5, w: 11.8, h: 11.8, rx: 5.9, fill: 'paper', stroke: 'ink', sw: 2.5 },
+  ],
+  trails: [
+    { d: 'M4262.58447265625,639.9818115234375L4269.130859375,613.7999877929688L4273.05859375,611.1818237304688L4266.51220703125,638.6727294921875Z', dx: -4236.4, dy: -585, fill: 'goldDeep', stroke: 'ink', sw: 2 },
+    { d: 'M4266.51220703125,646.5272827148438L4291.3876953125,646.5272827148438L4288.11474609375,624.272705078125L4269.78515625,624.272705078125Z', dx: -4236.4, dy: -585, fill: 'cinnabar', stroke: 'ink', sw: 2.5 },
+    { d: 'M4273.05859375,613.1454467773438L4284.84130859375,613.1454467773438L4282.22314453125,605.9454345703125L4275.6767578125,605.9454345703125Z', dx: -4236.4, dy: -585, fill: 'ink', stroke: 'ink', sw: 2.5 },
+    { d: 'M4275.0224609375,621L4282.8779296875,621L4278.9501953125,629.5090942382812Z', dx: -4236.4, dy: -585, fill: 'ink', sw: 0 },
+  ],
+};
+
+/**
+ * `art · Door Gods` — 85.1 × 72. TWO paper panels side by side, each with a cinnabar inner border, a robed figure,
+ * a pale face disc and a spear traced as a path. Read off `EN · 7b`, 2026-11-08.
+ */
+const DOORGODS: { box: readonly [number, number]; inks: readonly Ink[]; trails: readonly Trail[] } = {
+  box: [85.1, 72],
+  inks: [
+    { x: 5.6, y: 7.9, w: 22.4, h: 56.3, rx: 2, fill: 'paper', stroke: 'ink', sw: 3 },
+    { x: 7.3, y: 9.8, w: 19, h: 52.4, rx: 2, fill: 'paper', stroke: 'cinnabar', sw: 2 },
+    { x: 10.1, y: 36.7, w: 14.6, h: 17, rx: 2, fill: 'cinnabar', stroke: 'ink', sw: 2.5 },
+    { x: 10.6, y: 22.3, w: 12.3, h: 14.4, rx: 2, fill: 'goldDeep', stroke: 'ink', sw: 2 },
+    { x: 14.6, y: 15.7, w: 3.9, h: 6.5, rx: 2, fill: 'cinnabar', stroke: 'ink', sw: 2 },
+    { x: 13.4, y: 26.8, w: 6.7, h: 7.9, rx: 3.35, fill: 'paper', stroke: 'ink', sw: 2 },
+    { x: 38.1, y: 7.9, w: 22.4, h: 56.3, rx: 2, fill: 'paper', stroke: 'ink', sw: 3 },
+    { x: 39.8, y: 9.8, w: 19, h: 52.4, rx: 2, fill: 'paper', stroke: 'cinnabar', sw: 2 },
+    { x: 70.5, y: 36.7, w: 14.6, h: 17, rx: 2, fill: 'cinnabar', stroke: 'ink', sw: 2.5 },
+    { x: 67.7, y: 22.3, w: 12.3, h: 14.4, rx: 2, fill: 'goldDeep', stroke: 'ink', sw: 2 },
+    { x: 55.4, y: 15.7, w: 3.9, h: 6.5, rx: 2, fill: 'cinnabar', stroke: 'ink', sw: 2 },
+    { x: 45.9, y: 26.8, w: 6.7, h: 7.9, rx: 3.35, fill: 'paper', stroke: 'ink', sw: 2 },
+  ],
+  trails: [
+    { d: 'M4069.677734375,790.2000122070312L4080.875,773.1818237304688L4082.5546875,775.1454467773438L4071.357177734375,792.1636352539062Z', dx: -4059.6, dy: -747, fill: 'goldDeep', stroke: 'ink', sw: 1.5 },
+    { d: 'M4115.5869140625,790.2000122070312L4104.3896484375,773.1818237304688L4102.7099609375,775.1454467773438L4113.9072265625,792.1636352539062Z', dx: -4059.6, dy: -747, fill: 'goldDeep', stroke: 'ink', sw: 1.5 },
+  ],
+};
+
 const MOTIFS: Record<DecorationCode, { box: readonly [number, number]; inks: readonly Ink[]; trails: readonly Trail[] } | null> = {
   lanterns: LANTERN,
   spring_couplets: COUPLET,
-  zhong_kui: null,
-  door_gods: null,
+  zhong_kui: ZHONGKUI,
+  door_gods: DOORGODS,
   festive_set: null,
 };
 

@@ -3202,7 +3202,7 @@ function storeChecks(): void {
   const registered = ['lanterns', 'spring_couplets', 'zhong_kui', 'door_gods', 'festive_set'];
   check('⚠️ …and the registry covers all FIVE catalogue codes, with three still null',
     registered.every((c) => new RegExp(`\\b${c}:`).test(DECOR_CODE))
-      && (DECOR_CODE.match(/:\s*null,/g) ?? []).length === 3);
+      && (DECOR_CODE.match(/:\s*null,/g) ?? []).length === 1);  // ⚠️ only festive_set is still unported
   // ⚠️ POSITIVE CONTROL — the DECORATIONS list this registry must mirror really is five long.
   check('⚠️ guard: the catalogue still carries five decorations, so the registry cannot drift silently',
     DECORATIONS.length === 5);
