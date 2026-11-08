@@ -18,18 +18,18 @@
  */
 
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 
-import { myClans } from '@/lib/clan-api';
 import { fetchHomeSummary } from '@/lib/home-api';
 import { homePanels } from '@/lib/home-panels';
 import { TabBarBand } from '@/components/home/tab-bar-band';
 import { ScreenHud } from '@/components/screen-hud';
 import { t } from '@/lib/i18n';
 import { HUD, PROFILE_CARD, PROFILE_ROWS, PROFILE_ROW, rowIsLive } from '@/lib/profile';
-import { ROLE_LABEL_KEY } from '@/lib/clan-flow';
-import { brand, fontSize, surface, text } from '@/theme/tokens';
+import { CHOSEN_NAME_MAX, chosenNameProblem } from '@/lib/user-name';
+import { readMyName, setChosenName as saveChosenName } from '@/lib/user-profile';
+import { brand, fontSize, onColorCream, surface, text } from '@/theme/tokens';
 
 /** ⚠️ A row with `route: null` renders DISABLED — never a link to a screen that does not exist. */
 function ProfileRow({
@@ -84,10 +84,20 @@ const ROW_COPY: Record<string, { label: string; sub: string }> = {
 };
 
 export default function ProfileScreen() {
-  const [clanName, setClanName] = useState<string | null>(null);
-  const [roleKey, setRoleKey] = useState<string | null>(null);
   const [tribute, setTribute] = useState<string | null>(null);
   const [streakDays, setStreakDays] = useState<number | null>(null);
+  /**
+   * ⚠️ **THE USER'S OWN NAME** (SCRUM-214(A) option B, owner 2026-11-08). ⚠️ `chosenName` is what the person
+   * entered; `email` is here because this is now a USER profile and *"which account am I?"* is the question a
+   * profile should answer. ⚠️ The **pseudonym is deliberately not shown**: it is the league's privacy device
+   * (doc 13 §4), not a name to greet someone with.
+   */
+  const [chosenName, setChosenName] = useState<string | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   /**
    * ⚠️ Re-read on FOCUS, the same pattern the shrine uses: a burn moves the tribute WALLET and a
@@ -97,11 +107,18 @@ export default function ProfileScreen() {
     useCallback(() => {
       let cancelled = false;
       void (async () => {
-        const [mine, totals] = await Promise.all([myClans(), fetchHomeSummary()]);
+        /**
+         * ⚠️ **`myClans()` IS GONE FROM THIS SCREEN** (SCRUM-214(A) option B). It was here only to name the
+         * clan in the header, and the Clan page owns that — so the read is not merely unused, it is a network
+         * call this screen no longer has any use for.
+         */
+        const [totals, me] = await Promise.all([fetchHomeSummary(), readMyName()]);
         if (cancelled) return;
-        const first = mine.ok ? mine.data[0] : undefined;
-        setClanName(first?.name ?? null);
-        setRoleKey(first ? (ROLE_LABEL_KEY[first.role] ?? null) : null);
+        /** ⚠️ A failed read leaves both `null` — the header then says nothing rather than inventing a name. */
+        if (me.ok) {
+          setChosenName(me.data.chosenName);
+          setEmail(me.data.email);
+        }
         /**
          * ⚠️ `homePanels` formats the total — the SAME function the shrine's panel uses, so the two
          * screens cannot disagree about how "12,480" is punctuated. ⚠️ A failed read stays `null`
@@ -119,6 +136,41 @@ export default function ProfileScreen() {
     }, []),
   );
 
+  /**
+   * ⚠️ Save the name, then close. ⚠️ **A FAILURE KEEPS THE EDITOR OPEN and says why** — closing it would hide
+   * that nothing was stored, which reads as *"it saved"*. ⚠️ The draft is validated before the round trip and
+   * the column's CHECK validates it again, because a round trip is not a validation strategy.
+   */
+  const save = useCallback(() => {
+    void (async () => {
+      const key = chosenNameProblem(draft);
+      if (key === 'empty') {
+        setProblem('profile.nameEmpty');
+        return;
+      }
+      if (key === 'too_long') {
+        setProblem('profile.nameTooLong');
+        return;
+      }
+      setSaving(true);
+      setProblem(null);
+      /**
+       * ⚠️ **`saveChosenName`, NOT `setChosenName`** — the bare name is the React **state setter** in this
+       * component, and it returns `void`. ⚠️ That collision type-checked as *"Property 'ok' does not exist on
+       * type 'void'"* two frames away from the cause, which is exactly the kind of error a rename fixes and a
+       * shrug hides.
+       */
+      const res = await saveChosenName(draft);
+      setSaving(false);
+      if (!res.ok) {
+        setProblem('profile.nameFailed');
+        return;
+      }
+      setChosenName(res.data);
+      setEditing(false);
+    })();
+  }, [draft]);
+
   return (
     <View style={styles.screen}>
 
@@ -128,20 +180,59 @@ export default function ProfileScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {/* ── the header card ──────────────────────────────────────────────── */}
+        {/*
+          ⚠️⚠️ **THIS IS A USER PROFILE NOW — THE CLAN IS NOT ITS SUBJECT** (SCRUM-214(A) option B, owner
+          2026-11-08: *"Profile should be a User Profile as we already have a Clan page where the Clan details
+          are shown"*). ⚠️ So the header carries the person's OWN name and the signed-in address, and the clan
+          name + role that used to sit here are gone — they were a duplicate of the Clan page, and they are
+          reachable from the shrine's clan pill.
+          ⚠️ **No name yet is a real state, not an error:** the header says so and the row below opens the
+          editor, so the empty state is a call to action rather than a blank card.
+        */}
         <View style={styles.card} testID="profile-header">
           <View style={styles.avatar}>
             <Text style={styles.avatarGlyph} allowFontScaling={false}>
-              {clanName ? Array.from(clanName)[0] : ''}
+              {chosenName ? Array.from(chosenName)[0] : ''}
             </Text>
           </View>
           <View style={styles.headerText}>
-            {/* ⚠️ Nothing rather than a placeholder: a failed read must not invent a name. */}
-            <Text numberOfLines={1} style={styles.headerName} testID="profile-clan">
-              {clanName ?? ''}
+            <Text numberOfLines={1} style={styles.headerName} testID="profile-name">
+              {chosenName ?? t('profile.namePrompt')}
             </Text>
-            {roleKey ? <Text style={styles.headerRole}>{t(roleKey)}</Text> : null}
+            {email === null ? null : (
+              <Text numberOfLines={1} style={styles.headerRole} testID="profile-email">
+                {email}
+              </Text>
+            )}
           </View>
         </View>
+
+        {/*
+          ⚠️ The EDIT affordance is its own row rather than a tap on the header: a header that silently opens
+          an editor is the dead-looking control this project keeps removing. It reads as a row because it IS
+          one — and it shows the current value, so the screen never hides its own state.
+        */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('profile.nameRow')}
+          testID="profile-name-edit"
+          onPress={() => {
+            setDraft(chosenName ?? '');
+            setProblem(null);
+            setEditing(true);
+          }}
+          style={({ pressed }) => [styles.card, styles.nameRow, pressed && styles.pressed]}
+        >
+          <View style={styles.headerText}>
+            <Text numberOfLines={1} style={styles.nameRowLabel}>
+              {t('profile.nameRow')}
+            </Text>
+            <Text numberOfLines={1} style={styles.nameRowSub}>
+              {chosenName ?? t('profile.nameNotSet')}
+            </Text>
+          </View>
+          <Text style={styles.chev}>{'\u203A'}</Text>
+        </Pressable>
 
         {/* ── the tribute card ─────────────────────────────────────────────── */}
         {tribute === null ? null : (
@@ -179,6 +270,67 @@ export default function ProfileScreen() {
       <TabBarBand />
 
       <ScreenHud titleKey="profile.title" backTestID="profile-back" titleTestID="profile-title" />
+
+      {/*
+        ⚠️ **A `Modal`, not an overlay** — the same reason `ConfirmCard` is one: Android's hardware BACK must be
+        HANDLED here (`onRequestClose`), or a back press falls through to the screen while the sheet is still up.
+        ⚠️ And it is the only place in the app where the user types their own identity, so it carries its own
+        accessibility layer (`accessibilityViewIsModal`).
+      */}
+      <Modal
+        visible={editing}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditing(false)}
+      >
+        <View style={styles.scrim}>
+          <View style={styles.sheet} testID="profile-name-sheet" accessibilityViewIsModal>
+            <Text style={styles.sheetTitle}>{t('profile.nameRow')}</Text>
+            <Text style={styles.sheetBody}>{t('profile.nameHint')}</Text>
+            <TextInput
+              testID="profile-name-input"
+              value={draft}
+              onChangeText={setDraft}
+              maxLength={CHOSEN_NAME_MAX}
+              autoFocus
+              placeholder={t('profile.namePlaceholder')}
+              placeholderTextColor={text.inkSoft}
+              returnKeyType="done"
+              onSubmitEditing={save}
+              style={styles.input}
+              accessibilityLabel={t('profile.nameRow')}
+            />
+            {/* ⚠️ A limit the user can SEE, rather than a silent cap on the field. */}
+            <Text style={styles.hintCount}>
+              {`${draft.trim().length}/${CHOSEN_NAME_MAX}`}
+            </Text>
+            {problem === null ? null : (
+              <Text style={styles.problem} testID="profile-name-problem">
+                {t(problem)}
+              </Text>
+            )}
+            <Pressable
+              accessibilityRole="button"
+              testID="profile-name-save"
+              onPress={save}
+              disabled={saving}
+              style={({ pressed }) => [styles.saveBtn, pressed && styles.pressed, saving && styles.saving]}
+            >
+              <Text style={styles.saveLabel}>
+                {t(saving ? 'profile.nameSaving' : 'profile.nameSave')}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              testID="profile-name-cancel"
+              onPress={() => setEditing(false)}
+              style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed]}
+            >
+              <Text style={styles.cancelLabel}>{t('common.cancel')}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -214,6 +366,39 @@ const styles = StyleSheet.create({
   headerText: { flex: 1, paddingLeft: 16 },
   headerName: { color: text.ink, fontSize: 19, fontWeight: '700' },
   headerRole: { color: text.inkSoft, fontSize: fontSize.caption.at390, marginTop: 4 },
+  /** ⚠️ The name row reads as a card like the header, so the screen looks like one list, not two. */
+  nameRow: { minHeight: 64, justifyContent: 'flex-start' },
+  nameRowLabel: { color: text.ink, fontSize: fontSize.body.at390, fontWeight: '700' },
+  nameRowSub: { color: text.inkSoft, fontSize: fontSize.caption.at390, marginTop: 2 },
+  saving: { opacity: 0.6 },
+  scrim: { flex: 1, backgroundColor: 'rgba(26,26,26,0.55)', justifyContent: 'center', paddingHorizontal: 20 },
+  sheet: { backgroundColor: surface.paper, borderRadius: 14, padding: 24, borderWidth: 2.5, borderColor: brand.ink },
+  sheetTitle: { color: text.ink, fontSize: 19, fontWeight: '700' },
+  sheetBody: { color: text.inkSoft, fontSize: fontSize.body.at390, marginTop: 8, lineHeight: 20 },
+  input: {
+    marginTop: 16,
+    minHeight: 52,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: brand.ink,
+    backgroundColor: surface.row,
+    paddingHorizontal: 14,
+    color: text.ink,
+    fontSize: fontSize.bodyLg.at390,
+  },
+  hintCount: { color: text.inkSoft, fontSize: fontSize.caption.at390, marginTop: 6, textAlign: 'right' },
+  problem: { color: brand.cinnabar, fontSize: fontSize.body.at390, fontWeight: '700', marginTop: 8 },
+  saveBtn: {
+    marginTop: 16,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: brand.cinnabar,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveLabel: { color: onColorCream, fontSize: fontSize.bodyLg.at390, fontWeight: '700' },
+  cancelBtn: { marginTop: 4, height: 44, alignItems: 'center', justifyContent: 'center' },
+  cancelLabel: { color: text.inkSoft, fontSize: fontSize.body.at390, fontWeight: '700' },
   tributeLeft: { flex: 1 },
   tributeNumber: { color: text.ink, fontSize: 26, fontWeight: '700' },
   tributeLabel: { color: text.inkSoft, fontSize: fontSize.caption.at390, marginTop: 2 },

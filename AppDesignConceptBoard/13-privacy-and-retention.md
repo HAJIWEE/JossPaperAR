@@ -24,8 +24,18 @@
 | 10 | **Consent records** | on consent | `consent_records` (new, §11) | server only | proof of consent (PDPA/GDPR) |
 | 11 | **Usage events** | **opt-in only, default OFF** | analytics provider | provider | SCRUM-25 — never #1–#4, #9 |
 | 12 | **Ad id** | later (beta) | ad SDK | SDK | S9/ADR-008 |
+| 13 | ⚠️ **The user's own name** (`profiles.chosen_name`, SCRUM-214A option B, **2026-11-08**) | optional — the person types it on their Profile | Postgres `profiles` (RLS: `user_id = auth.uid()`) | ⚠️ **owner only** — no RPC returns it, and it is **not** the league pseudonym | the user profile. ⚠️ **This is SELF-IDENTIFYING DATA**, and it is a name *they* chose — unlike `display_label`, which is generated precisely to avoid one (§4) |
 
 **Never collected:** NRIC · phone · contact lists · raw GPS trail · precise coordinates (only the coarse cell ever leaves the device) · payment cards (Play Billing handles money — we never see cards).
+
+⚠️ **Row 13 is new (2026-11-08) and it is a DELIBERATE exception to §4's spirit, not an oversight.** The
+pseudonym rule exists so the league never shows a real name; `chosen_name` exists so a person can put **their own**
+name on **their own** profile, which is what a user profile is for. ⚠️ **The two must not be conflated:** no RPC
+returns `chosen_name`, the client never writes `display_label`, and `check:lib` asserts both — a single
+`.update({ display_label })` would put a chosen name into the privacy device and nothing else would notice.
+⚠️ **Knock-ons:** erased by `delete_my_data` (it deletes the `profiles` row, so the column goes with it) · the
+**Play data-safety declaration should now list a name** · §2's retention windows do not need a new rule because the
+datum lives and dies with the account.
 
 ⚠️⚠️ **AMENDED 2026-11-01 (ADR-004 Amendment 1) — AN EMAIL IS NOW COLLECTED.** This line used to read *"NRIC/phone (no account wall — ADR-004)"*, and that is no longer true: the owner has ruled that **an account is required to create or join a clan**, and the account is an **email**. ⚠️ **It is the first data class in this product that identifies a PERSON rather than a device** — a contact identifier, not a session id — and that is a materially different privacy posture from the one this document was written around. ⚠️ **The knock-ons are recorded, not yet done:** §2's retention windows do not cover the email (it persists for the life of the account, not the 7-day photo window), the one-tap delete (ADR-007) must erase it, and the Play Store **data-safety declaration must now declare it**. Treat this row as the authority over any older prose below that assumes a device-only identity.
 

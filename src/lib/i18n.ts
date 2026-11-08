@@ -260,6 +260,19 @@ export const MESSAGES = {
     'profile.rowSettings': 'Settings',
     'profile.rowSettingsSub': 'Language · notifications · privacy',
     'profile.tributeLabel': 'Tribute Points',
+    // ── The USER'S OWN NAME (SCRUM-214(A) option B) ──────────────────────────
+    // ⚠️ This is the person's name on their own profile — NOT the clan's name (Clan page) and NOT the league
+    // pseudonym (doc 13 §4, never shown as a name). The hint says so, because the three are easy to confuse.
+    'profile.namePrompt': 'Add your name',
+    'profile.nameRow': 'Your name',
+    'profile.nameNotSet': 'Not set yet',
+    'profile.nameHint': "Your own name, for your profile. Your clan's name lives on the Clan page.",
+    'profile.namePlaceholder': 'e.g. Ah Gwee',
+    'profile.nameSave': 'Save name',
+    'profile.nameSaving': 'Saving…',
+    'profile.nameEmpty': 'Enter a name first.',
+    'profile.nameTooLong': 'That name is too long.',
+    'profile.nameFailed': 'The name was not saved — try again.',
     // ⚠️ The tablet sheet (SCRUM-146 · SCRUM-168). Every limit named here is the DB's own.
     // ⚠️ The sheet's copy is `EN · 1s Ancestor sheet` / `EN · 1s2 … / edit mode`, read off
     // Penpot 2026-11-01 — NOT written here. The title says *ancestor* (the person), not
@@ -669,6 +682,17 @@ export const MESSAGES = {
     'profile.rowSettings': '设置',
     'profile.rowSettingsSub': '语言 · 通知 · 隐私',
     'profile.tributeLabel': '功德点',
+    // ── 用户自己的名字（SCRUM-214(A) 方案 B）────────────────────────────────
+    'profile.namePrompt': '添加你的名字',
+    'profile.nameRow': '你的名字',
+    'profile.nameNotSet': '尚未设置',
+    'profile.nameHint': '这仅是你的个人档案名字，宗族名称请到宗族页面查看。',
+    'profile.namePlaceholder': '例如：阿贵',
+    'profile.nameSave': '保存名字',
+    'profile.nameSaving': '保存中…',
+    'profile.nameEmpty': '请先输入名字。',
+    'profile.nameTooLong': '名字太长了。',
+    'profile.nameFailed': '名字未能保存 — 请重试。',
     // ⚠️ 牌位弹层 — 文案取自 `ZH · 1s 安奉牌位` / `ZH · 1s2 … / 编辑`（Penpot，2026-11-01）。
     'ancestor.titleAdd': '添加祖先',
     'ancestor.titleEdit': '编辑祖先',
