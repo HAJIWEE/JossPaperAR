@@ -436,6 +436,11 @@ export const MESSAGES = {
     'account.emailLabel': 'EMAIL',
     'account.emailPlaceholder': 'you@example.com',
     'account.languageCaption': 'LANGUAGE',
+    // ⚠️ THE PROMISE IS "ads or messages", NOT "ads or email" (owner, 2026-11-08 · SCRUM-217.2: *"we can
+    // generalize the ZH to 信息 instead"*). ⚠️ The ZH draft said 邮件推送 — which quietly promised something
+    // narrower than the EN sentence: only EMAIL pushes would be excluded, so an SMS, a notification or any
+    // future channel fell outside the promise the user was shown. 信息推送 keeps the two languages saying the
+    // same thing. `check:lib` holds this line, because a narrowing here is a privacy claim getting weaker.
     'account.privacy': 'Your email is only used to sign you in — never for ads or messages.',
     'account.create': 'Create account',
     'account.sendCode': 'Send code',
@@ -835,7 +840,7 @@ export const MESSAGES = {
     'account.emailLabel': '邮箱',
     'account.emailPlaceholder': '请输入邮箱',
     'account.languageCaption': '语言',
-    'account.privacy': '邮箱仅用于登录验证，不会用于广告或邮件推送。',
+    'account.privacy': '邮箱仅用于登录验证，不会用于广告或信息推送。',
     'account.create': '创建账号',
     'account.sendCode': '发送验证码',
     'account.verifyTitle': '输入验证码',

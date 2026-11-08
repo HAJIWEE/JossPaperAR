@@ -533,6 +533,36 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **SCRUM-59 was the one that changed the code**, and it was kept out of PR-3 on purpose — it edits `request_cartoonize`, which was already applied, so it belongs in its own migration + PR with its own tests. **It is built: see §12.5.**
 
+### 12.56 · S79m — SCRUM-217's three strings decided, and one of them was a PRIVACY claim getting weaker (2026-11-08)
+
+> **Owner:** *"For 217.1 it should be ok. For 217.2 we can generalize the ZH to 信息 instead. 3. we should be able to
+> find generic google components already designed and being used commonly in some design packages ... there should
+> already be multilingual options."*
+>
+> **217.1 — the clan-fork gate note: approved as drafted** (`An account and a clan are required to tend this altar
+> together.` / `需要账号与宗族，才能共同打理这座祭坛。`). ⚠️ It **replaces a signed-off string**, so it is a change to an
+> approved board. **Board copy only** — it is not in `src/`, and a search finding nothing there is expected.
+>
+> ⚠️⚠️ **217.2 — this one was not a wording nit.** The signed-off PHONE board promised 短信推送 (*SMS* push). Carried
+> to email it became **邮件推送** (*email* push) — which **narrowed the promise**: only email pushes were excluded, so
+> an SMS, a notification, or any future channel fell outside what the user was told. ⚠️ **The EN sentence says
+> "ads or messages" on purpose.** Generalised to **信息推送** so both languages promise the same thing, and
+> `check:lib` §32 now asserts it — ⚠️ a privacy claim getting weaker in one language is exactly what only a test
+> notices. Fault-tested red by restoring 邮件推送.
+>
+> **217.3 — the Google label: use Google's own button.** The owner's instinct is backed by Google's own spec.
+> ⚠️ [The branding guidelines](https://developers.google.com/identity/branding-guidelines) state that following them
+> is **required for app verification** — a Store blocker, not a style choice — and offer the SDK-rendered button,
+> **pre-approved PNG/SVG assets**, or a custom button whose text may be **localised** (*"允许并鼓励您对该文本进行本地化"*).
+> The official ZH string is **`使用 Google 账号登录`**. So there is deliberately **no `account.google*` key** in the
+> i18n table: a hand-written label is the thing the decision forbids. Four constraints are recorded in doc 15 §8.1 —
+> the "G" keeps its colour on white, never "Google" alone, prominence at least equal to other options, never an
+> invented icon.
+>
+> **All three live in doc 15 §8.1** — the copy authority — so a future session cannot re-draft them.
+> **Gates: 840** (from 838) · `tsc` **0** · 20/20 · **SCRUM-217 closed Done**. **US$0.00.**
+
+
 ### 12.55 · S79k — the name arrives BY DEFAULT, and can be changed once a week (SCRUM-223)
 
 > **Owner, 2026-11-08:** *"I want the profile name to be defaulted to a simplified of the email address used to

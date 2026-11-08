@@ -2394,6 +2394,26 @@ function accountChecks(): void {
   // ⚠️ THE WALL RULE (ADR-004 · SCRUM-147 · its Amendment 1): never before the first burn, offered after.
   check('⚠️ the account is NEVER reachable before the first burn — and IS offered after it',
     ACCOUNT_GATE.reachableBeforeFirstBurn === false && ACCOUNT_GATE.offeredAfterFirstBurn === true);
+
+  /**
+   * ⚠️⚠️ **THE PRIVACY PROMISE MUST SAY THE SAME THING IN BOTH LANGUAGES** (owner, 2026-11-08 · SCRUM-217.2:
+   * *"we can generalize the ZH to 信息 instead"*).
+   *
+   * The signed-off phone copy was 短信推送 (SMS push). Carried to email it became 邮件推送 — ⚠️ which
+   * **narrowed the promise**: only *email* pushes were excluded, so an SMS, a notification, or any future
+   * channel fell outside what the user was told. The EN sentence says *"ads or messages"*, deliberately broad.
+   * 信息推送 is the ZH that means the same thing.
+   * ⚠️ A privacy claim getting **weaker in one language** is not a copy nit — it is the promise the product
+   * makes, so it is asserted, on the RENDERED string.
+   */
+  const privacy = (loc: 'en' | 'zh') => MESSAGES[loc]['account.privacy'] ?? '';
+  check('⚠️⚠️ the ZH privacy promise is GENERAL (信息), not narrowed to email — it matches the EN sentence',
+    privacy('zh').includes('信息推送') && !privacy('zh').includes('邮件推送')
+      && privacy('en').includes('ads or messages'),
+    `zh="${privacy('zh')}" en="${privacy('en')}"`);
+  // ⚠️ POSITIVE CONTROL — the wording that shipped before the decision must FAIL that check.
+  check('⚠️ guard: the narrowed 邮件推送 string WOULD fail the general-promise check',
+    !'邮箱仅用于登录验证，不会用于广告或邮件推送。'.includes('信息推送'));
   // ⚠️ And the one case the upgrade cannot do: an email that is already an account means SIGN IN, never
   // the documented data-reassignment workaround — that would be the second user ADR-004 forbids.
   check('⚠️ an email that already has an account means SIGN IN, never a data reassignment',
