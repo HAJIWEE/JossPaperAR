@@ -16,6 +16,26 @@
  * ⚠️ **One exception, and it is deliberate:** `Original photos` renders as a plain **statement** — its
  * sub IS the retention policy, which is what the ticket asks to surface. It has no chevron because it
  * has no destination; a chevron is a promise to navigate.
+ *
+ * ── ⚠️ SIGN OUT — THE ROW THAT WAS DRAWN, REACHABLE AND DEAD (SCRUM-215) ─────
+ * Built 2026-11-08. It had rendered **disabled with `settings.notBuilt`** since SCRUM-151, which was
+ * correct while nothing was behind it: a live-looking control with no behaviour is the SCRUM-145 defect.
+ * ⚠️ But it left the account flow **one-way on glass** — a device could take on an email account and never
+ * leave it, so the email-link path could not be retested without wiping the install. The row now opens a
+ * `ConfirmCard` and calls `signOutAccount()`.
+ *
+ * ⚠️ **THE DEVICE IS THEN SIGNED OUT, AND STAYS SIGNED OUT** (ADR-004 · **Amendment 2**, 2026-11-08). The
+ * owner's ruling: *"the Demo should only be on first install of the App and signing out does not return us
+ * to anon status but require a sign in every time."* ⚠️ So this screen lands on **`/account` — the sign-in
+ * wall** — and the first version of this row, which re-minted an anonymous identity and showed a fresh
+ * demo shrine, was **the MVP's behaviour, not the product's**.
+ *
+ * ⚠️ **AND IT ERASES NOTHING.** It is NOT `resetIdentity()`: that one deletes and then mints a fresh
+ * identity (*"back to first run"*, the only caller of `clearFirstRun()`). ⚠️ Signing out must **not**
+ * forget the tutorial record — that flag is exactly what marks this device as past its demo, and clearing
+ * it would reopen the anonymous window. The account keeps everything server-side; the email brings it
+ * back. ⚠️ `check:lib` asserts the handler calls neither `deleteMyData` nor `clearFirstRun`.
+
  */
 
 import { useCallback, useState } from 'react';
@@ -26,7 +46,10 @@ import { Body } from '@/components/clan-ui';
 import { ConfirmCard } from '@/components/confirm-card';
 import { LocaleToggle } from '@/components/locale-toggle';
 import { deleteMyData, resetIdentity } from '@/lib/account-api';
+import { signOutAccount } from '@/lib/account';
+import { ACCOUNT_ROUTE } from '@/lib/account-flow';
 import { clearFirstRun } from '@/lib/first-run';
+import { clearOnboarded } from '@/lib/onboarded';
 import { ScreenHud } from '@/components/screen-hud';
 import { t } from '@/lib/i18n';
 import { HUD, SETTINGS_ROW } from '@/lib/profile';
@@ -98,6 +121,10 @@ export default function SettingsScreen() {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  /** ⚠️ Sign-out keeps its OWN three, so a failed sign-out cannot print the delete's copy (or vice versa). */
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutProblem, setSignOutProblem] = useState<string | null>(null);
 
   /**
    * ⚠️ THE ORDER MATTERS, AND IT IS THE WHOLE OF "back to first run":
@@ -113,6 +140,17 @@ export default function SettingsScreen() {
       setBusy(true);
       setProblem(null);
 
+      /**
+       * ⚠️ ORDER MATTERS, AND IT IS THE WHOLE OF "back to first run":
+       *   1. delete — and only continue if the SERVER says it went through;
+       *   2. forget the first-run record, so the walkthrough replays;
+       *   3. ⚠️ **forget the ONBOARDED record too** (ADR-004 · Amendment 2) — this is what reopens the
+       *      anonymous window, and it MUST happen before step 4 re-mints, or the delete would sign out and
+       *      then demand a sign-in from someone who has just erased their account;
+       *   4. sign out and mint a FRESH identity (the RPC cannot remove `auth.users`);
+       *   5. land on the shrine, which is clan-less — the first-run fork.
+       * ⚠️ A failed delete stops at step 1 and says so. Nothing is half-erased.
+       */
       const result = await deleteMyData();
       if (!result.ok) {
         setBusy(false);
@@ -121,9 +159,44 @@ export default function SettingsScreen() {
       }
 
       await clearFirstRun();
+      // ⚠️ BEFORE `resetIdentity()`: this is what reopens the anonymous window it mints into.
+      await clearOnboarded();
       await resetIdentity();
       setBusy(false);
       router.replace('/');
+    })();
+  }, []);
+
+  /**
+   * ⚠️ SIGN OUT — and NOTHING here erases: no `deleteMyData`, and deliberately **no `clearFirstRun`**.
+   *
+   * ⚠️ **THE DEVICE IS LEFT SIGNED OUT** (ADR-004 · Amendment 2): `signOutAccount()` does not mint a
+   * replacement identity, and **the sign-in wall takes over** — this navigates to `/account` itself rather
+   * than waiting for the root gate, so the wall appears immediately rather than after a frame of shrine.
+   * ⚠️ **Do NOT send this to `/`**: the shrine is what a signed-out device must not see, and with no session
+   * behind it every panel would render empty and every read would answer `42501`.
+   *
+   * ⚠️ **And neither `clearFirstRun` nor `clearOnboarded` may appear here.** Those two records are what tell
+   * the bootstrap this device is past its demo; clearing either would reopen the anonymous window and hand
+   * the user a fresh demo shrine — the exact behaviour the amendment removes. `clearOnboarded` belongs to the
+   * DELETE alone, which *is* "back to first run".
+   *
+   * ⚠️ A failure stops here and SAYS SO. *"You are still signed in"* must never render as if it worked.
+   */
+  const runSignOut = useCallback(() => {
+    void (async () => {
+      setConfirmingSignOut(false);
+      setSigningOut(true);
+      setSignOutProblem(null);
+
+      const result = await signOutAccount();
+      setSigningOut(false);
+      if (!result.ok) {
+        setSignOutProblem(t('settings.signOutFailed'));
+        return;
+      }
+      /** ⚠️ The SIGN-IN WALL, not the shrine: the device is signed out and stays that way. */
+      router.replace(ACCOUNT_ROUTE);
     })();
   }, []);
 
@@ -163,14 +236,32 @@ export default function SettingsScreen() {
         />
 
         <SettingRow labelKey="settings.policies" subKey="settings.notBuilt" testID="settings-policies" />
-        <SettingRow labelKey="settings.signOut" subKey="settings.notBuilt" testID="settings-signout" />
+
+        {/* ⚠️ LIVE as of SCRUM-215 — the sub names the consequence, not `settings.notBuilt`. */}
+        <SettingRow
+          labelKey="settings.signOut"
+          subKey="settings.signOutSub"
+          testID="settings-signout"
+          onPress={() => {
+            setSignOutProblem(null);
+            setConfirmingSignOut(true);
+          }}
+        />
 
         {busy ? <Body>{t('settings.deleting')}</Body> : null}
+        {signingOut ? <Body>{t('settings.signingOut')}</Body> : null}
         {/* ⚠️ The server's refusal is NOT shown raw here: the only refusals are the rate limit and a
             network failure, and both mean the same thing to the user — nothing was erased. */}
         {problem ? (
           <Text style={styles.problem} testID="settings-problem">
             {problem}
+          </Text>
+        ) : null}
+        {/* ⚠️ A FAILED SIGN-OUT IS ITS OWN LINE. Reusing `settings-problem` would let a failed sign-out
+            print the delete's copy, which claims data was erased — the opposite of what happened. */}
+        {signOutProblem ? (
+          <Text style={styles.problem} testID="settings-signout-problem">
+            {signOutProblem}
           </Text>
         ) : null}
       </ScrollView>
@@ -185,6 +276,18 @@ export default function SettingsScreen() {
         cancelLabel={t('common.cancel')}
         onConfirm={runDelete}
         onCancel={() => setConfirming(false)}
+      />
+
+      {/* ⚠️ A second card, not a shared one: the two actions differ in exactly the way a user must not
+          confuse — one erases the account's data, the other leaves it. */}
+      <ConfirmCard
+        visible={confirmingSignOut}
+        title={t('settings.signOutTitle')}
+        body={t('settings.signOutBody')}
+        confirmLabel={t('settings.signOutConfirm')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={runSignOut}
+        onCancel={() => setConfirmingSignOut(false)}
       />
     </View>
   );

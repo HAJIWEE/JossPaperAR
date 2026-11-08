@@ -50,6 +50,59 @@ export function planSession(state: SessionState): SessionPlan {
 }
 
 /**
+ * ⚠️ **THE BOOTSTRAP'S INPUT NOW CARRIES ONE MORE FACT** (ADR-004 **Amendment 2**, 2026-11-08): whether this
+ * device is **past onboarding** — i.e. it has linked an account, or signed out of one. ⚠️ That — and **not**
+ * "does a session exist" — is what decides whether an anonymous session may be minted at all.
+ *
+ * ⚠️⚠️ **IT DELIBERATELY DOES NOT ASK `needsTutorial()`.** That was the first design, and **the device
+ * falsified it**: the demo flag is written by one screen (the demo branch of `reward.tsx`), so a user whose
+ * first burn was a real one reads *"demo owed"* forever, the bootstrap minted, and a signed-out user came
+ * back to a shrine. See `onboarded.ts`.
+ */
+export interface BootstrapState extends SessionState {
+  /** `readOnboarded()` — this device has linked an account, or has signed out of one. */
+  readonly onboarded: boolean;
+}
+
+/**
+ * What the app should do with the identity on this launch.
+ *
+ * ⚠️ **`mint_anonymous` and `require_sign_in` are the amendment.** Before it, a session-less device ALWAYS
+ * got an anonymous session — which meant signing out silently produced a *new anonymous shrine* and the
+ * account was reachable forever. ⚠️ **The anonymous identity is now a FIRST-INSTALL artifact only.**
+ */
+export type BootstrapPlan =
+  | { readonly action: 'reuse'; readonly userId: string }
+  | { readonly action: 'mint_anonymous' }
+  | { readonly action: 'require_sign_in' }
+  | { readonly action: 'skip'; readonly reason: 'not_configured' };
+
+/**
+ * Decide the identity for this launch. Pure — no storage, no network, no React.
+ *
+ * ⚠️ **THE ORDER IS THE RULE:**
+ *   1. no config → nothing to do;
+ *   2. a session with a real user id → **reuse** (never mint a second identity on one device);
+ *   3. **not past onboarding** → **mint anonymous** — the ONLY window in which an anonymous session may be
+ *      created, because it is the only state that still needs one;
+ *   4. otherwise → **require a sign-in.**
+ *
+ * ⚠️ **Rule 1 of ADR-004 still holds:** nothing gates the first burn, because a fresh device is not past
+ * onboarding and therefore gets the anonymous session the demo runs on.
+ *
+ * ⚠️ **`clearOnboarded()` is therefore load-bearing for the DELETE path:** "delete everything" clears the
+ * record, so the device is legitimately new again and returns to an anonymous shrine. That is the one way
+ * back to anonymous, and it is the delete's, not a sign-out's.
+ */
+export function planBootstrap(state: BootstrapState): BootstrapPlan {
+  // ⚠️ `planSession` STAYS the authority on reuse/skip — this function only adds the onboarding gate.
+  const base = planSession(state);
+  if (base.action === 'skip') return base;
+  if (base.action === 'reuse') return { action: 'reuse', userId: base.userId };
+  return state.onboarded ? { action: 'require_sign_in' } : { action: 'mint_anonymous' };
+}
+
+/**
  * Map a Supabase auth error (or any thrown value) onto a STABLE reason string.
  *
  * The reason is carried, not shown raw: the screen keys its copy off a phase, so

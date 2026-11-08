@@ -166,6 +166,19 @@ export const MESSAGES = {
     'settings.policies': 'Privacy policy · Terms of Service',
     'settings.policiesSub': 'Published at josspaperar.app',
     'settings.signOut': 'Sign out',
+    // ⚠️ SCRUM-215 — this row carried `settings.notBuilt` until the sign-out was built. A sub-label now
+    // says what the row DOES, because the sub is what distinguishes a real row from a dead one.
+    // ⚠️ AMENDED 2026-11-08 (ADR-004 Amendment 2): the sub used to promise "goes back to anonymous". That
+    // is no longer what happens — the device is signed out and the next screen is the sign-in wall.
+    'settings.signOutSub': 'You will need to sign in again',
+    'settings.signOutTitle': 'Sign out?',
+    // ⚠️ The body NAMES the consequence, the standard the delete card is held to: the account is not
+    // erased, it is left behind — and the email is what brings it back. ⚠️ It no longer mentions an
+    // anonymous device, because there is no longer one to go back to.
+    'settings.signOutBody': 'You will be signed out on this device and will need your email to get back in. Your offerings, collection and tribute points stay with the account.',
+    'settings.signOutConfirm': 'Sign out',
+    'settings.signingOut': 'Signing out…',
+    'settings.signOutFailed': 'The sign out did not go through — you are still signed in. Try again.',
     // ⚠️ The confirm's body names the CONSEQUENCES, which is what SCRUM-151 asks for — a card that
     // says only "are you sure?" is the thing ADR-007's one-tap delete is not allowed to be.
     'settings.deleteTitle': 'Delete everything?',
@@ -582,6 +595,12 @@ export const MESSAGES = {
     'settings.policies': '隐私政策 · 服务条款',
     'settings.policiesSub': '发布于 josspaperar.app',
     'settings.signOut': '退出登录',
+    'settings.signOutSub': '退出后需重新登录',
+    'settings.signOutTitle': '退出登录？',
+    'settings.signOutBody': '此设备将退出登录，需用邮箱重新登录才能继续使用。供品、收藏与功德点仍保留在账号中。',
+    'settings.signOutConfirm': '退出登录',
+    'settings.signingOut': '正在退出…',
+    'settings.signOutFailed': '退出未成功 — 仍处于登录状态。请重试。',
     'settings.deleteTitle': '删除全部？',
     'settings.deleteBody': '此操作将清空你的供品、收藏与功德点，无法撤销，并将回到首次使用状态。',
     'settings.deleteConfirm': '删除全部',

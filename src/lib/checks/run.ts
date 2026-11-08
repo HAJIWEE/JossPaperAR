@@ -26,6 +26,7 @@ import {
   ACCOUNT_CODE_LENGTH,
   ACCOUNT_GATE,
   ACCOUNT_MODES,
+  ACCOUNT_ROUTE,
   AFTER_ACCOUNT_ROUTE,
   EMAIL_TAKEN_MEANS_SIGN_IN,
   emailProblem,
@@ -34,7 +35,9 @@ import {
   meansSignInInstead,
   nextAccountStep,
   normaliseEmail,
+  NO_ANONYMOUS_SESSION,
 } from '../account-flow.ts';
+import { planBootstrap } from '../session-map.ts';
 import { readBurnParams, readItemBurnParams, readItemRewardParams, readRewardParams } from '../route-params.ts';
 import { getOffering } from '../../domain/catalogue.ts';
 import { bookView, showsBookSectionTitle } from '../clan-roles.ts';
@@ -1907,6 +1910,10 @@ function localeChecks(): void {
     'settings.title', 'settings.general', 'settings.privacy', 'settings.language', 'settings.notBuilt',
     'settings.deleteAll', 'settings.deleteTitle', 'settings.deleteBody', 'settings.deleteConfirm',
     'settings.deleting', 'settings.deleteFailed', 'settings.retentionSub',
+    // ⚠️ SCRUM-215 — the sign-out row's own copy. ⚠️ It is in this list because the row is now LIVE: a
+    // missing 中文 string here would render the English key on a Chinese device.
+    'settings.signOut', 'settings.signOutSub', 'settings.signOutTitle', 'settings.signOutBody',
+    'settings.signOutConfirm', 'settings.signingOut', 'settings.signOutFailed',
   ];
   const missingCopy = SETTINGS_KEYS.filter((k) => !keyInBothLocales(k));
   check(`every Settings string exists in BOTH locales (${SETTINGS_KEYS.length})`,
@@ -2422,6 +2429,200 @@ function accountChecks(): void {
     normaliseEmail('  A@B.COM ') === 'a@b.com');
   check('the form steps are email → code, and the code is last',
     nextAccountStep('email') === 'code' && nextAccountStep('code') === null);
+
+  /**
+   * ── ⚠️ SIGN OUT (built 2026-11-08) ──────────────────────────────────────────
+   * The row has sat on Settings since **SCRUM-151**, rendered `disabled` with `settings.notBuilt`. ⚠️ The
+   * failure mode the build must not introduce is subtler than an inert row: a bare `signOut()` leaves the
+   * device holding **no session**, and `ensureAnonymousSession()` only signs in when there is none — so the
+   * next authenticated read answers `42501` while the shrine renders empty. That is why the pairing is
+   * asserted rather than trusted to a comment.
+   */
+  const SETTINGS_SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'app', 'settings.tsx');
+  const settingsSrc = readFileSync(SETTINGS_SRC, 'utf8');
+
+  /**
+   * ⚠️ Two slicers, because two DIFFERENT files hold the two halves: the SCREEN decides what the tap does
+   * (`runSignOut`), the LIBRARY decides what the call does (`signOutAccount`). ⚠️ Asking *"does it erase?"*
+   * of a whole file answers for the DELETE handler too — a check that cannot fail.
+   */
+  const handlerOf = (source: string, name: string): string => {
+    const at = source.indexOf(`const ${name} = useCallback`);
+    if (at < 0) return '';
+    const end = source.indexOf('}, []);', at);
+    return end < 0 ? '' : source.slice(at, end + '}, []);'.length);
+  };
+  const fnOf = (source: string, name: string): string => {
+    const at = source.indexOf(`export async function ${name}(`);
+    if (at < 0) return '';
+    const end = source.indexOf('\n}', at);
+    return end < 0 ? '' : source.slice(at, end + 2);
+  };
+  const signOutSrc = handlerOf(settingsSrc, 'runSignOut');
+  const deleteSrc = handlerOf(settingsSrc, 'runDelete');
+  const signOutFn = fnOf(accountSrc, 'signOutAccount');
+
+  check('⚠️ the sign-out ROW is wired to a real call and names its consequence (not `settings.notBuilt`)',
+    signOutSrc.includes('signOutAccount()')
+      && settingsSrc.includes('subKey="settings.signOutSub"'));
+
+  check('⚠️ the DEVICE half signs out, with an EXPLICIT scope',
+    signOutFn.includes("auth.signOut({ scope: 'global' })"));
+
+  /**
+   * ⚠️⚠️ **THE ASSERTION THIS BLOCK EXISTS FOR** (ADR-004 **Amendment 2**, 2026-11-08): an anonymous session
+   * is minted **only while the device is still owed its demo**. ⚠️ Past that, a missing session means
+   * SIGNED OUT and the answer is the sign-in wall — **never a new identity**. Before the amendment a
+   * session-less device always got one, so signing out silently produced a fresh anonymous shrine and the
+   * account was never actually left.
+   */
+  const plan = (over: Partial<Parameters<typeof planBootstrap>[0]> = {}) =>
+    planBootstrap({ configured: true, hasSession: false, userId: null, onboarded: false, ...over });
+
+  check('⚠️⚠️ past onboarding with NO session, the device is told to SIGN IN — it is never minted',
+    plan({ onboarded: true }).action === 'require_sign_in');
+  check('⚠️ …but a device NOT yet past onboarding gets the anonymous session first run needs',
+    plan({ onboarded: false }).action === 'mint_anonymous');
+  check('…and a real session is REUSED, whether or not the device is past onboarding',
+    plan({ hasSession: true, userId: 'u1' }).action === 'reuse'
+      && plan({ hasSession: true, userId: 'u1', onboarded: true }).action === 'reuse');
+  check('…and an unconfigured app decides nothing at all',
+    plan({ configured: false }).action === 'skip');
+  // ⚠️ POSITIVE CONTROL — `planSession`'s own rule must still hold underneath: a session with no user id is
+  // NOT reusable (reusing it is the `not_authenticated` failure the bootstrap exists to prevent).
+  check('⚠️ guard: a session WITHOUT a user id is not reused — it falls through to the onboarding rule',
+    plan({ hasSession: true, userId: null, onboarded: true }).action === 'require_sign_in');
+
+  /**
+   * ⚠️⚠️ **THE FACT IS RECORDED WHERE IT BECOMES TRUE, AND CLEARED IN EXACTLY ONE PLACE.** ⚠️ An
+   * anonymous device can sign out too, so `signOutAccount` must set it — otherwise its next launch mints a
+   * replacement and the user is back in a demo shrine, which is the behaviour the amendment removes.
+   */
+  check('⚠️ …`onboarded` is set on BOTH roads that make it true (sign-in confirmed · signed out)',
+    accountSrc.includes('await markOnboarded();')
+      && (accountSrc.match(/await markOnboarded\(\);/g) ?? []).length === 2);
+  check('⚠️ …and it is CLEARED only by the delete, BEFORE the re-mint',
+    deleteSrc.includes('await clearOnboarded()')
+      && deleteSrc.indexOf('await clearOnboarded()') < deleteSrc.indexOf('await resetIdentity()'));
+  // ⚠️ POSITIVE CONTROL — `signOutAccount` must not be the ONLY setter: an account link is the other.
+  check('⚠️ guard: the two `markOnboarded` calls are not both in the sign-out',
+    (signOutFn.match(/markOnboarded/g) ?? []).length === 1);
+
+  check('⚠️⚠️ SIGN OUT does NOT mint a replacement anonymous identity (Amendment 2)',
+    !signOutFn.includes('ensureAnonymousSession')
+      && !signOutFn.includes('signInAnonymously'));
+
+  /**
+   * ⚠️ **And the SIGN-OUT ROUTE is the WALL, not the shrine.** Sending a signed-out device to `/` renders a
+   * shrine whose every panel is empty over reads that answer `42501` — the screen looks fine and is a lie.
+   */
+  check('⚠️ …and the screen lands on the SIGN-IN WALL, not the shrine',
+    signOutSrc.includes('router.replace(ACCOUNT_ROUTE)'));
+
+  check('⚠️ the BOOTSTRAP is the one place the rule lives, and it reads the ONBOARDED record',
+    readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'session.ts'), 'utf8')
+      .includes('planBootstrap(') &&
+      readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'session.ts'), 'utf8')
+        .includes('readOnboarded()'));
+
+  check('⚠️ the ROOT GATE redirects on `sign_in_required` ALONE and exempts the account screen',
+    readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'app', '_layout.tsx'), 'utf8')
+      .match(/result\.reason === SIGN_IN_REQUIRED/g)?.length === 1
+      && readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'app', '_layout.tsx'), 'utf8')
+        .includes('pathname !== ACCOUNT_ROUTE'));
+
+  /**
+   * ⚠️ **THE DELETE PATH IS NOW ORDER-DEPENDENT, and nothing else can see it.** `resetIdentity()` ends by
+   * ensuring a session, and under Amendment 2 that only MINTS while the device is not yet past onboarding —
+   * so the record must be cleared BEFORE it, or "delete everything" would sign out and then demand a sign-in
+   * instead of returning the device to its demo. The order is a fact about the source, so it is asserted here.
+   * ⚠️ **It compares the `await` CALLS, not the words** — the first version of this check was defeated by its
+   * own explanatory comment, which named `resetIdentity()` a few lines above the call and made `indexOf`
+   * answer with the comment's position. A gate that a comment can satisfy is not a gate.
+   */
+  check('⚠️⚠️ the DELETE clears BOTH device records BEFORE re-minting — or it dead-ends at the wall',
+    deleteSrc.indexOf('await clearFirstRun()') >= 0
+      && deleteSrc.indexOf('await clearOnboarded()') >= 0
+      && deleteSrc.indexOf('await clearFirstRun()') < deleteSrc.indexOf('await resetIdentity()')
+      && deleteSrc.indexOf('await clearOnboarded()') < deleteSrc.indexOf('await resetIdentity()'));
+
+  check('⚠️ a failed sign-out is REPORTED, never swallowed — and the screen says so',
+    signOutFn.includes('if (error) return { ok: false')
+      && signOutSrc.includes("t('settings.signOutFailed')"));
+
+  check('⚠️⚠️ …and SIGNING OUT ERASES NOTHING — no delete, and no reopening of the anonymous window',
+    signOutSrc.length > 0
+      && !signOutSrc.includes('clearFirstRun')
+      && !signOutSrc.includes('clearOnboarded')
+      && !signOutSrc.includes('deleteMyData'));
+
+  /**
+   * ⚠️ POSITIVE CONTROLS — every assertion above is an exact `includes`/`!includes`, so each is vacuous if its
+   * slicer matched NOTHING. These prove the slicers bite: `runDelete` IS found and DOES contain the
+   * `clearFirstRun` the sign-out is checked for not having, and `signOutAccount` is the SIGN-OUT — not the
+   * upgrade, so it must not call `updateUser`.
+   */
+  check('⚠️ guard: the slicers find runDelete + its clearFirstRun, and signOutAccount + its scope',
+    deleteSrc.length > 0 && deleteSrc.includes('clearFirstRun')
+      && signOutFn.length > 0 && !signOutFn.includes('updateUser'));
+
+  /**
+   * ⚠️ **The two `/account` constants must agree.** `tutorial.ts` keeps its own copy so the pure tutorial
+   * module stays import-free; the wall uses `account-flow.ts`'s. If they drift, the demo would hand off to
+   * one path while the gate exempted another — and the gate would loop.
+   */
+  check('⚠️ the wall\'s ACCOUNT_ROUTE and the tutorial\'s hand-off name the SAME screen',
+    ACCOUNT_ROUTE === '/account' && ACCOUNT_ROUTE === AFTER_TUTORIAL_ROUTE);
+
+  /**
+   * ⚠️⚠️ **THE WALL'S SECOND DEFECT, found on glass minutes after the first** (2026-11-08). Signing out
+   * landed correctly on `/account` — and the screen opened on **"Create your account"**, whose road is the
+   * in-place UPGRADE (`updateUser`) and therefore needs an **anonymous session a signed-out device does not
+   * have**. ⚠️ The tap would have failed with the provider's *"not authenticated"*. So the ROAD is now chosen
+   * by the SESSION, and the refusal is turned into "sign in" rather than printed.
+   */
+  check('⚠️ sign-up is REFUSED by name when there is no anonymous session to upgrade',
+    meansSignInInstead('signUp', NO_ANONYMOUS_SESSION) === true
+      && meansSignInInstead('signIn', NO_ANONYMOUS_SESSION) === false);
+  check('⚠️ …and the DEVICE half refuses it before the provider can answer "not authenticated"',
+    accountSrc.includes('if (mode === \'signUp\' && !(await isAnonymousSession()))'));
+  const accountScreenSrc = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'app', 'account.tsx'), 'utf8');
+  check('⚠️ …and the WALL opens on sign IN, and does not offer "create" it cannot complete',
+    accountScreenSrc.includes('if (!yes) setMode(\'signIn\')')
+      && accountScreenSrc.includes("mode === 'signUp' || anonymous !== false"));
+  // ⚠️ POSITIVE CONTROL — the mode default must still be `signUp` for the FIRST-RUN road, or the upgrade
+  // (ADR-004 rule 4) would never be offered where it is the right answer.
+  /**
+   * ⚠️⚠️ **THE EMAIL MUST OFFER WHAT WORKS, AND ONLY THAT** (2026-11-08). Both templates used to carry
+   * `<a href="{{ .ConfirmationURL }}">…one tap…</a>`, and **a player tapped it and hit the Site URL in a
+   * browser.** ⚠️ Three things are missing and all three are needed: no `emailRedirectTo` in
+   * `sendAccountCode`, no handler for the returned `#access_token=…`, and no hosted Redirect-URL allowlist.
+   * ⚠️ **A link that cannot do what it promises is worse than an absent one** — the rule this project
+   * already applies to dead rows and dead toggles. The code is what works, so the code is what ships.
+   */
+  const TEMPLATE_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'supabase', 'templates');
+  /**
+   * ⚠️ **HTML COMMENTS ARE STRIPPED FIRST, and that is not tidiness.** The note that explains WHY the link is
+   * gone has to name `{{ .ConfirmationURL }}` — so a raw `includes` would fail on the very file that fixed it.
+   * ⚠️ This is the second time in two sessions that a gate read the *prose* instead of the *code*; the rule is
+   * now: **assert on what renders, not on what explains.**
+   */
+  const bodyOf = (html: string): string => html.replace(/<!--[\s\S]*?-->/g, '');
+  const templates = ['magic_link.html', 'email_change.html'].map((f) => ({
+    name: f,
+    body: bodyOf(readFileSync(join(TEMPLATE_DIR, f), 'utf8')),
+  }));
+  check('⚠️⚠️ both email templates carry the SIX-DIGIT CODE (`{{ .Token }}`)',
+    templates.every((t) => t.body.includes('{{ .Token }}')));
+  check('⚠️⚠️ …and NEITHER carries a one-tap link the app cannot receive',
+    templates.every((t) => !t.body.includes('{{ .ConfirmationURL }}')),
+    'the app has no emailRedirectTo, no callback handler and no hosted allowlist — doc 24 §6');
+  // ⚠️ POSITIVE CONTROL — the detector must be able to SEE a link, or "no link" passes for the wrong reason.
+  check('⚠️ guard: the same detector DOES find a link when one is present in the body',
+    bodyOf('<a href="{{ .ConfirmationURL }}">x</a>').includes('{{ .ConfirmationURL }}'));
+  check('…and `emailRedirectTo` is not wired anywhere, which is WHY the link is withheld',
+    !accountSrc.includes('emailRedirectTo'));
 }
 
 function storeChecks(): void {

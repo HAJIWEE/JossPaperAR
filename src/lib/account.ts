@@ -17,7 +17,8 @@
  * that data belongs to.
  */
 
-import { ACCOUNT_MODES, type AccountMode } from './account-flow.ts';
+import { ACCOUNT_MODES, NO_ANONYMOUS_SESSION, type AccountMode } from './account-flow.ts';
+import { markOnboarded } from './onboarded.ts';
 import { reasonFromAuthError } from './session-map.ts';
 import { isConfigured, supabase } from './supabase.ts';
 
@@ -39,6 +40,17 @@ export type AccountResult = { readonly ok: true } | { readonly ok: false; readon
  */
 export async function sendAccountCode(mode: AccountMode, email: string): Promise<AccountResult> {
   if (!isConfigured()) return { ok: false, reason: 'not_configured' };
+
+  /**
+   * ⚠️ **THE UPGRADE ROAD NEEDS A SESSION TO UPGRADE** (ADR-004 · Amendment 2). After a sign-out the device
+   * holds **no** session, so `updateUser` would fail with the provider's *"not authenticated"* — a reason
+   * about nothing the user can act on. ⚠️ It is refused here, by name, so the screen can turn it into
+   * **sign in** (`meansSignInInstead`) instead of printing it.
+   */
+  if (mode === 'signUp' && !(await isAnonymousSession())) {
+    return { ok: false, reason: NO_ANONYMOUS_SESSION };
+  }
+
   try {
     const auth = supabase().auth;
     const { error } =
@@ -71,6 +83,63 @@ export async function confirmAccountCode(
       type: ACCOUNT_MODES[mode].verifyType,
     });
     if (error || !data?.user?.id) return { ok: false, reason: reasonFromAuthError(error) };
+    /**
+     * ⚠️ **THIS DEVICE NOW HAS AN IDENTITY OF ITS OWN** (ADR-004 · Amendment 2). From here on a missing
+     * session means SIGNED OUT, and the bootstrap stops minting anonymous. ⚠️ Recorded only AFTER the server
+     * confirmed — a failed code must not close the demo window.
+     */
+    await markOnboarded();
+    return { ok: true };
+  } catch {
+    return { ok: false, reason: 'transport' };
+  }
+}
+
+/**
+ * ⚠️ **SIGN OUT — leave the ACCOUNT. The device is then SIGNED OUT, and this does NOT replace the
+ * session with an anonymous one** (ADR-004 **Amendment 2**, 2026-11-08).
+ *
+ * ── ⚠️ WHAT CHANGED, AND WHY IT MATTERS ─────────────────────────────────────
+ * The first version of this function ended by calling `ensureAnonymousSession()`, on the reading that a
+ * session-less device was an unusable one. ⚠️ **That reading was the MVP's, not the product's:** it made a
+ * sign-out quietly produce a *brand-new anonymous shrine*, so the account was never actually left and the
+ * demo could be replayed at will. The owner's ruling:
+ *
+ * > *"the Demo should only be on first install of the App and signing out does not return us to anon
+ * > status but require a sign in every time."*
+ *
+ * ⚠️ **So the two facts that used to be one are now two:** *"no session"* means **SIGNED OUT**, and the
+ * app's answer to it is the **sign-in wall** (`src/app/_layout.tsx` routes to `/account`), not a new
+ * anonymous identity. ⚠️ **And it is safe to leave the device session-less now** precisely because the
+ * bootstrap no longer mints behind our back — see `session.ts` / `planBootstrap`.
+ *
+ * ⚠️ **SIGNING OUT ERASES NOTHING.** Unlike `resetIdentity()` (delete-then-fresh-identity, *"back to first
+ * run"*, the only caller of `clearFirstRun()`), the account keeps its tributes, ancestors and streak **on
+ * the server**: signing back in with the email returns them. ⚠️ And this must **not** clear the device
+ * records — in fact it **writes** `onboarded`, which is what closes the anonymous window. Clearing either
+ * one here would hand the user a fresh demo shrine, i.e. exactly the behaviour this amendment removes.
+ *
+ * ⚠️ **A FAILURE IS REPORTED, never swallowed.** *"You are still signed in"* and *"you are signed out"*
+ * must not render the same — the rule `sendAccountCode` above states.
+ *
+ * ⚠️ **`scope: 'global'` IS EXPLICIT ON PURPOSE.** The SDK's default is global, but this account's posture
+ * (ADR-007) prefers revoking the refresh tokens over leaving one alive on a device someone may have picked
+ * up. ⚠️ If a multi-device story ever lands, revisit it: `'local'` signs out only this device, and global
+ * would kick the user off their other one.
+ */
+export async function signOutAccount(): Promise<AccountResult> {
+  if (!isConfigured()) return { ok: false, reason: 'not_configured' };
+
+  try {
+    const { error } = await supabase().auth.signOut({ scope: 'global' });
+    if (error) return { ok: false, reason: reasonFromAuthError(error) };
+    /**
+     * ⚠️ **A SIGN-OUT CLOSES THE ANONYMOUS WINDOW FOR GOOD** (ADR-004 · Amendment 2). Recorded here as well
+     * as on sign-in, because an **anonymous** device can sign out too — and without this its next launch
+     * would mint a replacement and hand the user a fresh demo shrine, which is the behaviour this whole
+     * amendment removes.
+     */
+    await markOnboarded();
     return { ok: true };
   } catch {
     return { ok: false, reason: 'transport' };

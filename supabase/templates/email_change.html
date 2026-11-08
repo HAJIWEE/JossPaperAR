@@ -13,6 +13,10 @@
 
   ⚠️ COPY IS A DRAFT — the wording is a proposed default for PM review (the project's
   "draft-then-owner-edits" pattern; the account strings are SCRUM-217).
+
+  ⚠️ THE ONE-TAP LINK IS GONE HERE TOO — see the long note in `magic_link.html` (2026-11-08). It opened the
+  project's Site URL in a browser and stopped, because there is no `emailRedirectTo`, no callback handler,
+  and no hosted Redirect-URL allowlist. ⚠️ The email offers the code, which is what actually works.
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -44,8 +48,7 @@
             <tr>
               <td style="padding:16px 32px 0 32px;font-family:Georgia,'Times New Roman',serif;">
                 <p style="margin:0;color:#4A463F;font-size:14px;line-height:1.5;">
-                  The code expires in 1 hour. Prefer a link?
-                  <a href="{{ .ConfirmationURL }}" style="color:#31506F;font-weight:700;">Confirm with one tap</a>.
+                  The code expires in 1 hour. Enter it in the app to confirm this address.
                 </p>
               </td>
             </tr>

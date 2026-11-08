@@ -9,6 +9,20 @@
   SAME HTML must be pasted into the HOSTED Dashboard (Auth → Email Templates). See SCRUM-215.
 
   ⚠️ COPY IS A DRAFT (PM review) — see `email_change.html`.
+
+  ── ⚠️⚠️ THE ONE-TAP LINK IS GONE, AND MUST NOT COME BACK UNTIL IT CAN WORK (2026-11-08) ──
+  This template used to offer `<a href="{{ .ConfirmationURL }}">Sign in with one tap</a>`. ⚠️ **IT COULD
+  NOT WORK, and a player found it:** tapping it opened a browser onto the project's **Site URL** and
+  stopped there. Three things are missing and ALL THREE are needed:
+    1. `sendAccountCode()` sends **no `emailRedirectTo`**, so `.ConfirmationURL` has nowhere app-shaped to go
+       (`emailRedirectTo` appears nowhere in `src/`);
+    2. the app has **no handler** for the returned `#access_token=…&refresh_token=…` — `app.json` declares
+       the `josspaperar` scheme but the only intent filter is `/join`, and `detectSessionInUrl: false` means
+       the SDK will not consume it either;
+    3. hosted **Redirect URLs** must allowlist the scheme — a Dashboard setting only the owner can change.
+  ⚠️ **So the email offers exactly what works: the six-digit code.** A control that cannot do what it
+  promises is worse than an absent one (the SCRUM-145 rule), and doc 24 §6 had recorded this as knowingly
+  unbuilt. ⚠️ **`check:lib` asserts these templates carry `{{ .Token }}` and NO `{{ .ConfirmationURL }}`.**
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -40,8 +54,7 @@
             <tr>
               <td style="padding:16px 32px 0 32px;font-family:Georgia,'Times New Roman',serif;">
                 <p style="margin:0;color:#4A463F;font-size:14px;line-height:1.5;">
-                  The code expires in 1 hour. Prefer a link?
-                  <a href="{{ .ConfirmationURL }}" style="color:#31506F;font-weight:700;">Sign in with one tap</a>.
+                  The code expires in 1 hour. Enter it in the app to return to your shrine.
                 </p>
               </td>
             </tr>

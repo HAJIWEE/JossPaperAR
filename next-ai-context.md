@@ -1736,6 +1736,173 @@ phase 1 is code-only.
 no colon), so every shorthand placeholder read as unsubstituted — the mirror of the blind first
 `check:copy`. Fixed, with two controls (one that is quiet on shorthand, one that still bites).
 
+## 2026-11-08 (S79) — SIGN OUT is built, and the account flow stops being one-way
+
+**Built.** `settings-signout` — drawn on `EN · 8b Settings` and **disabled with `settings.notBuilt` since
+SCRUM-151** — is now live: row → `ConfirmCard` → `signOutAccount()` → `/`, as a **fresh anonymous device**.
+⚠️ **The retest it unblocks is the point:** before this, a device that took on an account could never leave
+it without wiping the install, so the **email-link path** could not be tried on glass at all.
+
+**⚠️ A bare `signOut()` would have been the real bug.** ADR-004 gives every install an anonymous session
+and `ensureAnonymousSession()` signs in **only when there is none** — so one `signOut()` leaves the device
+**session-less** while the shrine keeps rendering, and the next authenticated read answers **`42501`**. So
+`signOutAccount()` is **sign out → re-mint anonymous** (the pair `resetIdentity()` already makes), and the
+gate slices the **function**, not the file — a file-wide `includes` would have passed on `resetIdentity`'s
+code and proved nothing. That was a real mistake in my own first draft of the check: `signOutSrc.length > 0
+|| accountSrc.includes(...)` passes on the SCREEN handler existing, i.e. a check that cannot fail. Fixed
+before it shipped.
+
+**⚠️ It erases nothing, and the tutorial does NOT replay.** `resetIdentity()` is *"back to first run"* and
+the only caller of `clearFirstRun()`. Sign-out keeps tributes, ancestors and streak **on the server**, so
+the handler calls neither `deleteMyData` nor `clearFirstRun` — replaying the walkthrough would describe an
+erasure that did not happen. Both absences asserted, **with a control** proving the slicer does find
+`clearFirstRun` in `runDelete`.
+
+**`scope: 'global'` — read from the installed `GoTrueClient.d.ts`, not memory:** `signOut(options?:
+SignOut)` defaults to global; `SIGN_OUT_SCOPES = ['global','local','others']`. ⚠️ Multi-device would want
+`'local'`, since global also signs the user out of their **other** device.
+
+**Gates.** `check:lib` **761** green, each new gate **fault-tested red** individually (1 of 761 each time).
+⚠️ `tsc` shows **3** pre-existing errors — `expo-image-manipulator` / `expo-blob` are missing from the
+local `node_modules`, in files this session never touched. ⚠️ **A fresh worktree has no `node_modules` at
+all**; borrowed here with `cp -al` from the main checkout. **US$0.00** — no fal.ai call, no install.
+
+✅ **ON GLASS — measured 2026-11-08 (`HN615L005386`, Expo Go + Metro over `adb reverse`, HOSTED).**
+`Android Bundled 5524 ms (2141 modules)` from the worktree; reached via **Profile → Settings** because the
+header gear sits under **Expo Go's own dev FAB** (tapping it opened the dev menu). The row is
+**`enabled=true` `clickable=true`** with sub *"This device goes back to anonymous"*; the card draws
+**"Sign out?"** + the body verbatim + **Sign out / Cancel**; **Cancel** dismisses and stays on Settings;
+**Confirm** leaves Settings for the shrine as a **genuinely new anonymous identity** — clan pill **gone**,
+altar *"Your altar is empty"*, tributes **0**, streak **0-day**, CTA flipped to **Clan** — and **Profile
+renders with no error copy**, so the re-minted session really authenticates (no `42501`). That last row is
+the whole reason sign-out is two steps, now **measured** instead of argued.
+
+⚠️⚠️ **Two traps, each of which nearly produced a FALSE NEGATIVE:**
+
+1. **Expo Go resumed a CACHED bundle.** The first launch showed the **old** code (`enabled=false`,
+   *"Not built yet"*) while Metro logged **no bundle request** — it reads exactly like "the change did not
+   work". ⚠️ **`adb shell am force-stop host.exp.exponent` before relaunching**, and confirm
+   `Android Bundled …` in the Metro log before believing any on-glass result.
+2. **The borrowed `node_modules` was INCOMPLETE** — `expo-blob` and `expo-image-manipulator` are declared
+   in `package.json` but absent from the main checkout's install, so Metro answered **`Unable to resolve
+   "expo-blob"`** and every bundle failed (same cause as the 3 `tsc` errors). ⚠️ Fixing it takes
+   **`--no-save` and an EXACT version**: `expo-image-manipulator@~57.0.21` resolves to **57.0.22** and
+   **rewrites `package-lock.json`**; `--no-save … @57.0.21` leaves the lock byte-identical.
+
+⏳ **Still open — the sign-back-in.** That the account's tributes/clan/ancestors survived is asserted by
+the card's copy, **not yet observed**: signing in with the email and watching the altar refill is what
+closes it, and it needs the email (SCRUM-222 / doc 24).
+
+
+## 2026-11-08 (S79b) — ANONYMOUS IS FIRST-INSTALL ONLY: the sign-out is a WALL, and the device broke the first design
+## 2026-11-08 (S79d) — email is CODE-ONLY (confirmed), and GOOGLE will be the primary road — recorded before it is built
+
+**The owner closed the one-tap question:** *"its ok to remove the link as this is for email based logins only.
+Once we get the google console I expect 99% of users to be using their google accounts to login automatically."*
+
+⚠️ **So one-tap is not "unbuilt" — it is CLOSED.** The three blockers in §S79c are recorded for the record and
+are **not** a work item: building the return would be work spent on the road Google replaces. ⚠️ A future
+session reading *"one-tap — NOT BUILT, all three needed"* would have gone and built it; the follow-up now says
+**"NOT to be rebuilt"**, in those words.
+
+⚠️⚠️ **AND GOOGLE SIGN-IN WAS RECORDED NOWHERE IN THE REPO** — not in a doc, not in an ADR, not in a ticket. It
+just became the intended **primary** sign-in path, so it is written into **ADR-004 Amendment 2 item 6** and a
+follow-up item, with the trap that matters:
+
+- ⚠️ **On first install, Google must be LINK-then-verify** — `linkIdentity` / `signInWithIdToken` against the
+  **existing anonymous session** — because the demo's ledger has to survive. `signInWithOAuth` **replaces the
+  session**, which is correct **only** at the sign-in wall for a returning user.
+- ⚠️ That is the *same* distinction `ACCOUNT_MODES` already encodes for email (`updateUser` vs
+  `signInWithOtp`) — **the exact mistake this session's §S79b was about.** Rule 4 gets broken by a plausible
+  one-liner, so it is written down before anyone writes it.
+- ⚠️ A successful Google sign-in must write **`onboarded`**, or the wall will not know the device is past
+  onboarding and would go on minting anonymous sessions.
+- ⚠️ It cannot be verified in Expo Go (the OAuth return needs a real scheme/build), same as one-tap.
+
+**US$0.00** — docs only; no code change, no AI call.
+
+
+## 2026-11-08 (S79c) — THE EMAIL'S "ONE TAP" LINK WAS A PROMISE THE APP COULD NOT KEEP — removed, and gated
+
+**The report.** *"The link in the email for the one tap log in does not work."* ⚠️ It never could, and
+**doc 24 §6 had already said so** — *"one-tap links appear in both templates as a convenience, but the app has
+no deep-link handler for them… They open the Supabase verify endpoint, not the app."* ⚠️ The note was accurate
+and the link shipped anyway, which is the defect class this project already refuses for dead rows and dead
+toggles.
+
+**Three causes, and all three are needed for a fix — no two are enough:**
+
+1. `sendAccountCode()` sends **no `emailRedirectTo`** (`emailRedirectTo` appears **nowhere** in `src/`), so
+   `{{ .ConfirmationURL }}` targets the project's **Site URL** — a web address, never the app.
+2. **Nothing handles the return.** `app.json` declares the `josspaperar` scheme, but the only intent filter is
+   `https://josspaperar.app/join`, and no code parses `#access_token=…&refresh_token=…`;
+   `detectSessionInUrl: false` means the SDK will not either.
+3. The **hosted Redirect URLs allowlist** must contain the scheme — a Dashboard setting only the owner can
+   change; without it Supabase silently falls back to the Site URL and the browser dead-ends.
+
+**What was done.** ⚠️ **The link is removed from both templates** — the email now offers exactly what works,
+the six-digit code — with the three blockers written into the template header, doc 24 §6, and
+`follow-up-items.md`. **`check:lib` (781) now asserts both templates carry `{{ .Token }}` and NO
+`{{ .ConfirmationURL }}`**, fault-tested by putting the link back (**1 of 781**).
+
+⚠️ **And the new gate caught the same trap as last session's:** the note explaining the removal has to *name*
+`{{ .ConfirmationURL }}`, so a raw `includes` failed on the very file that fixed it. It **strips HTML comments
+first**. ⚠️ **The rule, now twice earned: assert on what RENDERS, not on what EXPLAINS.**
+
+⚠️ **The hosted emails keep the dead link until the templates are pasted into the Dashboard** (doc 24 §B) —
+that is the owner's step, and the reason a repo-only fix does not change the next email received.
+
+⏳ **One-tap is a ticket, not a tweak:** (1)+(2) are code, (3) is the Dashboard, and ⚠️ **it cannot be verified
+in Expo Go** — Expo Go will not route `josspaperar://`, so proving it needs an **EAS build**.
+**US$0.00** — no AI call.
+
+
+
+**The owner reversed the MODEL, not the button.** *"Anonymous shrine is only for the MVP demo. Now that we are
+building the actual app, the Demo should only be on first install of the App and signing out does not return
+us to anon status but require a sign in every time."* ⚠️ So the section above is **superseded in part**: its
+two-step sign-out (*sign out → re-mint anonymous*) is **gone**. The row was right; the identity model behind it
+was the MVP's. ⚠️ **Every gate was green because the code did what it was told** — the spec moved.
+
+**What landed.** `signOutAccount()` no longer mints. **`useIdentityGate()`** (`_layout.tsx`) sends a
+session-less device that is past onboarding to a **sign-in wall** at `/account`, keyed on
+**`sign_in_required` alone** — ⚠️ never on a network failure, which would read as *"you have been logged out"*.
+`planBootstrap()` (pure, `session-map.ts`) decides reuse / mint / require-sign-in / skip and is applied in
+**one** place (`session.ts`), so none of its four callers can mint quietly. Sign-out now says *"You will need to
+sign in again"* and lands on the wall. **ADR-004 gained Amendment 2.**
+
+**⚠️⚠️ THE FINDING WORTH KEEPING: the device falsified the design, and 775 green checks could not see it.** The
+first cut keyed *"may this device have an anonymous session?"* on **`needsTutorial()`** (the demo flag),
+reasoning that a device still owed its demo had never onboarded. ⚠️ **On glass, signing out and restarting came
+back to an anonymous shrine** — because that flag is written by **exactly one screen** (the demo branch of
+`reward.tsx`), so a user whose first burn was a **real** one reads *"demo owed"* forever. ⚠️ **Fix:**
+`onboarded.ts`, a dedicated record written where the fact actually becomes true (**an account linked** or **a
+sign-out**), cleared **only** by the delete. ⚠️ **An existing flag that looks like "first install" is not
+evidence that it is** — the demo flag was answering a different question.
+
+**On glass (hosted, `adb reverse`):** sign-out → `/account`; the wall reads *"Sign in to return to your
+shrine"* with **Send code** disabled until a valid email; ⚠️ **restart while signed out → the WALL**, with no
+session minted. That restart is the decisive test, and it is the one that failed before `onboarded.ts`.
+
+**⚠️ And the wall had a second defect, found the same minute.** It opened on **"Create your account"**, whose
+road is the in-place **UPGRADE** (`updateUser`) and therefore needs *an anonymous session to upgrade* — which a
+signed-out device has not got; the tap would have failed with the provider's *"not authenticated"*. ⚠️ So the
+**road is chosen by the session** (`isAnonymousSession()`), the screen opens on **sign in**, the *"New here?
+Create an account"* link is **withheld** where it cannot complete, and `sendAccountCode` refuses the upgrade
+**by name** (`no_anonymous_session`) so `meansSignInInstead` turns it into sign-in instead of printing it.
+
+**Gates: 778** green · `tsc` **0** errors · 20/20 suite steps. New checks **fault-tested red** (mint while
+onboarded → 2 of 778 · a sign-out that forgets `markOnboarded` → 1 · the delete clearing the record *after*
+re-minting → 2). ⚠️ **One gate was defeated by its own comment** — `indexOf('resetIdentity')` matched the words
+in the explanatory comment above the call, so the order check passed for the wrong reason; it now compares the
+**`await` calls**. ⚠️ A gate a comment can satisfy is not a gate. **US$0.00** — no AI call, no new dependency.
+
+⏳ **Open — the sign-back-in** (email + code → the clan and ancestors return) is still **unobserved**. A
+signed-out user who wants a **different** account has no in-app path (recorded in the amendment as a
+follow-up, not a defect). ⚠️ And consider hiding **Sign out** while the session is anonymous: it abandons a
+throwaway identity for a wall that user cannot pass without an account.
+
+
 ## Next, in order
 
 1. **`SCRUM-215`'s remaining half** — the SMTP provider + the two templates carrying `{{ .Token }}`, then

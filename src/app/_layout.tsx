@@ -9,14 +9,56 @@
  */
 import '@/lib/blob-polyfill';
 
-import { Stack } from 'expo-router';
+import { Stack, router, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { LocaleProvider } from '@/components/locale-provider';
-import { ensureAnonymousSession } from '@/lib/session';
+import { ACCOUNT_ROUTE } from '@/lib/account-flow';
+import { SIGN_IN_REQUIRED, ensureAnonymousSession } from '@/lib/session';
 import { surface } from '@/theme/tokens';
+
+/**
+ * ⚠️ **THE IDENTITY GATE — `ADR-004 · Amendment 2` (2026-11-08).**
+ *
+ * The owner's ruling: *"the Demo should only be on first install of the App and signing out does not return
+ * us to anon status but require a sign in every time."*
+ *
+ * It does TWO things, and both are needed:
+ *   1. **bootstraps the identity** — on a device still owed its demo this mints the anonymous session the
+ *      demo needs; on any other it must NOT (see `session.ts`);
+ *   2. **is the sign-in wall** — a device that is past its demo and has no session goes to `/account`.
+ *
+ * ⚠️ **Without (2) a sign-out would be a dead end**: `signOutAccount()` deliberately leaves the device with
+ * no session, so every authenticated read would answer `42501` behind a shrine that still renders.
+ *
+ * ⚠️ **IT KEYS ON `SIGN_IN_REQUIRED` ALONE, and that is the whole discipline.** Every other failure — a
+ * blip, a timeout, `not_configured`, a refused anonymous sign-in — must **NOT** bounce a signed-in user to
+ * a sign-in wall. A network failure and a sign-out are not the same fact; treating one as the other turns a
+ * bad signal into "you have been logged out", which is the worst copy in the app.
+ *
+ * ⚠️ **And it exempts `/account` itself** — otherwise the redirect would point at the screen it is already
+ * on, which is a loop. The route is on `pathname` so the effect re-runs on every navigation: a signed-out
+ * user who reaches the shrine some other way (a deep link, a back gesture) is put back on the wall.
+ */
+function useIdentityGate(): void {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const result = await ensureAnonymousSession();
+      if (!live) return;
+      if (!result.ok && result.reason === SIGN_IN_REQUIRED && pathname !== ACCOUNT_ROUTE) {
+        router.replace(ACCOUNT_ROUTE);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [pathname]);
+}
 
 /**
  * The root navigator (doc 19 §7).
@@ -30,13 +72,7 @@ import { surface } from '@/theme/tokens';
  * reward) land with the slice (SCRUM-53, doc 19 §8 PR-4).
  */
 export default function RootLayout() {
-  // ADR-004 / SCRUM-80 — the device adopts an anonymous session at first launch,
-  // BEFORE any ritual call, so the very first burn needs no account and no sign-in
-  // wall. Fire-and-forget: the ritual re-ensures at its own network boundary, so a
-  // slow or failed attempt here is merely un-warm, never fatal.
-  useEffect(() => {
-    void ensureAnonymousSession();
-  }, []);
+  useIdentityGate();
 
   return (
     <SafeAreaProvider>

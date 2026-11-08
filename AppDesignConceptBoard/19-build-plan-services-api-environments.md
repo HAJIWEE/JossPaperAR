@@ -567,6 +567,72 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.49 · S79b — ADR-004 AMENDMENT 2: anonymous is a FIRST-INSTALL identity, and a sign-out is a WALL (2026-11-08)
+
+> ✅ **Built and verified on glass the same day, an hour after §12.48 was closed.** The owner's ruling:
+>
+> > *"Anonymous shrine is only for the MVP demo. Now that we are building the actual app, the Demo should only be on first install of the App and signing out does not return us to anon status but require a sign in every time."*
+>
+> ⚠️ **§12.48 had made the sign-out *work* — and it worked by minting a NEW anonymous identity**, which is the MVP's model. So the row was right and the **identity model behind it was stale**. ⚠️ Every gate was green because the code did exactly what it was written to do; this is the class of defect a test suite cannot catch, because the spec changed.
+>
+> **What changed.** `signOutAccount()` no longer re-mints. A **sign-in wall** (`useIdentityGate()` in `_layout.tsx`) routes a session-less device past onboarding to `/account`, keyed on **`sign_in_required` alone** — ⚠️ not on any failure, or a wifi blip would read as "you have been logged out". `planBootstrap()` (pure) decides reuse / mint / require-sign-in / skip, applied in **one** place (`session.ts`) so none of the four callers can mint quietly. The sign-out now lands on `/account`; the copy says *"You will need to sign in again"*; ADR-004 gained **Amendment 2**.
+>
+> ⚠️⚠️ **THE FINDING THAT MATTERS — THE DEVICE FALSIFIED THE DESIGN, AND THE GATES COULD NOT.** The first implementation keyed "may this device have an anonymous session?" on **`needsTutorial()`** (the demo flag), reasoning that a device owed its demo had never onboarded. ⚠️ **On glass, signing out and restarting came back to an anonymous SHRINE**, with **775** checks green. Cause: that flag is written by **exactly one screen** — the demo branch of `reward.tsx` — so a user whose first burn was a **REAL** one never gets it and reads *"demo owed"* forever. ⚠️ The fix is `onboarded.ts`, a dedicated record written where the fact becomes true (**an account linked** or **a signed out of**), and cleared **only** by the delete. ⚠️ Lesson: an existing flag that *looks* like it means "first install" is not evidence that it does — the demo flag answered a different question.
+>
+> **On glass, measured** (`HN615L005386`, hosted, Expo Go + `adb reverse`):
+>
+> | step | measured |
+> |---|---|
+> | sign out (anonymous device) | left Settings → **`/account`**, not the shrine |
+> | the wall | **"Sign in or register new account"** / *"Sign in to return to your shrine."* / **Send code** disabled until a valid email |
+> | ⚠️ **restart while signed out** | **came back to the WALL** — no anonymous session minted. This is the decisive test, and it is the one that failed before `onboarded.ts` |
+> | the shrine | unreachable; the gate returns a signed-out device to `/account` from any other route |
+>
+> ⚠️⚠️ **AND THE WALL HAD A SECOND DEFECT, FOUND THE SAME MINUTE:** it opened on **"Create your account"**, whose road is the in-place **UPGRADE** (`updateUser`) and therefore needs *an anonymous session to upgrade* — which a signed-out device does not have. The tap would have failed with the provider's *"not authenticated"*. ⚠️ So the **road is now chosen by the session** (`isAnonymousSession()`), the screen opens on **sign in**, the "New here? Create an account" cross-link is **not offered** where it cannot complete, and `sendAccountCode` refuses the upgrade road **by name** (`no_anonymous_session`) so `meansSignInInstead` can turn it rather than print it.
+>
+> **Gates: 778** green, `tsc` **0** errors, all 20 suite steps green. The new checks were **fault-tested red**: `planBootstrap` minting while onboarded (2 of 778); `signOutAccount` forgetting `markOnboarded` (1); the delete clearing the record **after** re-minting (2). ⚠️ **And one gate was found to be defeated by its own comment** — `indexOf('resetIdentity')` matched the words in an explanatory comment above the call, so the order check passed for the wrong reason; it now compares the **`await` calls**. ⚠️ A gate a comment can satisfy is not a gate.
+>
+> ⏳ **Open:** the **sign-back-in** (email + code → the account's clan/ancestors return) is still unobserved. ⚠️ A signed-out user who wants a **different** account has no in-app path (recorded in the amendment as a follow-up, not a defect). ⚠️ And consider hiding **Sign out** while the session is anonymous — it abandons a throwaway identity for a wall the user cannot pass without an account.
+
+
+### 12.48 · S79 — SCRUM-215's SIGN OUT: the row was drawn, reachable and dead — and a bare `signOut()` would have been worse than the dead row (2026-11-08)
+
+> ⚠️⚠️ **SUPERSEDED IN PART, LATER THE SAME DAY — READ [[#12.49 · S79b — ADR-004 AMENDMENT 2|§12.49]] FIRST.** The
+> **two-step** sign-out described below (*sign out → re-mint an anonymous identity*) was **reversed by the owner**
+> hours after it was verified: the anonymous shrine is an **MVP demo** thing, so a sign-out must leave the device
+> **signed out** behind a **sign-in wall**. ⚠️ What still stands here: the row wiring, the confirm card, the copy
+> principle, the gates' fault-testing, the `scope: 'global'` read from the installed types, and both
+> false-negative traps. What does **not**: "re-mints an anonymous identity" and "lands on `/`".
+
+> ✅ **Built 2026-11-08.** `settings-signout` had rendered **disabled with `settings.notBuilt`** since SCRUM-151, which left the account flow **one-way on glass**: a device could take on an email account and never leave it, so the **email-link path could not be retested** without wiping the install — the reason it was asked for. ⚠️ **The fix is not "call `signOut()`".** ADR-004 gives every install an anonymous session and `ensureAnonymousSession()` signs in **only when there is none** — so a bare sign-out leaves the device **session-less while the shrine still renders**, and every authenticated read answers **`42501`** (the same defect `account-api.ts` records for the delete path, one step further on). `signOutAccount()` is therefore **two steps — sign out, then re-mint an anonymous identity** — and `check:lib` asserts the pairing on the **function slice**, not the file: `resetIdentity()` pairs the same two calls, so a file-wide `includes` would have passed on someone else's code and proved nothing.
+>
+> ⚠️ **It erases NOTHING, and that is the whole difference from the delete.** `resetIdentity()` is delete-then-fresh-identity — *"back to first run"* — and the **only** caller of `clearFirstRun()`. A sign-out leaves the account's tributes, ancestors and streak **on the server** (the email is what brings them back), so the handler must call neither `deleteMyData` nor `clearFirstRun`: replaying the tutorial would describe an erasure that did not happen. Both absences are asserted **with a positive control** proving the same slicer *does* find `clearFirstRun` in `runDelete`.
+>
+> **`scope: 'global'` is explicit, and it was read from the installed types, not memory:** `signOut(options?: SignOut)` defaults to **global**, and `SIGN_OUT_SCOPES = readonly ['global','local','others']`. Global revokes the refresh tokens — ADR-007's posture. ⚠️ **If a multi-device story lands, revisit it:** `'local'` signs out only this device, whereas global would sign the user out of their **other** one too.
+>
+> **Gate status.** `check:lib` **761** green, and the new gates were each **fault-tested red** rather than assumed: dropping `ensureAnonymousSession()` from the function failed the RE-MINTS check **1 of 761**, and a `clearFirstRun` placed in the sign-out handler failed the ERASES-NOTHING check **1 of 761**. ⚠️ `tsc` reports **3** errors — `expo-image-manipulator` and `expo-blob` are absent from the local `node_modules`, in files this session never touched; the other **20** `npm run check` steps are green. ⚠️ **A fresh worktree has no `node_modules` at all** (the documented trap), borrowed here with `cp -al` from the main checkout. **US$0.00** — no fal.ai call, no dependency installed.
+>
+> ### ✅ ON GLASS — measured 2026-11-08, `HN615L005386`, Expo Go + Metro over `adb reverse` against **HOSTED**
+>
+> `Android Bundled 5524 ms (2141 modules)` from the worktree. Then, via **Profile → Settings** (the header gear is covered by **Expo Go's own dev FAB**, which opened its dev menu — see below):
+>
+> | step | measured |
+> |---|---|
+> | the row | `settings-signout` **`enabled=true` `clickable=true`**, sub *"This device goes back to anonymous"*, chevron drawn — it was `enabled=false` / *"Not built yet"* on the cached bundle |
+> | the confirm | `confirm-card` + `confirm-card-primary` + `confirm-card-cancel`; title **"Sign out?"**, the body verbatim, buttons **Sign out** / **Cancel** |
+> | **Cancel** | card dismissed, **still on Settings**, identity unchanged — the negative test |
+> | **Confirm** | left Settings → shrine, and **the device is a NEW anonymous identity**: the *Gwee / Clan Head* pill **gone**, altar **"Your altar is empty — tap ＋ to add a tablet."** (was *"One ancestor enshrined"*), tribute **0**, streak **0-day**, and the CTA changed from *Begin an offering* to **Clan** — the clan-less first-run fork |
+> | ⚠️ **no `42501`** | Profile then rendered its three rows and its tribute card with **no error copy**, so the re-minted anonymous session really authenticates. That is the whole reason sign-out is two steps, and it is now measured rather than argued |
+>
+> ⚠️⚠️ **TWO TRAPS THIS RUN CAUGHT, both of which would have produced a FALSE NEGATIVE.**
+>
+> 1. **Expo Go resumed a CACHED bundle.** The first launch after `adb shell am start … exp://127.0.0.1:8081` showed the **old** code — `settings-signout` `enabled=false`, *"Not built yet"* — while Metro logged **no bundle request at all**. It reads exactly like "the change did not work". ⚠️ **`adb shell am force-stop host.exp.exponent` before relaunching**, and confirm `Android Bundled …` in the Metro log before believing any on-glass result.
+> 2. **The borrowed `node_modules` was INCOMPLETE** — `expo-blob` and `expo-image-manipulator` are declared in `package.json` but absent from the main checkout's install, so Metro answered **`Unable to resolve "expo-blob" from "src/lib/blob-polyfill.ts"`** and *every* bundle failed. (This is also the source of the 3 `tsc` errors above — same two packages.) ⚠️ **Reinstalling them takes `--no-save` and an EXACT version:** `npm install expo-image-manipulator@~57.0.21` resolves to **57.0.22** and **rewrites `package-lock.json`**, which is unrelated churn; `npm install --no-save --no-audit expo-image-manipulator@57.0.21 expo-blob@57.0.2` leaves the lock byte-identical and the installed versions equal to it (verified).
+>
+> ⏳ **Still open, and the open half is the interesting one:** the **sign-back-in**. The account's tributes/ancestors/clan are on the server, but that is **asserted by the copy, not yet observed** — signing in with the email and watching the altar refill is what closes it, and it needs the email (SCRUM-222 / doc 24).
+
+
+
 ### 12.38 · S59b — THE DEVICE RUN: the whole capture path ran on glass, and it found a THIRD upload defect (2026-10-17)
 
 > ✅ **MERGED 2026-10-17 — PRs #55 · #56 · #57** (`main` = `b8ecaa1`); **`SCRUM-124` and `SCRUM-125` both closed `Done`**. ⚠️ **Verified on glass, not on the emulator**: the slice's whole ritual — `capture → cartoonize → burn → award → persist` — completed on the real sensor (**874,762 B** raw → **~100 KB** · hosted `status=styled` · `cost_micros=90000` · `latency_ms=13065` · a **44,680 B** webp · swipe **`Graze` ±41.45 px** · **Balance 400**), and the anti-hang is **measured** (20 orchestrator probes ~3.08 s apart, then nothing — matching `MAX_PROBES` exactly). ⚠️ **Two environment traps from this run are now a rule in `AGENTS.md`**: **a worktree has NO gitignored files** (a 19-byte stub `.env` is worse than an absence — verify by size), and **the LOCAL stack cannot finish Path C** (`createSignedUrl` → the Docker-internal `http://kong:8000`, unreachable by fal.ai). ⚠️ **Left open: `SCRUM-126`** (a stale `running` job — a money decision) **and `SCRUM-127`** (the copy half of SCRUM-124's AC 3). Full record: [[completed-work-archive]] §7.

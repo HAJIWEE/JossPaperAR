@@ -52,6 +52,14 @@ export async function deleteMyData(): Promise<ApiResult<DeleteReceipt>> {
  *
  * ⚠️ The order is the point: `signOut` THEN `ensureAnonymousSession`. Reusing the old session would
  * leave the device on an identity whose `profiles` row the delete just removed.
+ *
+ * ⚠️⚠️ **AND SINCE `ADR-004 · Amendment 2` (2026-11-08) THIS ALSO DEPENDS ON ITS CALLER.** The bootstrap
+ * now mints an anonymous session **only while the device is still owed its demo**, so a signed-out device
+ * whose first-run record survives would be told to **sign in** instead of being returned to a demo. ⚠️ The
+ * delete therefore MUST call `clearFirstRun()` **before** this — which is exactly what
+ * `settings.tsx`'s `runDelete` does, in that order, and `check:lib` asserts the two lines' order because
+ * nothing else can see it. ⚠️ A caller that gets this backwards dead-ends the user at the sign-in wall
+ * holding no account at all.
  */
 export async function resetIdentity(): Promise<ApiResult<null>> {
   try {
