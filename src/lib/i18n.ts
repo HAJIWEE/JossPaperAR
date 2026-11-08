@@ -226,6 +226,13 @@ export const MESSAGES = {
     'store.title': 'Store',
     'store.intro': 'Standard offerings.',
     'store.pointsChip': 'Store Points %{points}',
+    // ⚠️ The CASH rail's copy (owner, 2026-11-08: build the layout, not the payment). ⚠️ `%{cash}` is
+    // formatted in cents->dollars at the call site, so no float ever reaches the string.
+    'store.cashChip': 'Cash $%{cash}',
+    'store.cashPrice': '$%{cash}',
+    'store.buyCash': 'Buy for cash',
+    // ⚠️ A control that exists must SAY what it does — this is not a greyed-out promise, it is the truth.
+    'store.cashNotOpen': 'Cash purchases open when Google Play billing goes live — use Store Points for now.',
     'store.tabOfferings': 'Offerings',
     'store.tabDecorations': 'Decorations',
     'store.featured': 'FEATURED',
@@ -664,6 +671,10 @@ export const MESSAGES = {
     'store.title': '商店',
     'store.intro': '标准供品。',
     'store.pointsChip': '功德点 %{points}',
+    'store.cashChip': '现金 $%{cash}',
+    'store.cashPrice': '$%{cash}',
+    'store.buyCash': '现金购买',
+    'store.cashNotOpen': '现金购买将于 Google Play 结算上线后开放 — 目前请使用功德点。',
     'store.tabOfferings': '供品',
     'store.tabDecorations': '装饰',
     'store.featured': '精选',

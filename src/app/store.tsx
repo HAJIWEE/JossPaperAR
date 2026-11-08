@@ -116,14 +116,32 @@ export default function StoreScreen() {
           <>
             <Text style={[styles.intro, { fontSize: 13 * s }]}>{t('store.intro')}</Text>
 
-            {/* ── the points chip ⚠️ and NO cash chip — see the header ─────── */}
-            <View
-              style={[styles.chip, { height: STORE.chip.h * s, borderRadius: STORE.chip.radius * s }]}
-              testID="store-points-chip"
-            >
-              <Text style={[styles.chipText, { fontSize: 12 * s }]} numberOfLines={1}>
-                {t('store.pointsChip', { points: String(points) })}
-              </Text>
+            {/* ── the two balance chips: CASH and POINTS ─────────────────────
+                ⚠️⚠️ **THE CASH CHIP IS RENDERED AND THE PAYMENT IS NOT WIRED** (owner, 2026-11-08:
+                *"i still don't see the Cash portions of the store ... build out all of it to the point of the
+                actual payments portion"*). ⚠️ So this is LAYOUT: the chip is drawn to the board's geometry
+                (`EN · 7b` / `EN · 7`) and shows the balance the RPC surface can actually give us — which is
+                ⚠️ **nothing**: there is no cash-balance read anywhere in the RPC surface, so it renders `$0.00`
+                rather than the board's sample `$12.50`. ⚠️ Printing a sample balance would be the one lie this
+                screen could tell that a user would believe.
+            */}
+            <View style={styles.chips}>
+              <View
+                style={[styles.chip, { height: STORE.chip.h * s, borderRadius: STORE.chip.radius * s }]}
+                testID="store-cash-chip"
+              >
+                <Text style={[styles.chipText, { fontSize: 12 * s }]} numberOfLines={1}>
+                  {t('store.cashChip', { cash: (0).toFixed(2) })}
+                </Text>
+              </View>
+              <View
+                style={[styles.chip, { height: STORE.chip.h * s, borderRadius: STORE.chip.radius * s }]}
+                testID="store-points-chip"
+              >
+                <Text style={[styles.chipText, { fontSize: 12 * s }]} numberOfLines={1}>
+                  {t('store.pointsChip', { points: String(points) })}
+                </Text>
+              </View>
             </View>
 
             {/* ── the switcher ⚠️ Decorations is disabled, not dead ────────── */}
@@ -250,6 +268,30 @@ export default function StoreScreen() {
                 {buyIssue}
               </Text>
             )}
+            {/**
+              ⚠️⚠️ **THE CASH AFFORDANCE — RENDERED, AND IT DOES NOT CHARGE** (owner, 2026-11-08: *"build out all
+              of it to the point of the actual payments portion"*).
+              ⚠️ It is NOT disabled and NOT greyed: it is a real button that, when pressed, says the truth
+              (`store.cashNotOpen`) — Play Billing is not in this build, so there is no receipt to wait for.
+              ⚠️ The alternative — a `disabled` button — was my first instinct and it is worse: this project's
+              rule is that a control must do what it promises, and "Buy for cash" on a dead button promises a
+              purchase. A button that answers *"cash opens when Play billing goes live"* is honest.
+            */}
+            {buying === null ? null : (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('store.buyCash')}
+                testID="store-buy-cash"
+                onPress={() => setBuyIssue(t('store.cashNotOpen'))}
+                style={styles.cashBtn}
+              >
+                <Text style={styles.cashBtnLabel}>
+                  {t('store.buyCash')} · {t('store.cashPrice', { cash: (0).toFixed(2) })}
+                </Text>
+              </Pressable>
+            )}
+
+
 
             <ConfirmCard
               visible={buying !== null}
@@ -279,6 +321,21 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, paddingBottom: 40 },
   problem: { color: text.inkSoft, fontSize: fontSize.body.at390 },
   intro: { color: text.inkSoft },
+  /** ⚠️ The cash button beside the points confirm — outlined, not filled: it is the secondary rail. */
+  cashBtn: {
+    marginTop: 10,
+    minHeight: 46,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: brand.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  cashBtnLabel: { color: brand.ink, fontSize: 14, fontWeight: '700' },
+  /** ⚠️ The two-chip row (cash + points) — the board draws them side by side, not stacked. */
+  chips: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+
   chip: {
     alignSelf: 'flex-end',
     paddingHorizontal: 12,

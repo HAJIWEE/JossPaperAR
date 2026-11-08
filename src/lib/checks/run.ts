@@ -3136,33 +3136,38 @@ function storeChecks(): void {
   check('⚠️ guard: the featured item is NOT also in the list beneath it',
     !more.some((o) => o.code === FEATURED_CODE));
   /**
-   * ⚠️⚠️ **THE CASH RAIL IS ABSENT, NOT DISABLED** (owner, 2026-11-08 · SCRUM-212).
+   * ⚠️⚠️ **THE CASH RAIL IS NOW *RENDERED* — and the payment is still not wired** (owner, 2026-11-08).
    *
-   * *"but disable the cash portions for now. I want to see the UI first. The google pay and everything related to
-   * google console is estimated to only come online in mid to end of this month."*
+   * ⚠️ **THIS CHECK IS DELIBERATELY THE OPPOSITE OF WHAT IT SAID THIS MORNING, and the reversal is the owner's.**
+   * I first read *"disable the cash portions for now"* as *render nothing*, and enforced it. The owner then said:
+   * *"i still don't see the Cash portions of the store. Please build out all of it to the point of the actual
+   * payments portion for now. At least so i can see the UI layout is fine."*
    *
-   * ⚠️ So the cash price, the cash balance chip and `Buy for cash` must be **rendered nowhere** — not greyed out.
-   * A greyed-out "Buy for cash" advertises a purchase with no path to a receipt, and Play Billing does not exist
-   * in this build; that is the SCRUM-145 rule (a control that cannot do what it promises is worse than none).
+   * ⚠️ So the rule is a LINE, not an absence: **the layout is drawn to the pixel; the payment is not called.**
+   * - ✅ REQUIRED: the cash balance chip, the cash price beside the points price, and `Buy for cash`.
+   * - ⛔ STILL FORBIDDEN: any Play Billing call, and any claim that a purchase completed.
    *
-   * ⚠️ **ASSERTED ON THE CODE, NOT THE COMMENT.** `store.tsx`'s header DISCUSSES the cash rail at length — prose
-   * naming `cash` is exactly the false positive this project has been bitten by twice — so comments are stripped
-   * first and only executable JSX is searched.
+   * ⚠️ The SCRUM-145 rule still applies and is why the button must be honest: it may exist, but tapping it must
+   * say cash is not open yet — never pretend to charge.
+   *
+   * ⚠️ **ASSERTED ON THE CODE, NOT THE COMMENT** — `store.tsx`'s header discusses the rail at length, and this
+   * project has twice shipped a gate that read prose. Comments are stripped first.
    */
   const stripComments = (src: string): string =>
     src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const STORE_SCREEN_JS = stripComments(
     readFileSync(join(PROJECT_ROOT, 'src', 'app', 'store.tsx'), 'utf8'),
   );
-  check('⚠️⚠️ the store renders NO cash affordance — points is the only price and the only balance',
-    // ⚠️ `/\$/` alone is WRONG and this check proved it: `${…}` template literals in `testID` and `setBuyKey`
-    // matched it. What a cash price actually looks like is a DOLLAR AMOUNT (`$0.99`, `$12.50`).
-    !/\bcash\b/i.test(STORE_SCREEN_JS) && !/\$\s?\d/.test(STORE_SCREEN_JS),
-    STORE_SCREEN_JS.match(/[^\n]*\bcash\b[^\n]*/i)?.[0]?.trim() ?? '');
-  check('⚠️ …the points chip is the ONE balance on the screen',
-    STORE_SCREEN_JS.includes('store-points-chip') && !/store-cash/i.test(STORE_SCREEN_JS));
-  // ⚠️ POSITIVE CONTROL — the strip must not be so aggressive that it hides a real affordance.
-  check('⚠️ guard: the comment-stripper keeps executable JSX, so the check above can fail',
+  check('~ the cash LAYOUT is rendered — chip, price and Buy for cash (the owner reversed my first reading)',
+    STORE_SCREEN_JS.includes('store-cash-chip')
+      && STORE_SCREEN_JS.includes('store-buy-cash')
+      && /\$\s?\d|\.toFixed\(2\)/.test(STORE_SCREEN_JS),
+    'cash chip / buy-for-cash / a dollar amount must all be in the rendered JSX');
+  check('⚠️⚠️ …but NO payment is wired — no Play Billing, and nothing claims a cash purchase succeeded',
+    !/react-native-iap|play.?billing|initConnection|requestPurchase/i.test(STORE_SCREEN_JS)
+      && !/purchase_item[\s\S]{0,80}cash/i.test(STORE_SCREEN_JS));
+  // ⚠️ POSITIVE CONTROL — the stripper must keep executable JSX, or "nothing found" is vacuous.
+  check('⚠️ guard: the comment-stripper keeps executable JSX, so the checks above can bite',
     stripComments('/* cash $1 */ <Btn label="Buy for cash" />').includes('Buy for cash')
       && !stripComments('/* cash $1 */ <Btn />').includes('cash'));
 
