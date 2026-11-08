@@ -2060,6 +2060,28 @@ stroke ÷ its own edge against the ratio parsed from the board SVG. Fault-tested
 **Gates 821** (+4) · `tsc` 0 · 20/20. **US$0.00.**
 
 
+## 2026-11-08 (S79k) — the profile name defaults from the email; changeable once a week (SCRUM-223)
+
+⚠️⚠️ **THE PATH THAT MATTERS IS THE UPDATE, NOT THE INSERT.** Anonymous-first (ADR-004) means `handle_new_user`
+sees `email = NULL`; the address arrives later as an **UPDATE** on `auth.users`. A default written only into the
+insert trigger would look implemented and never fire for a real user. Two triggers: insert + `on_auth_user_email_set`.
+
+**Derivation lives in SQL ONLY** (`simplified_name_from_email`) — the client displays the stored value. `hajiwee94.11@`
+→ `Hajiwee94` · `gwee+work@` → `Gwee` · `张.伟@` → `张伟` · nothing → NULL.
+
+**The limit** raises `name_change_too_soon` inside 7 days AND owns `name_changed_at` (RLS is column-agnostic — a
+client could otherwise reset its own cooldown). **A default starts no clock** (INSERT, and the `joss.name_defaulted`
+flag) or the upgrade would spend the user's first change.
+
+⚠️ **Backfill MUST precede the trigger** or every existing account is locked out over a name it never chose — gated.
+
+⚠️ **The SQL test found two real bugs**: a reversed-split that derived the DOMAIN (`Example`), and a CJK branch that
+kept the dot (`张.伟`). `supabase/tests/profile_name.sql` S1–S7; fault-tested by deleting the flag branch → S5 red.
+**Hosted after push: 20 profiles · 3 named · 0 clocks started.**
+
+**Gates 831** (+10) · `tsc` 0 · 20/20. **US$0.00.**
+
+
 ## Next, in order
 
 1. **`SCRUM-215`'s remaining half** — the SMTP provider + the two templates carrying `{{ .Token }}`, then

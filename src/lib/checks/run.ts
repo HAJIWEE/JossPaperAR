@@ -39,7 +39,7 @@ import {
   routeAfterAccount,
 } from '../account-flow.ts';
 import { planBootstrap } from '../session-map.ts';
-import { chosenNameProblem, normaliseChosenName } from '../user-name.ts';
+import { chosenNameProblem, normaliseChosenName, nameChangeCooldown, DAY_MS, NAME_CHANGE_INTERVAL_DAYS, NAME_CHANGE_INTERVAL_MS } from '../user-name.ts';
 import { readBurnParams, readItemBurnParams, readItemRewardParams, readRewardParams } from '../route-params.ts';
 import { getOffering } from '../../domain/catalogue.ts';
 import { bookView, showsBookSectionTitle } from '../clan-roles.ts';
@@ -2781,6 +2781,36 @@ function accountChecks(): void {
   check('⚠️ guard: padding does not push a legal name over the limit',
     chosenNameProblem(`  ${'A'.repeat(24)}  `) === null && normaliseChosenName('  Gwee  ') === 'Gwee');
 
+  /**
+   * ⚠️⚠️ **THE ONCE-A-WEEK LIMIT — THE DISPLAY HALF** (owner, 2026-11-08 · SCRUM-223).
+   *
+   * ⚠️ The DATABASE is the authority (`enforce_name_change_limit`); this rule only decides whether the row
+   * reads as editable, so the screen never offers a control the database will refuse. ⚠️ The cases that matter
+   * are the BOUNDARIES, and the one that would strand somebody: a malformed timestamp must FAIL OPEN, because
+   * a display bug must never lock a person out.
+   */
+  const DAY = DAY_MS;
+  const T0 = Date.parse('2026-11-08T00:00:00.000Z');
+  const iso = (ms: number) => new Date(ms).toISOString();
+  check('⚠️ a name never changed is editable, and a fresh change is not',
+    nameChangeCooldown(null, T0).allowed
+      && nameChangeCooldown(iso(T0), T0).allowed === false);
+  check('⚠️ the window is 7 days — allowed one millisecond after it, refused one millisecond before',
+    nameChangeCooldown(iso(T0), T0 + 7 * DAY - 1).allowed === false
+      && nameChangeCooldown(iso(T0), T0 + 7 * DAY).allowed === true
+      && nameChangeCooldown(iso(T0), T0 + 7 * DAY + 1).allowed === true);
+  // ⚠️ Rounded UP: "in 0 days" would read as allowed, which is exactly wrong at 6 days 1 hour.
+  check('⚠️ the wait is reported in whole days, ROUNDED UP (never "0 days" while still locked)',
+    nameChangeCooldown(iso(T0), T0 + 6 * DAY + 23 * 60 * 60 * 1000).daysRemaining === 1
+      && nameChangeCooldown(iso(T0), T0 + 1 * DAY).daysRemaining === 6
+      && nameChangeCooldown(iso(T0), T0 + 7 * DAY).daysRemaining === 0);
+  check('⚠️⚠️ a malformed timestamp FAILS OPEN — a display bug must not lock anyone out',
+    nameChangeCooldown('not-a-date', T0).allowed && nameChangeCooldown('', T0).allowed);
+  // ⚠️ POSITIVE CONTROL — the boundary check above is only meaningful if the window is not trivially large/small.
+  check('⚠️ guard: the interval is exactly 7 days, not a week-ish guess',
+    NAME_CHANGE_INTERVAL_DAYS === 7 && NAME_CHANGE_INTERVAL_MS === 7 * DAY_MS);
+
+
   const NAME_MIGRATION = readFileSync(
     join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'supabase', 'migrations', '20261108120000_profile_chosen_name.sql'),
     'utf8');
@@ -2788,6 +2818,43 @@ function accountChecks(): void {
     /chosen_name\s+text/i.test(NAME_MIGRATION) && /between 1 and 24/i.test(NAME_MIGRATION));
   check('⚠️⚠️ …and it is NOT unique — duplicate account names are allowed (identity is user_id)',
     !/unique/i.test(NAME_MIGRATION.replace(/--.*$/gm, '')));
+
+  /**
+   * ⚠️⚠️ **THE MIGRATION THAT MAKES THE NAME AUTOMATIC** (SCRUM-223). Three things in it are load-bearing and
+   * invisible at runtime when wrong, so each gets its own assertion:
+   *   1. the derivation function exists and clamps to the SAME 24 the column checks;
+   *   2. ⚠️ the backfill runs BEFORE the limit trigger is created — after it, every existing account would be
+   *      locked out of changing a name it never chose;
+   *   3. ⚠️ there is a trigger on **auth.users UPDATE**, not just the insert path: this app signs people in
+   *      anonymously and attaches the email LATER, so `handle_new_user` never sees it (ADR-004).
+   */
+  const LIMIT_MIGRATION = readFileSync(
+    join(
+      dirname(fileURLToPath(import.meta.url)),
+      '..', '..', '..',
+      'supabase', 'migrations', '20261108130000_profile_name_default_and_weekly_limit.sql',
+    ),
+    'utf8',
+  );
+  const SQL_ONLY = LIMIT_MIGRATION.replace(/--.*$/gm, '');
+  check('⚠️ the derivation exists and clamps to the same 24 the column enforces',
+    /create or replace function public\.simplified_name_from_email/i.test(SQL_ONLY)
+      && /left\(candidate, 24\)/i.test(SQL_ONLY));
+  check('⚠️⚠️ the BACKFILL runs before the limit trigger — else a name nobody chose costs a week',
+    SQL_ONLY.indexOf('update public.profiles p') < SQL_ONLY.indexOf('create trigger enforce_name_change_limit')
+      && SQL_ONLY.indexOf('update public.profiles p') > -1);
+  check('⚠️⚠️ the limit refuses an early change and OWNS the timestamp (a client PATCH cannot reset it)',
+    /raise exception 'name_change_too_soon'/i.test(SQL_ONLY)
+      && /new\.name_changed_at := old\.name_changed_at/i.test(SQL_ONLY)
+      && /interval '7 days'/i.test(SQL_ONLY));
+  check('⚠️⚠️ the default is applied when the EMAIL ARRIVES, not only at sign-up (the anonymous upgrade)',
+    /after update of email on auth\.users/i.test(SQL_ONLY)
+      && /joss\.name_defaulted/i.test(SQL_ONLY)
+      && /and chosen_name is null/i.test(SQL_ONLY));
+  // ⚠️ POSITIVE CONTROL — a derived name is not a choice, so the default must not start the 7-day clock.
+  check('⚠️ guard: a SERVER-SET default is excluded from the cooldown, an INSERT starts no clock',
+    /if tg_op = 'INSERT' then\s*\n\s*new\.name_changed_at := null/i.test(SQL_ONLY)
+      && /coalesce\(current_setting\('joss\.name_defaulted', true\), 'off'\) = 'on'/i.test(SQL_ONLY));
   /**
    * ⚠️ **THE PRIVACY LINE.** `display_label` is auto-generated by `pseudonym_for()` on sign-in and its own table
    * comment says *"NEVER the ancestor name"* (doc 13 §4). ⚠️ So no client file may write it — a single

@@ -533,6 +533,44 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **SCRUM-59 was the one that changed the code**, and it was kept out of PR-3 on purpose — it edits `request_cartoonize`, which was already applied, so it belongs in its own migration + PR with its own tests. **It is built: see §12.5.**
 
+### 12.55 · S79k — the name arrives BY DEFAULT, and can be changed once a week (SCRUM-223)
+
+> **Owner, 2026-11-08:** *"I want the profile name to be defaulted to a simplified of the email address used to
+> sign up with the optional for the user to change it once every week."*
+>
+> ⚠️⚠️ **THE SIGN-UP PATH HERE IS NOT THE USUAL ONE, AND THAT IS THE WHOLE RISK.** This app is **anonymous-first**
+> (ADR-004): `handle_new_user` creates the profile from an **insert** on `auth.users` where `email` is **NULL**,
+> and the address arrives later — as an **UPDATE**, which that trigger never sees. ⚠️ A default written only into
+> `handle_new_user` would therefore look implemented and never once fire on the journey every real user takes.
+> So there are **two** paths: the insert (§5) and `on_auth_user_email_set` (§6).
+>
+> **The derivation** (`simplified_name_from_email`) lives in **SQL only** — the client displays the stored value
+> instead of re-deriving it, so there is no second implementation to drift. `hajiwee94.11@…` → `Hajiwee94`;
+> `gwee+work@…` → `Gwee`; `张.伟@…` → `张伟`; nothing derivable → `NULL`, and the screen keeps its call to action.
+>
+> **The limit** is a BEFORE trigger that (a) raises `name_change_too_soon` inside 7 days, and (b) ⚠️ **owns
+> `name_changed_at`** — because `profiles_update_own` is *column-agnostic*, so without that a client could PATCH
+> its own row and reset its own cooldown. ⚠️ And a **default is not a choice**: an INSERT and the
+> `joss.name_defaulted` flag both start no clock, or the anonymous→email upgrade would spend the user's first change
+> before they opened the screen.
+>
+> ⚠️ **THE BACKFILL MUST RUN BEFORE THE TRIGGER IS CREATED** — after it, every existing account would be locked
+> out for a week over a name nobody chose. There is a gate on that ordering, and it was fault-tested by moving the
+> backfill after the trigger went live (red).
+>
+> **Verified against real Postgres**, `supabase/tests/profile_name.sql` (S1–S7): the derivation cases, the sign-up
+> default, the refusal, the client-cannot-reset-its-clock case, the **anonymity upgrade**, never overwriting a
+> chosen name, and the anonymous-stays-nameless case. ⚠️ **The test found two real bugs in the migration**: a
+> reversed-split trick that derived the DOMAIN (`Example` instead of `Hajiwee94`) and a CJK branch that kept the
+> dot (`张.伟`). Both are now unrepresentable. Fault-tested by deleting the `joss.name_defaulted` branch → **S5 red**.
+>
+> **Hosted, after `db push`:** 20 profiles · **3 named** · **0 clocks started** — the backfill named the nameless
+> accounts and started nobody's week.
+>
+> **Gates: 831** (from 821) · `tsc` **0** · 20/20. Two fault-tested red (rounding the wait down; moving the
+> backfill after the trigger). **US$0.00.**
+
+
 ### 12.54 · S79j — the in-app mark was a BLACK SLAB: strokes (and two radii) were never scaled (2026-11-08)
 
 > ⚠️⚠️ **The launcher icon and the in-app header mark were drawing the same design at different weights**, and the

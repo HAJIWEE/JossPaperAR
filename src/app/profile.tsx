@@ -27,7 +27,7 @@ import { TabBarBand } from '@/components/home/tab-bar-band';
 import { ScreenHud } from '@/components/screen-hud';
 import { t } from '@/lib/i18n';
 import { HUD, PROFILE_CARD, PROFILE_ROWS, PROFILE_ROW, rowIsLive } from '@/lib/profile';
-import { CHOSEN_NAME_MAX, chosenNameProblem } from '@/lib/user-name';
+import { CHOSEN_NAME_MAX, chosenNameProblem, NAME_CHANGE_INTERVAL_DAYS, NAME_CHANGE_INTERVAL_MS, type NameCooldown } from '@/lib/user-name';
 import { readMyName, setChosenName as saveChosenName } from '@/lib/user-profile';
 import { brand, fontSize, onColorCream, surface, text } from '@/theme/tokens';
 
@@ -97,7 +97,15 @@ export default function ProfileScreen() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
+  /** ⚠️ Interpolation values for `problem` — the weekly limit's copy needs `{days}` and `{remaining}`. */
+  const [problemVars, setProblemVars] = useState<Record<string, string> | undefined>(undefined);
   const [saving, setSaving] = useState(false);
+  /**
+   * ⚠️ **THE ONCE-A-WEEK LIMIT** (SCRUM-223), as the screen sees it. ⚠️ The DATABASE is the authority; this only
+   * decides whether the row reads as editable, so nobody types a name and then loses it to a refusal. ⚠️ It
+   * starts `allowed` because an unread profile has told us nothing — locking on a failed read would be a claim.
+   */
+  const [cooldown, setCooldown] = useState<NameCooldown>({ allowed: true, daysRemaining: 0, nextChangeAtMs: null });
 
   /**
    * ⚠️ Re-read on FOCUS, the same pattern the shrine uses: a burn moves the tribute WALLET and a
@@ -118,6 +126,7 @@ export default function ProfileScreen() {
         if (me.ok) {
           setChosenName(me.data.chosenName);
           setEmail(me.data.email);
+          setCooldown(me.data.cooldown);
         }
         /**
          * ⚠️ `homePanels` formats the total — the SAME function the shrine's panel uses, so the two
@@ -154,6 +163,7 @@ export default function ProfileScreen() {
       }
       setSaving(true);
       setProblem(null);
+      setProblemVars(undefined);
       /**
        * ⚠️ **`saveChosenName`, NOT `setChosenName`** — the bare name is the React **state setter** in this
        * component, and it returns `void`. ⚠️ That collision type-checked as *"Property 'ok' does not exist on
@@ -163,10 +173,35 @@ export default function ProfileScreen() {
       const res = await saveChosenName(draft);
       setSaving(false);
       if (!res.ok) {
+        /**
+         * ⚠️ **`too_soon` IS THE DATABASE REFUSING**, not a validation slip — `enforce_name_change_limit` raised
+         * it. ⚠️ So the remaining wait is re-READ from the row rather than computed here: the refusal's own
+         * `detail` carries the next instant, and the row is the authority on when that is.
+         */
+        if (res.reason === 'too_soon') {
+          const again = await readMyName();
+          if (again.ok) {
+            setCooldown(again.data.cooldown);
+            setProblem('profile.nameTooSoon');
+            setProblemVars({
+              days: String(NAME_CHANGE_INTERVAL_DAYS),
+              remaining: String(Math.max(1, again.data.cooldown.daysRemaining)),
+            });
+          } else {
+            setProblem('profile.nameFailed');
+          }
+          return;
+        }
         setProblem('profile.nameFailed');
         return;
       }
       setChosenName(res.data);
+      /**
+       * ⚠️ The write just consumed the allowance, so the row locks immediately — without this the screen would
+       * offer "edit" again until the next focus, and the following tap would be refused by the database. The
+       * arithmetic mirrors the trigger; a focus re-read corrects it if they ever disagree.
+       */
+      setCooldown({ allowed: false, daysRemaining: NAME_CHANGE_INTERVAL_DAYS, nextChangeAtMs: Date.now() + NAME_CHANGE_INTERVAL_MS });
       setEditing(false);
     })();
   }, [draft]);
@@ -211,28 +246,52 @@ export default function ProfileScreen() {
           ⚠️ The EDIT affordance is its own row rather than a tap on the header: a header that silently opens
           an editor is the dead-looking control this project keeps removing. It reads as a row because it IS
           one — and it shows the current value, so the screen never hides its own state.
+
+          ⚠️⚠️ **AND WHEN THE WEEKLY LIMIT IS RUNNING IT DOES NOT OPEN AT ALL** (SCRUM-223). ⚠️ The database
+          would refuse the write anyway — so offering the tap would be a control that cannot do what it
+          promises (the SCRUM-145 rule). Instead the row renders DISABLED and says how long is left, which is
+          the same pattern the rows with no destination use.
         */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('profile.nameRow')}
-          testID="profile-name-edit"
-          onPress={() => {
-            setDraft(chosenName ?? '');
-            setProblem(null);
-            setEditing(true);
-          }}
-          style={({ pressed }) => [styles.card, styles.nameRow, pressed && styles.pressed]}
-        >
-          <View style={styles.headerText}>
-            <Text numberOfLines={1} style={styles.nameRowLabel}>
-              {t('profile.nameRow')}
-            </Text>
-            <Text numberOfLines={1} style={styles.nameRowSub}>
-              {chosenName ?? t('profile.nameNotSet')}
-            </Text>
+        {cooldown.allowed ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('profile.nameRow')}
+            testID="profile-name-edit"
+            onPress={() => {
+              setDraft(chosenName ?? '');
+              setProblem(null);
+              setProblemVars(undefined);
+              setEditing(true);
+            }}
+            style={({ pressed }) => [styles.card, styles.nameRow, pressed && styles.pressed]}
+          >
+            <View style={styles.headerText}>
+              <Text numberOfLines={1} style={styles.nameRowLabel}>
+                {t('profile.nameRow')}
+              </Text>
+              <Text numberOfLines={1} style={styles.nameRowSub}>
+                {chosenName ?? t('profile.nameNotSet')}
+              </Text>
+            </View>
+            <Text style={styles.chev}>{'\u203A'}</Text>
+          </Pressable>
+        ) : (
+          <View
+            style={[styles.card, styles.nameRow, styles.rowDisabled]}
+            testID="profile-name-edit"
+            accessibilityState={{ disabled: true }}
+          >
+            <View style={styles.headerText}>
+              <Text numberOfLines={1} style={styles.nameRowLabel}>
+                {t('profile.nameRow')}
+              </Text>
+              {/* ⚠️ The wait, not "Not set yet" — the state of the control IS the message. */}
+              <Text numberOfLines={1} style={styles.nameRowSub} testID="profile-name-locked">
+                {t('profile.nameLockedSub', { remaining: String(Math.max(1, cooldown.daysRemaining)) })}
+              </Text>
+            </View>
           </View>
-          <Text style={styles.chev}>{'\u203A'}</Text>
-        </Pressable>
+        )}
 
         {/* ── the tribute card ─────────────────────────────────────────────── */}
         {tribute === null ? null : (
@@ -286,7 +345,9 @@ export default function ProfileScreen() {
         <View style={styles.scrim}>
           <View style={styles.sheet} testID="profile-name-sheet" accessibilityViewIsModal>
             <Text style={styles.sheetTitle}>{t('profile.nameRow')}</Text>
-            <Text style={styles.sheetBody}>{t('profile.nameHint')}</Text>
+            <Text style={styles.sheetBody}>
+              {t('profile.nameHint', { days: String(NAME_CHANGE_INTERVAL_DAYS) })}
+            </Text>
             <TextInput
               testID="profile-name-input"
               value={draft}
@@ -306,7 +367,7 @@ export default function ProfileScreen() {
             </Text>
             {problem === null ? null : (
               <Text style={styles.problem} testID="profile-name-problem">
-                {t(problem)}
+                {t(problem, problemVars ?? {})}
               </Text>
             )}
             <Pressable
