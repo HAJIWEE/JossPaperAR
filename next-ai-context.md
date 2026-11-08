@@ -2015,6 +2015,29 @@ cause; the import is now aliased `saveChosenName`.
 writing `display_label` (1) · the clan block back in the header (1). **US$0.00**.
 
 
+## 2026-11-08 (S79i) — the ICON and SPLASH ship from the boards (they were Expo's defaults)
+
+⚠️ **The owner caught it on the APK: a generic icon.** `app.json` used Expo's template assets and
+`adaptiveIcon.backgroundColor` was **`#E6F4FE`** (Expo's blue). ⚠️ Nothing failed — a default is not a decision, and
+no gate looked at an image.
+
+**The design was already in Penpot** (`ICON · app mark + tile`, `EN · 0 ZH · 0 Splash`). ⚠️ The splash is **DARK**:
+`#1b1613` ground, a 190 px mark, cinnabar + paper wordmark, a loading bar.
+
+**Shipped:** `assets/app-mark.svg` transcribed from the board's **own SVG export** + a dark-ground recolour, and six
+generated assets — `icon.png` (1024², **RGB no alpha**, Play rejects alpha), adaptive foreground (transparent, inside
+the safe zone), flat background, **monochrome flattened to white** (Android tints the alpha), `splash-icon.png`,
+`favicon.png`. ⚠️ **`expo-splash-screen` was not installed at all** — hence no splash; now a dependency + plugin at
+the board's colours.
+
+⚠️⚠️ **The first render exposed a REAL bug:** building from `header-art.tsx`'s `AppMark` gave a black slab, because
+the board's `strokeWidth 8` is in a **170** space and `AppMark` uses `8` in a **53** space — **~3.2× too thick**.
+The icon is built from the board so it is right; ⚠️ **the in-app mark is still wrong** (follow-up).
+
+**Gates: 814** (+7) · `tsc` 0 · 20/20. They read **PNG headers** (no image lib in CI) + the wiring, and fault-tested
+red on: adaptive colour → `#E6F4FE` (1 of 814), splash plugin deleted (1). **US$0.00.**
+
+
 ## Next, in order
 
 1. **`SCRUM-215`'s remaining half** — the SMTP provider + the two templates carrying `{{ .Token }}`, then

@@ -2786,6 +2786,58 @@ function accountChecks(): void {
     ['profile.namePrompt', 'profile.nameRow', 'profile.nameNotSet', 'profile.nameHint', 'profile.namePlaceholder',
       'profile.nameSave', 'profile.nameSaving', 'profile.nameEmpty', 'profile.nameTooLong', 'profile.nameFailed']
       .every((k) => MESSAGES.en[k] !== undefined && MESSAGES.zh[k] !== undefined));
+
+  /**
+   * ⚠️⚠️ **THE LAUNCHER ICON AND SPLASH WERE EXPO'S DEFAULTS UNTIL 2026-11-08.** `app.json` pointed at the
+   * template's assets and its `adaptiveIcon.backgroundColor` was **`#E6F4FE`** — Expo's starter blue — so the
+   * installed APK showed a generic icon while the design sat in Penpot (`ICON · app mark + tile`,
+   * `EN · 0 ZH · 0 Splash`). ⚠️ A default is not a decision: nothing failed, which is why it survived to an
+   * APK. These checks read the PNG headers (no image library needed) and the wiring that points at them.
+   */
+  const ASSETS = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'assets');
+  const pngInfo = (file: string): { w: number; h: number; colourType: number } | null => {
+    try {
+      const d = readFileSync(join(ASSETS, file)).subarray(0, 33);
+      return { w: d.readUInt32BE(16), h: d.readUInt32BE(20), colourType: d[25] };
+    } catch {
+      return null;
+    }
+  };
+  const iconPng = pngInfo('icon.png');
+  const fgPng = pngInfo('android-icon-foreground.png');
+  const monoPng = pngInfo('android-icon-monochrome.png');
+  const splashPng = pngInfo('splash-icon.png');
+
+  check('⚠️ the launcher icon is 1024×1024 and OPAQUE (colour type 2 — Play rejects an alpha source)',
+    iconPng !== null && iconPng.w === 1024 && iconPng.h === 1024 && iconPng.colourType === 2);
+  check('⚠️ the adaptive foreground is 1024² with ALPHA, and the monochrome layer exists too',
+    fgPng !== null && fgPng.w === 1024 && fgPng.colourType === 6
+      && monoPng !== null && monoPng.w === 1024 && monoPng.colourType === 6);
+  check('⚠️ the splash art is present and small enough to sit at the board\'s 190 px',
+    splashPng !== null && splashPng.w >= 190);
+
+  const APP_JSON = JSON.parse(
+    readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'app.json'), 'utf8')).expo;
+  const adaptive = APP_JSON.android?.adaptiveIcon ?? {};
+  const splashPlugin = (APP_JSON.plugins ?? []).find(
+    (p: unknown) => Array.isArray(p) && p[0] === 'expo-splash-screen') as [string, Record<string, unknown>] | undefined;
+
+  // ⚠️ THE LINE THAT CATCHES THE REVERT: #E6F4FE is Expo's starter blue, not this product's paper.
+  check('⚠️⚠️ the adaptive background is the app\'s PAPER (#F5F0E8), not Expo\'s default #E6F4FE',
+    String(adaptive.backgroundColor).toUpperCase() === '#F5F0E8');
+  check('⚠️ …and the icon/foreground/monochrome paths are the generated ones, not the template\'s names left over',
+    APP_JSON.icon === './assets/icon.png'
+      && adaptive.foregroundImage === './assets/android-icon-foreground.png'
+      && adaptive.monochromeImage === './assets/android-icon-monochrome.png');
+  // ⚠️ The splash colours are the BOARD's: #1b1613 ground, a 190 px mark — not invented values.
+  check('⚠️⚠️ the splash is configured from the boards — #1b1613 ground, a 190 px mark',
+    splashPlugin !== undefined
+      && String(splashPlugin[1].backgroundColor).toLowerCase() === '#1b1613'
+      && splashPlugin[1].imageWidth === 190
+      && splashPlugin[1].image === './assets/splash-icon.png');
+  // ⚠️ The source art is kept in the repo, so a future size can be regenerated instead of re-traced.
+  check('⚠️ the mark is kept as SVG — the icon was generated from it, not hand-drawn',
+    ['app-mark.svg', 'app-mark-on-dark.svg'].every((f) => existsSync(join(ASSETS, f))));
 }
 
 function storeChecks(): void {

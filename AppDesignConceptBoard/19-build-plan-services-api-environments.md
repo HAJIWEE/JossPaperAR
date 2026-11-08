@@ -533,6 +533,37 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **SCRUM-59 was the one that changed the code**, and it was kept out of PR-3 on purpose — it edits `request_cartoonize`, which was already applied, so it belongs in its own migration + PR with its own tests. **It is built: see §12.5.**
 
+### 12.53 · S79i — THE ICON AND THE SPLASH: the boards were there, the APK shipped Expo's defaults (2026-11-08)
+
+> ⚠️⚠️ **The owner spotted it on the installed APK: a generic icon.** `app.json` pointed at Expo's template assets and
+> its `android.adaptiveIcon.backgroundColor` was **`#E6F4FE`** — Expo's starter blue. ⚠️ **Nothing failed**, which is
+> exactly why it reached an APK: a default is not a decision, and no gate looked at an image.
+>
+> **The design was already in Penpot** (page *New-user tutorial · Core loop*): `ICON · app mark + tile` (the mark at
+> 170 px plus **paper / cinnabar / ink** tile variants and 64/32/24 launcher-size labels) and `EN · 0 Splash` /
+> `ZH · 0 Splash` (390×844). ⚠️ **The splash is a DARK screen — `#1b1613` ground**, a 190 px mark, the wordmark in
+> cinnabar + paper, a loading bar — *not* the paper background one would assume.
+>
+> **What shipped:** the mark transcribed to `assets/app-mark.svg` **from the board's own SVG export** (every
+> coordinate is Penpot's), a recoloured `app-mark-on-dark.svg` for the dark ground, and six generated assets —
+> `icon.png` (**1024², RGB, no alpha** — Play rejects an alpha source), `android-icon-foreground.png` (transparent,
+> content inside the **adaptive safe zone**), `android-icon-background.png`, `android-icon-monochrome.png` (flattened
+> to white because Android tints the alpha), `splash-icon.png` and `favicon.png`. `expo-splash-screen` was **not
+> installed at all** — which is why there was no splash — so it is now a dependency and a configured plugin at the
+> board's `#1b1613` / 190 px.
+>
+> ⚠️⚠️ **AND THE FIRST RENDER EXPOSED A REAL FIDELITY BUG IN THE APP.** Building the icon from
+> `header-art.tsx`'s `AppMark` produced a **black slab**: the tablet's `strokeWidth 8` is the BOARD's value in a
+> **170**-unit space, but `AppMark` uses the same `8` in a **53**-unit viewBox — so the in-app mark's strokes are
+> **~3.2× too thick**. ⚠️ The icon is built from the board, so the icon is right; ⚠️ **the in-app mark is still
+> wrong and is a follow-up**, because fixing it changes every screen and needs its own visual pass.
+>
+> **Gates: 814** (from 807: +7) · `tsc` **0** · 20/20 suite steps. ⚠️ They read the **PNG headers** (no image
+> library in CI) and the wiring: 1024² + colour type 2 for the icon, colour type 6 for the adaptive layers, and the
+> two colour assertions that catch a revert — **paper, not `#E6F4FE`**, and **`#1b1613` at 190 px**. Fault-tested
+> red: the adaptive colour reverted to Expo blue (1 of 814); the splash plugin deleted (1).
+
+
 ### 12.5 · SCRUM-59 — the AI-budget stop-rule, built (migration `0011`)
 
 **The decision was option B** (§12.4): enforce the daily cap **and** a global daily AI-budget stop-rule, with no wallets. This is what it took — and what it found.
