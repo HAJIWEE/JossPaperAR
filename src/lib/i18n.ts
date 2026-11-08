@@ -422,6 +422,9 @@ export const MESSAGES = {
     'account.resendIn': 'Resend code in %{time}',
     'account.resendNow': 'Resend a new code',
     'account.editEmail': 'Wrong email? Edit',
+    // ⚠️ A TEMPORARY refusal, and it must not read as a broken sign-in. The server answers 429 when the
+    // address was mailed too recently, so the copy names the WAIT and keeps the code road alive.
+    'account.tooMany': 'A code was just sent to this address — give it a minute, then ask again.',
     'account.verify': 'Verify',
     'account.signIn': 'Sign in',
     'account.haveAccount': 'Already have an account? Sign in',
@@ -802,6 +805,7 @@ export const MESSAGES = {
     'account.resendIn': '%{time} 后可重新发送',
     'account.resendNow': '重新发送验证码',
     'account.editEmail': '邮箱有误？修改',
+    'account.tooMany': '验证码刚刚已发送到此邮箱 — 请稍等一分钟后再试。',
     'account.verify': '验证',
     'account.signIn': '登录',
     'account.haveAccount': '已有账号？登录',

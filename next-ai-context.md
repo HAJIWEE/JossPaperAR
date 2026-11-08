@@ -1903,6 +1903,44 @@ follow-up, not a defect). ⚠️ And consider hiding **Sign out** while the sess
 throwaway identity for a wall that user cannot pass without an account.
 
 
+## 2026-11-08 (S79f) — the SIGN-IN road had two defects, and the gates could not see either
+
+**Found by the owner on the installed APK**, minutes after the first build landed. Both are in the road the
+gate suite never walked: the gates test the *functions*, and nothing tested *which route a returning user
+takes* or *what a 429 says*.
+
+**1 · A temporary refusal read as a broken sign-in.** *"when i used the 'resend the code' then 'wrong email?
+edit' it prevents me from logging in with the same email again."* ⚠️ `signInWithOtp` answers **429** when the
+address was mailed moments ago; that maps to `rate_limited`, which fell through to **`account.genericIssue`**
+— so *"wait a minute"* rendered as *"something went wrong"*. ⚠️ And **"Resend a new code" stayed live**,
+inviting the one action that could not succeed.
+**Fix:** `rate_limited` → **`account.tooMany`** (*"A code was just sent… give it a minute"*), ⚠️ **email step
+only** — on the code step a 429 is a different limiter and claiming "we just mailed you" there is a lie — and
+a 429 now **re-arms the 42 s countdown** so the affordance matches the state.
+⚠️ **The other half is not code:** the hosted **email rate limit** is still default (doc 24 §4 step D). The app
+now says *wait* instead of *broken*; the limit is a Dashboard setting.
+
+**2 · Every returning user was sent back to the clan fork.** *"After i re-login, it asked me to create or join a
+clan again, so i created the same clan…"* ⚠️⚠️ **The data was perfect and the workflow was wrong — and the
+workflow is the dangerous one**, because being asked to create a clan you already have invites a **second**
+clan. Cause: `confirm()` ended with `router.replace(AFTER_ACCOUNT_ROUTE)` — the **first-run** handoff — for
+**everyone**; the user's clan was never looked at.
+**Fix:** pure **`routeAfterAccount(hasClan)`**; `confirm()` reads `myClans()` → **with a clan, `/`** · clan-less,
+the fork · **unchecked** (`null`, read failed), the fork — preserving the documented chain
+`demo → account → clan fork`. ⚠️ `busy` stays true across the check so a second confirm cannot fire.
+
+✅ **And this report is the proof the project did not have:** *"the tablet i create was still there"* — **the
+sign-back-in returns the account's data.** That was the one claim §S79b and §12.49 both left open.
+
+**Gates: 788** (from 781) · `tsc` **0** · 20/20 suite steps, each new check **fault-tested red**
+(route always fork → 2 of 788 · 429 mapping deleted → 1 · routing blind again → 1).
+**US$0.00** — no AI call.
+
+⏳ **Open for the owner:** ⚠️ **does the account now hold a SECOND clan** from that re-creation? The fix
+prevents the prompt, not a duplicate already made — and it is worth knowing whether duplicate clan **names**
+are even allowed.
+
+
 ## Next, in order
 
 1. **`SCRUM-215`'s remaining half** — the SMTP provider + the two templates carrying `{{ .Token }}`, then

@@ -567,6 +567,25 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.50 · S79f — TWO DEFECTS IN THE *SIGN-IN* ROAD: a 429 read as "broken", and every returning user sent back to the clan fork (2026-11-08)
+
+> ✅ **Found by the owner on the installed APK, minutes after the first build landed — and both are in the road the gates could not reach.**
+>
+> **1 · "when i used the 'resend the code' then 'wrong email? edit' it prevents me from logging in with the same email again."**
+> ⚠️ **It was not the app refusing — it was a temporary refusal wearing the wrong words.** `signInWithOtp` answers **429** when the address was mailed moments ago; `reasonFromAuthError` maps that to `rate_limited`, and `issueKeyFor` then fell through to **`account.genericIssue`**. So "wait a minute" rendered as "something went wrong", which reads as *this email does not work*. ⚠️ **And the "Resend a new code" button stayed live**, inviting the same refusal again — the app was telling the user to retry the one action that could not succeed.
+> **Fix:** `rate_limited` → **`account.tooMany`** (*"A code was just sent to this address — give it a minute, then ask again."*), ⚠️ **mapped on the EMAIL step only** — on the code step a 429 comes from a different limiter and claiming "we just mailed you" there would be a lie — and a 429 now **re-arms the 42 s countdown**, so the affordance matches the state.
+> ⚠️ **The other half of this one is not code:** the hosted **email rate limit** is still at its default (doc 24 §4 step D, *"raise the email rate limit"*). The app now says *wait* instead of *broken*, but the limit itself is a Dashboard setting.
+>
+> **2 · "After i re-login, it asked me to create or join a clan again, so i created the same clan, then the tablet i create was still there."**
+> ⚠️⚠️ **The data was PERFECT and the workflow was wrong — and the workflow is the dangerous one**, because being asked to create a clan you already have invites a *second* clan on top of a good one. Cause: `confirm()` ended with `router.replace(AFTER_ACCOUNT_ROUTE)` — the **first-run** handoff — **for everyone**. A returning user's clan was never even looked at.
+> **Fix:** a pure `routeAfterAccount(hasClan)`; `confirm()` reads `myClans()` and sends a user **with a clan to `/`**, a **clan-less** user to the fork, and an **unchecked** one (`null` — the read failed) to the fork, which preserves the documented first-run chain `demo → account → clan fork`. ⚠️ `busy` stays true across the check so a second confirm cannot fire on the new session.
+> ✅ **And the same report is the proof this project has never had:** *"the tablet i create was still there"* — **the sign-back-in returns the account's data.** That was the one claim §12.49 and §S79b both left open, and it is now answered from the owner's own account.
+>
+> **Gates: 788** (from 781: +7) · `tsc` **0** · all 20 suite steps green. Each new check **fault-tested red**: `routeAfterAccount` always returning the fork (2 of 788), the 429 mapping deleted (1), `confirm()` routing blind again (1). ⚠️ **Both bugs were invisible to every gate that existed** — nothing asserts which route a *returning* user takes, and nothing asserts what a 429 says; that is why they are now asserted.
+>
+> ⏳ **Open, for the owner:** ⚠️ **check whether creating "the same clan" left a SECOND clan** on the account (the fix prevents the prompt, not a duplicate already created), and whether duplicate clan **names** are even permitted. **US$0.00** — no AI call.
+
+
 ### 12.49 · S79b — ADR-004 AMENDMENT 2: anonymous is a FIRST-INSTALL identity, and a sign-out is a WALL (2026-11-08)
 
 > ✅ **Built and verified on glass the same day, an hour after §12.48 was closed.** The owner's ruling:

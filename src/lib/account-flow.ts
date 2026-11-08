@@ -164,6 +164,24 @@ export const AFTER_ACCOUNT_ROUTE = '/clan';
 export const ACCOUNT_ROUTE = '/account';
 
 /**
+ * ⚠️ **WHERE A CONFIRMED ACCOUNT GOES — and it is NOT always the fork** (found on glass 2026-11-08).
+ *
+ * `AFTER_ACCOUNT_ROUTE` is the **first-run** handoff: the account is created, and the clan fork is the next
+ * required step (ADR-004 Amendment 1). ⚠️ **But a RETURNING user already has a clan**, and sending them to
+ * the fork made them go through create-or-join again — the owner hit it on their own account: *"After i
+ * re-login, it asked me to create or join a clan again, so i created the same clan, then the tablet i create
+ * was still there."* ⚠️ So the data was fine and the **workflow was wrong**, which is the worse of the two:
+ * it invites a second clan on top of a good one.
+ *
+ * ⚠️ **`hasClan: null` means the check could not be made** (offline, or the read failed). It keeps the
+ * **documented first-run chain** — fork — because that is the safe, recoverable direction for a new user, and
+ * the fork is also where a clan-less returning user must go anyway.
+ */
+export function routeAfterAccount(hasClan: boolean | null): string {
+  return hasClan === true ? '/' : AFTER_ACCOUNT_ROUTE;
+}
+
+/**
  * ⚠️ **A REASON IS NOT COPY.** FOUND ON GLASS (2026-11-07): a failed `verifyOtp` printed the raw string
  * **`sign_in_failed`** in the issue line, because the screen rendered the reason verbatim. ⚠️ The board
  * (`EN · 0c4`) draws a sentence — *"That code didn't match. Have another go…"* — so the reason is mapped
@@ -175,6 +193,15 @@ export const ACCOUNT_ROUTE = '/account';
  */
 export function issueKeyFor(reason: string, step: 'email' | 'code' = 'email'): string {
   if (isEmailProblem(reason)) return 'account.emailInvalid';
+  /**
+   * ⚠️ **"WAIT" IS NOT "SOMETHING WENT WRONG"** (found on glass 2026-11-08). `signInWithOtp` answers **429**
+   * when the address has been mailed too recently, and `reasonFromAuthError` maps that to `rate_limited` —
+   * ⚠️ which used to fall through to `account.genericIssue`, so a **temporary** refusal read as a broken
+   * sign-in. The owner reported it as *"it prevents me from logging in with the same email again"*.
+   * ⚠️ It is mapped on the **EMAIL step only**: on the code step a 429 comes from a different limiter
+   * (`over_request_rate_limit` on verification), and telling someone *"we just sent a code"* there is a lie.
+   */
+  if (step === 'email' && reason === 'rate_limited') return 'account.tooMany';
   /**
    * ⚠️ **ON THE CODE STEP, EVERY FAILURE IS A CODE FAILURE.** The provider's wording for a bad or stale
    * code is not a stable contract — the local stack answers **`sign_in_failed`**, which no

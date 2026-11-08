@@ -36,6 +36,7 @@ import {
   nextAccountStep,
   normaliseEmail,
   NO_ANONYMOUS_SESSION,
+  routeAfterAccount,
 } from '../account-flow.ts';
 import { planBootstrap } from '../session-map.ts';
 import { readBurnParams, readItemBurnParams, readItemRewardParams, readRewardParams } from '../route-params.ts';
@@ -2410,6 +2411,8 @@ function accountChecks(): void {
       issueKeyFor('?'),
       issueKeyFor('sign_in_failed', 'code'),
       issueKeyFor('otp_expired', 'code'),
+      // ⚠️ A 429 is a TEMPORARY refusal, not a broken sign-in — and it is a key, so it must exist twice.
+      issueKeyFor('rate_limited'),
     ].every((k) => MESSAGES.en[k] !== undefined && MESSAGES.zh[k] !== undefined));
   check('⚠️ EMAIL-ALREADY-TAKEN means SIGN IN — and ONLY on the sign-up road',
     meansSignInInstead('signUp', 'A user with this email address has already been registered') === true &&
@@ -2623,6 +2626,39 @@ function accountChecks(): void {
     bodyOf('<a href="{{ .ConfirmationURL }}">x</a>').includes('{{ .ConfirmationURL }}'));
   check('…and `emailRedirectTo` is not wired anywhere, which is WHY the link is withheld',
     !accountSrc.includes('emailRedirectTo'));
+
+  /**
+   * ⚠️⚠️ **TWO BUGS THE OWNER FOUND ON GLASS, 2026-11-08 — both in the SIGN-IN road, both invisible to every
+   * gate that existed.**
+   *
+   * 1. *"when i used the 'resend the code' then 'wrong email? edit' it prevents me from logging in with the
+   *    same email again."* — ⚠️ `signInWithOtp` answers **429** when the address was mailed moments ago. That
+   *    reason fell through to `account.genericIssue`, so a **temporary** refusal read as a broken sign-in.
+   * 2. *"After i re-login, it asked me to create or join a clan again, so i created the same clan, then the
+   *    tablet i create was still there."* — ⚠️ the account data was PERFECT and the **handoff** was wrong:
+   *    `confirm()` sent **everyone** to the first-run fork.
+   */
+  check('⚠️⚠️ a 429 on the EMAIL step says WAIT — it does not read as a broken sign-in',
+    issueKeyFor('rate_limited') === 'account.tooMany');
+  // ⚠️ POSITIVE CONTROL — on the CODE step a 429 comes from a different limiter, so it must NOT borrow the
+  // "we just mailed you" sentence. This is the same step-based discipline `codeWrong` relies on.
+  check('⚠️ …and a 429 on the CODE step does NOT claim a code was just sent',
+    issueKeyFor('rate_limited', 'code') === 'account.codeWrong');
+  check('⚠️⚠️ a RETURNING user with a clan goes to the SHRINE, not the first-run fork',
+    routeAfterAccount(true) === '/');
+  check('⚠️ …but a clan-less user still gets the fork, and so does an UNCHECKED one',
+    routeAfterAccount(false) === AFTER_ACCOUNT_ROUTE
+      && routeAfterAccount(null) === AFTER_ACCOUNT_ROUTE);
+  // ⚠️ POSITIVE CONTROL — the two branches must actually differ, or the function is a constant.
+  check('⚠️ guard: `routeAfterAccount` is not a constant',
+    routeAfterAccount(true) !== routeAfterAccount(false));
+  check('⚠️ …and the SCREEN makes the clan check rather than routing blind',
+    accountScreenSrc.includes('await myClans()')
+      && accountScreenSrc.includes('routeAfterAccount(')
+      && !accountScreenSrc.includes("router.replace(AFTER_ACCOUNT_ROUTE)"));
+  check('⚠️ …and a 429 RE-ARMS the resend countdown instead of re-offering a button that will fail',
+    accountScreenSrc.includes("if (res.reason === 'rate_limited')")
+      && accountScreenSrc.includes('setSecondsLeft(RESEND_SECONDS);\n        setIssue(issueKeyFor(res.reason));'));
 }
 
 function storeChecks(): void {
