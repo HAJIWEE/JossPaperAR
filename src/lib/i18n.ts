@@ -168,11 +168,14 @@ export const MESSAGES = {
     'settings.signOut': 'Sign out',
     // ⚠️ SCRUM-215 — this row carried `settings.notBuilt` until the sign-out was built. A sub-label now
     // says what the row DOES, because the sub is what distinguishes a real row from a dead one.
-    'settings.signOutSub': 'This device goes back to anonymous',
+    // ⚠️ AMENDED 2026-11-08 (ADR-004 Amendment 2): the sub used to promise "goes back to anonymous". That
+    // is no longer what happens — the device is signed out and the next screen is the sign-in wall.
+    'settings.signOutSub': 'You will need to sign in again',
     'settings.signOutTitle': 'Sign out?',
     // ⚠️ The body NAMES the consequence, the standard the delete card is held to: the account is not
-    // erased, it is left behind — and the email is what brings it back.
-    'settings.signOutBody': 'You go back to an anonymous device. Your offerings, collection and tribute points stay with the account — sign in again with your email to get them back.',
+    // erased, it is left behind — and the email is what brings it back. ⚠️ It no longer mentions an
+    // anonymous device, because there is no longer one to go back to.
+    'settings.signOutBody': 'You will be signed out on this device and will need your email to get back in. Your offerings, collection and tribute points stay with the account.',
     'settings.signOutConfirm': 'Sign out',
     'settings.signingOut': 'Signing out…',
     'settings.signOutFailed': 'The sign out did not go through — you are still signed in. Try again.',
@@ -592,9 +595,9 @@ export const MESSAGES = {
     'settings.policies': '隐私政策 · 服务条款',
     'settings.policiesSub': '发布于 josspaperar.app',
     'settings.signOut': '退出登录',
-    'settings.signOutSub': '此设备将回到匿名状态',
+    'settings.signOutSub': '退出后需重新登录',
     'settings.signOutTitle': '退出登录？',
-    'settings.signOutBody': '此设备将回到匿名状态。供品、收藏与功德点仍保留在账号中 — 用邮箱重新登录即可取回。',
+    'settings.signOutBody': '此设备将退出登录，需用邮箱重新登录才能继续使用。供品、收藏与功德点仍保留在账号中。',
     'settings.signOutConfirm': '退出登录',
     'settings.signingOut': '正在退出…',
     'settings.signOutFailed': '退出未成功 — 仍处于登录状态。请重试。',

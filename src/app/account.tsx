@@ -30,7 +30,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppMark } from '@/components/home/header-art';
 import { LocaleToggle } from '@/components/locale-toggle';
-import { confirmAccountCode, sendAccountCode } from '@/lib/account';
+import { confirmAccountCode, isAnonymousSession, sendAccountCode } from '@/lib/account';
 import {
   ACCOUNT_CODE_LENGTH,
   AFTER_ACCOUNT_ROUTE,
@@ -77,6 +77,18 @@ export default function AccountScreen() {
   const s = scale();
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<AccountMode>('signUp');
+  /**
+   * ⚠️ **IS THERE AN ANONYMOUS SESSION TO UPGRADE?** `null` = not known yet. This is the difference between
+   * the two ways this screen is reached (ADR-004 · Amendment 2):
+   *   · **first run** — the demo's anonymous session exists, so "Create your account" is the in-place
+   *     UPGRADE and keeps the ledger;
+   *   · **the sign-in wall** — the device is signed out with NO session, so there is nothing to upgrade and
+   *     only **sign in** can work.
+   * ⚠️ Leaving the default at `signUp` on the wall would draw "Create your account" over a road that
+   * cannot complete — exactly the dead control this project treats as a defect. Found on glass 2026-11-08:
+   * the wall opened on *"Create your account"*.
+   */
+  const [anonymous, setAnonymous] = useState<boolean | null>(null);
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -85,6 +97,23 @@ export default function AccountScreen() {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const emailRef = useRef<TextInput>(null);
   const codeRef = useRef<TextInput>(null);
+
+  /**
+   * ⚠️ **THE ROAD IS CHOSEN BY THE SESSION, NOT BY THE SCREEN.** Runs once on mount: with no anonymous
+   * session there is nothing to upgrade, so the screen opens on **sign in** and stops offering "create".
+   * ⚠️ It never fights the user afterwards — a deliberate `swapMode` is theirs to make.
+   */
+  useEffect(() => {
+    let live = true;
+    void isAnonymousSession().then((yes) => {
+      if (!live) return;
+      setAnonymous(yes);
+      if (!yes) setMode('signIn');
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
 
   const canSend = emailProblem(email) === null && !busy;
   const canConfirm = isCompleteCode(code) && !busy;
@@ -299,17 +328,22 @@ export default function AccountScreen() {
           </Text>
         </Pressable>
 
-        {/* `link` — the cross-link at y 764 */}
-        <Pressable
-          testID="account-swap"
-          accessibilityRole="button"
-          onPress={() => swapMode(mode === 'signUp' ? 'signIn' : 'signUp')}
-          style={{ marginLeft: A.link.x * s, marginTop: gap(A.button.y, A.button.h, A.link.y), minHeight: TOUCH_TARGET, justifyContent: 'center' }}
-        >
-          <Text style={[styles.link, { fontSize: fontSize.body.at390 * s }]}>
-            {t(mode === 'signUp' ? 'account.haveAccount' : 'account.newHere')}
-          </Text>
-        </Pressable>
+        {/* `link` — the cross-link at y 764
+            ⚠️ **AND IT IS NOT ALWAYS OFFERED** (ADR-004 · Amendment 2): "New here? Create an account" is the
+            UPGRADE road, which needs an anonymous session. On the sign-in wall there is none, so the link
+            would promise something that cannot complete — the dead-control defect this project refuses. */}
+        {mode === 'signUp' || anonymous !== false ? (
+          <Pressable
+            testID="account-swap"
+            accessibilityRole="button"
+            onPress={() => swapMode(mode === 'signUp' ? 'signIn' : 'signUp')}
+            style={{ marginLeft: A.link.x * s, marginTop: gap(A.button.y, A.button.h, A.link.y), minHeight: TOUCH_TARGET, justifyContent: 'center' }}
+          >
+            <Text style={[styles.link, { fontSize: fontSize.body.at390 * s }]}>
+              {t(mode === 'signUp' ? 'account.haveAccount' : 'account.newHere')}
+            </Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
     </View>
   );

@@ -1794,6 +1794,53 @@ the card's copy, **not yet observed**: signing in with the email and watching th
 closes it, and it needs the email (SCRUM-222 / doc 24).
 
 
+## 2026-11-08 (S79b) — ANONYMOUS IS FIRST-INSTALL ONLY: the sign-out is a WALL, and the device broke the first design
+
+**The owner reversed the MODEL, not the button.** *"Anonymous shrine is only for the MVP demo. Now that we are
+building the actual app, the Demo should only be on first install of the App and signing out does not return
+us to anon status but require a sign in every time."* ⚠️ So the section above is **superseded in part**: its
+two-step sign-out (*sign out → re-mint anonymous*) is **gone**. The row was right; the identity model behind it
+was the MVP's. ⚠️ **Every gate was green because the code did what it was told** — the spec moved.
+
+**What landed.** `signOutAccount()` no longer mints. **`useIdentityGate()`** (`_layout.tsx`) sends a
+session-less device that is past onboarding to a **sign-in wall** at `/account`, keyed on
+**`sign_in_required` alone** — ⚠️ never on a network failure, which would read as *"you have been logged out"*.
+`planBootstrap()` (pure, `session-map.ts`) decides reuse / mint / require-sign-in / skip and is applied in
+**one** place (`session.ts`), so none of its four callers can mint quietly. Sign-out now says *"You will need to
+sign in again"* and lands on the wall. **ADR-004 gained Amendment 2.**
+
+**⚠️⚠️ THE FINDING WORTH KEEPING: the device falsified the design, and 775 green checks could not see it.** The
+first cut keyed *"may this device have an anonymous session?"* on **`needsTutorial()`** (the demo flag),
+reasoning that a device still owed its demo had never onboarded. ⚠️ **On glass, signing out and restarting came
+back to an anonymous shrine** — because that flag is written by **exactly one screen** (the demo branch of
+`reward.tsx`), so a user whose first burn was a **real** one reads *"demo owed"* forever. ⚠️ **Fix:**
+`onboarded.ts`, a dedicated record written where the fact actually becomes true (**an account linked** or **a
+sign-out**), cleared **only** by the delete. ⚠️ **An existing flag that looks like "first install" is not
+evidence that it is** — the demo flag was answering a different question.
+
+**On glass (hosted, `adb reverse`):** sign-out → `/account`; the wall reads *"Sign in to return to your
+shrine"* with **Send code** disabled until a valid email; ⚠️ **restart while signed out → the WALL**, with no
+session minted. That restart is the decisive test, and it is the one that failed before `onboarded.ts`.
+
+**⚠️ And the wall had a second defect, found the same minute.** It opened on **"Create your account"**, whose
+road is the in-place **UPGRADE** (`updateUser`) and therefore needs *an anonymous session to upgrade* — which a
+signed-out device has not got; the tap would have failed with the provider's *"not authenticated"*. ⚠️ So the
+**road is chosen by the session** (`isAnonymousSession()`), the screen opens on **sign in**, the *"New here?
+Create an account"* link is **withheld** where it cannot complete, and `sendAccountCode` refuses the upgrade
+**by name** (`no_anonymous_session`) so `meansSignInInstead` turns it into sign-in instead of printing it.
+
+**Gates: 778** green · `tsc` **0** errors · 20/20 suite steps. New checks **fault-tested red** (mint while
+onboarded → 2 of 778 · a sign-out that forgets `markOnboarded` → 1 · the delete clearing the record *after*
+re-minting → 2). ⚠️ **One gate was defeated by its own comment** — `indexOf('resetIdentity')` matched the words
+in the explanatory comment above the call, so the order check passed for the wrong reason; it now compares the
+**`await` calls**. ⚠️ A gate a comment can satisfy is not a gate. **US$0.00** — no AI call, no new dependency.
+
+⏳ **Open — the sign-back-in** (email + code → the clan and ancestors return) is still **unobserved**. A
+signed-out user who wants a **different** account has no in-app path (recorded in the amendment as a
+follow-up, not a defect). ⚠️ And consider hiding **Sign out** while the session is anonymous: it abandons a
+throwaway identity for a wall that user cannot pass without an account.
+
+
 ## Next, in order
 
 1. **`SCRUM-215`'s remaining half** — the SMTP provider + the two templates carrying `{{ .Token }}`, then

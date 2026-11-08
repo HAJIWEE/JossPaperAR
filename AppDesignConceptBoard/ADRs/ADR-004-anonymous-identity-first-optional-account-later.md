@@ -144,6 +144,71 @@ that a soft wall is a hard wall with worse manners; if the account is required, 
 
 ---
 
+## Amendment 2 · 2026-11-08 — **ANONYMOUS IS A FIRST-INSTALL DEMO IDENTITY, AND A SIGN-OUT REQUIRES A SIGN-IN**
+
+**Status:** ✅ **decided by the owner (2026-11-08)**, building the app out past the MVP — the direct
+continuation of Amendment 1, in the same words.
+
+**Context.** Amendment 1 made the account required for clans, but it left the **bootstrap** untouched: a
+device with no session was always given a fresh anonymous one. ⚠️ So "sign out" produced a **brand-new
+anonymous shrine** and the account was never actually left. That was not a bug in the sign-out — it was
+the identity model still being the MVP's. Measured on glass 2026-11-08 (S79, `HN615L005386`): signing out
+minted a new anonymous identity, the *Clan Head* pill disappeared, the altar read *"Your altar is empty"*.
+⚠️ **Every gate was green, because the code did exactly what it was written to do.**
+
+The owner's ruling:
+
+> *"Anonymous shrine is only for the MVP demo. Now that we are building the actual app, the Demo should
+> only be on first install of the App and signing out does not return us to anon status but require a sign
+> in every time."*
+> — owner, 2026-11-08
+
+**Amendment.**
+
+1. ⚠️⚠️ **Rule 2 is NARROWED AGAIN — an anonymous session is minted ONLY while this device is NOT past
+   onboarding.** Past that point the bootstrap **never** mints. The rule is `planBootstrap()` in
+   `session-map.ts`, applied in **one** place (`session.ts`) so no caller can quietly mint an identity the
+   product no longer allows.
+   ⚠️⚠️ **AND "PAST ONBOARDING" IS ITS OWN RECORD (`onboarded.ts`), NOT `needsTutorial()` — the device
+   falsified the first attempt on glass, 2026-11-08.** The demo flag is written by exactly one screen (the
+   demo branch of `reward.tsx`), so a user whose first burn was a **REAL** one never gets it: their device
+   reads *"demo owed"*, the bootstrap minted, and a **signed-out user came back to a shrine** — with all
+   **775** gates green. ⚠️ So the fact is recorded where it becomes true — **an account linked**
+   (`confirmAccountCode`) or **an account signed out of** (`signOutAccount`) — and nowhere else.
+2. ⚠️ **A sign-out leaves the device SIGNED OUT.** No replacement identity, anonymous or otherwise. The
+   app's answer to a missing session is the **SIGN-IN WALL**: the root gate routes to `/account`, and any
+   other route returns there.
+3. **Rule 1 STANDS, and it still means what it says:** nothing gates the **first burn**. The demo runs
+   before any account because it is owed on first install — and it is free besides (a catalogue item, no
+   photo, no server call).
+4. **Rule 4 STANDS for its own case.** The sign-up road is still the in-place **UPGRADE** — the demo's
+   anonymous session is what the email attaches to, so the ledger, ancestors and streak keep their
+   `auth.users` id. ⚠️ **After a sign-out there is no anonymous session to upgrade**, so the wall offers
+   **sign-in only**; "create an account" remains the first-run road. ⚠️ A signed-out user who wants a
+   *different* account therefore has no path in-app — recorded as a follow-up, not a defect.
+5. **The DELETE is the one way back to anonymous.** `clearFirstRun()` resets the demo flag and
+   `clearOnboarded()` reopens the anonymous window, and `resetIdentity()` then mints — ⚠️ **in that order**,
+   which is now load-bearing and asserted, because reversed the delete would sign out and then demand a
+   sign-in from a user who has just erased their account.
+
+**Consequences.**
+
+- A signed-out device can reach **no** screen but the wall. ⚠️ The shrine must never render session-less:
+  its panels would be empty over reads that answer `42501` — the screen looks fine and is a lie.
+- ⚠️ **The `onboarded` record is now part of the identity model**, not onboarding copy. Clearing it is the
+  delete's privilege; a sign-out must never clear it — that would reopen the anonymous window it just closed.
+- ⚠️ **An anonymous demo user who taps Sign out abandons that identity** (it is a throwaway: the demo
+  awards nothing and holds no clan). Consider hiding the row while the session is anonymous — filed as a
+  follow-up rather than decided here.
+- Devices already holding a pre-amendment anonymous session keep reusing it; the rule only governs
+  **minting**.
+
+**Rejected.** *Keeping the mint and calling the result "anonymous mode"* — that is the behaviour this
+amendment reverses, and it made the account un-leavable. *A soft wall with a skip* — rejected in
+Amendment 1 and still rejected: a soft wall is a hard wall with worse manners.
+
+---
+
 - [[../05-concept-to-mvp-gap-analysis]] — §6 decision 5 (the row this record closes)
 - [[../07-system-architecture]] §2 (service map · *"anonymous first, → account"*) · §5.3 (`profiles`)
 - [[../13-privacy-and-retention]] §1 item 7 (the device/session id class) · §5 (consent without walls)

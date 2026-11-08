@@ -567,7 +567,42 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **Residue: zero.** The verified run left no rows (profiles · captures · jobs), no Storage objects and no `auth.users`; the SQL test's teardown removes its fixtures **and asserts the budget was restored to $5/day**, because the alternative is an outage.
 
+### 12.49 · S79b — ADR-004 AMENDMENT 2: anonymous is a FIRST-INSTALL identity, and a sign-out is a WALL (2026-11-08)
+
+> ✅ **Built and verified on glass the same day, an hour after §12.48 was closed.** The owner's ruling:
+>
+> > *"Anonymous shrine is only for the MVP demo. Now that we are building the actual app, the Demo should only be on first install of the App and signing out does not return us to anon status but require a sign in every time."*
+>
+> ⚠️ **§12.48 had made the sign-out *work* — and it worked by minting a NEW anonymous identity**, which is the MVP's model. So the row was right and the **identity model behind it was stale**. ⚠️ Every gate was green because the code did exactly what it was written to do; this is the class of defect a test suite cannot catch, because the spec changed.
+>
+> **What changed.** `signOutAccount()` no longer re-mints. A **sign-in wall** (`useIdentityGate()` in `_layout.tsx`) routes a session-less device past onboarding to `/account`, keyed on **`sign_in_required` alone** — ⚠️ not on any failure, or a wifi blip would read as "you have been logged out". `planBootstrap()` (pure) decides reuse / mint / require-sign-in / skip, applied in **one** place (`session.ts`) so none of the four callers can mint quietly. The sign-out now lands on `/account`; the copy says *"You will need to sign in again"*; ADR-004 gained **Amendment 2**.
+>
+> ⚠️⚠️ **THE FINDING THAT MATTERS — THE DEVICE FALSIFIED THE DESIGN, AND THE GATES COULD NOT.** The first implementation keyed "may this device have an anonymous session?" on **`needsTutorial()`** (the demo flag), reasoning that a device owed its demo had never onboarded. ⚠️ **On glass, signing out and restarting came back to an anonymous SHRINE**, with **775** checks green. Cause: that flag is written by **exactly one screen** — the demo branch of `reward.tsx` — so a user whose first burn was a **REAL** one never gets it and reads *"demo owed"* forever. ⚠️ The fix is `onboarded.ts`, a dedicated record written where the fact becomes true (**an account linked** or **a signed out of**), and cleared **only** by the delete. ⚠️ Lesson: an existing flag that *looks* like it means "first install" is not evidence that it does — the demo flag answered a different question.
+>
+> **On glass, measured** (`HN615L005386`, hosted, Expo Go + `adb reverse`):
+>
+> | step | measured |
+> |---|---|
+> | sign out (anonymous device) | left Settings → **`/account`**, not the shrine |
+> | the wall | **"Sign in or register new account"** / *"Sign in to return to your shrine."* / **Send code** disabled until a valid email |
+> | ⚠️ **restart while signed out** | **came back to the WALL** — no anonymous session minted. This is the decisive test, and it is the one that failed before `onboarded.ts` |
+> | the shrine | unreachable; the gate returns a signed-out device to `/account` from any other route |
+>
+> ⚠️⚠️ **AND THE WALL HAD A SECOND DEFECT, FOUND THE SAME MINUTE:** it opened on **"Create your account"**, whose road is the in-place **UPGRADE** (`updateUser`) and therefore needs *an anonymous session to upgrade* — which a signed-out device does not have. The tap would have failed with the provider's *"not authenticated"*. ⚠️ So the **road is now chosen by the session** (`isAnonymousSession()`), the screen opens on **sign in**, the "New here? Create an account" cross-link is **not offered** where it cannot complete, and `sendAccountCode` refuses the upgrade road **by name** (`no_anonymous_session`) so `meansSignInInstead` can turn it rather than print it.
+>
+> **Gates: 778** green, `tsc` **0** errors, all 20 suite steps green. The new checks were **fault-tested red**: `planBootstrap` minting while onboarded (2 of 778); `signOutAccount` forgetting `markOnboarded` (1); the delete clearing the record **after** re-minting (2). ⚠️ **And one gate was found to be defeated by its own comment** — `indexOf('resetIdentity')` matched the words in an explanatory comment above the call, so the order check passed for the wrong reason; it now compares the **`await` calls**. ⚠️ A gate a comment can satisfy is not a gate.
+>
+> ⏳ **Open:** the **sign-back-in** (email + code → the account's clan/ancestors return) is still unobserved. ⚠️ A signed-out user who wants a **different** account has no in-app path (recorded in the amendment as a follow-up, not a defect). ⚠️ And consider hiding **Sign out** while the session is anonymous — it abandons a throwaway identity for a wall the user cannot pass without an account.
+
+
 ### 12.48 · S79 — SCRUM-215's SIGN OUT: the row was drawn, reachable and dead — and a bare `signOut()` would have been worse than the dead row (2026-11-08)
+
+> ⚠️⚠️ **SUPERSEDED IN PART, LATER THE SAME DAY — READ [[#12.49 · S79b — ADR-004 AMENDMENT 2|§12.49]] FIRST.** The
+> **two-step** sign-out described below (*sign out → re-mint an anonymous identity*) was **reversed by the owner**
+> hours after it was verified: the anonymous shrine is an **MVP demo** thing, so a sign-out must leave the device
+> **signed out** behind a **sign-in wall**. ⚠️ What still stands here: the row wiring, the confirm card, the copy
+> principle, the gates' fault-testing, the `scope: 'global'` read from the installed types, and both
+> false-negative traps. What does **not**: "re-mints an anonymous identity" and "lands on `/`".
 
 > ✅ **Built 2026-11-08.** `settings-signout` had rendered **disabled with `settings.notBuilt`** since SCRUM-151, which left the account flow **one-way on glass**: a device could take on an email account and never leave it, so the **email-link path could not be retested** without wiping the install — the reason it was asked for. ⚠️ **The fix is not "call `signOut()`".** ADR-004 gives every install an anonymous session and `ensureAnonymousSession()` signs in **only when there is none** — so a bare sign-out leaves the device **session-less while the shrine still renders**, and every authenticated read answers **`42501`** (the same defect `account-api.ts` records for the delete path, one step further on). `signOutAccount()` is therefore **two steps — sign out, then re-mint an anonymous identity** — and `check:lib` asserts the pairing on the **function slice**, not the file: `resetIdentity()` pairs the same two calls, so a file-wide `includes` would have passed on someone else's code and proved nothing.
 >

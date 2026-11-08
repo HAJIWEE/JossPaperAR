@@ -24,10 +24,16 @@
  * leave it, so the email-link path could not be retested without wiping the install. The row now opens a
  * `ConfirmCard` and calls `signOutAccount()`.
  *
+ * ⚠️ **THE DEVICE IS THEN SIGNED OUT, AND STAYS SIGNED OUT** (ADR-004 · **Amendment 2**, 2026-11-08). The
+ * owner's ruling: *"the Demo should only be on first install of the App and signing out does not return us
+ * to anon status but require a sign in every time."* ⚠️ So this screen lands on **`/account` — the sign-in
+ * wall** — and the first version of this row, which re-minted an anonymous identity and showed a fresh
+ * demo shrine, was **the MVP's behaviour, not the product's**.
+ *
  * ⚠️ **AND IT ERASES NOTHING.** It is NOT `resetIdentity()`: that one deletes and then mints a fresh
  * identity (*"back to first run"*, the only caller of `clearFirstRun()`). ⚠️ Signing out must **not**
- * forget the tutorial record — this device's first run did not change, and replaying the walkthrough would
- * describe an erasure that did not happen. The account keeps everything server-side; the email brings it
+ * forget the tutorial record — that flag is exactly what marks this device as past its demo, and clearing
+ * it would reopen the anonymous window. The account keeps everything server-side; the email brings it
  * back. ⚠️ `check:lib` asserts the handler calls neither `deleteMyData` nor `clearFirstRun`.
 
  */
@@ -41,7 +47,9 @@ import { ConfirmCard } from '@/components/confirm-card';
 import { LocaleToggle } from '@/components/locale-toggle';
 import { deleteMyData, resetIdentity } from '@/lib/account-api';
 import { signOutAccount } from '@/lib/account';
+import { ACCOUNT_ROUTE } from '@/lib/account-flow';
 import { clearFirstRun } from '@/lib/first-run';
+import { clearOnboarded } from '@/lib/onboarded';
 import { ScreenHud } from '@/components/screen-hud';
 import { t } from '@/lib/i18n';
 import { HUD, SETTINGS_ROW } from '@/lib/profile';
@@ -132,6 +140,17 @@ export default function SettingsScreen() {
       setBusy(true);
       setProblem(null);
 
+      /**
+       * ⚠️ ORDER MATTERS, AND IT IS THE WHOLE OF "back to first run":
+       *   1. delete — and only continue if the SERVER says it went through;
+       *   2. forget the first-run record, so the walkthrough replays;
+       *   3. ⚠️ **forget the ONBOARDED record too** (ADR-004 · Amendment 2) — this is what reopens the
+       *      anonymous window, and it MUST happen before step 4 re-mints, or the delete would sign out and
+       *      then demand a sign-in from someone who has just erased their account;
+       *   4. sign out and mint a FRESH identity (the RPC cannot remove `auth.users`);
+       *   5. land on the shrine, which is clan-less — the first-run fork.
+       * ⚠️ A failed delete stops at step 1 and says so. Nothing is half-erased.
+       */
       const result = await deleteMyData();
       if (!result.ok) {
         setBusy(false);
@@ -140,6 +159,8 @@ export default function SettingsScreen() {
       }
 
       await clearFirstRun();
+      // ⚠️ BEFORE `resetIdentity()`: this is what reopens the anonymous window it mints into.
+      await clearOnboarded();
       await resetIdentity();
       setBusy(false);
       router.replace('/');
@@ -148,10 +169,18 @@ export default function SettingsScreen() {
 
   /**
    * ⚠️ SIGN OUT — and NOTHING here erases: no `deleteMyData`, and deliberately **no `clearFirstRun`**.
-   * ⚠️ The order still matters, for a different reason than the delete's: `signOutAccount()` signs out and
-   * then **re-mints the anonymous identity**, because this app has no session-less state to render. Landing
-   * on the shrine afterwards is what makes the fresh anonymous device visible — it is clan-less, which is
-   * the first-run fork.
+   *
+   * ⚠️ **THE DEVICE IS LEFT SIGNED OUT** (ADR-004 · Amendment 2): `signOutAccount()` does not mint a
+   * replacement identity, and **the sign-in wall takes over** — this navigates to `/account` itself rather
+   * than waiting for the root gate, so the wall appears immediately rather than after a frame of shrine.
+   * ⚠️ **Do NOT send this to `/`**: the shrine is what a signed-out device must not see, and with no session
+   * behind it every panel would render empty and every read would answer `42501`.
+   *
+   * ⚠️ **And neither `clearFirstRun` nor `clearOnboarded` may appear here.** Those two records are what tell
+   * the bootstrap this device is past its demo; clearing either would reopen the anonymous window and hand
+   * the user a fresh demo shrine — the exact behaviour the amendment removes. `clearOnboarded` belongs to the
+   * DELETE alone, which *is* "back to first run".
+   *
    * ⚠️ A failure stops here and SAYS SO. *"You are still signed in"* must never render as if it worked.
    */
   const runSignOut = useCallback(() => {
@@ -166,7 +195,8 @@ export default function SettingsScreen() {
         setSignOutProblem(t('settings.signOutFailed'));
         return;
       }
-      router.replace('/');
+      /** ⚠️ The SIGN-IN WALL, not the shrine: the device is signed out and stays that way. */
+      router.replace(ACCOUNT_ROUTE);
     })();
   }, []);
 

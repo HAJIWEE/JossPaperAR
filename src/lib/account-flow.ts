@@ -63,9 +63,25 @@ export const EMAIL_TAKEN_MEANS_SIGN_IN = true;
  */
 export const EMAIL_TAKEN_PATTERN = /already|exist|registered/i;
 
+/**
+ * ⚠️ **THE ONE FAILURE THAT IS NOT ABOUT THE EMAIL: the UPGRADE ROAD NEEDS SOMETHING TO UPGRADE.**
+ *
+ * ADR-004 rule 4 makes sign-up an **in-place upgrade** (`updateUser({ email })` on the anonymous session the
+ * demo used). ⚠️ Since **Amendment 2** a device can be **signed out with no session at all** — and
+ * `updateUser` has nothing to attach the email to, so the road cannot work. `account.ts` returns this reason
+ * instead of letting the provider's own *"not authenticated"* reach the screen, and the screen turns it into
+ * **sign in**, the same way it turns "email already taken" into sign in.
+ *
+ * ⚠️ It is a REASON, not copy: `issueKeyFor` never sees it, because the answer is a mode switch.
+ */
+export const NO_ANONYMOUS_SESSION = 'no_anonymous_session';
+
 /** ⚠️ The decision APPLIED to a real failure: does this sign-up refusal mean *"sign in instead"*? */
 export function meansSignInInstead(mode: AccountMode, reason: string): boolean {
-  return mode === 'signUp' && EMAIL_TAKEN_MEANS_SIGN_IN && EMAIL_TAKEN_PATTERN.test(reason);
+  if (mode !== 'signUp') return false;
+  // ⚠️ Amendment 2 — with no session there is nothing to upgrade, so the road IS sign-in.
+  if (reason === NO_ANONYMOUS_SESSION) return true;
+  return EMAIL_TAKEN_MEANS_SIGN_IN && EMAIL_TAKEN_PATTERN.test(reason);
 }
 
 /** The form steps, in the order the boards draw them (`0d6 Sign-up · email` → `0d7 … /verify code`). */
@@ -136,6 +152,16 @@ export const ACCOUNT_GATE = {
  * **demo → account → clan fork → altar**.
  */
 export const AFTER_ACCOUNT_ROUTE = '/clan';
+
+/**
+ * ⚠️ **The ACCOUNT SCREEN'S OWN ROUTE — and, since ADR-004 Amendment 2, THE SIGN-IN WALL.**
+ *
+ * `src/app/_layout.tsx` sends a session-less device that is **past its demo** here, so this string has two
+ * jobs: it is where the tutorial hands off (`tutorial.ts` keeps its own copy to stay import-free, and a
+ * `check:lib` assertion holds the two equal), and it is the exemption in that gate — ⚠️ **without which the
+ * gate would redirect to the screen it is already on, forever.**
+ */
+export const ACCOUNT_ROUTE = '/account';
 
 /**
  * ⚠️ **A REASON IS NOT COPY.** FOUND ON GLASS (2026-11-07): a failed `verifyOtp` printed the raw string
