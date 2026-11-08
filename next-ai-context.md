@@ -1922,8 +1922,10 @@ now says *wait* instead of *broken*; the limit is a Dashboard setting.
 
 **2 · Every returning user was sent back to the clan fork.** *"After i re-login, it asked me to create or join a
 clan again, so i created the same clan…"* ⚠️⚠️ **The data was perfect and the workflow was wrong — and the
-workflow is the dangerous one**, because being asked to create a clan you already have invites a **second**
-clan. Cause: `confirm()` ended with `router.replace(AFTER_ACCOUNT_ROUTE)` — the **first-run** handoff — for
+workflow is the dangerous one**, because the prompt makes a user create a clan they did not want. ⚠️ **The extra
+clan is not the fault: duplicate clans and duplicate NAMES are allowed by design** (doc 15 §2.1 · §5.2 — clans
+are keyed by **UUID**, names display plain, one person may belong to several). **The fault is the PROMPT.**
+Cause: `confirm()` ended with `router.replace(AFTER_ACCOUNT_ROUTE)` — the **first-run** handoff — for
 **everyone**; the user's clan was never looked at.
 **Fix:** pure **`routeAfterAccount(hasClan)`**; `confirm()` reads `myClans()` → **with a clan, `/`** · clan-less,
 the fork · **unchecked** (`null`, read failed), the fork — preserving the documented chain

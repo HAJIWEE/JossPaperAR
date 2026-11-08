@@ -2659,6 +2659,42 @@ function accountChecks(): void {
   check('⚠️ …and a 429 RE-ARMS the resend countdown instead of re-offering a button that will fail',
     accountScreenSrc.includes("if (res.reason === 'rate_limited')")
       && accountScreenSrc.includes('setSecondsLeft(RESEND_SECONDS);\n        setIssue(issueKeyFor(res.reason));'));
+
+  /**
+   * ⚠️⚠️ **THE CLAN MODEL IS A PRODUCT RULE, AND THE SCHEMA IS WHERE IT CAN BE BROKEN IN SILENCE**
+   * (PM, 2026-11-08): *"Clans and accounts are allowed to have duplicate names… the Clans we should have a
+   * UUID… It is ok for someone to be part of multiple clans."*
+   * ⚠️ Nothing would have caught a later `unique (name)` or `unique (user_id)`: the app would simply stop
+   * allowing what doc 15 §2.1 and §5.2 promise, and every screen would keep rendering. So the **SHAPE** is
+   * asserted — a migration that narrows it now has to delete a check, deliberately.
+   */
+  const SCHEMA_SQL = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'supabase', 'migrations', '20261003085500_slice_schema.sql'),
+    'utf8');
+  const tableDdl = (sql: string, name: string): string => {
+    const at = sql.indexOf(`create table public.${name} (`);
+    if (at < 0) return '';
+    const end = sql.indexOf('\n);', at);
+    return end < 0 ? '' : sql.slice(at, end);
+  };
+  const clansDdl = tableDdl(SCHEMA_SQL, 'clans');
+  const membersDdl = tableDdl(SCHEMA_SQL, 'clan_members');
+  const UNIQUE_NAME = /unique\s*\(\s*(?:lower\(\s*)?name\s*\)?/i;
+  const UNIQUE_USER = /unique\s*\(\s*user_id\s*\)/i;
+
+  check('⚠️ a CLAN is identified by a UUID — not by its name',
+    clansDdl.includes('id') && /id\s+uuid\s+primary key/i.test(clansDdl));
+  check('⚠️⚠️ …and its NAME may duplicate: no `unique` on the name, at column or table level',
+    clansDdl.length > 0
+      && !clansDdl.split('\n').filter((l) => /\bname\b/.test(l)).join(' ').match(/unique/i)
+      && !UNIQUE_NAME.test(SCHEMA_SQL));
+  check('⚠️⚠️ …and one person may belong to SEVERAL clans: membership is keyed by (clan_id, user_id)',
+    /primary key \(clan_id, user_id\)/i.test(membersDdl) && !UNIQUE_USER.test(SCHEMA_SQL));
+  // ⚠️ POSITIVE CONTROLS — the two detectors must be able to SEE the constraint they forbid, or "no unique"
+  // passes for the wrong reason. This is the same discipline as every other absence-check here.
+  check('⚠️ guard: the detectors DO fire on the constraints they forbid',
+    UNIQUE_NAME.test('constraint x unique (name)') && UNIQUE_USER.test('unique (user_id)')
+      && !UNIQUE_USER.test('unique (user_id, seq)'));
 }
 
 function storeChecks(): void {
