@@ -188,16 +188,18 @@ npx tsc --noEmit
 
 ✅ **Remedy — two commands, no investigation:** `npx expo install --fix`, commit the lockfile, confirm with `npm run check:doctor`. ⚠️ **Run `npm run check:doctor` BEFORE pushing** — it is deliberately **not** in `npm run check`, because it needs the **network** and the suite must stay usable offline (same reason `check:db` needs docker and `check:clanapi` needs `supabase start`).
 
-⚠️⚠️ **AND EXPECT THE DOCTOR TO REPORT THREE "Unexpected error" CHECKS THAT ARE NOT YOUR FAULT (measured 2026-11-08, S79e).**
-On a plain `npm ci` tree it prints three checks like —
-`npm explain @expo/vector-icons|@unimodules/core|expo-cli --json exited with a non-zero code` — and exits **1**.
+⚠️⚠️ **ON A LOCAL MACHINE THE DOCTOR MAY ALSO REPORT THREE "Unexpected error" CHECKS — THEY ARE LOCAL NOISE, NOT CI (measured 2026-11-08, S79e).**
+Locally it can print —
+`npm explain @expo/vector-icons|@unimodules/core|expo-cli --json exited with a non-zero code` — and exit **1**.
 ⚠️ **Those packages are CORRECTLY ABSENT:** `npm explain` exits 1 for a package that is not in the tree
 (*"No dependencies found matching X"*), and expo-doctor counts that as a failed check. ⚠️ **Measured on 1.21.6
 AND 1.20.0, so pinning the doctor does not fix it** — do not "fix" it by installing the packages, and do not
-chase it. ⚠️ **`App checks` was red on `main` and on PR #79 for this reason** (that PR merged with it red).
-✅ **The check that matters is the SDK-version one** — *"packages match versions required by installed Expo
+chase it. ✅ **CI never sees them: the same commit that was red went GREEN with only the SDK patches bumped**, so
+`App checks` fails in CI for the SDK-version reason and nothing else.
+✅ **So the check that matters is the SDK-version one** — *"packages match versions required by installed Expo
 SDK"* — and that one is real: a newer Expo patch makes an untouched repo red, and `npx expo install --fix` is
-the remedy. Read the failure by NAME, not by count.
+the remedy. ⚠️ **Read a red `App checks` by NAME, not by count**: locally the count includes three failures CI
+does not have.
 
 ⚠️ **And never read its exit code through a pipe.** `npx expo-doctor | tail -40` reports **`tail`'s** status, so a genuine failure reads as `EXIT: 0` — measured, and it is exactly how a broken gate would ship unnoticed. This is the **second** occurrence of the class (`48f0865`, *"refresh package-lock so installed patches match SDK 57"*); pinning one version is a treadmill. See **SCRUM-120**.
 

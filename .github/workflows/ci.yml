@@ -167,14 +167,15 @@ jobs:
       - name: Copy checks (no literal outside t() · no unsubstituted placeholder)
         run: npm run check:copy
 
-      # ⚠️ If this is RED and your diff is innocent, read the three "Unexpected error" checks
-      # FIRST — they are NOT about this project (measured 2026-11-08, S79e):
-      #   npm explain @expo/vector-icons|@unimodules/core|expo-cli --json exited with a non-zero code
-      # ⚠️ Those packages are **correctly ABSENT**. `npm explain` exits 1 for a package that is not
-      # in the tree ("No dependencies found matching X"), and expo-doctor counts that as a failed
-      # check. ⚠️ Measured on 1.21.6 AND 1.20.0, on a plain `npm ci` tree — so it is an upstream
-      # doctor/npm interaction, not a pinned-version accident, and pinning the doctor does not fix it.
-      # ⚠️ The check that DOES matter reports "packages match versions required by installed Expo SDK".
+      # ⚠️ If this is RED and your diff is innocent, read the reported checks by NAME before
+      # investigating (measured 2026-11-08, S79e):
+      #   · "packages match versions required by installed Expo SDK" — REAL. Expo published a
+      #     patch; an untouched repo goes red. Remedy: `npx expo install --fix`, commit the lockfile.
+      #   · three "Unexpected error" checks naming @expo/vector-icons / @unimodules/* / expo-cli —
+      #     ⚠️ these appear LOCALLY and NOT in CI (the same commit went green here with only the SDK
+      #     patches bumped). They happen because `npm explain` exits 1 for a package that is
+      #     correctly ABSENT, and the doctor counts that as a failed check. Do not install those
+      #     packages and do not pin the doctor — measured unfixed on 1.21.6 and 1.20.0 alike.
       - name: Expo doctor
         run: npx expo-doctor
 
