@@ -62,16 +62,29 @@ const LANTERN: { box: readonly [number, number]; inks: readonly Ink[] } = {
   ],
 };
 
-/** `decor · couplet (side-left)` — 41 × 160: a hanging scroll with four character blocks. */
+/**
+ * `art · Spring Couplets` — 85.1 × 72, the SEVEN-B-a card painting: a horizontal scroll above TWO vertical
+ * ones. ⚠️ This replaces an earlier port of `decor · couplet (side-left)` (41 × 160), which is the single scroll
+ * the SHRINE hangs — the wrong drawing for a store card. Read off `EN · 7b` on 2026-11-08.
+ */
 const COUPLET: { box: readonly [number, number]; inks: readonly Ink[] } = {
-  box: [41, 160],
+  box: [85.1, 72],
   inks: [
-    { x: 19.5, y: 2.1, w: 3.1, h: 10.3, fill: 'ink' },
-    { x: 4.1, y: 10.3, w: 32.8, h: 145.6, rx: 3, fill: 'cinnabar', stroke: 'ink', sw: 3 },
-    { x: 12.3, y: 22.6, w: 16.4, h: 20.5, fill: 'goldBright', stroke: 'ink', sw: 2 },
-    { x: 12.3, y: 53.3, w: 16.4, h: 20.5, fill: 'goldBright', stroke: 'ink', sw: 2 },
-    { x: 12.3, y: 84.1, w: 16.4, h: 20.5, fill: 'goldBright', stroke: 'ink', sw: 2 },
-    { x: 12.3, y: 114.9, w: 16.4, h: 20.5, fill: 'goldBright', stroke: 'ink', sw: 2 },
+    // the horizontal scroll, with its three gold blocks
+    { x: 9.2, y: 5.2, w: 66.8, h: 17, rx: 3, fill: 'cinnabar', stroke: 'ink', sw: 3 },
+    { x: 18.3, y: 9.8, w: 13.1, h: 7.9, fill: 'goldBright', stroke: 'ink', sw: 2 },
+    { x: 36, y: 9.8, w: 13.1, h: 7.9, fill: 'goldBright', stroke: 'ink', sw: 2 },
+    { x: 53.7, y: 9.8, w: 13.1, h: 7.9, fill: 'goldBright', stroke: 'ink', sw: 2 },
+    // the left scroll and its three character blocks (the last is a half block, as drawn)
+    { x: 14.4, y: 27.5, w: 23.6, h: 40.6, rx: 3, fill: 'cinnabar', stroke: 'ink', sw: 3 },
+    { x: 19.6, y: 32.7, w: 13.1, h: 9.8, fill: 'goldBright', stroke: 'ink', sw: 2 },
+    { x: 19.6, y: 45.8, w: 13.1, h: 9.8, fill: 'goldBright', stroke: 'ink', sw: 2 },
+    { x: 19.6, y: 58.9, w: 13.1, h: 5.2, fill: 'goldBright', stroke: 'ink', sw: 2 },
+    // the right scroll
+    { x: 47.1, y: 27.5, w: 23.6, h: 40.6, rx: 3, fill: 'cinnabar', stroke: 'ink', sw: 3 },
+    { x: 52.4, y: 32.7, w: 13.1, h: 9.8, fill: 'goldBright', stroke: 'ink', sw: 2 },
+    { x: 52.4, y: 45.8, w: 13.1, h: 9.8, fill: 'goldBright', stroke: 'ink', sw: 2 },
+    { x: 52.4, y: 58.9, w: 13.1, h: 5.2, fill: 'goldBright', stroke: 'ink', sw: 2 },
   ],
 };
 

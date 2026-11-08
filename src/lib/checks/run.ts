@@ -3195,7 +3195,7 @@ function storeChecks(): void {
     DECOR_CODE.includes("from 'react-native-svg'")
       && !/#[0-9a-fA-F]{6}/.test(DECOR_CODE));
   check('⚠️ every motif is transcribed with the board\'s own box — a viewBox per motif, not one shared',
-    /box: \[52, 66\]/.test(DECOR_CODE) && /box: \[41, 160\]/.test(DECOR_CODE));
+    /box: \[52, 66\]/.test(DECOR_CODE) && /box: \[85.1, 72\]/.test(DECOR_CODE));
   check('⚠️⚠️ an UNPORTED decoration renders a placeholder, never a stand-in motif',
     /if \(motif === null\)/.test(DECOR_CODE) && DECOR_CODE.includes('viewBox="0 0 40 40"'));
   // ⚠️ The honest count: exactly two of five ported, and the registry names all five.
