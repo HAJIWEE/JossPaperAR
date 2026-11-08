@@ -154,7 +154,7 @@ import {
 import { QUOTA_SPENT_COPY } from '../../domain/quota.ts';
 import { AIM_BANDS } from '../../domain/aim.ts';
 import { LEAGUE_TIERS } from '../../domain/league.ts';
-import { OFFERINGS } from '../../domain/catalogue.ts';
+import { DECORATIONS, OFFERINGS } from '../../domain/catalogue.ts';
 import { INITIAL_OFFERING, applyAll, isWaiting, nextAction } from '../../domain/slice.ts';
 import { eventsFromResponse } from '../ritual-map.ts';
 import {
@@ -3168,6 +3168,41 @@ function storeChecks(): void {
 
 
   // ⚠️ THE BUNDLE IS A BUNDLE, NOT AN ITEM (device report, 2026-11-07). `purchase_item` now reads
+  /**
+   * ⚠️⚠️ **THE DECORATION ART IS PORTED FROM PENPOT, AND ONLY WHERE A DRAWING EXISTS** (SCRUM-212, owner
+   * 2026-11-08: *"I meant DIFFERENT art — the Decorations … leave the five offering items as rasters."*).
+   *
+   * ⚠️ **READ AS TEXT, NOT IMPORTED** — `decoration-art.tsx` imports `react-native-svg`, and a `.tsx` that
+   * reaches `react-native` crashes `check:lib` under plain Node (the `ERR_MODULE_NOT_FOUND` lesson). So the
+   * invariants are asserted on the source, and the arithmetic ones live in the file's own data.
+   *
+   * ⚠️⚠️ **TWO OF THE FIVE ARE DELIBERATELY UNPORTED**, and that is the honest state, not an omission: the board's
+   * `option · couplets (icon)` and `option · zhongkui (icon)` are **byte-identical to `option · lanterns (icon)`**
+   * (copy-paste placeholders), and `festive_set` has no drawing at all. ⚠️ A gate that demanded five ported motifs
+   * would push the next session into inventing three.
+   */
+  const DECOR_SRC = readFileSync(
+    join(PROJECT_ROOT, 'src', 'components', 'decoration-art.tsx'),
+    'utf8',
+  );
+  const DECOR_CODE = stripComments(DECOR_SRC);
+  check('⚠️ the decoration art exists as SVG and uses TOKEN KEYS, never hex',
+    DECOR_CODE.includes("from 'react-native-svg'")
+      && !/#[0-9a-fA-F]{6}/.test(DECOR_CODE));
+  check('⚠️ every motif is transcribed with the board\'s own box — a viewBox per motif, not one shared',
+    /box: \[52, 66\]/.test(DECOR_CODE) && /box: \[41, 160\]/.test(DECOR_CODE));
+  check('⚠️⚠️ an UNPORTED decoration renders a placeholder, never a stand-in motif',
+    /if \(motif === null\)/.test(DECOR_CODE) && DECOR_CODE.includes('viewBox="0 0 40 40"'));
+  // ⚠️ The honest count: exactly two of five ported, and the registry names all five.
+  const registered = ['lanterns', 'spring_couplets', 'zhong_kui', 'door_gods', 'festive_set'];
+  check('⚠️ …and the registry covers all FIVE catalogue codes, with three still null',
+    registered.every((c) => new RegExp(`\\b${c}:`).test(DECOR_CODE))
+      && (DECOR_CODE.match(/:\s*null,/g) ?? []).length === 3);
+  // ⚠️ POSITIVE CONTROL — the DECORATIONS list this registry must mirror really is five long.
+  check('⚠️ guard: the catalogue still carries five decorations, so the registry cannot drift silently',
+    DECORATIONS.length === 5);
+
+
   // `offerings_catalog.composed_of` — the SQL twin of this code field — and grants one of each
   // component, never the bundle itself. The SERVER behaviour is asserted in
   // `supabase/tests/purchase_bundle.sql`; THIS holds the code mirror the server was copied from, so a
