@@ -52,10 +52,38 @@
                 </p>
               </td>
             </tr>
+            <!--
+              ⚠️ BOTH LANGUAGES, IN EVERY EMAIL (owner, 2026-11-08) — see the long note in
+              `magic_link.html`. GoTrue renders ONE template for every recipient and has no per-user locale,
+              so this email carries the SAME code once and describes it twice.
+            -->
             <tr>
-              <td style="padding:16px 32px 28px 32px;font-family:Georgia,'Times New Roman',serif;">
+              <td style="padding:18px 32px 0 32px;">
+                <div style="border-top:1px solid #D9CFBA;font-size:0;line-height:0;">&nbsp;</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:14px 32px 0 32px;font-family:Georgia,'Times New Roman','Songti SC','Noto Serif CJK SC',serif;">
+                <h2 style="margin:0;color:#1A1A1A;font-size:19px;line-height:1.4;">确认你的新邮箱地址</h2>
+                <p style="margin:10px 0 0 0;color:#4A463F;font-size:15px;line-height:1.6;">
+                  在应用中输入上方验证码，即可将 <strong style="color:#1A1A1A;">{{ .Email }}</strong> 确认为 Joss Paper AR 的邮箱。
+                </p>
+                <p style="margin:8px 0 0 0;color:#4A463F;font-size:14px;line-height:1.6;">
+                  验证码 1 小时内有效。
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 32px 0 32px;font-family:Georgia,'Times New Roman',serif;">
                 <p style="margin:0;color:#4A463F;font-size:13px;line-height:1.5;">
                   If you didn’t request this change, you can safely ignore this email.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:6px 32px 28px 32px;font-family:Georgia,'Times New Roman','Songti SC','Noto Serif CJK SC',serif;">
+                <p style="margin:0;color:#4A463F;font-size:13px;line-height:1.6;">
+                  如果这不是你本人的操作，可以安全地忽略这封邮件。
                 </p>
               </td>
             </tr>

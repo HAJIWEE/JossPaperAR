@@ -2621,6 +2621,19 @@ function accountChecks(): void {
   check('⚠️⚠️ …and NEITHER carries a one-tap link the app cannot receive',
     templates.every((t) => !t.body.includes('{{ .ConfirmationURL }}')),
     'the app has no emailRedirectTo, no callback handler and no hosted allowlist — doc 24 §6');
+  /**
+   * ⚠️ **BOTH LANGUAGES IN EVERY EMAIL** (owner, 2026-11-08): *"supabase can't change it per recipient just
+   * include both in the email templates."* ⚠️ GoTrue renders ONE template for every recipient — there is no
+   * per-user locale — so a single-language email guesses, and gets it wrong for half the audience. ⚠️ And the
+   * **code appears ONCE**: two code blocks would make a reader wonder which one is theirs.
+   */
+  check('⚠️⚠️ both templates carry BOTH languages (GoTrue cannot switch per recipient)',
+    templates.every((t) => /[\u4e00-\u9fff]/.test(t.body) && /[A-Za-z]{4,}/.test(t.body)));
+  check('⚠️ …and the CODE appears exactly once, described twice — never two codes',
+    templates.every((t) => (t.body.match(/\{\{ \.Token \}\}/g) ?? []).length === 1));
+  // ⚠️ POSITIVE CONTROL — a monolingual body must FAIL the both-languages check, or it passes on any text.
+  check('⚠️ guard: an English-only body WOULD fail the both-languages check',
+    !(/[\u4e00-\u9fff]/.test('<p>The code expires in 1 hour</p>')));
   // ⚠️ POSITIVE CONTROL — the detector must be able to SEE a link, or "no link" passes for the wrong reason.
   check('⚠️ guard: the same detector DOES find a link when one is present in the body',
     bodyOf('<a href="{{ .ConfirmationURL }}">x</a>').includes('{{ .ConfirmationURL }}'));
@@ -2695,6 +2708,40 @@ function accountChecks(): void {
   check('⚠️ guard: the detectors DO fire on the constraints they forbid',
     UNIQUE_NAME.test('constraint x unique (name)') && UNIQUE_USER.test('unique (user_id)')
       && !UNIQUE_USER.test('unique (user_id, seq)'));
+
+  /**
+   * ⚠️⚠️ **`.easignore` REPLACES `.gitignore` FOR EAS UPLOADS** (S79g, 2026-11-08). ⚠️ So every secret the
+   * `.gitignore` was quietly protecting becomes **uploadable** the moment that file exists — and **nothing
+   * fails**: the build succeeds and the key has been posted to a build server. ⚠️ Measured: the file took the
+   * archive from **178 MB → 5.5 MB** while keeping every secret out, verified with
+   * `rsync --exclude-from=.easignore` in both directions.
+   */
+  const EASIGNORE_RULES = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '.easignore'), 'utf8')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !l.startsWith('#'));
+  check('⚠️⚠️ `.easignore` still excludes `.env` — the rule that replaced `.gitignore`',
+    EASIGNORE_RULES.includes('.env'));
+  check('⚠️ …and the other two secret vectors: `supabase/.temp/` (pooler URL) and `node_modules/`',
+    EASIGNORE_RULES.includes('supabase/.temp/') && EASIGNORE_RULES.includes('node_modules/'));
+  // ⚠️ A `!` rule can put a secret BACK. The one legitimate un-ignore is `.env.example`, which holds no key.
+  check('⚠️ …and no `!` rule re-includes a real `.env`',
+    !EASIGNORE_RULES.some((l) => l.startsWith('!') && /\.env(?!\.example)/.test(l)));
+  // ⚠️ POSITIVE CONTROL — that detector must fire on an un-ignore of `.env`, or "no bad rule" is vacuous.
+  check('⚠️ guard: the un-ignore detector WOULD fire on `!.env`',
+    /\.env(?!\.example)/.test('!.env'));
+
+  /**
+   * ⚠️ **SCRUM-214(A) IS DECIDED, NOT OMITTED** (owner, 2026-11-08): *"Profile should be a User Profile as we
+   * already have a Clan page where the Clan details are shown."* ⚠️ So the sign-up asks for **no family name** —
+   * a family name is a **clan** concept, named on the Clan page — and `profiles.display_label` is **not** the
+   * place for it: it is the auto-generated **league pseudonym**, *"NEVER the ancestor name"* (doc 13 §4).
+   * ⚠️ The check exists so the board's field cannot reappear **silently**, and so the reason stays attached.
+   */
+  check('⚠️ SCRUM-214(A) — sign-up asks for NO family name, and the screen records why',
+    !accountScreenSrc.includes('account-name')
+      && accountScreenSrc.includes('DECIDED 2026-11-08 (SCRUM-214(A))'));
 }
 
 function storeChecks(): void {

@@ -58,10 +58,41 @@
                 </p>
               </td>
             </tr>
+            <!--
+              ⚠️ BOTH LANGUAGES, IN EVERY EMAIL (owner, 2026-11-08): *"supabase can't change it per
+              recipient just include both in the email templates."* ⚠️ GoTrue renders ONE template for every
+              recipient and has no per-user locale, so a single-language email sends English to a 中文 speaker
+              (or 中文 to an English one) with no way to know. ⚠️ The app is EN/中文 and the code is the SAME
+              code, so the email carries it once and describes it twice — never a second code block, which
+              would make a reader wonder which one is theirs.
+            -->
             <tr>
-              <td style="padding:16px 32px 28px 32px;font-family:Georgia,'Times New Roman',serif;">
+              <td style="padding:18px 32px 0 32px;">
+                <div style="border-top:1px solid #D9CFBA;font-size:0;line-height:0;">&nbsp;</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:14px 32px 0 32px;font-family:Georgia,'Times New Roman','Songti SC','Noto Serif CJK SC',serif;">
+                <h2 style="margin:0;color:#1A1A1A;font-size:19px;line-height:1.4;">你的登录验证码</h2>
+                <p style="margin:10px 0 0 0;color:#4A463F;font-size:15px;line-height:1.6;">
+                  在应用中输入上方验证码即可登录 Joss Paper AR，回到你的神龛。
+                </p>
+                <p style="margin:8px 0 0 0;color:#4A463F;font-size:14px;line-height:1.6;">
+                  验证码 1 小时内有效。
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 32px 0 32px;font-family:Georgia,'Times New Roman',serif;">
                 <p style="margin:0;color:#4A463F;font-size:13px;line-height:1.5;">
                   If you didn’t request this, you can safely ignore this email.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:6px 32px 28px 32px;font-family:Georgia,'Times New Roman','Songti SC','Noto Serif CJK SC',serif;">
+                <p style="margin:0;color:#4A463F;font-size:13px;line-height:1.6;">
+                  如果这不是你本人的操作，可以安全地忽略这封邮件。
                 </p>
               </td>
             </tr>

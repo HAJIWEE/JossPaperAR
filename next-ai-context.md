@@ -1953,6 +1953,37 @@ prevents the prompt, not a duplicate already made — and it is worth knowing wh
 are even allowed.
 
 
+## 2026-11-08 (S79g) — bilingual emails, a 97 % smaller upload (secrets checked), and 214(A) decided
+
+**1 · Both languages in every email.** *"supabase can't change it per recipient just include both in the email
+templates."* ⚠️ GoTrue renders **one** template for every recipient — no per-user locale — so a single-language
+email guesses. Both templates now carry **EN → divider → 中文**, with the **code once** and described twice.
+⚠️ Uses a CJK-safe serif stack (`'Songti SC'`, `'Noto Serif CJK SC'`) — Latin fonts render 中文 as tofu.
+⚠️ **Needs the Dashboard re-paste again** (doc 24 §B) or the next email is unchanged.
+
+**2 · ⚠️⚠️ `.easignore` — 178 MB → 5.5 MB, and the trap that mattered.** **`.easignore` REPLACES `.gitignore`
+for EAS uploads**, so the moment it exists every secret `.gitignore` protected becomes **uploadable** — and
+⚠️ **nothing fails**: the build succeeds and the key sits on a build server. Secrets therefore come first in the
+file, and a gate holds them there. **Verified both directions** with `rsync --exclude-from=.easignore` (a faithful
+simulator): **164 files / 5.5 MB**; build inputs present; `.env` · `supabase/functions/.env` (the live `FAL_KEY`) ·
+`supabase/.temp/` · `node_modules` · `spike/` (73 MB) · `design-system/` (14 MB) · docs · `android/` · `ios/` all
+absent. **Sweep result: no live secret is committed** — only `.env.example` is tracked, and the key-shaped hits are
+role names in comments or scripts that read keys from `supabase status` at runtime.
+
+**3 · ⚠️ SCRUM-214(A) DECIDED: the FAMILY NAME field is DROPPED.** *"Profile should be a User Profile as we already
+have a Clan page where the Clan details are shown."* A family name is a **clan** concept, named on the Clan page.
+⚠️ **And the column recorded earlier was the wrong one:** `profiles.display_label` is the **league pseudonym**
+(`pseudonym_for(user_id)`), and the schema says *"NEVER the ancestor name"* (doc 13 §4) — a family name there would
+have broken the privacy record. ⏳ **Flagged, not guessed:** a true *user* profile needs a **user-chosen name** and
+the schema has none, so Profile's header still shows the clan name + role (now duplicating the Clan page). Options
+are in `follow-up-items.md`.
+
+**Gates: 800** (from 792) · `tsc` **0** · 20/20 suite steps. Fault-tested red: `.easignore` losing its `.env` rule
+(1 of 800) · a template stripped of all CJK (1 of 800) · controls proving the un-ignore detector fires on `!.env`
+and that an English-only body fails the bilingual check. **US$0.00**, and **no new APK** (templates aren't in the
+bundle, `.easignore` is build-side, the account change is a docblock).
+
+
 ## Next, in order
 
 1. **`SCRUM-215`'s remaining half** — the SMTP provider + the two templates carrying `{{ .Token }}`, then
