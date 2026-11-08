@@ -3252,11 +3252,34 @@ function storeChecks(): void {
     pointsPrice(getOffering('gold_bar')) === '600'
       && pointsPrice({ ...getOffering('gold_bar'), price: Number.NaN }) === null);
 
-  check('⚠️ Decorations is DISABLED — its prices are NULL until the economy pass',
-    STORE_TABS.some((tab) => tab.id === 'decorations' && !tab.enabled)
-      && STORE_TABS.some((tab) => tab.id === 'offerings' && tab.enabled));
-  check('⚠️ there is NO cash chip — no rail and no read, so it is omitted rather than faked',
-    CASH_IS_READABLE === false);
+  /**
+   * ⚠️⚠️ **BOTH TABS ARE LIVE NOW, AND THIS CHECK IS THE OPPOSITE OF WHAT IT SAID THIS MORNING.**
+   *
+   * It used to assert *"Decorations is DISABLED — its prices are NULL until the economy pass"*. ⚠️ That was wrong
+   * twice over: the board `EN · 7b` had **all five prices designed** (owner: *"there is already pricing for the
+   * decorations in En-7b"*) and I had never read it, so the app hid a finished design behind a TODO of mine.
+   *
+   * ⚠️ **Every price is asserted against the board here**, because these numbers came off a drawing rather than
+   * out of code and a typo in one of them would be invisible until someone was charged.
+   */
+  check('⚠️⚠️ both store tabs are LIVE — Decorations is no longer dark',
+    STORE_TABS.every((tab) => tab.enabled));
+  const BOARD_DECOR_PRICES: Record<string, readonly [number, number]> = {
+    festive_set: [3000, 399], spring_couplets: [800, 99], zhong_kui: [1000, 129],
+    door_gods: [1600, 199], lanterns: [1200, 149],
+  };
+  check('⚠️⚠️ every decoration is priced EXACTLY as `EN · 7b` draws it — points AND cash, in cents',
+    DECORATIONS.length === 5
+      && DECORATIONS.every((d) => {
+        const want = BOARD_DECOR_PRICES[d.code];
+        return want !== undefined && d.price === want[0] && d.cashPrice === want[1];
+      }),
+    DECORATIONS.map((d) => `${d.code}=${d.price}/${d.cashPrice}`).join(' '));
+  // ⚠️ POSITIVE CONTROL — cash is INTEGER CENTS, so no float can ever reach a price.
+  check('⚠️ guard: cash prices are whole cents, never a decimal',
+    DECORATIONS.every((d) => Number.isInteger(d.cashPrice)));
+  check('⚠️⚠️ the CASH rail is now DRAWN — the old "omit the chip" rule is retired',
+    readFileSync(join(PROJECT_ROOT, 'src', 'app', 'store.tsx'), 'utf8').includes('store-cash-chip'));
 
   /**
    * ⚠️⚠️ **THE SIZES MUST MATCH THE FILES ON DISK.** Since 2026-11-01 the art is five raster

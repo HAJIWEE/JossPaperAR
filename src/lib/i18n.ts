@@ -238,6 +238,11 @@ export const MESSAGES = {
     'store.featured': 'FEATURED',
     'store.featuredValue': 'base value %{value}',
     'store.more': 'More bundles',
+    // ── DECORATIONS (`EN · 7b Store · Decorations`) — the board's own copy, not a paraphrase. ────
+    'store.decorIntro': 'Decorations stay on your altar. Pay with cash or Store Points.',
+    'store.decorFeaturedValue': 'four pieces · permanent',
+    'store.decorPermanent': 'Decoration · permanent',
+    'store.moreDecorations': 'More decorations',
     'store.base': 'base %{value}',
     'store.price': '%{points} pts',
     'store.note': 'Pay with Store Points — every burn earns Points at 20% of its tribute.',
@@ -680,6 +685,11 @@ export const MESSAGES = {
     'store.featured': '精选',
     'store.featuredValue': '基础 %{value}',
     'store.more': '更多套装',
+    'store.decorIntro': '装饰会留在你的神台上，可用现金或功德点购买。',
+    'store.decorFeaturedValue': '四件 · 永久',
+    'store.decorPermanent': '装饰 · 永久',
+    'store.moreDecorations': '更多装饰',
+
     'store.base': '基础 %{value}',
     'store.price': '%{points} 点',
     'store.note': '使用功德点购买 — 每次焚烧可获得其功德 20% 的点数。',

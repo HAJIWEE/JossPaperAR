@@ -21,24 +21,108 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { ConfirmCard } from '@/components/confirm-card';
 import { OfferingArt } from '@/components/offering-art';
 import { TabBarBand } from '@/components/home/tab-bar-band';
 import { ScreenHud } from '@/components/screen-hud';
-import { t } from '@/lib/i18n';
+import { localized, t } from '@/lib/i18n';
+import { DecorationArt } from '@/components/decoration-art';
 import { fetchHomeSummary } from '@/lib/home-api';
 import { getOffering, type OfferingCode } from '@/domain/catalogue';
 import { collectedItemName } from '@/lib/collection';
 import { purchaseItem } from '@/lib/offerings-api';
 import { HUD } from '@/lib/profile';
-import { STORE, STORE_TABS, baseMetaValue, pointsPrice, storeList } from '@/lib/store';
+import { STORE, STORE_TABS, baseMetaValue, decorationList, pointsPrice, storeList, type StoreTabId } from '@/lib/store';
 import { DESIGN_REFERENCE_WIDTH, brand, fontSize, surface, text } from '@/theme/tokens';
 
 function scale(): number {
   return Dimensions.get('screen').width / DESIGN_REFERENCE_WIDTH;
 }
+
+/**
+ * THE DECORATIONS HALF OF THE STORE — `EN · 7b Store · Decorations`.
+ *
+ * ⚠️ **Every price here is the board's own** (`EN · 7b`): Festive Set $3.99/3,000 · Couplets $0.99/800 ·
+ * Zhong Kui Print $1.29/1,000 · Door Gods $1.99/1,600 · Lanterns $1.49/1,200. They live in `domain/catalogue.ts`
+ * and are formatted here, never hand-typed into copy.
+ *
+ * ⚠️⚠️ **BOTH RAILS ARE DRAWN AND NEITHER PURCHASE IS WIRED.** ⚠️ Decorations were `price: null` until today, so
+ * no server-side purchase can honour these yet — `decorations_catalog.price` is still NULL. So the cards are
+ * honest about being a layout: they show the design, and tapping one says so rather than pretending to sell.
+ * ⚠️ That is the owner's line, verbatim: *"build out all of it to the point of the actual payments portion."*
+ */
+function DecorationsBlock() {
+  const { width } = useWindowDimensions();
+  const s = width / DESIGN_REFERENCE_WIDTH;
+  const { featured, more } = decorationList();
+  const cents = (c: number | null) => (c === null ? '' : (c / 100).toFixed(2));
+  return (
+    <>
+      <Text style={[styles.intro, { fontSize: 13 * s }]} testID="store-decor-intro">
+        {t('store.decorIntro')}
+      </Text>
+
+      {/* ── the FEATURED decoration ─────────────────────────────────────── */}
+      <Pressable
+        accessibilityRole="button"
+        testID="store-decor-featured"
+        onPress={() => undefined}
+        style={({ pressed }) => [
+          styles.featured,
+          { borderRadius: STORE.featuredFrame.radius * s, borderWidth: STORE.featuredFrame.stroke * s, paddingHorizontal: 12 * s, paddingTop: 12 * s },
+        ]}
+      >
+        <View style={[styles.tag, { width: STORE.tag.w * s, height: STORE.tag.h * s, borderRadius: STORE.tag.radius * s, borderWidth: STORE.tag.stroke * s }]}>
+          <Text style={[styles.tagText, { fontSize: 10 * s }]}>{t('store.featured')}</Text>
+        </View>
+        <View style={{ height: STORE.featuredArt.h * s, alignItems: 'center', justifyContent: 'center' }}>
+          <DecorationArt code={featured.code} size={STORE.featuredArt.h * s} />
+        </View>
+        <Text style={[styles.featuredName, { fontSize: 16 * s }]} numberOfLines={1}>{localized(featured.name)}</Text>
+        <Text style={[styles.featuredValue, { fontSize: 12 * s }]} numberOfLines={1}>{t('store.decorFeaturedValue')}</Text>
+        {/* ⚠️ BOTH rails, as the board draws them — cash first, then points. */}
+        <View style={[styles.chips, { marginTop: 6 * s }]}>
+          <View style={[styles.tag, { width: STORE.pricePill.w * s, height: STORE.pricePill.h * s, borderRadius: STORE.pricePill.radius * s, borderWidth: STORE.pricePill.stroke * s }]}>
+            <Text style={[styles.priceText, { fontSize: 11 * s }]} numberOfLines={1}>{t('store.cashPrice', { cash: cents(featured.cashPrice) })}</Text>
+          </View>
+          <View style={[styles.tag, { width: STORE.pricePill.w * s, height: STORE.pricePill.h * s, borderRadius: STORE.pricePill.radius * s, borderWidth: STORE.pricePill.stroke * s }]}>
+            <Text style={[styles.priceText, { fontSize: 11 * s }]} numberOfLines={1}>{t('store.price', { points: String(featured.price) })}</Text>
+          </View>
+        </View>
+      </Pressable>
+
+      {/* ── the rest ─────────────────────────────────────────────────────── */}
+      <Text style={[styles.moreHead, { fontSize: 15 * s }]}>{t('store.moreDecorations')}</Text>
+      <View style={[styles.grid, { gap: (STORE.card.xs[1] - STORE.card.xs[0] - STORE.card.w) * s }]}>
+        {more.map((item) => (
+          <Pressable
+            key={item.code}
+            accessibilityRole="button"
+            testID={`store-decor-${item.code}`}
+            onPress={() => undefined}
+            style={({ pressed }) => [
+              styles.card,
+              { width: STORE.card.w * s },
+                ]}
+          >
+            <View style={{ height: STORE.card.artH * s, alignItems: 'center', justifyContent: 'center' }}>
+              <DecorationArt code={item.code} size={STORE.card.artH * s} />
+            </View>
+            <Text style={[styles.name, { fontSize: 13 * s }]} numberOfLines={1}>{localized(item.name)}</Text>
+            <Text style={[styles.meta, { fontSize: 10.5 * s }]} numberOfLines={1}>{t('store.decorPermanent')}</Text>
+            <View style={[styles.chips, { marginTop: 4 * s }]}>
+              <Text style={[styles.priceText, { fontSize: 10 * s }]} numberOfLines={1}>{t('store.cashPrice', { cash: cents(item.cashPrice) })}</Text>
+              <Text style={[styles.priceText, { fontSize: 10 * s }]} numberOfLines={1}>{t('store.price', { points: String(item.price) })}</Text>
+            </View>
+          </Pressable>
+        ))}
+      </View>
+    </>
+  );
+}
+
 
 export default function StoreScreen() {
   const s = scale();
@@ -46,6 +130,8 @@ export default function StoreScreen() {
   const [failed, setFailed] = useState(false);
   /** ⚠️ The code awaiting confirmation, or `null`. One card, not one per item. */
   const [buying, setBuying] = useState<{ readonly code: OfferingCode; readonly price: number } | null>(null);
+  /** ⚠️ Which half of the store is showing. The switcher is the board's, and both tabs are live. */
+  const [tabId, setTabId] = useState<StoreTabId>('offerings');
   const [buyIssue, setBuyIssue] = useState<string | null>(null);
   /**
    * ⚠️ **ONE KEY PER CONFIRM, not per attempt.** It is minted when the card OPENS and reused until
@@ -94,12 +180,22 @@ export default function StoreScreen() {
    * lines, because the extractor that hunts untranslated copy cannot follow one.
    */
   const buyingOffering = buying === null ? null : getOffering(buying.code);
+  /**
+   * ⚠️ **NO CASH AMOUNT YET, DELIBERATELY.** The offering cash prices are drawn on `EN · 7` and I have not read
+   * them — a made-up `$0.00` beside a real item would be an invented price, which is worse than an absent one.
+   * ⚠️ The DECORATIONS board (`EN · 7b`) gave its five prices and those ARE in `catalogue.ts`; the offerings'
+   * cash prices are the next read.
+   */
+  const buyCashLabel = t('store.buyCash');
+
   const buyBody =
     buying === null ? '' : (buyingOffering?.composedOf?.length ?? 0) > 0
       ? t('store.buyBodyBundle', { name: String(collectedItemName(buying.code)), points: String(buying.price) })
       : t('store.buyBody', { name: String(collectedItemName(buying.code)), points: String(buying.price) });
 
   const { featured, more } = storeList();
+  /** ⚠️ The decorations now have PRICES (from `EN · 7b`) and PORTED ART, so the tab is live rather than dark. */
+  const decor = decorationList();
 
   return (
     <View style={styles.screen}>
@@ -152,8 +248,9 @@ export default function StoreScreen() {
             >
             <View style={[styles.switcher, { gap: (STORE.switcher.xs[1] - STORE.switcher.xs[0] - STORE.switcher.w) * s }]}>
               {STORE_TABS.map((tab) => (
-                <View
+                <Pressable
                   key={tab.id}
+                  onPress={() => setTabId(tab.id)}
                   testID={`store-tab-${tab.id}`}
                   accessibilityState={{ disabled: !tab.enabled }}
                   style={[
@@ -173,7 +270,7 @@ export default function StoreScreen() {
                   >
                     {t(tab.labelKey)}
                   </Text>
-                </View>
+                </Pressable>
               ))}
             </View>
             </View>
@@ -190,6 +287,7 @@ export default function StoreScreen() {
                  name + a value and NO pill, but a card you can buy must show what it costs.
                  ⚠️ No CASH price is drawn: there is no cash rail and **no read for a cash balance**
                  (`CASH_IS_READABLE`), and inventing a price is a product decision. */}
+            {tabId === 'offerings' ? (<>
             <Pressable
               accessibilityRole="button"
               onPress={() => {
@@ -261,6 +359,9 @@ export default function StoreScreen() {
             <Text style={[styles.note, { fontSize: 11.5 * s }]} testID="store-note">
               {t('store.note')}
             </Text>
+            </>) : (
+              <DecorationsBlock />
+            )}
 
             {/** ⚠️ The SERVER's own refusal, shown as it came — not reworded into copy. */}
             {buyIssue === null ? null : (
@@ -268,31 +369,6 @@ export default function StoreScreen() {
                 {buyIssue}
               </Text>
             )}
-            {/**
-              ⚠️⚠️ **THE CASH AFFORDANCE — RENDERED, AND IT DOES NOT CHARGE** (owner, 2026-11-08: *"build out all
-              of it to the point of the actual payments portion"*).
-              ⚠️ It is NOT disabled and NOT greyed: it is a real button that, when pressed, says the truth
-              (`store.cashNotOpen`) — Play Billing is not in this build, so there is no receipt to wait for.
-              ⚠️ The alternative — a `disabled` button — was my first instinct and it is worse: this project's
-              rule is that a control must do what it promises, and "Buy for cash" on a dead button promises a
-              purchase. A button that answers *"cash opens when Play billing goes live"* is honest.
-            */}
-            {buying === null ? null : (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('store.buyCash')}
-                testID="store-buy-cash"
-                onPress={() => setBuyIssue(t('store.cashNotOpen'))}
-                style={styles.cashBtn}
-              >
-                <Text style={styles.cashBtnLabel}>
-                  {t('store.buyCash')} · {t('store.cashPrice', { cash: (0).toFixed(2) })}
-                </Text>
-              </Pressable>
-            )}
-
-
-
             <ConfirmCard
               visible={buying !== null}
               title={t('store.buyTitle')}
@@ -301,6 +377,16 @@ export default function StoreScreen() {
               cancelLabel={t('common.cancel')}
               onConfirm={() => void confirmBuy()}
               onCancel={() => setBuying(null)}
+              /**
+               * ⚠️⚠️ **THE CASH RAIL, INSIDE THE MODAL** (owner, 2026-11-08). It was first rendered on the page
+               * BEHIND this modal, which made it invisible on glass — a gate that greps for the testID passes on a
+               * control nobody can see. `ConfirmCard` now takes a second action, so the layout is honest AND reachable.
+               * ⚠️ It stays enabled and answers the truth on press: Play Billing is not in this build.
+               */
+              secondaryLabel={buyCashLabel}
+              secondaryTestID="store-buy-cash"
+              onSecondary={() => setBuyIssue(t('store.cashNotOpen'))}
+              secondaryNote={t('store.cashNotOpen')}
             />
           </>
         )}
