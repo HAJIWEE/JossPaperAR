@@ -2729,6 +2729,27 @@ function accountChecks(): void {
   // ⚠️ A `!` rule can put a secret BACK. The one legitimate un-ignore is `.env.example`, which holds no key.
   check('⚠️ …and no `!` rule re-includes a real `.env`',
     !EASIGNORE_RULES.some((l) => l.startsWith('!') && /\.env(?!\.example)/.test(l)));
+  /**
+   * ⚠️⚠️ **AN UNANCHORED `android/` MATCHES AT ANY DEPTH — AND THIS REPO HAS A LOCAL EXPO MODULE.**
+   * Measured 2026-11-08: `.easignore` carried bare `android/` and `ios/`, which silently stripped
+   * `modules/zoom-range/android` and `/ios` — the NATIVE SOURCE of a real module — out of every build
+   * archive. ⚠️ **`git` never saw it** (`.gitignore` has no such rule), so the tree looked clean; the only
+   * thing that noticed was **`expo-doctor`'s "common project setup issues" check**, which failed CI.
+   * ⚠️ So the rule must be `/android/` and `/ios/`: the generated ROOT trees only.
+   */
+  const BARE_NATIVE = EASIGNORE_RULES.filter((l) => /^(android|ios)\/?$/.test(l));
+  check('⚠️⚠️ `.easignore` anchors `/android/` and `/ios/` — a bare one strips a local module\'s native source',
+    BARE_NATIVE.length === 0
+      && EASIGNORE_RULES.includes('/android/')
+      && EASIGNORE_RULES.includes('/ios/'),
+    `unanchored: ${BARE_NATIVE.join(', ')}`);
+  // ⚠️ POSITIVE CONTROL — the detector must fire on the unanchored form, or "none found" is vacuous.
+  check('⚠️ guard: the unanchored-native detector WOULD fire on a bare `android/`',
+    ['android/', 'ios', '/android/'].filter((l) => /^(android|ios)\/?$/.test(l)).length === 2);
+  // ⚠️ And the check is about something REAL: this repo does carry a local module with native dirs.
+  check('⚠️ …and that matters because a local Expo module with native dirs is present',
+    existsSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'modules', 'zoom-range', 'android'))
+      && existsSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'modules', 'zoom-range', 'ios')));
   // ⚠️ POSITIVE CONTROL — that detector must fire on an un-ignore of `.env`, or "no bad rule" is vacuous.
   check('⚠️ guard: the un-ignore detector WOULD fire on `!.env`',
     /\.env(?!\.example)/.test('!.env'));
