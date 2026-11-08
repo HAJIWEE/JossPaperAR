@@ -104,8 +104,14 @@ function DecorationsBlock() {
             onPress={() => undefined}
             style={({ pressed }) => [
               styles.card,
-              { width: STORE.card.w * s },
-                ]}
+              /**
+               * ⚠️⚠️ **BORDER FROM THE BOARD** (owner, 2026-11-08: *"the decorations page individual items is also
+               * missing their borders"*). `card · X (bg)` on `EN · 7b` is **165 × 150 with r14 and a 2.5 ink
+               * stroke** — and this screen had dropped the stroke entirely, so the cards floated as bare paper
+               * with nothing separating them from the page.
+               */
+              { width: 165 * s, minHeight: 150 * s, borderRadius: 14 * s, borderWidth: 2.5 * s, borderColor: brand.ink },
+            ]}
           >
             <View style={{ height: STORE.card.artH * s, alignItems: 'center', justifyContent: 'center' }}>
               <DecorationArt code={item.code} size={STORE.card.artH * s} />
@@ -427,7 +433,17 @@ const styles = StyleSheet.create({
   },
   cashBtnLabel: { color: brand.ink, fontSize: 14, fontWeight: '700' },
   /** ⚠️ The two-chip row (cash + points) — the board draws them side by side, not stacked. */
-  chips: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  /**
+   * ⚠️⚠️ **THE BALANCE ROW IS RIGHT-ALIGNED** (owner, 2026-11-08: *"the UI Layout for the cash and points display is
+   * not right aligned like the penpot design"*).
+   *
+   * ⚠️ The board settles it: `chip · points balance (bg)` on `EN · 7b` sits at **x 250 of 390** — **18 dp from the
+   * right edge** — at 122 × 28. It answers "how much do I have?", so the group hugs that edge while the reading
+   * column above it stays left-flush.
+   * ⚠️ `alignSelf: stretch` is what makes `flex-end` mean anything: without it the row shrink-wraps its content and
+   * both alignments look identical.
+   */
+  chips: { flexDirection: 'row', gap: 8, marginBottom: 8, alignSelf: 'stretch', justifyContent: 'flex-end' },
 
   chip: {
     alignSelf: 'flex-end',
