@@ -76,7 +76,7 @@ import {
   scanDecision,
   shouldHoldInvite,
 } from '../invite-flow.ts';
-import { LOCALES, MESSAGES, detectLocale, localized, messageKeys, setLocale, t } from '../i18n.ts';
+import { LOCALES, MESSAGES, activeLocale, detectLocale, localized, messageKeys, setLocale, t } from '../i18n.ts';
 import {
   LOCALE_KEY,
   LOCALE_LABELS,
@@ -2809,6 +2809,79 @@ function accountChecks(): void {
   // ⚠️ POSITIVE CONTROL — the boundary check above is only meaningful if the window is not trivially large/small.
   check('⚠️ guard: the interval is exactly 7 days, not a week-ish guess',
     NAME_CHANGE_INTERVAL_DAYS === 7 && NAME_CHANGE_INTERVAL_MS === 7 * DAY_MS);
+
+  /**
+   * ⚠️⚠️ **A BARE `{placeholder}` RENDERS LITERALLY, AND THE OWNER FOUND IT** (2026-11-08: *"i dont see one when
+   * i go to change the name"* — the sheet read *"once every {days} days"*).
+   *
+   * The app uses **`i18n-js`**, whose interpolation syntax is `%{name}` — so my `{days}` was never substituted.
+   * ⚠️ **Nothing could see it**: `tsc` is happy, the key existed in both locales, and the string WAS rendered —
+   * it just read as braces. ⚠️ So this asserts the syntax across EVERY message in BOTH locales, not just the ones
+   * in this feature, because the next author will make the same mistake.
+   */
+  const barePlaceholders = (locale: Record<string, string>, name: string): string[] =>
+    Object.entries(locale)
+      .filter(([, v]) => typeof v === 'string' && /(?<!%)\{[A-Za-z_]/.test(v))
+      .map(([k]) => `${name}:${k}`);
+  const bare = [...barePlaceholders(MESSAGES.en, 'en'), ...barePlaceholders(MESSAGES.zh, 'zh')];
+  check('⚠️⚠️ no message uses a bare `{placeholder}` — i18n-js only substitutes `%{name}`',
+    bare.length === 0, bare.join(', '));
+  // ⚠️ POSITIVE CONTROL — the detector must fire on the exact mistake that shipped, or "none found" is vacuous.
+  check('⚠️ guard: the placeholder detector WOULD catch the `{days}` that shipped',
+    barePlaceholders({ probe: 'once every {days} days' }, 'probe').length === 1
+      && barePlaceholders({ probe: 'once every %{days} days' }, 'probe').length === 0);
+
+  /**
+   * ⚠️⚠️ **AND THE SYNTAX IS NOT THE BEHAVIOUR — THIS RENDERS EVERY `%{…}` MESSAGE THROUGH THE APP'S OWN
+   * INSTANCE.** ⚠️ The syntax check above would pass on a table that the instance cannot resolve, and a dotted key
+   * used to do exactly that (`[missing "en.ritual.cannotPrepare" translation]`, SCRUM-53/64 — the reason
+   * `defaultSeparator` is `\u0000`). ⚠️ So this asks the library, not the source: substitute every declared
+   * placeholder with a number and fail if any `{…}` survives or a key does not resolve.
+   */
+  const localeBefore = activeLocale();
+  const unresolved: string[] = [];
+  for (const loc of ['en', 'zh'] as const) {
+    setLocale(loc);
+    for (const [key, value] of Object.entries(MESSAGES[loc])) {
+      if (typeof value !== 'string' || !value.includes('%{')) continue;
+      const vars: Record<string, string> = {};
+      for (const m of value.matchAll(/%\{([A-Za-z_]\w*)\}/g)) vars[m[1]] = '7';
+      const rendered = t(key, vars);
+      if (rendered.includes('[missing') || /\{[A-Za-z_]/.test(rendered)) unresolved.push(`${loc}:${key}`);
+    }
+  }
+  setLocale(localeBefore);
+  check('⚠️⚠️ every `%{…}` message really interpolates through the app instance — no raw braces, no missing key',
+    unresolved.length === 0, unresolved.join(', '));
+  // ⚠️ POSITIVE CONTROL — the sweep must be able to fail; `7` days is the copy under test.
+  check('⚠️ guard: the interpolation sweep finds the limit copy and it reads as a sentence',
+    (() => {
+      const before = activeLocale();
+      setLocale('en');
+      const out = t('profile.nameLimitNote', { days: '7' });
+      setLocale(before);
+      return out === 'You can change your name once every 7 days.';
+    })());
+
+  /**
+   * ⚠️ **AND THE LIMIT MUST BE VISIBLE IN THE SHEET, NOT JUST TRANSLATED.** ⚠️ The first version put the notice
+   * inside the hint paragraph, where it read as boilerplate. This reads the RENDERED element (the same lesson as
+   * `AppMark`: assert on what draws, not on what is declared).
+   */
+  const PROFILE_SCREEN_SRC = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'app', 'profile.tsx'),
+    'utf8',
+  );
+  check('⚠️⚠️ the weekly limit is RENDERED as its own notice in the name sheet',
+    PROFILE_SCREEN_SRC.includes('testID="profile-name-limit"')
+      && /t\('profile\.nameLimitNote',\s*\{\s*days:/.test(PROFILE_SCREEN_SRC));
+  check('⚠️ …and both locales carry it with the `%{days}` placeholder',
+    MESSAGES.en['profile.nameLimitNote']?.includes('%{days}') === true
+      && MESSAGES.zh['profile.nameLimitNote']?.includes('%{days}') === true);
+  // ⚠️ POSITIVE CONTROL — a hardcoded sentence would pass a "does it exist" check but drift from the constant.
+  check('⚠️ guard: the notice takes the interval as a PARAMETER, so the copy cannot disagree with the rule',
+    !/'profile\.nameLimitNote': '[^']*\b7\b/.test(readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '..', 'i18n.ts'), 'utf8')));
 
 
   const NAME_MIGRATION = readFileSync(

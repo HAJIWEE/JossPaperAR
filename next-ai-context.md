@@ -2082,6 +2082,23 @@ kept the dot (`张.伟`). `supabase/tests/profile_name.sql` S1–S7; fault-teste
 **Gates 831** (+10) · `tsc` 0 · 20/20. **US$0.00.**
 
 
+## 2026-11-08 (S79l) — the limit warning rendered as `{days}`, and i18n-js wants `%{days}`
+
+⚠️⚠️ **Owner: "i dont see one when i go to change the name."** He was right, and the cause was not layout — it was a
+placeholder **the library never substitutes**. The app uses **`i18n-js`**, syntax **`%{name}`**; I wrote `{days}`,
+so the sheet printed *"once every {days} days"*. ⚠️ **Nothing could see it**: `tsc` fine, key in both locales, string
+rendered. `check:lib` only compared key SETS.
+
+**Fixed:** the limit is its **own bordered notice** above the field (not a clause in the hint paragraph), and there is
+now a gate on the **CLASS** — no bare `{placeholder}` in either locale — plus a sweep that RENDERS every `%{…}`
+message **through the app's own instance** and fails on a surviving brace or `[missing]`.
+
+⚠️ **My first sweep was a FALSE GREEN**: the probe built `new I18n(...)` WITHOUT `defaultSeparator`, printed
+`[missing … translation]`, and a brace-only detector passed it. Render through the real instance or don't claim it.
+
+**Gates 838** (+7) · fault-tested red 3 of 838. **US$0.00.**
+
+
 ## Next, in order
 
 1. **`SCRUM-215`'s remaining half** — the SMTP provider + the two templates carrying `{{ .Token }}`, then

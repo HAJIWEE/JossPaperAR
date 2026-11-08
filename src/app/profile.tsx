@@ -345,9 +345,20 @@ export default function ProfileScreen() {
         <View style={styles.scrim}>
           <View style={styles.sheet} testID="profile-name-sheet" accessibilityViewIsModal>
             <Text style={styles.sheetTitle}>{t('profile.nameRow')}</Text>
-            <Text style={styles.sheetBody}>
-              {t('profile.nameHint', { days: String(NAME_CHANGE_INTERVAL_DAYS) })}
-            </Text>
+            <Text style={styles.sheetBody}>{t('profile.nameHint')}</Text>
+            {/*
+              ⚠️⚠️ **THE WEEKLY LIMIT GETS ITS OWN LINE, AND THAT IS THE POINT** (owner, 2026-11-08: *"i dont see
+              one when i go to change the name"*). It used to be a clause at the end of the hint paragraph, where it
+              read as boilerplate — while being the one thing that costs the user something. Now it is a bordered
+              notice directly under the hint, before the field, so it is read BEFORE a name is typed.
+              ⚠️ And it uses `%{days}` — the `i18n-js` syntax. The first version wrote `{days}`, which rendered
+              literally as `{days}`; `check:lib` now forbids a bare placeholder in either locale.
+            */}
+            <View style={styles.limitNote} testID="profile-name-limit">
+              <Text style={styles.limitNoteText}>
+                {t('profile.nameLimitNote', { days: String(NAME_CHANGE_INTERVAL_DAYS) })}
+              </Text>
+            </View>
             <TextInput
               testID="profile-name-input"
               value={draft}
@@ -436,6 +447,21 @@ const styles = StyleSheet.create({
   sheet: { backgroundColor: surface.paper, borderRadius: 14, padding: 24, borderWidth: 2.5, borderColor: brand.ink },
   sheetTitle: { color: text.ink, fontSize: 19, fontWeight: '700' },
   sheetBody: { color: text.inkSoft, fontSize: fontSize.body.at390, marginTop: 8, lineHeight: 20 },
+  /**
+   * ⚠️ A bordered NOTICE, not another grey sentence: the weekly limit is the one line in this sheet that costs the
+   * user something, so it must not read as fine print. Cinnabar edge + paper ground = the same emphasis the code
+   * box uses on the sign-in sheet, and no new colour.
+   */
+  limitNote: {
+    marginTop: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: brand.cinnabar,
+    backgroundColor: surface.paper,
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  limitNoteText: { color: text.ink, fontSize: fontSize.caption.at390, lineHeight: 18, fontWeight: '600' },
   input: {
     marginTop: 16,
     minHeight: 52,

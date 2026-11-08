@@ -569,6 +569,25 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 >
 > **Gates: 831** (from 821) · `tsc` **0** · 20/20. Two fault-tested red (rounding the wait down; moving the
 > backfill after the trigger). **US$0.00.**
+>
+> ── ⚠️⚠️ FOLLOW-UP THE SAME DAY: THE WARNING WAS THERE AND RENDERED AS `{days}` ──────────────────
+> **Owner:** *"Can you make sure that there is a warning about the weekly once limit for name change in the UI
+> currently i dont see one when i go to change the name."* ⚠️ **He was right, and the cause was not layout — it was
+> a placeholder the library never substitutes.**
+>
+> The app uses **`i18n-js`**, whose interpolation syntax is **`%{name}`** (see `home.streakLabel`). ⚠️ **I wrote
+> `{days}`**, so the sheet rendered the literal words *"once every {days} days"* — and ⚠️ **nothing could see it**:
+> `tsc` was happy, the key existed in both locales, and the string *was* rendered. `check:lib` compared key SETS.
+>
+> **Two fixes.** (1) The limit is now its **own bordered notice** above the field, not a clause at the end of the
+> hint paragraph — it was fine print about the one thing that costs the user something. (2) ⚠️ **A gate on the CLASS,
+> not the instance**: no message in EITHER locale may contain a bare `{placeholder}`, plus a sweep that renders every
+> `%{…}` message **through the app's own instance** (the one lesson `defaultSeparator` exists for) and fails on a
+> surviving brace or a `[missing]` key. ⚠️ The first version of that sweep was a **false green** — my probe built a
+> plain `new I18n(...)` without the separator, printed `[missing … translation]`, and my brace-only detector passed it.
+>
+> **Gates: 838** (from 831) · `tsc` **0** · 20/20. Fault-tested red on the shipped mistake: 3 of 838.
+> ⚠️ **The lesson:** "the key exists in both locales" is not "the user can read it".
 
 
 ### 12.54 · S79j — the in-app mark was a BLACK SLAB: strokes (and two radii) were never scaled (2026-11-08)

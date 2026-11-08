@@ -266,8 +266,11 @@ export const MESSAGES = {
     'profile.namePrompt': 'Add your name',
     'profile.nameRow': 'Your name',
     'profile.nameNotSet': 'Not set yet',
-    'profile.nameHint':
-      "Your own name, for your profile. Your clan's name lives on the Clan page. You can change it once every {days} days.",
+    'profile.nameHint': "Your own name, for your profile. Your clan's name lives on the Clan page.",
+    // ⚠️ THE LIMIT IS ITS OWN LINE, NOT A CLAUSE INSIDE THE HINT (owner, 2026-11-08: *"i dont see one when i go
+    // to change the name"*). Buried at the end of a paragraph it read as boilerplate. It now has one job and its
+    // own styled row in the sheet, because it is a COST the user is about to pay.
+    'profile.nameLimitNote': 'You can change your name once every %{days} days.',
     'profile.namePlaceholder': 'e.g. Ah Gwee',
     'profile.nameSave': 'Save name',
     'profile.nameSaving': 'Saving…',
@@ -277,8 +280,8 @@ export const MESSAGES = {
     // ⚠️ The once-a-week limit (SCRUM-223). ⚠️ `{days}` is the DATABASE's interval and `{remaining}` is this
     // user's wait — two different numbers. Reusing one placeholder for both would print "once every 2 days" to
     // someone with 2 days left.
-    'profile.nameLockedSub': 'Change again in {remaining} days',
-    'profile.nameTooSoon': 'A name can be changed once every {days} days. Try again in {remaining} days.',
+    'profile.nameLockedSub': 'Change again in %{remaining} days',
+    'profile.nameTooSoon': 'A name can be changed once every %{days} days. Try again in %{remaining} days.',
     // ⚠️ The tablet sheet (SCRUM-146 · SCRUM-168). Every limit named here is the DB's own.
     // ⚠️ The sheet's copy is `EN · 1s Ancestor sheet` / `EN · 1s2 … / edit mode`, read off
     // Penpot 2026-11-01 — NOT written here. The title says *ancestor* (the person), not
@@ -692,7 +695,8 @@ export const MESSAGES = {
     'profile.namePrompt': '添加你的名字',
     'profile.nameRow': '你的名字',
     'profile.nameNotSet': '尚未设置',
-    'profile.nameHint': '这仅是你的个人档案名字，宗族名称请到宗族页面查看。每 {days} 天可修改一次。',
+    'profile.nameHint': '这仅是你的个人档案名字，宗族名称请到宗族页面查看。',
+    'profile.nameLimitNote': '名字每 %{days} 天只能修改一次。',
     'profile.namePlaceholder': '例如：阿贵',
     'profile.nameSave': '保存名字',
     'profile.nameSaving': '保存中…',
@@ -701,8 +705,8 @@ export const MESSAGES = {
     'profile.nameFailed': '名字未能保存 — 请重试。',
     // ⚠️ 每 7 天只能修改一次（SCRUM-223）。`{days}` 是数据库的间隔，`{remaining}` 是这位用户还需等待的天数 —
     // 两个不同的数字，混用会让只剩 2 天的人看到「每 2 天可修改一次」。
-    'profile.nameLockedSub': '{remaining} 天后可再次修改',
-    'profile.nameTooSoon': '名字每 {days} 天只能修改一次，请 {remaining} 天后再试。',
+    'profile.nameLockedSub': '%{remaining} 天后可再次修改',
+    'profile.nameTooSoon': '名字每 %{days} 天只能修改一次，请 %{remaining} 天后再试。',
     // ⚠️ 牌位弹层 — 文案取自 `ZH · 1s 安奉牌位` / `ZH · 1s2 … / 编辑`（Penpot，2026-11-01）。
     'ancestor.titleAdd': '添加祖先',
     'ancestor.titleEdit': '编辑祖先',
