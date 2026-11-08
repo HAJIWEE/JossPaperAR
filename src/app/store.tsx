@@ -35,7 +35,7 @@ import { collectedItemName } from '@/lib/collection';
 import { purchaseItem } from '@/lib/offerings-api';
 import { HUD } from '@/lib/profile';
 import { STORE, STORE_TABS, baseMetaValue, decorationList, pointsPrice, storeList, type StoreTabId } from '@/lib/store';
-import { DESIGN_REFERENCE_WIDTH, brand, fontSize, surface, text } from '@/theme/tokens';
+import { DESIGN_REFERENCE_WIDTH, brand, fontSize, onColorCream, surface, text } from '@/theme/tokens';
 
 function scale(): number {
   return Dimensions.get('screen').width / DESIGN_REFERENCE_WIDTH;
@@ -243,29 +243,36 @@ export default function StoreScreen() {
             {/* ── the switcher ⚠️ Decorations is disabled, not dead ────────── */}
             {/* The pill BACKGROUND first — `switcher · category (bg)`, r19, ink 2.5. */}
             <View
-              style={[styles.switcherBg, { height: STORE.switcherBg.h * s, borderRadius: STORE.switcherBg.radius * s, borderWidth: STORE.switcherBg.stroke * s, paddingHorizontal: 3 * s }]}
+              /**
+               * ⚠️⚠️ **GEOMETRY FROM THE BOARD, NOT FROM MEMORY** (`switcher · category (bg)` on `EN · 7b`):
+               * 350 × 38, r19, ink stroke 2.5, and the two segments sit inside it at 171 × 33 with **NO border
+               * of their own**. ⚠️ The first version bordered every pill, which grew each one by 4 px and pushed
+               * the pair into the container's own stroke — the misalignment the owner saw.
+               */
+              style={[styles.switcherBg, { width: 350 * s, height: 38 * s, borderRadius: 19 * s, borderWidth: 2.5 * s, paddingHorizontal: 2.5 * s }]}
               testID="store-switcher"
             >
-            <View style={[styles.switcher, { gap: (STORE.switcher.xs[1] - STORE.switcher.xs[0] - STORE.switcher.w) * s }]}>
+            <View style={styles.switcher}>
               {STORE_TABS.map((tab) => (
                 <Pressable
                   key={tab.id}
                   onPress={() => setTabId(tab.id)}
                   testID={`store-tab-${tab.id}`}
                   accessibilityState={{ disabled: !tab.enabled }}
+                  /**
+                   * ⚠️⚠️ **SELECTION, NOT ENABLEDNESS.** The pills used to be styled by `tab.enabled` — so the
+                   * day Decorations was enabled, BOTH drew as the active cinnabar segment. ⚠️ Two identical red
+                   * pills is not a switcher; the state has to be `tab.id === tabId`.
+                   * ⚠️ And no per-pill border: the board's only stroke is the container's.
+                   */
                   style={[
                     styles.tab,
-                    {
-                      width: STORE.switcher.w * s,
-                      height: STORE.switcher.h * s,
-                      borderRadius: STORE.switcher.radius * s,
-                    },
-                    tab.enabled && styles.tabOn,
-                    !tab.enabled && styles.tabOff,
+                    { width: 171 * s, height: 33 * s, borderRadius: 16.5 * s },
+                    tabId === tab.id ? styles.tabOn : styles.tabOff,
                   ]}
                 >
                   <Text
-                    style={[styles.tabText, { fontSize: 13.5 * s }, tab.enabled && styles.tabTextOn]}
+                    style={[styles.tabText, { fontSize: 13.5 * s }, tabId === tab.id ? styles.tabTextOn : styles.tabTextOff]}
                     numberOfLines={1}
                   >
                     {t(tab.labelKey)}
@@ -440,11 +447,15 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   switcher: { flexDirection: 'row' },
-  tab: { alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: brand.ink },
+  /** ⚠️ NO border, NO opacity — the board's segment is a flat fill and the container carries the only stroke. */
+  tab: { alignItems: 'center', justifyContent: 'center' },
   tabOn: { backgroundColor: brand.cinnabar },
-  tabOff: { backgroundColor: 'transparent', opacity: 0.45 },
+  // ⚠️ Unselected is the CONTAINER's own ground showing through, so it reads as a well, not a dimmed button.
+  tabOff: { backgroundColor: 'transparent' },
   tabText: { color: text.ink, fontWeight: '700' },
-  tabTextOn: { color: surface.paper },
+  /** ⚠️ Both colours are the board's: `#fff8e8` on the active segment, `#4a463f` off it. */
+  tabTextOn: { color: onColorCream },
+  tabTextOff: { color: text.inkSoft },
   featured: {
     marginTop: 16,
     backgroundColor: surface.row,

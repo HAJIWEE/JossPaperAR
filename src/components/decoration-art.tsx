@@ -18,7 +18,7 @@
  * (`EN · 1e Home / decorated (festive set)`), so it must be composed from the parts rather than traced.
  */
 
-import Svg, { Rect } from 'react-native-svg';
+import Svg, { G, Path, Rect } from 'react-native-svg';
 
 import type { DecorationCode } from '@/domain/catalogue';
 import { brand, surface } from '@/theme/tokens';
@@ -47,18 +47,39 @@ interface Ink {
 /** ⚠️ Typed on `brand`'s own keys, so a mistyped token is a COMPILE error rather than a silent `undefined` fill. */
 const C = (k: TokenKey) => brand[k];
 
-/** `decor · lantern (top-left)` — 52 × 66, 6 painted shapes. The lantern pair at the head of the altar. */
-const LANTERN: { box: readonly [number, number]; inks: readonly Ink[] } = {
-  box: [52, 66],
+/**
+ * `art · Lanterns` — 85.1 × 72, the SEVEN-B card painting: a gold bar above TWO hexagonal lanterns, each traced
+ * as a PATH (not a stack of rects), with gold caps, a tassel bead and a tassel. Read off `EN · 7b`, 2026-11-08.
+ * ⚠️ This replaces a port of `decor · lantern (top-left)` (52 × 66) — the single lantern the SHRINE hangs, which
+ * is the wrong drawing for a store card and is why the card looked off.
+ * ⚠️ The circles (`e` on the board) are rects with `rx` = half their width; the board draws no ovals here. ⚠️ The board's
+ * hanging cords are `#121418`, which is darker than any token; they are drawn as `ink` rather than adding a
+ * one-off hex, so the art stays inside the token set.
+ */
+const LANTERN: { box: readonly [number, number]; inks: readonly Ink[]; trails: readonly Trail[] } = {
+  box: [85.1, 72],
   inks: [
-    { x: 15.6, y: 0, w: 20.8, h: 1.4, fill: 'ink' },
-    { x: 6.5, y: 1.4, w: 39, h: 9.7, rx: 2, fill: 'cinnabar', stroke: 'ink', sw: 2.4 },
-    { x: 11.4, y: 4.4, w: 7.2, h: 4.2, fill: 'goldBright', stroke: 'ink', sw: 1.6 },
-    { x: 22.4, y: 4.4, w: 7.2, h: 4.2, fill: 'goldBright', stroke: 'ink', sw: 1.6 },
-    { x: 33.4, y: 4.4, w: 7.2, h: 4.2, fill: 'goldBright', stroke: 'ink', sw: 1.6 },
-    { x: 11.1, y: 14.6, w: 29.8, h: 43.4, rx: 14.9, fill: 'cinnabar', stroke: 'ink', sw: 2.6 },
-    { x: 24, y: 22, w: 4, h: 4, fill: 'goldBright', stroke: 'ink', sw: 1.4 },
-    { x: 24, y: 60, w: 4, h: 4, fill: 'goldBright', stroke: 'ink', sw: 1.4 },
+    { x: 10.5, y: 3.9, w: 64.2, h: 3.3, rx: 2.5, fill: 'goldDeep', stroke: 'ink', sw: 2 },
+    // ── left lantern ──
+    { x: 29.1, y: 7.2, w: 2, h: 9.2, fill: 'ink' },
+    { x: 24.9, y: 15.7, w: 10.5, h: 3.9, rx: 2, fill: 'goldDeep', stroke: 'ink', sw: 2 },
+    { x: 29.6, y: 19.6, w: 1, h: 20.9, fill: 'goldBright' },
+    { x: 26.2, y: 39.9, w: 7.9, h: 3.3, rx: 2, fill: 'goldDeep', stroke: 'ink', sw: 2 },
+    { x: 28.1, y: 43.2, w: 3.9, h: 3.9, rx: 1.95, fill: 'goldBright' },
+    { x: 29.1, y: 46.5, w: 2, h: 10.5, fill: 'goldBright' },
+    // ── right lantern ──
+    { x: 54, y: 7.2, w: 2, h: 9.2, fill: 'ink' },
+    { x: 49.8, y: 15.7, w: 10.5, h: 3.9, rx: 2, fill: 'goldDeep', stroke: 'ink', sw: 2 },
+    { x: 54.5, y: 19.6, w: 1, h: 20.9, fill: 'goldBright' },
+    { x: 51.1, y: 39.9, w: 7.9, h: 3.3, rx: 2, fill: 'goldDeep', stroke: 'ink', sw: 2 },
+    { x: 53, y: 43.2, w: 3.9, h: 3.9, rx: 1.95, fill: 'goldBright' },
+    { x: 54, y: 46.5, w: 2, h: 10.5, fill: 'goldBright' },
+  ],
+  trails: [
+    { d: 'M4253.6201171875,777.1090698242188L4260.166015625,766.6363525390625L4273.25830078125,766.6363525390625L4279.8046875,777.1090698242188L4273.25830078125,787.5818481445312L4260.166015625,787.5818481445312Z',
+      dx: -4236.62, dy: -747.04, fill: 'cinnabar', stroke: 'ink', sw: 3 },
+    { d: 'M4278.49560546875,777.1090698242188L4285.04150390625,766.6363525390625L4298.1337890625,766.6363525390625L4304.68017578125,777.1090698242188L4298.1337890625,787.5818481445312L4285.04150390625,787.5818481445312Z',
+      dx: -4236.6, dy: -747.04, fill: 'cinnabar', stroke: 'ink', sw: 3 },
   ],
 };
 
@@ -67,8 +88,9 @@ const LANTERN: { box: readonly [number, number]; inks: readonly Ink[] } = {
  * ones. ⚠️ This replaces an earlier port of `decor · couplet (side-left)` (41 × 160), which is the single scroll
  * the SHRINE hangs — the wrong drawing for a store card. Read off `EN · 7b` on 2026-11-08.
  */
-const COUPLET: { box: readonly [number, number]; inks: readonly Ink[] } = {
+const COUPLET: { box: readonly [number, number]; inks: readonly Ink[]; trails: readonly Trail[] } = {
   box: [85.1, 72],
+  trails: [],
   inks: [
     // the horizontal scroll, with its three gold blocks
     { x: 9.2, y: 5.2, w: 66.8, h: 17, rx: 3, fill: 'cinnabar', stroke: 'ink', sw: 3 },
@@ -94,7 +116,7 @@ const COUPLET: { box: readonly [number, number]; inks: readonly Ink[] } = {
  * the art is pending. ⚠️ Reusing one lantern for four decorations would be worse than a placeholder, because it
  * looks finished.
  */
-const MOTIFS: Record<DecorationCode, { box: readonly [number, number]; inks: readonly Ink[] } | null> = {
+const MOTIFS: Record<DecorationCode, { box: readonly [number, number]; inks: readonly Ink[]; trails: readonly Trail[] } | null> = {
   lanterns: LANTERN,
   spring_couplets: COUPLET,
   zhong_kui: null,
@@ -115,6 +137,21 @@ export function portedDecorationCodes(): readonly DecorationCode[] {
  * ⚠️ No background is painted: a decoration sits over the altar, and a filled backdrop would cover what it
  * decorates (the same reasoning as the cut-outs in `offering-art.tsx`).
  */
+/**
+ * ⚠️ A traced PATH, in the board's own `d` data.
+ * ⚠️⚠️ Penpot writes path data in ABSOLUTE board coordinates (`M4253.6,777.1L…`), so a `d` cannot simply be
+ * dropped into a motif's small viewBox — each one carries the translate that brings it back to the motif's
+ * origin. ⚠️ The numbers below are the group's own absolute origin, subtracted once at read time.
+ */
+interface Trail {
+  readonly d: string;
+  readonly dx: number;
+  readonly dy: number;
+  readonly fill: TokenKey | null;
+  readonly stroke?: TokenKey;
+  readonly sw?: number;
+}
+
 export function DecorationArt({ code, size }: { code: DecorationCode; size: number }) {
   const motif = MOTIFS[code];
   if (motif === null) {
@@ -141,6 +178,18 @@ export function DecorationArt({ code, size }: { code: DecorationCode; size: numb
           stroke={r.stroke === undefined ? undefined : C(r.stroke)}
           strokeWidth={r.sw ?? 0}
         />
+      ))}
+      {/* ⚠️ Traced paths last, so a body is never covered by a later rectangle. */}
+      {motif.trails.map((t, i) => (
+        <G key={`t${i}`} transform={`translate(${t.dx}, ${t.dy})`}>
+          <Path
+            d={t.d}
+            fill={t.fill === null ? 'none' : C(t.fill)}
+            stroke={t.stroke === undefined ? undefined : C(t.stroke)}
+            strokeWidth={t.sw ?? 0}
+            strokeLinejoin="round"
+          />
+        </G>
       ))}
     </Svg>
   );
