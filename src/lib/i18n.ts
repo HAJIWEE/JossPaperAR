@@ -166,6 +166,16 @@ export const MESSAGES = {
     'settings.policies': 'Privacy policy · Terms of Service',
     'settings.policiesSub': 'Published at josspaperar.app',
     'settings.signOut': 'Sign out',
+    // ⚠️ SCRUM-215 — this row carried `settings.notBuilt` until the sign-out was built. A sub-label now
+    // says what the row DOES, because the sub is what distinguishes a real row from a dead one.
+    'settings.signOutSub': 'This device goes back to anonymous',
+    'settings.signOutTitle': 'Sign out?',
+    // ⚠️ The body NAMES the consequence, the standard the delete card is held to: the account is not
+    // erased, it is left behind — and the email is what brings it back.
+    'settings.signOutBody': 'You go back to an anonymous device. Your offerings, collection and tribute points stay with the account — sign in again with your email to get them back.',
+    'settings.signOutConfirm': 'Sign out',
+    'settings.signingOut': 'Signing out…',
+    'settings.signOutFailed': 'The sign out did not go through — you are still signed in. Try again.',
     // ⚠️ The confirm's body names the CONSEQUENCES, which is what SCRUM-151 asks for — a card that
     // says only "are you sure?" is the thing ADR-007's one-tap delete is not allowed to be.
     'settings.deleteTitle': 'Delete everything?',
@@ -582,6 +592,12 @@ export const MESSAGES = {
     'settings.policies': '隐私政策 · 服务条款',
     'settings.policiesSub': '发布于 josspaperar.app',
     'settings.signOut': '退出登录',
+    'settings.signOutSub': '此设备将回到匿名状态',
+    'settings.signOutTitle': '退出登录？',
+    'settings.signOutBody': '此设备将回到匿名状态。供品、收藏与功德点仍保留在账号中 — 用邮箱重新登录即可取回。',
+    'settings.signOutConfirm': '退出登录',
+    'settings.signingOut': '正在退出…',
+    'settings.signOutFailed': '退出未成功 — 仍处于登录状态。请重试。',
     'settings.deleteTitle': '删除全部？',
     'settings.deleteBody': '此操作将清空你的供品、收藏与功德点，无法撤销，并将回到首次使用状态。',
     'settings.deleteConfirm': '删除全部',

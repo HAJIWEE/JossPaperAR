@@ -19,6 +19,7 @@
 
 import { ACCOUNT_MODES, type AccountMode } from './account-flow.ts';
 import { reasonFromAuthError } from './session-map.ts';
+import { ensureAnonymousSession } from './session.ts';
 import { isConfigured, supabase } from './supabase.ts';
 
 export type AccountResult = { readonly ok: true } | { readonly ok: false; readonly reason: string };
@@ -75,6 +76,49 @@ export async function confirmAccountCode(
   } catch {
     return { ok: false, reason: 'transport' };
   }
+}
+
+/**
+ * ⚠️ **SIGN OUT — leave the ACCOUNT, not the app.**
+ *
+ * ⚠️ **A BARE `signOut()` WOULD LEAVE THE DEVICE DEAD, and that is the whole reason this is two steps.**
+ * ADR-004 gives every install an anonymous session, and `ensureAnonymousSession()` only calls
+ * `signInAnonymously` when there is **no** session at all (`planSession` → `sign_in`). So:
+ *   1. `auth.signOut()` — drop the account's session, and (`scope: 'global'`) revoke its refresh tokens;
+ *   2. `ensureAnonymousSession()` — mint the fresh ANONYMOUS identity the rest of the app assumes.
+ * ⚠️ **Skipping (2)** leaves the next authenticated read with `42501` while the user looks at an empty
+ * shrine — the same defect `account-api.ts` records for the delete path, one step further on.
+ *
+ * ⚠️ **SIGNING OUT ERASES NOTHING — unlike `resetIdentity()`.** That one is delete-then-fresh-identity,
+ * *"back to first run"*, and it is the only caller of `clearFirstRun()`. This one leaves the account's
+ * tributes, ancestors and streak **on the server**: signing back in with the email returns them. ⚠️ So the
+ * SCREEN must not clear the tutorial record either — nothing about this device's first run changed, and
+ * replaying the walkthrough on a sign-out would be a lie about what happened.
+ *
+ * ⚠️ **A FAILURE IS REPORTED, never swallowed.** *"You are still signed in"* and *"you are signed out"*
+ * must not render the same — the rule `sendAccountCode` above states.
+ *
+ * ⚠️ **`scope: 'global'` IS EXPLICIT ON PURPOSE.** The SDK's default is global, but this account's posture
+ * (ADR-007) prefers revoking the refresh tokens over leaving one alive on a device someone may have picked
+ * up. ⚠️ If a multi-device story ever lands, revisit it: `'local'` signs out only this device, and global
+ * would kick the user off their other one.
+ */
+export async function signOutAccount(): Promise<AccountResult> {
+  if (!isConfigured()) return { ok: false, reason: 'not_configured' };
+
+  try {
+    const { error } = await supabase().auth.signOut({ scope: 'global' });
+    if (error) return { ok: false, reason: reasonFromAuthError(error) };
+  } catch {
+    return { ok: false, reason: 'transport' };
+  }
+
+  /**
+   * ⚠️ Step 2 is NOT cleanup — it is the operation. The sign-out above leaves the device with no session,
+   * and this app has no anonymous-less state it can render.
+   */
+  const next = await ensureAnonymousSession();
+  return next.ok ? { ok: true } : { ok: false, reason: next.reason };
 }
 
 /**

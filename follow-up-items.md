@@ -24,6 +24,13 @@
   - ⚠️ **Two recorded DEVIATIONS from the board, not guesses:** `field · name` (**FAMILY NAME**, `0d6` @20,250) is **omitted** — **SCRUM-214(A)** is open and `profiles.display_label` is the natural column, but no write path is agreed; and `0c`'s `Use a password instead` / `Forgot or need help?` are omitted because **phase 1 is code-only**.
   - ⚠️ **`check:copy` was flagging CORRECT code** — it could not read object **shorthand** (`{ email }` has no colon), so every shorthand placeholder read as unsubstituted; the mirror of the blind first `check:copy`. Fixed, **+2 controls** (quiet on shorthand · still bites when shorthand omits one).
 
+- 📱 **S79 (2026-11-08) — SIGN OUT is built, so the account flow is no longer one-way (`SCRUM-215`). ⚠️ US$0.00 AI spend; no device run yet.**
+  - ✅ **What shipped:** `settings-signout` (drawn on `EN · 8b Settings`, disabled with `settings.notBuilt` since `SCRUM-151`) is now a live row → `ConfirmCard` → `signOutAccount()` → `/`. It unblocks the **email-link retest**: until now a device that took on an account could only leave it by wiping the install.
+  - ⚠️ **A bare `signOut()` would have been WORSE than the dead row:** `ensureAnonymousSession()` signs in **only when there is no session**, so the device would be left session-less while the shrine still rendered — every authenticated read answering **`42501`**. `signOutAccount()` is sign-out → **re-mint anonymous**, and `check:lib` asserts it on the **function slice** (a file-wide `includes` passes on `resetIdentity`'s code — a check that cannot fail).
+  - ⚠️ **It erases nothing** — no `deleteMyData`, and deliberately **no `clearFirstRun`**: *"back to first run"* is the delete's, not a sign-out's. Both absences asserted, **with a positive control** on `runDelete`.
+  - ⏳ **NOT yet on glass.** The device pass is what proves the fresh anonymous device is **clan-less** and that the **email signs back into the same account** — the two facts the gates cannot see.
+
+
 - 🧭 **`SCRUM-163` (To Do) — the geometry gate, incl. the 360 dp assertions.** Cheap. It is what stops the **absolute-vs-board-relative** class that has now shipped **four** times.
 - 🧭 **`SCRUM-164` (In Progress) — the tab bar is built, but the ticket asks for a **Book** entry and **a way back** from each destination.** Neither exists.
 - 🎯 **`SCRUM-208` (To Do) — ⚠️ YOURS, not mine: the Home board's active tab is `#9A2B18` on `#C23B22` = **1.44:1**. The build ships 4.90:1 and §22 pins both, but the **board** still needs the fix.**

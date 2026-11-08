@@ -1736,6 +1736,42 @@ phase 1 is code-only.
 no colon), so every shorthand placeholder read as unsubstituted — the mirror of the blind first
 `check:copy`. Fixed, with two controls (one that is quiet on shorthand, one that still bites).
 
+## 2026-11-08 (S79) — SIGN OUT is built, and the account flow stops being one-way
+
+**Built.** `settings-signout` — drawn on `EN · 8b Settings` and **disabled with `settings.notBuilt` since
+SCRUM-151** — is now live: row → `ConfirmCard` → `signOutAccount()` → `/`, as a **fresh anonymous device**.
+⚠️ **The retest it unblocks is the point:** before this, a device that took on an account could never leave
+it without wiping the install, so the **email-link path** could not be tried on glass at all.
+
+**⚠️ A bare `signOut()` would have been the real bug.** ADR-004 gives every install an anonymous session
+and `ensureAnonymousSession()` signs in **only when there is none** — so one `signOut()` leaves the device
+**session-less** while the shrine keeps rendering, and the next authenticated read answers **`42501`**. So
+`signOutAccount()` is **sign out → re-mint anonymous** (the pair `resetIdentity()` already makes), and the
+gate slices the **function**, not the file — a file-wide `includes` would have passed on `resetIdentity`'s
+code and proved nothing. That was a real mistake in my own first draft of the check: `signOutSrc.length > 0
+|| accountSrc.includes(...)` passes on the SCREEN handler existing, i.e. a check that cannot fail. Fixed
+before it shipped.
+
+**⚠️ It erases nothing, and the tutorial does NOT replay.** `resetIdentity()` is *"back to first run"* and
+the only caller of `clearFirstRun()`. Sign-out keeps tributes, ancestors and streak **on the server**, so
+the handler calls neither `deleteMyData` nor `clearFirstRun` — replaying the walkthrough would describe an
+erasure that did not happen. Both absences asserted, **with a control** proving the slicer does find
+`clearFirstRun` in `runDelete`.
+
+**`scope: 'global'` — read from the installed `GoTrueClient.d.ts`, not memory:** `signOut(options?:
+SignOut)` defaults to global; `SIGN_OUT_SCOPES = ['global','local','others']`. ⚠️ Multi-device would want
+`'local'`, since global also signs the user out of their **other** device.
+
+**Gates.** `check:lib` **761** green, each new gate **fault-tested red** individually (1 of 761 each time).
+⚠️ `tsc` shows **3** pre-existing errors — `expo-image-manipulator` / `expo-blob` are missing from the
+local `node_modules`, in files this session never touched. ⚠️ **A fresh worktree has no `node_modules` at
+all**; borrowed here with `cp -al` from the main checkout. **US$0.00** — no fal.ai call, no install.
+
+⚠️ **NOT done, and not claimable:** no **device pass** yet. The code path is proven by the gates; that the
+fresh anonymous device is really **clan-less**, and that the **email signs back into the same account**,
+is a glass fact and stays open until it is run.
+
+
 ## Next, in order
 
 1. **`SCRUM-215`'s remaining half** — the SMTP provider + the two templates carrying `{{ .Token }}`, then

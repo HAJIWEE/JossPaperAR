@@ -1907,6 +1907,10 @@ function localeChecks(): void {
     'settings.title', 'settings.general', 'settings.privacy', 'settings.language', 'settings.notBuilt',
     'settings.deleteAll', 'settings.deleteTitle', 'settings.deleteBody', 'settings.deleteConfirm',
     'settings.deleting', 'settings.deleteFailed', 'settings.retentionSub',
+    // ⚠️ SCRUM-215 — the sign-out row's own copy. ⚠️ It is in this list because the row is now LIVE: a
+    // missing 中文 string here would render the English key on a Chinese device.
+    'settings.signOut', 'settings.signOutSub', 'settings.signOutTitle', 'settings.signOutBody',
+    'settings.signOutConfirm', 'settings.signingOut', 'settings.signOutFailed',
   ];
   const missingCopy = SETTINGS_KEYS.filter((k) => !keyInBothLocales(k));
   check(`every Settings string exists in BOTH locales (${SETTINGS_KEYS.length})`,
@@ -2422,6 +2426,74 @@ function accountChecks(): void {
     normaliseEmail('  A@B.COM ') === 'a@b.com');
   check('the form steps are email → code, and the code is last',
     nextAccountStep('email') === 'code' && nextAccountStep('code') === null);
+
+  /**
+   * ── ⚠️ SIGN OUT (built 2026-11-08) ──────────────────────────────────────────
+   * The row has sat on Settings since **SCRUM-151**, rendered `disabled` with `settings.notBuilt`. ⚠️ The
+   * failure mode the build must not introduce is subtler than an inert row: a bare `signOut()` leaves the
+   * device holding **no session**, and `ensureAnonymousSession()` only signs in when there is none — so the
+   * next authenticated read answers `42501` while the shrine renders empty. That is why the pairing is
+   * asserted rather than trusted to a comment.
+   */
+  const SETTINGS_SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'app', 'settings.tsx');
+  const settingsSrc = readFileSync(SETTINGS_SRC, 'utf8');
+
+  /**
+   * ⚠️ Two slicers, because two DIFFERENT files hold the two halves: the SCREEN decides what the tap does
+   * (`runSignOut`), the LIBRARY decides what the call does (`signOutAccount`). ⚠️ Asking *"does it erase?"*
+   * of a whole file answers for the DELETE handler too — a check that cannot fail.
+   */
+  const handlerOf = (source: string, name: string): string => {
+    const at = source.indexOf(`const ${name} = useCallback`);
+    if (at < 0) return '';
+    const end = source.indexOf('}, []);', at);
+    return end < 0 ? '' : source.slice(at, end + '}, []);'.length);
+  };
+  const fnOf = (source: string, name: string): string => {
+    const at = source.indexOf(`export async function ${name}(`);
+    if (at < 0) return '';
+    const end = source.indexOf('\n}', at);
+    return end < 0 ? '' : source.slice(at, end + 2);
+  };
+  const signOutSrc = handlerOf(settingsSrc, 'runSignOut');
+  const deleteSrc = handlerOf(settingsSrc, 'runDelete');
+  const signOutFn = fnOf(accountSrc, 'signOutAccount');
+
+  check('⚠️ the sign-out ROW is wired to a real call and names its consequence (not `settings.notBuilt`)',
+    signOutSrc.includes('signOutAccount()')
+      && settingsSrc.includes('subKey="settings.signOutSub"'));
+
+  check('⚠️ the DEVICE half signs out, with an EXPLICIT scope',
+    signOutFn.includes("auth.signOut({ scope: 'global' })"));
+
+  /**
+   * ⚠️⚠️ **THE ASSERTION THIS BLOCK EXISTS FOR.** A bare `signOut()` leaves **no session**, and
+   * `ensureAnonymousSession()` signs in only when there is none — so without this second step the device keeps
+   * rendering while every authenticated read answers `42501`. ⚠️ And it is `signOutFn`, not the whole file:
+   * `account-api.ts`'s `resetIdentity` pairs the same two calls, so a file-wide `includes` would pass on
+   * someone else's code.
+   */
+  check('⚠️⚠️ …and RE-MINTS an anonymous identity, so the device is never left session-less (ADR-004)',
+    signOutFn.includes('ensureAnonymousSession()'));
+
+  check('⚠️ …and a failed sign-out is REPORTED, never swallowed — and the screen says so',
+    signOutFn.includes('if (error) return { ok: false')
+      && signOutSrc.includes("t('settings.signOutFailed')"));
+
+  check('⚠️⚠️ …and SIGNING OUT ERASES NOTHING — no delete, and no tutorial replay',
+    signOutSrc.length > 0
+      && !signOutSrc.includes('clearFirstRun')
+      && !signOutSrc.includes('deleteMyData'));
+
+  /**
+   * ⚠️ POSITIVE CONTROLS — every assertion above is an exact `includes`/`!includes`, so each is vacuous if its
+   * slicer matched NOTHING. These prove the slicers bite: `runDelete` IS found and DOES contain the
+   * `clearFirstRun` the sign-out is checked for not having, and `signOutAccount` is the SIGN-OUT — not the
+   * upgrade, so it must not call `updateUser`.
+   */
+  check('⚠️ guard: the slicers find runDelete + its clearFirstRun, and signOutAccount + its scope',
+    deleteSrc.length > 0 && deleteSrc.includes('clearFirstRun')
+      && signOutFn.length > 0 && !signOutFn.includes('updateUser'));
 }
 
 function storeChecks(): void {
