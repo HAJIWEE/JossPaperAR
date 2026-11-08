@@ -558,6 +558,11 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 > that replaced `strokeWidth={TABLET_STROKE}` with a literal `8` left the constants pristine and the gate **green**
 > while the app drew a slab. It now parses the **rendered elements**. Fault-tested red — `pair0 (8): 29.0 % of its
 > edge vs board 9.0 %` (1 of 821).
+>
+> ✅ **CONFIRMED ON GLASS, 2026-11-08** (Expo Go + Metro over `adb reverse`, so the ACTUAL working tree): the
+> sign-in wall's header now draws the gold tablet with a thin ink border, the cinnabar ring and a gold diamond —
+> matching the launcher icon. ⚠️ **Before the fix the same screen was the black slab** whose render is in §12.53's
+> commit; the two now agree because they share a ratio, not because someone eyed them.
 
 
 ### 12.53 · S79i — THE ICON AND THE SPLASH: the boards were there, the APK shipped Expo's defaults (2026-11-08)
@@ -589,6 +594,8 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 > library in CI) and the wiring: 1024² + colour type 2 for the icon, colour type 6 for the adaptive layers, and the
 > two colour assertions that catch a revert — **paper, not `#E6F4FE`**, and **`#1b1613` at 190 px**. Fault-tested
 > red: the adaptive colour reverted to Expo blue (1 of 814); the splash plugin deleted (1).
+>
+> ✅ **CONFIRMED ON GLASS, 2026-11-08** (Galaxy A-series, APK from build `7d6118d2`, installed 13:29:26): Android's own **App info** screen shows the gold tablet on the **cream `#F5F0E8`** adaptive ground — the corner brackets clip to nubs at 12/3/6/9 under the circular mask, the three small diamonds show at the top — and a cold start shows the **dark `#1b1613`** splash with the paper-coloured mark at 190 px. ⚠️ Read from the **device's** rendering, not from the source, because "the config names the file" was exactly what was true when it shipped Expo's default.
 
 
 ### 12.5 · SCRUM-59 — the AI-budget stop-rule, built (migration `0011`)
