@@ -150,7 +150,13 @@ is the second user ADR-004 rule 4 forbids). Use a fresh address to test sign-up.
   was accurate and the link shipped anyway, which is the same defect class this project already refuses for
   dead rows and dead toggles: **a control that cannot do what it promises is worse than an absent one.**
   The email now offers **only the six-digit code**, which is what the app can actually receive.
-  ⚠️ **What a real one-tap road needs — ALL THREE, and no two of them are enough:**
+  ⚠️⚠️ **AND IT IS NOT COMING BACK: email sign-in is CODE-ONLY by product decision, and Google sign-in is
+  expected to carry ~99% of users once the Google console is available** (owner, 2026-11-08). So the three
+  blockers below are recorded for the record, **not as a work item** — building the one-tap return would be
+  work spent on the road Google is about to replace. ⚠️ See `follow-up-items.md` → *GOOGLE SIGN-IN*, which
+  carries the trap that matters (the demo's anonymous user must keep its id, so first-run Google is
+  **link**-then-verify, not `signInWithOAuth`).
+  ⚠️ **For completeness, what one-tap would have needed — all three:**
   1. `emailRedirectTo` in `sendAccountCode()` (`emailRedirectTo` appears **nowhere** in `src/` today), so
      `.ConfirmationURL` has an app-shaped destination;
   2. a **handler for the return** — parse `#access_token=…&refresh_token=…` and `setSession` — because

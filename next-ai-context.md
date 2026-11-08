@@ -1795,6 +1795,33 @@ closes it, and it needs the email (SCRUM-222 / doc 24).
 
 
 ## 2026-11-08 (S79b) — ANONYMOUS IS FIRST-INSTALL ONLY: the sign-out is a WALL, and the device broke the first design
+## 2026-11-08 (S79d) — email is CODE-ONLY (confirmed), and GOOGLE will be the primary road — recorded before it is built
+
+**The owner closed the one-tap question:** *"its ok to remove the link as this is for email based logins only.
+Once we get the google console I expect 99% of users to be using their google accounts to login automatically."*
+
+⚠️ **So one-tap is not "unbuilt" — it is CLOSED.** The three blockers in §S79c are recorded for the record and
+are **not** a work item: building the return would be work spent on the road Google replaces. ⚠️ A future
+session reading *"one-tap — NOT BUILT, all three needed"* would have gone and built it; the follow-up now says
+**"NOT to be rebuilt"**, in those words.
+
+⚠️⚠️ **AND GOOGLE SIGN-IN WAS RECORDED NOWHERE IN THE REPO** — not in a doc, not in an ADR, not in a ticket. It
+just became the intended **primary** sign-in path, so it is written into **ADR-004 Amendment 2 item 6** and a
+follow-up item, with the trap that matters:
+
+- ⚠️ **On first install, Google must be LINK-then-verify** — `linkIdentity` / `signInWithIdToken` against the
+  **existing anonymous session** — because the demo's ledger has to survive. `signInWithOAuth` **replaces the
+  session**, which is correct **only** at the sign-in wall for a returning user.
+- ⚠️ That is the *same* distinction `ACCOUNT_MODES` already encodes for email (`updateUser` vs
+  `signInWithOtp`) — **the exact mistake this session's §S79b was about.** Rule 4 gets broken by a plausible
+  one-liner, so it is written down before anyone writes it.
+- ⚠️ A successful Google sign-in must write **`onboarded`**, or the wall will not know the device is past
+  onboarding and would go on minting anonymous sessions.
+- ⚠️ It cannot be verified in Expo Go (the OAuth return needs a real scheme/build), same as one-tap.
+
+**US$0.00** — docs only; no code change, no AI call.
+
+
 ## 2026-11-08 (S79c) — THE EMAIL'S "ONE TAP" LINK WAS A PROMISE THE APP COULD NOT KEEP — removed, and gated
 
 **The report.** *"The link in the email for the one tap log in does not work."* ⚠️ It never could, and

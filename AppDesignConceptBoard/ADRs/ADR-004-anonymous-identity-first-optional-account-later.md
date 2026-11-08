@@ -190,6 +190,16 @@ The owner's ruling:
    `clearOnboarded()` reopens the anonymous window, and `resetIdentity()` then mints — ⚠️ **in that order**,
    which is now load-bearing and asserted, because reversed the delete would sign out and then demand a
    sign-in from a user who has just erased their account.
+6. ⚠️⚠️ **GOOGLE SIGN-IN IS THE INTENDED PRIMARY ROAD, AND RULE 4 GOVERNS IT** (owner, 2026-11-08: *"Once we
+   get the google console I expect 99% of users to be using their google accounts to login automatically."*).
+   ⚠️ **This is recorded now, before the build, because it is where rule 4 gets broken next:** a first-install
+   user who signs in with Google must **KEEP their `auth.users` id** — so the demo road is
+   **link-then-verify** (`linkIdentity` / `signInWithIdToken` against the **existing anonymous session**),
+   whereas `signInWithOAuth` **replaces the session** and is correct **only** at the sign-in wall, for a
+   returning user. ⚠️ That is the identical distinction `ACCOUNT_MODES` already encodes for email
+   (`updateUser` vs `signInWithOtp`), and swapping them is the second user this record calls a failure.
+   ⚠️ And a successful Google sign-in must write `onboarded`, exactly as `confirmAccountCode` does, or the
+   wall will not know the device is past onboarding.
 
 **Consequences.**
 
