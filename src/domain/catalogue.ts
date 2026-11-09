@@ -36,11 +36,20 @@ export interface Offering {
    * a note here said *"I have not read them"*, and an unread price is not the same as an absent design.
    * `EN · 7 Store` and `ZH · 7 商店` both draw TWO pills per card and **name the item in the layer**
    * (`card · Gold Bar cash` = `$1.99`), which is the pairing to trust — see the block comment below.
-   * ⚠️ `null` is a real answer, never a placeholder: the House's card is drawn in its **owned** state
-   * (`card · House owned` = `Owned` / `已拥有`) and carries no cash or points layer, so its cash price has
-   * never been designed. Inventing one would be a product decision, not a transcription.
+   * ⚠️ `null` is a real answer, never a placeholder — but as of 2026-11-09 **no offering is `null`**: the four
+   * the board prices are transcribed, and the House's (which the board never drew) is derived on the owner's
+   * instruction, which is why `cashSource` sits beside this field.
    */
   readonly cashPrice: number | null;
+  /**
+   * WHERE the cash price came from — `board` = transcribed from a layer that names the item, `derived` =
+   * calculated from the other items' points-per-dollar because no board draws one.
+   *
+   * ⚠️ **This exists so a derived number can never pass for a transcription.** It is the cash rail's twin of
+   * `priceSource`, and `check:lib` reads it: exactly ONE offering may be `derived`, and the rate it implies
+   * must land within 1% of the board-priced singles' mean.
+   */
+  readonly cashSource: 'board' | 'derived';
   readonly name: { readonly en: string; readonly zh?: string };
   readonly priceSource: 'documented' | 'derived';
   /** The wealth bundle is the four composed into one (S13). */
@@ -74,7 +83,16 @@ export function baseValueOf(price: number): number {
  * pairing outright, which is what makes it trustworthy:
  *   `card · Joss Paper Stack cash = $0.99` · `card · Gold Bar cash = $1.99` · `card · Phone cash = $1.49`
  *   `card · featured cash = $2.99`         (`ZH` agrees: `$0.99 / $1.99 / $1.49 / $2.99`)
- * ⚠️ **The House is the exception and stays unpriced** — its card is drawn OWNED, with no cash layer.
+ * ⚠️ **The House is the ONE price on this rail that is DERIVED, not read** — the board draws its card OWNED
+ * with no cash layer, so the owner ruled (2026-11-09): *"Use the rest of the objects cash price vs their
+ * points and calculate an appropriate value."* The three singles sit at **404.04 · 402.68 · 402.01 points per
+ * dollar** (a spread of 0.5%), i.e. ≈**403 points per $1**; 1,200 points ÷ 402.91 (their mean) = **$2.9783**,
+ * and the median gives **$2.9800** — so the House is **$2.98**. ⚠️ It carries `cashSource: 'derived'` so this
+ * is visible in code and machine-checked, instead of looking like a transcription. ⚠️ `$2.99` would also sit
+ * inside the band (401.34 pts/$) and matches the store's other `.99`/`.49` price points; `$2.98` is shipped
+ * because it is the arithmetic, and the difference is one number if the PM prefers the price point.
+ * ⚠️ The **featured bundle is excluded** from the derivation on purpose: at 2,000 pts for $2.99 it is
+ * **668.9 pts/$** — a deliberate bundle discount, and including it would drag the House down.
  *
  * ⚠️⚠️ **AND THE READ EXPOSED A REAL DEFECT, WHICH IS RECORDED HERE RATHER THAN QUIETLY FIXED.** The boards
  * pair **Gold Bar = 800 pts (base 960)** and **Phone = 600 pts (base 720)**. This catalogue has them the
@@ -93,6 +111,7 @@ export const OFFERINGS: readonly Offering[] = [
     price: 400,
     /** `card · Joss Paper Stack cash` = `$0.99`. */
     cashPrice: 99,
+    cashSource: 'board',
     name: { en: 'Joss Paper Stack', zh: '金银纸' },
     priceSource: 'documented',
   },
@@ -102,6 +121,7 @@ export const OFFERINGS: readonly Offering[] = [
     price: 600,
     /** `card · Gold Bar cash` = `$1.99`. */
     cashPrice: 199,
+    cashSource: 'board',
     name: { en: 'Gold Bar', zh: '金条' },
     priceSource: 'documented',
   },
@@ -111,6 +131,7 @@ export const OFFERINGS: readonly Offering[] = [
     price: 800,
     /** `card · Phone cash` = `$1.49`. */
     cashPrice: 149,
+    cashSource: 'board',
     name: { en: 'Smartphone', zh: '手机' },
     priceSource: 'documented',
   },
@@ -119,14 +140,20 @@ export const OFFERINGS: readonly Offering[] = [
     tier: 4,
     price: 1200,
     /**
-     * ⚠️ **`null` ON PURPOSE — the board prices no cash for the House.** `EN · 7 Store` draws its card in the
-     * OWNED state (`card · House owned (bg)` 82×24 reading `Owned`, `已拥有` on `ZH · 7`) with no cash and no
-     * points pill, and no other board prices it either. ⚠️ A cash price could be *inferred* from the three
-     * singles (≈ $2.98 at the board's ~403 pts/$) and that is exactly what must not happen: a derived dollar
-     * amount beside a real one is an invented price. It stays `null` until the PM gives it one — raised as
-     * **SCRUM-229** (`🎯 Decide:`), because a dollar figure is a revenue decision, not a transcription.
+     * ⚠️ **$2.98 — DERIVED, NOT READ, on the owner's instruction** (2026-11-09: *"Use the rest of the objects
+     * cash price vs their points and calculate an appropriate value"*). The board draws this card OWNED, with
+     * no cash layer, so there was nothing to transcribe.
+     *
+     * ⚠️ The arithmetic: the three single offerings sit at **404.04 · 402.68 · 402.01 points per dollar**
+     * (0.5% apart, i.e. ≈403 pts/$1). `1200 ÷ 402.9117 (mean) = **$2.9783**` · `1200 ÷ 402.6846 (median) =
+     * **$2.9800**` · the most adverse single rate gives $2.9850, the most generous $2.9700 — so **$2.98** is
+     * the centre of a band that stays inside the observed spread. The bundle is excluded (668.9 pts/$ is its
+     * deliberate discount).
+     * ⚠️ `cashSource: 'derived'` exists so this can never pass for a transcription; `check:lib` asserts the
+     * rate it implies is within 1% of the singles' mean.
      */
-    cashPrice: null,
+    cashPrice: 298,
+    cashSource: 'derived',
     name: { en: 'House', zh: '楼房' },
     priceSource: 'derived',
   },
@@ -136,6 +163,7 @@ export const OFFERINGS: readonly Offering[] = [
     price: 2000,
     /** `card · featured cash` = `$2.99` (the featured card carries the bundle's own cash price). */
     cashPrice: 299,
+    cashSource: 'board',
     name: { en: 'Wealth Bundle', zh: '财富套装' },
     priceSource: 'documented',
     composedOf: ['joss_paper_stack', 'gold_bar', 'smartphone', 'house'],

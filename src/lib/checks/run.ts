@@ -3386,23 +3386,81 @@ function storeChecks(): void {
     gold_bar: 199,
     smartphone: 149,
     wealth_bundle: 299,
-    house: null,
+    /** ⚠️ DERIVED, not read — see the block below. */
+    house: 298,
   };
-  check('⚠️⚠️ every offering carries EXACTLY the cash price `EN · 7 Store` draws — in cents',
+  check('⚠️⚠️ every offering carries the cash price `EN · 7 Store` draws — in cents (the House is the one DERIVED)',
     OFFERINGS.every((o) => o.cashPrice === BOARD_OFFERING_CASH[o.code]),
     OFFERINGS.map((o) => `${o.code}=${o.cashPrice}`).join(' '));
   check('⚠️ …and NO two offerings share one — a transposition would otherwise be invisible',
     (() => {
       const priced = OFFERINGS.map((o) => o.cashPrice).filter((c): c is number => c !== null);
-      return priced.length === 4 && new Set(priced).size === 4;
+      return priced.length === 5 && new Set(priced).size === 5;
     })(),
     OFFERINGS.map((o) => `${o.code}=${o.cashPrice}`).join(' '));
-  check('⚠️ …and the HOUSE stays `null` — the board draws it OWNED, with no cash layer (never invent one)',
-    getOffering('house').cashPrice === null);
+  check('⚠️⚠️ …and exactly ONE cash price is `derived` — the House, and nothing else may claim that provenance',
+    OFFERINGS.filter((o) => o.cashSource === 'derived').map((o) => o.code).join(',') === 'house');
   check('⚠️ …and every cash price is WHOLE cents — no float may ever reach money',
     OFFERINGS.every((o) => o.cashPrice === null || (Number.isInteger(o.cashPrice) && o.cashPrice > 0)));
   check('…and `cashText` gives the copy key two decimals, and refuses a null or a float rather than a `$`',
-    cashText(99) === '0.99' && cashText(149) === '1.49' && cashText(null) === null && cashText(99.5) === null);
+    cashText(99) === '0.99' && cashText(149) === '1.49' && cashText(298) === '2.98'
+      && cashText(null) === null && cashText(99.5) === null);
+
+  /**
+   * ⚠️⚠️ **THE HOUSE'S $2.98 IS RECOMPUTED HERE, and it matters WHICH points you calibrate against.**
+   *
+   * Owner, 2026-11-09: *"Use the rest of the objects cash price vs their points and calculate an appropriate
+   * value."* The board draws the House's card in its OWNED state with no cash layer, so there was nothing to
+   * transcribe; the three **board-priced singles** are the calibration set and the **bundle is excluded**
+   * (668.9 pts/$ is its deliberate discount, and including it would drag the House down).
+   *
+   * ⚠️⚠️ **BUT THE SIBLINGS' POINTS ARE THEMSELVES IN DISPUTE (SCRUM-230).** Two rates exist:
+   *   · the BOARD's pairing — 800/`$1.99` · 600/`$1.49` · 400/`$0.99` → mean **402.9117 pts/$** → **298¢**
+   *   · the CATALOGUE's current, transposed pairing — 600/`$1.99` · 800/`$1.49` · 400/`$0.99` →
+   *     mean **414.1536 pts/$** → **290¢**
+   * ⚠️ **298¢ is shipped**, because every other cash price on this rail is the board's, and 298 is the value
+   * that stays correct once SCRUM-230 aligns the app to the board. 290¢ is what today's points imply — the
+   * ⚠️ **8¢ spread IS the transposition's signature**, and this gate recomputes both so the choice cannot
+   * silently rot: fix SCRUM-230 and the two rates converge on 298¢.
+   */
+  const BOARD_OFFERING_POINTS: Record<string, number> = {
+    joss_paper_stack: 400,
+    gold_bar: 800,
+    smartphone: 600,
+    wealth_bundle: 2000,
+  };
+  /**
+   * ⚠️ The catalogue's points vs the board's — ⚠️ **TWO MISMATCHES ARE THE KNOWN SCRUM-230 DEFECT**, so this
+   * does not fail today. It fails the moment a THIRD appears, and it goes green on its own when the swap is
+   * fixed. ⚠️ Written this way on purpose: a gate asserting equality would be red on `main` and would get
+   * disabled, which is how a real check dies.
+   * ⚠️ The HOUSE is not in the board table at all — its card is drawn OWNED, so the board states neither its
+   * cash nor its points; only its `priceSource: 'derived'` points are the catalogue's own.
+   */
+  const pointMismatches = OFFERINGS
+    .filter((o) => o.code in BOARD_OFFERING_POINTS && o.price !== BOARD_OFFERING_POINTS[o.code])
+    .map((o) => o.code)
+    .sort();
+  check('⚠️ the catalogue\'s POINTS differ from the board only on the SCRUM-230 pair — no third drift',
+    pointMismatches.length === 0 || (pointMismatches.length === 2 && pointMismatches[0] === 'gold_bar' && pointMismatches[1] === 'smartphone'),
+    pointMismatches.join(',') || 'none');
+
+  const boardSingles = ['joss_paper_stack', 'gold_bar', 'smartphone'];
+  const rateFrom = (points: (code: string) => number): number =>
+    boardSingles.reduce((sum, code) => sum + points(code) / ((getOffering(code as never).cashPrice as number) / 100), 0) / boardSingles.length;
+  const boardRate = rateFrom((code) => BOARD_OFFERING_POINTS[code]);
+  const catalogueRate = rateFrom((code) => getOffering(code as never).price);
+  const houseFromBoard = Math.round((getOffering('house').price / boardRate) * 100);
+  const houseFromCatalogue = Math.round((getOffering('house').price / catalogueRate) * 100);
+  check("⚠️⚠️ the House's cash price is the BOARD-priced siblings' rate, recomputed at check time",
+    getOffering('house').cashPrice === houseFromBoard,
+    `board ${boardRate.toFixed(4)} pts/$ → ${houseFromBoard}¢ vs stored ${getOffering('house').cashPrice}¢`);
+  check('⚠️⚠️ …and the catalogue\'s own (transposed) rate would give a DIFFERENT price — the 8¢ SCRUM-230 delta',
+    houseFromBoard !== houseFromCatalogue && houseFromBoard - houseFromCatalogue === 8,
+    `board ${houseFromBoard}¢ · catalogue ${houseFromCatalogue}¢ · delta ${houseFromBoard - houseFromCatalogue}¢`);
+  // ⚠️ POSITIVE CONTROL — a cent either way must FAIL, or the recomputation is decoration.
+  check("⚠️ guard: $2.97 and $2.99 are NOT what the siblings' rate gives",
+    houseFromBoard === 298 && Math.abs(Math.round((1200 / boardRate) * 100) - 299) === 1);
 
   /**
    * ⚠️⚠️ **THE PRICE-PILL BUDGET — the switcher's 171s in a different disguise.**

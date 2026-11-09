@@ -2281,9 +2281,16 @@ glass.** `tsc` cannot see a missing pill; every gate was green through all three
 - **The offerings had no cash rail at all.** `catalogue.ts` said the cash prices *"are the next read"* — and an
   unread price looks exactly like an undecided one. ⚠️ **`EN · 7 Store` and `ZH · 7 商店` both draw TWO pills on
   every card and NAME the item in the layer** (`card · Gold Bar cash` = `$1.99`). Read: **$0.99 · $1.99 · $1.49
-  · featured $2.99**, in cents. ⚠️ **The House stays `null`** — its card is drawn OWNED (`card · House owned`),
-  with no cash layer on any board; ≈$2.98 is *inferable* from the three singles and inferring it is inventing
-  money. That needs a PM number, not arithmetic — **`SCRUM-229`** (`🎯 Decide:`, sprint 3).
+  · featured $2.99**, in cents. ⚠️ **The House is the one price on this rail that is DERIVED, not read** — its card
+  is drawn OWNED (`card · House owned`) on both boards, so there was nothing to transcribe. **The owner answered
+  `SCRUM-229` the same day** (*"Use the rest of the objects cash price vs their points and calculate an
+  appropriate value"*): the three singles sit at **404.04 · 402.68 · 402.01 pts/$** → mean **402.9117** →
+  `1,200 ÷ 402.9117 = $2.9783` → **`$2.98`**, carrying `cashSource: 'derived'` so it never passes for a
+  transcription. ⚠️⚠️ **AND THE DERIVATION EXPOSED THE DEPENDENCE ON `SCRUM-230`:** calibrated on the
+  CATALOGUE's *transposed* points the same sum gives **414.1536 pts/$ → $2.90**, so the two pairings differ by
+  exactly **8¢**. `$2.98` ships (every other cash price on the rail is the board's, and it is the value that
+  survives the swap); `check:lib` recomputes BOTH and asserts the 8¢ delta, so fixing `SCRUM-230` makes them
+  converge instead of silently changing the House's price.
 - **The featured card's last child sat on its own stroke.** It had `paddingHorizontal` + `paddingTop` and no
   bottom inset. `card · featured` leaves **14 px** under the pill row (row ends 518, card ends 532) — on BOTH
   store boards, and both tabs had the defect.
