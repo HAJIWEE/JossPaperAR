@@ -2393,3 +2393,42 @@ for a `category` · removing the composed-SKU guard. Verified on glass that Home
 returns. **US$0.00.**
 
 
+
+## 📍 2026-11-09 (S80, cont.) — SCRUM-230: the Gold Bar / Phone point prices were transposed, and now they are not
+
+⚠️ **Owner: *"yes you should do 230 and fix that as well"*** — so the fourth price defect of the week is closed.
+
+**THE DEFECT.** `catalogue.ts` paired `gold_bar` with **600** (base 720) and `smartphone` with **800** (base 960).
+Both boards say the opposite, in EN and ZH, **in layer names that state their own item**:
+`card · Gold Bar points` = **800** · `card · Phone points` = **600** (`ZH · 7 商店`: 金条 800 / 手机 600).
+⚠️ So a player paid **600 for the more valuable item and 800 for the less** — 200 points each way, in the wrong
+direction — and it survived because the pairing was assigned by **list position** under a `priceSource: 'derived'`
+that said it *"still needs a PM confirmation"* and never got one.
+
+**FOUR PLACES HAD TO MOVE TOGETHER** — points are what `purchase_item` charges, and a client/server disagreement
+would mean the card says 800 while the server bills 600:
+1. `src/domain/catalogue.ts` — the swap (+ the PROVENANCE block, which asked the question the board has now answered).
+2. `supabase/seed.sql` — the mirror rows **and its own `base_value` self-check** (720/960 → 960/720), which would
+   otherwise have failed the next `db reset`.
+3. **A NEW migration** `20261109163000_offering_price_swap.sql` — an applied one is never edited — then
+   `npx supabase db push --yes`. ⚠️ **A fresh worktree has no `supabase/.temp`, so every remote command dies with
+   *"Cannot find project ref"*;** copied from the vault first, then `migration list` **read before pushing** (it was
+   aligned — the new file was the ONLY pending one).
+4. The Store's gates — `BOARD_OFFERING_POINTS` already held the board's pairing, and ⚠️ **the tolerance that let it
+   pass while the defect was live is now GONE**: it asserts **zero drift**, so a re-transposition fails immediately.
+
+✅ **The House's $2.98 needed no change** — and that is the gate doing its job: it recomputes the price from BOTH
+pairings, so the **8¢ gap it asserted yesterday flipped to "identical"** on its own. `boardRate === catalogueRate`
+is now an assertion, not a hope.
+
+✅ **VERIFIED IN THREE PLACES, not one.** `check:lib` **931 green** (the `pointsPrice(gold_bar) === '800'` assertion
+moved with it); **hosted rows read back** with a read-only SQL query — `gold_bar 800/base 960 · smartphone
+600/base 720`, `base_value` following because it is a GENERATED column; **on glass** (`HN615L005386`) the cards now
+read **Gold Bar `base 960 · $1.99 · 800 pts`** and **Smartphone `base 720 · $1.49 · 600 pts`**.
+⚠️ An **anon PostgREST** read of `offerings_catalog` answers `[]` — that is RLS, **not** an empty table; do not read
+it as "the push did nothing".
+
+⚠️ **And `cashPrice` deliberately did NOT move** — the cash rail is a separate pairing and it was already right.
+
+**US$0.00.**
+

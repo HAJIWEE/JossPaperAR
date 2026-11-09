@@ -17,10 +17,11 @@
  * from doc 07 §5.3's list (`400/480 · 600/720 · 800/960 · House 1,440 ·
  * bundle 2,000/2,400`) and arithmetic, and **still needs a PM confirmation**:
  *   1. The House's PRICE (doc 07 wrote only its base, 1,440 → 1,440 ÷ 1.2 = 1,200).
- *   2. WHICH item takes the 800 and which the 1,200 — the docs give the set of
- *      prices, not the pairing. Assigned here in ascending order of the S13 icon
- *      list (stack · gold bar · house · smartphone), except the House, which the
- *      "House 1,440" note pins to 1,200.
+ *   2. ✅ **ANSWERED 2026-11-09 (SCRUM-230) — WHICH item takes the 600 and which the 800.** The docs give the
+ *      SET of prices, not the pairing, and the pairing here was originally assigned by *list position* — which
+ *      had **Gold Bar and Phone transposed**. ⚠️ The boards settle it in their own layer NAMES
+ *      (`card · Gold Bar points` = 800 · `card · Phone points` = 600), so the catalogue now follows them:
+ *      **Gold Bar 800 · Phone 600**. ⚠️ The House stays pinned to 1,200 by the *"House 1,440"* note.
  */
 
 export type OfferingCode = 'joss_paper_stack' | 'gold_bar' | 'smartphone' | 'house' | 'wealth_bundle';
@@ -67,9 +68,9 @@ export function baseValueOf(price: number): number {
  * ⚠️ **The `zh` names were ADDED 2026-10-10 (SCRUM-97), because they did not exist** — so
  * `localized(o.name)` rendered English on a 中文 panel, which is the same defect as the
  * hardcoded screen copy. They are taken from the design's `ZH · 7 Store / 商店` board
- * (`金银纸 · 金条 · 手机 · 楼房 · 财富套装`), matched BY NAME — **not** by base value, because
- * the board's metas (`Cash Bundle 基础 480 · Gold Bar 基础 960 · House 基础 1,440`) do not
- * line up with doc 10's prices, which is a pre-existing drift worth its own look.
+ * (`金银纸 · 金条 · 手机 · 楼房 · 财富套装`), matched BY NAME — **not** by base value. ⚠️ At the time the
+ * board's metas (`Cash Bundle 基础 480 · Gold Bar 基础 960 · House 基础 1,440`) did not line up with the
+ * catalogue; ✅ **they do now** — SCRUM-230 swapped Gold Bar and Phone, and 960 / 720 are the board's own bases.
  * ⚠️ Two further design inconsistencies seen while doing this, recorded not fixed:
  * the board calls this item **"Cash Bundle"** in EN where the catalogue says *"Joss Paper
  * Stack"*, and the House is **楼房** in the store but **祖屋** in the collection board.
@@ -95,16 +96,19 @@ export function baseValueOf(price: number): number {
  * ⚠️ The **featured bundle is excluded** from the derivation on purpose: at 2,000 pts for $2.99 it is
  * **668.9 pts/$** — a deliberate bundle discount, and including it would drag the House down.
  *
- * ⚠️⚠️ **AND THE READ EXPOSED A REAL DEFECT, WHICH IS RECORDED HERE RATHER THAN QUIETLY FIXED.** The boards
- * pair **Gold Bar = 800 pts (base 960)** and **Phone = 600 pts (base 720)**. This catalogue has them the
- * OTHER WAY ROUND — `gold_bar` 600/base 720, `smartphone` 800/base 960 — so the app charges 600 for the gold
- * bar and 800 for the phone. ⚠️ That is the **same class as the decoration price transposition** (Door Gods ↔
- * Lanterns, fixed under SCRUM-204), and it came
- * from the same shape of mistake: the pairing was assigned by *list position* under a `priceSource: 'derived'`
- * that admits it *"still needs a PM confirmation"*. ⚠️ **NOT CHANGED HERE.** Points are what `purchase_item`
- * actually charges — fixing them means the catalogue, `seed.sql`, the `offerings_catalog` mirror, a NEW
- * migration (an applied one is never edited) and a re-push, plus a product call between doc 07 §5.3's derived
- * pairing and the board. It needs its own ticket, not a ride along a layout change — raised as **SCRUM-230**.
+ * ⚠️⚠️ **THE TRANSPOSITION THIS READ EXPOSED IS NOW FIXED (2026-11-09, SCRUM-230).** The boards pair
+ * **Gold Bar = 800 pts (base 960)** and **Phone = 600 pts (base 720)**; this catalogue had them the OTHER WAY
+ * ROUND — `gold_bar` 600/base 720, `smartphone` 800/base 960 — so the app charged 600 for the gold bar and 800
+ * for the phone, 200 points each way in the wrong direction.
+ *
+ * ⚠️ It is the **same class as the decoration price transposition** (Door Gods ↔ Lanterns, fixed under
+ * SCRUM-204) and came from the same shape of mistake: the pairing was assigned by *list position* under a
+ * `priceSource: 'derived'` that admits it *"still needs a PM confirmation"*.
+ * ✅ **The fix is the board's pairing, and it had to be made in FOUR places at once** — here, `seed.sql`, a NEW
+ * migration for the hosted `offerings_catalog` mirror (an applied one is never edited), and the Store's own
+ * gates — because points are what `purchase_item` actually charges, and a client/server disagreement would mean
+ * the card says 800 while the server charges 600.
+ * ⚠️ `cashPrice` did **NOT** move: the cash rail is a separate pairing and it was already right.
  */
 export const OFFERINGS: readonly Offering[] = [
   {
@@ -120,7 +124,8 @@ export const OFFERINGS: readonly Offering[] = [
   {
     code: 'gold_bar',
     tier: 2,
-    price: 600,
+    /** ✅ **800, not 600** — `card · Gold Bar points` on both store boards (SCRUM-230). */
+    price: 800,
     /** `card · Gold Bar cash` = `$1.99`. */
     cashPrice: 199,
     cashSource: 'board',
@@ -130,7 +135,8 @@ export const OFFERINGS: readonly Offering[] = [
   {
     code: 'smartphone',
     tier: 3,
-    price: 800,
+    /** ✅ **600, not 800** — `card · Phone points` on both store boards (SCRUM-230). */
+    price: 600,
     /** `card · Phone cash` = `$1.49`. */
     cashPrice: 149,
     cashSource: 'board',

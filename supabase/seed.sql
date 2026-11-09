@@ -26,8 +26,8 @@
 -- the SQL twin of `Offering.composedOf` in the code catalogue.
 insert into public.offerings_catalog (code, name_en, name_zh, tier, price, burnable, composed_of) values
   ('joss_paper_stack', 'Joss Paper Stack', null, 1,  400, true,  null),
-  ('gold_bar',         'Gold Bar',         null, 2,  600, true,  null),
-  ('smartphone',       'Smartphone',       null, 3,  800, true,  null),
+  ('gold_bar',         'Gold Bar',         null, 2,  800, true,  null),
+  ('smartphone',       'Smartphone',       null, 3,  600, true,  null),
   ('house',            'House',            null, 4, 1200, true,  null),
   ('wealth_bundle',    'Wealth Bundle',    null, 5, 2000, false,
      array['joss_paper_stack', 'gold_bar', 'smartphone', 'house'])
@@ -84,8 +84,8 @@ begin
   -- the generated column must reproduce the documented pairs
   select count(*) into bad from public.offerings_catalog
    where (code = 'joss_paper_stack' and base_value <> 480)
-      or (code = 'gold_bar'         and base_value <> 720)
-      or (code = 'smartphone'       and base_value <> 960)
+      or (code = 'gold_bar'         and base_value <> 960)
+      or (code = 'smartphone'       and base_value <> 720)
       or (code = 'house'            and base_value <> 1440)
       or (code = 'wealth_bundle'    and base_value <> 2400);
   if bad > 0 then

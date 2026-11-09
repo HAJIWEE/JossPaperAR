@@ -3414,7 +3414,7 @@ function storeChecks(): void {
   check('…and it is the 20% rule, not a hard-coded 480',
     OFFERINGS.every((o) => baseMetaValue(o) === Math.round(o.price * 1.2)));
   check('⚠️ a price renders with a unit, and an UNPRICED item renders null (never "0 pts")',
-    pointsPrice(getOffering('gold_bar')) === '600'
+    pointsPrice(getOffering('gold_bar')) === '800'
       && pointsPrice({ ...getOffering('gold_bar'), price: Number.NaN }) === null);
 
   /**
@@ -3522,12 +3522,11 @@ function storeChecks(): void {
    *
    * ⚠️⚠️ **BUT THE SIBLINGS' POINTS ARE THEMSELVES IN DISPUTE (SCRUM-230).** Two rates exist:
    *   · the BOARD's pairing — 800/`$1.99` · 600/`$1.49` · 400/`$0.99` → mean **402.9117 pts/$** → **298¢**
-   *   · the CATALOGUE's current, transposed pairing — 600/`$1.99` · 800/`$1.49` · 400/`$0.99` →
-   *     mean **414.1536 pts/$** → **290¢**
-   * ⚠️ **298¢ is shipped**, because every other cash price on this rail is the board's, and 298 is the value
-   * that stays correct once SCRUM-230 aligns the app to the board. 290¢ is what today's points imply — the
-   * ⚠️ **8¢ spread IS the transposition's signature**, and this gate recomputes both so the choice cannot
-   * silently rot: fix SCRUM-230 and the two rates converge on 298¢.
+   *   · the CATALOGUE's pairing WAS transposed — 600/`$1.99` · 800/`$1.49` · 400/`$0.99` → mean **414.1536
+   *     pts/$** → **290¢**, and that **8¢ gap was the transposition's signature**
+   * ⚠️ **298¢ shipped while the two disagreed, because it is the value that survives the swap.** ✅ **SCRUM-230
+   * landed 2026-11-09 and the two rates have CONVERGED on 298¢** — the assertion below flipped from "8¢ apart"
+   * to "identical", which is the whole point of recomputing both instead of restating the stored number.
    */
   const BOARD_OFFERING_POINTS: Record<string, number> = {
     joss_paper_stack: 400,
@@ -3536,19 +3535,20 @@ function storeChecks(): void {
     wealth_bundle: 2000,
   };
   /**
-   * ⚠️ The catalogue's points vs the board's — ⚠️ **TWO MISMATCHES ARE THE KNOWN SCRUM-230 DEFECT**, so this
-   * does not fail today. It fails the moment a THIRD appears, and it goes green on its own when the swap is
-   * fixed. ⚠️ Written this way on purpose: a gate asserting equality would be red on `main` and would get
-   * disabled, which is how a real check dies.
-   * ⚠️ The HOUSE is not in the board table at all — its card is drawn OWNED, so the board states neither its
+   * ⚠️⚠️ **THE TRANSPOSITION IS CLOSED (SCRUM-230, 2026-11-09) — this now asserts ZERO drift.**
+   *
+   * ⚠️ While the defect was live this check accepted *"0 mismatches or exactly the gold_bar/smartphone pair"*,
+   * because a gate that is red on `main` gets disabled. ✅ **That tolerance is gone on purpose**: the two
+   * now match the board, so a re-transposition — or any third drift — fails here immediately.
+   * ⚠️ The HOUSE is not in the board table at all: its card is drawn OWNED, so the board states neither its
    * cash nor its points; only its `priceSource: 'derived'` points are the catalogue's own.
    */
   const pointMismatches = OFFERINGS
     .filter((o) => o.code in BOARD_OFFERING_POINTS && o.price !== BOARD_OFFERING_POINTS[o.code])
     .map((o) => o.code)
     .sort();
-  check('⚠️ the catalogue\'s POINTS differ from the board only on the SCRUM-230 pair — no third drift',
-    pointMismatches.length === 0 || (pointMismatches.length === 2 && pointMismatches[0] === 'gold_bar' && pointMismatches[1] === 'smartphone'),
+  check("⚠️⚠️ every offering's POINTS match the board — the SCRUM-230 swap is closed, and no drift may return",
+    pointMismatches.length === 0,
     pointMismatches.join(',') || 'none');
 
   const boardSingles = ['joss_paper_stack', 'gold_bar', 'smartphone'];
@@ -3561,8 +3561,8 @@ function storeChecks(): void {
   check("⚠️⚠️ the House's cash price is the BOARD-priced siblings' rate, recomputed at check time",
     getOffering('house').cashPrice === houseFromBoard,
     `board ${boardRate.toFixed(4)} pts/$ → ${houseFromBoard}¢ vs stored ${getOffering('house').cashPrice}¢`);
-  check('⚠️⚠️ …and the catalogue\'s own (transposed) rate would give a DIFFERENT price — the 8¢ SCRUM-230 delta',
-    houseFromBoard !== houseFromCatalogue && houseFromBoard - houseFromCatalogue === 8,
+  check("⚠️⚠️ …and the catalogue's own rate now AGREES with the board's — the 8¢ SCRUM-230 gap is closed",
+    houseFromBoard === houseFromCatalogue && boardRate === catalogueRate,
     `board ${houseFromBoard}¢ · catalogue ${houseFromCatalogue}¢ · delta ${houseFromBoard - houseFromCatalogue}¢`);
   // ⚠️ POSITIVE CONTROL — a cent either way must FAIL, or the recomputation is decoration.
   check("⚠️ guard: $2.97 and $2.99 are NOT what the siblings' rate gives",
