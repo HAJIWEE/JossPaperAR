@@ -339,6 +339,8 @@ export interface DrawPlan {
    * banner, not a scroll — so the drawing is chosen by SLOT as well as by code. `undefined` = the code's own motif.
    */
   readonly art?: 'crown' | 'single' | 'scroll' | 'leaf';
+  /** ⚠️ Draw the art flipped horizontally — the right-hand member of a pair. See `MIRRORED_SLOTS`. */
+  readonly mirror?: boolean;
 }
 
 /**
@@ -362,6 +364,19 @@ export function artVariantFor(code: DecorationCode, slot: DecorationSlot): 'crow
   if (code === 'door_gods') return 'leaf';
   return undefined;
 }
+
+/**
+ * ⚠️⚠️ **THE RIGHT-HAND MEMBER OF A PAIR IS THE MIRROR OF THE LEFT** (owner, 2026-11-09, seeing the two sides drawn
+ * identically: *"The right one is mirrored"*).
+ *
+ * ⚠️ A 門神 pair is **matching but opposite** — the weapon on opposite sides, matched faces — so drawing the LEFT leaf
+ * twice is wrong even though both sides hold "one leaf". ⚠️ `side_right` is the only slot with a partner (door gods are
+ * the only set that occupies both sides), so it is the only one that flips; the top corners hold the same **symmetric**
+ * lantern either side, which is why they are not in here.
+ * ⚠️ Declared as data rather than a `slot === 'side_right'` test inside the layer, so a gate can assert it and the
+ * renderer stays dumb.
+ */
+const MIRRORED_SLOTS: ReadonlySet<DecorationSlot> = new Set<DecorationSlot>(['side_right']);
 
 /**
  * ⚠️⚠️ **WHERE A DECORATION ACTUALLY DRAWS — and it is not "the slot it is stored in".**
@@ -444,6 +459,8 @@ export function drawPlan(
       rect: SLOT_ART[slot],
       behind: SLOT_CATEGORY[slot] === 'background',
       art: artVariantFor(code, slot),
+      /** ⚠️ The right-hand member of a pair draws flipped — see `MIRRORED_SLOTS`. */
+      mirror: MIRRORED_SLOTS.has(slot),
     });
     taken.add(slot);
   };

@@ -4097,6 +4097,19 @@ function storeChecks(): void {
   check('⚠️⚠️ every DOOR GOD piece draws the ONE-LEAF variant, never the pair motif',
     doorGodsOnly.length === 2 && doorGodsOnly.every((p) => p.art === 'leaf'),
     doorGodsOnly.map((p) => `${p.slot}:${p.art ?? 'pair-motif'}`).join(' '));
+  /**
+   * ⚠️⚠️ **THE RIGHT ONE IS MIRRORED** (owner, 2026-11-09 — the two sides were drawn identically: *"The right one is
+   * mirrored"*). ⚠️ A 門神 pair is **matching but opposite**, so the same leaf twice is wrong even when each side holds
+   * one leaf. ⚠️ `side_right` is the only slot with a partner; the lanterns are symmetric and the corners do not flip.
+   */
+  check('⚠️⚠️ the RIGHT door god is MIRRORED and the left is not — a pair is matching but opposite',
+    doorGodsOnly.find((p) => p.slot === 'side_right')?.mirror === true
+      && doorGodsOnly.find((p) => p.slot === 'side_left')?.mirror === false,
+    doorGodsOnly.map((p) => `${p.slot}:mirror=${String(p.mirror)}`).join(' '));
+  // ⚠️ POSITIVE CONTROL — a symmetric pair must NOT flip, or "mirror everything" would pass this.
+  check('⚠️ guard: the lanterns are symmetric, so their corners are not mirrored',
+    lanternOnly.every((p) => p.mirror === false),
+    lanternOnly.map((p) => `${p.slot}:mirror=${String(p.mirror)}`).join(' '));
   // ⚠️ POSITIVE CONTROL — the variant must be the reason, not a coincidence of some other field.
   check('⚠️ guard: without the variant the pair motif is what a side would get — the defect that shipped',
     artVariantFor('door_gods', 'side_left') === 'leaf'

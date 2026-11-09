@@ -2431,6 +2431,32 @@ it as "the push did nothing".
 ⚠️ **And `cashPrice` deliberately did NOT move** — the cash rail is a separate pairing and it was already right.
 
 **US$0.00.**
+## 📍 2026-11-09 (S80, cont.) — the right-hand door god is MIRRORED
+
+⚠️ **Owner: *"The right one is mirrored"*** — a request, and I checked first: **nothing in the code mirrored anything**
+(`scaleX`/`transform` appeared nowhere in the decor path), and a pixel comparison of the two sides from the shrine
+screenshot showed them **identical**. So both sides were drawing the *same* leaf, which is wrong for a 門神 pair —
+they are **matching but opposite** (weapon on opposite sides, matched faces).
+
+**WHAT SHIPPED**
+· `MIRRORED_SLOTS` in `decorate.ts` — **data, not a `slot === 'side_right'` test buried in the renderer**, so a gate can
+assert it. `side_right` is the only slot with a partner; ⚠️ the top corners hold the same **symmetric** lantern, so they
+must NOT flip.
+· `drawPlan` marks each piece `mirror: true|false`.
+· `decor-layer.tsx` flips the **art** (`scaleX: -1` on an inner wrapper), ⚠️ **not the box**: flipping the pressable's
+own rect would make the hit area and the drawing two things that can drift, and the rect is the board's measurement.
+
+✅ `check:lib` **938 → 940**, fault-tested **both ways**: nothing mirroring reports
+*"side_left:mirror=false side_right:mirror=false"* and a blanket flip reports *"side_left:mirror=true"* **plus** the
+lantern guard — each red, then green on restore.
+
+⚠️ **Verified on glass**, not by assertion: the crop of both sides now shows the spear running the other way on the
+right. ⚠️ The preview used to see it was again a **temporary client override** (no rows written to the account) and is
+**reverted** — `git status` shows only the three real files.
+
+**US$0.00.**
+
+
 ## 📍 2026-11-09 (S80, cont.) — door gods render ONE leaf per side on the shrine
 
 ⚠️ **Owner, after eyeballing the shrine: *"door gods should be 1 per side not 2 per side"*** — and the render he was
