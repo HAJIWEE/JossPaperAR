@@ -773,6 +773,9 @@ ported from the boards and on glass — and the altar can finally **hold a table
 `SCRUM-167` ⏳ To Do    ⚠️ **re-scope or close** — "4 visible + an honest overflow" is superseded by three-and-swipe
 `SCRUM-148` 🔄 In Progress   ⚠️ 162 + 163 are In Review; 167 wants re-scoping before this can close
 `SCRUM-208` ✅ Done   the Home board's active tab (decided)
+`SCRUM-151` 🔄 In Progress   ⚠️ **step 6 is BUILT** — children **182** switcher · **183** delete ·
+                              **184** /settings · **185** history · **186** gates are ALL ✅ **Done**
+                              (2026-11-09); the parent is the last click
 ```
 
 ⚠️ **That block was four statuses out of date until 2026-11-09** (162 said ✅ Done when it was `In Progress`,
