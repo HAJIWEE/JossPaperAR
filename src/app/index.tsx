@@ -571,14 +571,30 @@ export default function HomeShrine() {
               </Pressable>
             )}
 
-            {/* ⚠️ A carousel, never a "+N more": at the cap of 10 every tablet must be reachable
-                (the board draws prev/next at 26,412 and 340,412). The ends are ends — no wrap. */}
+            {/* ⚠️ AFTER the art: `1d` draws the lanterns and couplets in FRONT of the table. */}
+            {decor === null ? null : (
+              <DecorFront scale={s} equipped={decor.equipped} onEnter={customize ? undefined : enterCustomize} />
+            )}
+            {/* ⚠️⚠️ **THE CAROUSEL IS PAINTED AFTER `DecorFront`, WITH THE BOARD'S 44×44 TOUCH TARGETS** (`EN · 1b`).
+                ⚠️ Two defects this fixes, both measured on glass 2026-11-09:
+                  1. the Pressable used to be the GLYPH's box (`24×40`), so the hit area was 24 dp wide — the board draws an
+                     invisible `touch · carousel next` of `44×44` centred on the glyph, and that is now the control;
+                  2. the arrows were painted BEFORE the decorations, so a side banner covered them and a tap meant for *next*
+                     opened the customiser. Paging must survive a decorated altar, so they paint on top.
+                ⚠️ The ends are ends — no wrap (`pageStep` clamps), which is why each arrow is conditional. */}
             {!customize && view.kind === 'tablet' && view.hasPrev ? (
               <Pressable
                 accessibilityRole="button"
-                testID="home-tablet-prev"
+                accessibilityLabel={t('home.prevTablet')}
                 onPress={() => setPage(pageStep(view.index, view.count, -1))}
-                style={[styles.abs, bandRect(HOME_BANDS.carouselPrev, s), styles.carousel]}
+                style={({ pressed }) => [
+                  styles.abs,
+                  bandRect(HOME_BANDS.carouselPrevTouch, s),
+                  styles.carousel,
+                  styles.carouselChip,
+                  pressed && styles.pressed,
+                ]}
+                testID="home-tablet-prev"
               >
                 <Text style={[styles.carouselGlyph, { fontSize: 28 * s }]}>{'\u2039'}</Text>
               </Pressable>
@@ -586,18 +602,21 @@ export default function HomeShrine() {
             {!customize && view.kind === 'tablet' && view.hasNext ? (
               <Pressable
                 accessibilityRole="button"
-                testID="home-tablet-next"
+                accessibilityLabel={t('home.nextTablet')}
                 onPress={() => setPage(pageStep(view.index, view.count, 1))}
-                style={[styles.abs, bandRect(HOME_BANDS.carouselNext, s), styles.carousel]}
+                style={({ pressed }) => [
+                  styles.abs,
+                  bandRect(HOME_BANDS.carouselNextTouch, s),
+                  styles.carousel,
+                  styles.carouselChip,
+                  pressed && styles.pressed,
+                ]}
+                testID="home-tablet-next"
               >
                 <Text style={[styles.carouselGlyph, { fontSize: 28 * s }]}>{'\u203A'}</Text>
               </Pressable>
             ) : null}
 
-            {/* ⚠️ AFTER the art: `1d` draws the lanterns and couplets in FRONT of the table. */}
-            {decor === null ? null : (
-              <DecorFront scale={s} equipped={decor.equipped} onEnter={customize ? undefined : enterCustomize} />
-            )}
             {/* ⚠️⚠️ **THE ONLY WAY TO ADD A TABLET ONCE ONE EXISTS** (owner, 2026-11-09: *"GO WITH 1"* — a ＋ beside the
                 carousel arrows). ⚠️ The empty altar's ＋ is `home-add-slot`, rendered ONLY for `view.kind === 'empty'`, so from
                 the first enshrined ancestor onward there was **no add control at all** while `ancestor_cap` is 10.
@@ -854,6 +873,18 @@ const styles = StyleSheet.create({
   ctaLabel: { color: onColorCream, fontWeight: '600' },
   clanEntry: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   carousel: { alignItems: 'center', justifyContent: 'center' },
+  /**
+   * ⚠️ **A SOFT BACKING BEHIND EACH ARROW — a deviation from `1b`, and a needed one.** `1b` draws `nav · carousel prev/next`
+   * as bare glyphs because that board carries no decorations; on a decorated altar the chevron lands ON a red couplet and
+   * disappears into it. The chip is `paperDeep` at 82 % so the arrow reads over art while the art still shows through, and the
+   * board's 44×44 touch target is unchanged.
+   */
+  carouselChip: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(250, 248, 244, 0.82)',
+    borderRadius: 999,
+  },
   carouselGlyph: { color: text.inkSoft, fontWeight: '700' },
   /** `nav · ＋ add a tablet` — a small round pill, so it reads as a CONTROL beside the arrows rather than altar art. */
   addTablet: {

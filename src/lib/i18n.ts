@@ -351,6 +351,9 @@ export const MESSAGES = {
     // singular is OURS: the board only draws the 3-tablet case, and "1 ancestors" is not copy.
     'home.altarFilledOne': 'One ancestor enshrined — swipe or tap a tablet to edit.',
     'home.altarFilled': '%{count} ancestors enshrined — swipe or tap a tablet to edit.',
+    /** ⚠️ Spoken names for the carousel arrows (`EN · 1b`): they are the only way to reach a tablet that is off-screen. */
+    'home.prevTablet': 'Previous tablet',
+    'home.nextTablet': 'Next tablet',
 
     // ── the throw (doc 05 §2 — the four bands) ────────────────────────────
     'band_bullseye': 'Bullseye',
@@ -796,6 +799,8 @@ export const MESSAGES = {
     'ancestor.archiveConfirm': '归档后牌位将离开神龛，无法撤销。',
     'home.altarFilledOne': '已安奉 1 位祖先 — 滑动查看，轻点编辑',
     'home.altarFilled': '已安奉 %{count} 位祖先 — 滑动查看，轻点编辑',
+    'home.prevTablet': '上一个牌位',
+    'home.nextTablet': '下一个牌位',
 
     'band_bullseye': '正中',
     'band_devout': '虔诚',

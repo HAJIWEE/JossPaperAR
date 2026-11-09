@@ -3472,6 +3472,37 @@ function storeChecks(): void {
     addBlock.length > 0 && !addBlock.includes('fontSize') && addBlock.includes('(side - stroke) / 2'),
     addBlock.length === 0 ? 'control not found' : `${addBlock.length} chars`);
 
+  /**
+   * ⚠️⚠️ **THE CAROUSEL IS `EN · 1b`'s, NOT AN ARROW GLYPH WITH A HIT BOX** (owner: *"Refer to EN -1b on penpot… there should
+   * be a carousel to scroll thru, build this"*). ⚠️ `1b` draws `nav · carousel prev/next` as 24×40 TEXT and adds an invisible
+   * `touch · carousel next` of **44×44 centred on the glyph** — the first cut used the glyph's own box as the Pressable, i.e. a
+   * 24 dp-wide control. ⚠️ `prev`'s touch layer is **derived by mirror symmetry** (`1b` draws only `next`'s); the assertion
+   * holds both to the same rule, because an asymmetric pair of hit areas is a bug in either direction.
+   */
+  const midOf = (r: { x: number; y: number; w: number; h: number }) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
+  const centredOn = (touch: { x: number; y: number; w: number; h: number }, glyph: { x: number; y: number; w: number; h: number }) =>
+    Math.abs(midOf(touch).x - midOf(glyph).x) < 1e-9 && Math.abs(midOf(touch).y - midOf(glyph).y) < 1e-9;
+  check('⚠️⚠️ the carousel arrows carry the board\'s 44×44 touch targets, centred on their glyphs',
+    HOME_BANDS.carouselPrevTouch.w === 44 && HOME_BANDS.carouselPrevTouch.h === 44
+      && HOME_BANDS.carouselNextTouch.w === 44 && HOME_BANDS.carouselNextTouch.h === 44
+      && centredOn(HOME_BANDS.carouselPrevTouch, HOME_BANDS.carouselPrev)
+      && centredOn(HOME_BANDS.carouselNextTouch, HOME_BANDS.carouselNext),
+    `prev ${midOf(HOME_BANDS.carouselPrevTouch).x}/${midOf(HOME_BANDS.carouselPrev).x} · next ${midOf(HOME_BANDS.carouselNextTouch).x}/${midOf(HOME_BANDS.carouselNext).x}`);
+
+  /**
+   * ⚠️⚠️ **AND IT MUST SURVIVE A DECORATED ALTAR.** The arrows were painted BEFORE `DecorFront`, so a side banner covered them
+   * and a tap meant for *next* opened the customiser — measured on glass 2026-11-09, and the reason paging died the moment a
+   * side set was equipped. ⚠️ Asserted as SOURCE ORDER, the only thing that can express a paint order.
+   */
+  const homeSrc = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'app', 'index.tsx'), 'utf8'));
+  const decorAt = homeSrc.indexOf('<DecorFront');
+  check('⚠️⚠️ the carousel paints AFTER the decorations, so a banner cannot swallow the tap',
+    decorAt > 0
+      && homeSrc.indexOf('testID="home-tablet-next"') > decorAt
+      && homeSrc.indexOf('testID="home-tablet-prev"') > decorAt
+      && homeSrc.includes('bandRect(HOME_BANDS.carouselNextTouch')
+      && homeSrc.includes('bandRect(HOME_BANDS.carouselPrevTouch'));
+
   const outsideZone = SLOTS.filter((s) => {
     const z = SLOT_HIT[s];
     const a = SLOT_ART[s];

@@ -99,6 +99,16 @@ export const HOME_BANDS = {
   carouselPrev: { x: 26, y: 412, w: 24, h: 40 },
   /** `nav · carousel next` — 340,412 24×40. */
   carouselNext: { x: 340, y: 412, w: 24, h: 40 },
+  /**
+   * `touch · carousel next (44, invisible)` — **330,410 44×44**, straight off `EN · 1b`.
+   * ⚠️⚠️ **THE GLYPH IS NOT THE CONTROL.** `nav · carousel next` is a 24×40 TEXT box; the board gives it a 44×44 invisible
+   * touch layer, centred on the glyph (330 + 22 = 352 = the glyph's own centre). Tapping the glyph's box meant a 24 px-wide
+   * target — the narrowest control on the screen.
+   * ⚠️ `prev` is the board's `next` **mirrored** (16,410 44×44, centre 38 = the `‹` glyph's centre): `1b` draws only the
+   * `next` touch layer, and an asymmetric pair of hit areas would be a bug either way. Recorded, not hidden.
+   */
+  carouselPrevTouch: { x: 16, y: 410, w: 44, h: 44 },
+  carouselNextTouch: { x: 330, y: 410, w: 44, h: 44 },
   /** `nav · ＋ add a tablet (tap)` — 330,494 48×48, beside the carousel arrows (last tablet only).
    * ⚠️ Placed BELOW the grown side banner (`y 492`) and clear of the background zone (`x 291`), because a control
    * under a decoration is a control that opens the decoration instead — measured 2026-11-09 on the arrows themselves. */
