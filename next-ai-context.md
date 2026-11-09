@@ -773,9 +773,12 @@ ported from the boards and on glass — and the altar can finally **hold a table
 `SCRUM-167` ⏳ To Do    ⚠️ **re-scope or close** — "4 visible + an honest overflow" is superseded by three-and-swipe
 `SCRUM-148` 🔄 In Progress   ⚠️ 162 + 163 are In Review; 167 wants re-scoping before this can close
 `SCRUM-208` ✅ Done   the Home board's active tab (decided)
-`SCRUM-151` 🔄 In Progress   ⚠️ **step 6 is BUILT** — children **182** switcher · **183** delete ·
-                              **184** /settings · **185** history · **186** gates are ALL ✅ **Done**
-                              (2026-11-09); the parent is the last click
+`SCRUM-151` ✅ Done   ⚠️ **step 6 is COMPLETE** — children **182** switcher · **183** delete · **184**
+                      /settings · **185** history · **186** gates all ✅ **Done** (2026-11-09), and the
+                      parent closed with them. ⚠️ All five had sat at `To Do` for shipped work whose
+                      briefs had gone stale (*"the route does not exist at all today"*, *"`delete_my_data()`
+                      has never had a caller"* — both false for weeks). The one branch item is a
+                      one-line label fix riding in PR #85.
 ```
 
 ⚠️ **That block was four statuses out of date until 2026-11-09** (162 said ✅ Done when it was `In Progress`,
