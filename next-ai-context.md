@@ -9,6 +9,13 @@
 ## 📌 Quick Reference
 
 - **Project** — Joss Paper AR, an AR app that replaces physical joss-paper burning with a digital ritual
+- **Session S79s · 2026-11-09 — 👻 THE ADD-TABLET ＋ IS NOW A GHOST TABLET (owner: *"redesign the '+' … so that its following the tablet shape"*).**
+  - `TabletGhost` in `components/home/tablet.tsx` reuses **`TabletPlate`'s outline path verbatim** (crown · shoulders · body · plinth) and changes only the paint — translucent paper fill, dashed ink stroke, dashed gold name frame. The control that promises a tablet is drawn as a tablet.
+  - ⚠️ **The control IS the slot now**: `peerSlot(slot,'right')` — 66.9×159.2 board (~61×147 dp) — instead of the 48×48 pill; `addTabletSlot()` deleted with it.
+  - ⚠️⚠️ **THREE GLASS-ONLY CORRECTIONS:** (1) the ＋ mark was **invisible** — its arms were multiplied by `width / VB.w` *inside a viewBox-scaled `<Svg>`*, so a 123 px ghost got a 5 px plus; it is in **viewBox units** now, because the `<Svg>` already scales. (2) the dashed edge **crossed the current tablet's face** — the ghost now paints **between `DecorBack` and the centre tablet**: above the print (no stolen taps) and below the tablet (the 13.7 px overlap is covered, like a peer's). (3) the "clear of every decoration ART rect" clause is **gone** — a slot-sized control necessarily overlaps the print; **paint order** is the thing that keeps it usable, and that stays asserted.
+  - ✅ **Gates 899, five faults tested**: LEFT slot → red · no `<TabletGhost` → red · ghost moved after the centre → red on paint order · a `fontSize` in the ghost → red · no `strokeLinecap` → red. ⚠️ The old two-bars assertion **followed the mark into `tablet.tsx`** rather than being deleted — the font-metrics lesson survives the redraw.
+
+
 - **Session S79r · 2026-11-09 — ➕ THE ADD-TABLET ＋ MOVED INTO THE THIRD TABLET'S SLOT.**
   - `peerSlot(band, side)` gives a neighbour's slot whether or not a neighbour exists · `addTabletSlot(band)` places the ＋ inside it · `carouselStage()` is now built on `peerSlot()`, so the ＋ and the peers share one geometry and cannot drift.
   - ⚠️⚠️ **The slot OVERLAPS the centre tablet (`13.7` board px) — fine for a PEER, which is drawn behind it, but the ＋ is drawn ON TOP**, so centring it in the raw slot put its edge `4` px into the current tablet's border. It is centred in the **VISIBLE** part of the slot instead (`53.3` wide against a `48` control), and it stands on the slot's **floor** so it sits exactly where a tablet would. `HOME_BANDS.addTablet` is **deleted** — it was a second source of truth for the same control.
