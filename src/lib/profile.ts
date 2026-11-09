@@ -38,6 +38,25 @@ export const HUD = {
 } as const;
 
 /**
+ * ⚠️⚠️ **THE STRIP THE HUD OWNS — its own opaque ground on a paper screen.**
+ *
+ * Owner on glass, 2026-11-09: *"when i scroll up the Title bar is not opaque so the Store title overlaps with
+ * the content."* ⚠️ **It was never a Store bug.** `ScreenHud` is absolutely positioned over a full-height
+ * `ScrollView`, so on **every** screen that scrolls, content slid under a transparent back button and title —
+ * nine screens shared it, because the HUD paints above the scroll view by necessity (see the component).
+ *
+ * ⚠️ The height is not a taste call: the screens reserve exactly `touch.y + touch.size + 15` at the top of
+ * their content, so a band of THAT height hides everything that scrolls up and **never clips the first line
+ * at rest** — at scroll 0 its lower edge is where the content begins.
+ *
+ * ⚠️ It is **opt-in per screen, not derived from `tone`**: `preparing.tsx` is a dark `surface.camera` screen
+ * that deliberately draws the LIGHT hud (*"a paper disc reads on this screen's `surface.camera` background"*),
+ * so `light` does not imply a paper ground. `check:lib` §26 holds the rule instead — every screen whose own
+ * background IS `surface.paper` must pass `band`.
+ */
+export const HUD_BAND_HEIGHT = HUD.touch.y + HUD.touch.size + 15;
+
+/**
  * ⚠️ **THE HUD HAS TWO BOARD VARIANTS, AND THEY ARE NOT INTERCHANGEABLE.**
  *
  * | where | circle | ring | glyph | title |

@@ -328,7 +328,7 @@ export default function ProfileScreen() {
       */}
       <TabBarBand />
 
-      <ScreenHud titleKey="profile.title" backTestID="profile-back" titleTestID="profile-title" />
+      <ScreenHud titleKey="profile.title" backTestID="profile-back" titleTestID="profile-title" band />
 
       {/*
         ⚠️ **A `Modal`, not an overlay** — the same reason `ConfirmCard` is one: Android's hardware BACK must be

@@ -2323,3 +2323,46 @@ call — **not a ride along a layout change.** Recorded in `catalogue.ts`; raise
 **US$0.00** — boards read through the Penpot MCP, device verified over the local Metro loop.
 
 
+## 📍 2026-11-09 (S80) — the header was see-through, and it was never a Store bug
+
+⚠️ **Owner on glass: *"when i scroll up the Title bar is not opaque so the Store title overlaps with the content."***
+He was right about the symptom and the cause was structural, not local.
+
+**Why it happened.** `ScreenHud` is absolutely positioned **above** the `ScrollView` — and it has to be, or it never
+receives a tap (the `2026-11-01` defect: a perfect-looking back button that did nothing). ⚠️ It had **no ground of its
+own**, so every screen that scrolls let its cards run straight through the title and the back circle. ⚠️ **Nine
+screens, not one** — the owner noticed it where he was scrolling.
+
+**The fix** — the owner's second option (keep the title, hide what goes under it), because the first (scroll the header
+away) would take the back button with it:
+- `ScreenHud` gained an **opt-in `band`**: a full-width, **opaque** strip at `surface.paper`, declared **before** the
+  circle and title so it paints under them and over the scroll view. ⚠️ **No `elevation`**: a raised strip would cast a
+  shadow line the board does not draw.
+- `HUD_BAND_HEIGHT = touch.y + touch.size + 15` — **not a taste call.** Every screen already reserves exactly that at
+  the top of its content, so the band's lower edge is where the content begins: it hides everything that scrolls up
+  and **never clips the first line at rest** (verified: at scroll 0 the Store's intro sits immediately below it).
+- ⚠️ **Opt-in, NOT derived from `tone`**: `preparing.tsx` is a dark `surface.camera` screen that deliberately draws the
+  LIGHT hud (*"a paper disc reads on this screen's `surface.camera` background"*), so `light` does not imply paper.
+  `capture.tsx` likewise — and it carries a paper `gate` PANEL, so "the file mentions `surface.paper`" is not the test.
+
+✅ **`check:lib` §26 makes the rule DERIVED, not a list**: it reads every screen that renders `<ScreenHud` and requires
+`band` on any whose ROOT style (`screen:` / `root:`) is `surface.paper` — **7/7**. A hand-maintained list is what let
+the HUD order drift across five screens; this covers the next screen automatically.
+
+⚠️⚠️ **AND MY FIRST DETECTOR PASSED VACUOUSLY.** The `rootIsPaper` regex only matched **multi-line** style objects, and
+every paper ground here is written `screen: { flex: 1, backgroundColor: surface.paper },` on **one line** — so it found
+**no** paper screens and "no screen is missing a band" was true for the wrong reason. ⚠️ **The positive control caught
+it** (ninth sighting of the class); the detector is now brace-balanced AND the check asserts the **denominator**
+(`=== 7`), so a detector that stops recognising paper grounds goes red instead of silent.
+
+✅ **Measured on `HN615L005386`**: `hud-band` = `[0,0][720,200]` — 200 px = 100 dp × density 2, exactly the content's
+`paddingTop`; the title (`[132,102][214,148]`) and back circle sit inside it. Scrolled, the featured card crops cleanly
+at the band edge with no bleed-through; at rest nothing is clipped. Profile and History carry the band and show **no**
+visible bar — it is the page's own colour.
+
+✅ `check:lib` **920 → 926**, **fault-tested three ways, all red**: Store losing `band` · the band made unconditional
+(a cream strip would land on the viewfinder) · the height off by one. `npm run check` green, `tsc` clean, CI green.
+
+**US$0.00.**
+
+

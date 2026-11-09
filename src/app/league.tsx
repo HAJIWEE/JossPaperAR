@@ -95,7 +95,7 @@ export default function LeagueScreen() {
         painted last, so a HUD rendered BEFORE it is swallowed — it draws (through the transparent
         scroll view) and never receives a tap. That was the Settings defect, 2026-11-01.
       */}
-      <ScreenHud titleKey="league.title" backTestID="league-back" titleTestID="league-title" />
+      <ScreenHud titleKey="league.title" backTestID="league-back" titleTestID="league-title" band />
     </View>
   );
 }

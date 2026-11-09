@@ -103,7 +103,7 @@ export default function HistoryScreen() {
         )}
       </ScrollView>
 
-      <ScreenHud titleKey="hist.title" backTestID="history-back" titleTestID="history-title" />
+      <ScreenHud titleKey="hist.title" backTestID="history-back" titleTestID="history-title" band />
     </View>
   );
 }

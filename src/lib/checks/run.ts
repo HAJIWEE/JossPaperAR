@@ -11,7 +11,7 @@
  * ⚠️ FAULT-TEST IT: change an expected string and confirm it goes RED.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -116,6 +116,7 @@ import {
   HUD,
   HUD_TONES,
   LOCALE_PILL,
+  HUD_BAND_HEIGHT,
   PROFILE_ROUTE,
   PROFILE_ROUTES,
   PROFILE_ROWS,
@@ -1808,6 +1809,75 @@ function localeChecks(): void {
   check('⚠️ guard: a HUD declared before the scroll view WOULD fail that check',
     '<ScreenHud x />\n<ScrollView></ScrollView>'.indexOf('<ScreenHud')
       < '<ScreenHud x />\n<ScrollView></ScrollView>'.lastIndexOf('</ScrollView>'));
+
+  /**
+   * ⚠️⚠️ **THE HUD OWNS AN OPAQUE BAND — the header must HIDE what scrolls under it.**
+   *
+   * Owner on glass, 2026-11-09: *"when i scroll up the Title bar is not opaque so the Store title overlaps with
+   * the content."* ⚠️ **It was never a Store bug.** The HUD has to paint ABOVE the scroll view (see the order
+   * rule above — that is what makes it tappable), and it had no ground of its own, so on **every** screen that
+   * scrolls the cards ran straight through the title and the back button.
+   *
+   * ⚠️ **So the rule is DERIVED from each screen's ROOT style, not from a list**: if the screen's own ground is
+   * `surface.paper`, it must pass `band`. A hand-maintained list is exactly what let the HUD order drift across
+   * five screens; this one covers the next screen automatically. ⚠️ It reads the ROOT (`screen:`/`root:`) and
+   * not any `surface.paper` in the file — `capture.tsx` has a paper `gate` panel inside a camera screen, and
+   * demanding a band there would paint a cream strip across the viewfinder.
+   * ⚠️ `preparing.tsx` is excluded by the same rule and deliberately: it is `surface.camera` with a LIGHT hud,
+   * which is why the band is opt-in and not derived from `tone`.
+   */
+  const hudTagOf = (src: string): string => /<ScreenHud\b[^>]*>/.exec(src)?.[0] ?? '';
+  /** ⚠️ Re-derived here, not shared: `PROJECT_ROOT` is scoped to this function, and so is this. */
+  const APP_DIR = join(PROJECT_ROOT, 'src', 'app');
+  /**
+   * ⚠️⚠️ **BRACE-BALANCED ON PURPOSE — the first version of this regex only matched MULTI-LINE style objects,
+   * and every paper ground here is written `screen: { flex: 1, backgroundColor: surface.paper },` on ONE line.**
+   * ⚠️ So it found no paper screens at all and the check below passed **vacuously** — the exact class this file
+   * keeps warning about. The positive control caught it; the `=== 7` denominator below is what keeps it caught.
+   */
+  const rootIsPaper = (src: string): boolean => {
+    const at = /(?:^|\n)\s*(?:screen|root): \{/.exec(src);
+    if (at === null) return false;
+    const start = at.index + at[0].length;
+    let depth = 1;
+    let i = start;
+    while (i < src.length && depth > 0) {
+      if (src[i] === '{') depth += 1;
+      else if (src[i] === '}') depth -= 1;
+      i += 1;
+    }
+    return src.slice(start, i).includes('backgroundColor: surface.paper');
+  };
+  const hudScreenFiles = readdirSync(APP_DIR)
+    .filter((f) => f.endsWith('.tsx'))
+    .map((f) => ({ rel: `src/app/${f}`, src: readFileSync(join(APP_DIR, f), 'utf8') }))
+    .filter((s) => s.src.includes('<ScreenHud'));
+  const paperHudScreens = hudScreenFiles.filter((s) => rootIsPaper(s.src));
+  const bandMissing = paperHudScreens.filter((s) => !/\bband\b/.test(hudTagOf(s.src)));
+  /**
+   * ⚠️ **THE `=== 7` IS THE POINT.** A detector that silently stops recognising paper grounds would make
+   * "no screen is missing a band" true for ever — so the count is asserted alongside the emptiness.
+   */
+  check(`⚠️⚠️ every paper-ground screen gives the HUD an opaque band (${paperHudScreens.length}/7 of ${hudScreenFiles.length} HUD screens)`,
+    paperHudScreens.length === 7 && bandMissing.length === 0,
+    `no band: ${bandMissing.map((s) => s.rel).join(', ') || 'none'}`);
+  // ⚠️ POSITIVE CONTROL — the SOURCE THAT SHIPPED must fail the predicate, or it cannot catch a regression.
+  check('⚠️ guard: a paper screen WITHOUT `band` WOULD fail that rule',
+    rootIsPaper('const styles = {\n  screen: { flex: 1, backgroundColor: surface.paper },\n};')
+      && !/\bband\b/.test(hudTagOf('<ScreenHud titleKey="x" backTestID="b" />')));
+  check('⚠️ …and the camera screen is still correctly EXEMPT — its root is not paper',
+    !rootIsPaper(readFileSync(join(APP_DIR, 'capture.tsx'), 'utf8')));
+
+  const HUD_SRC = readFileSync(join(PROJECT_ROOT, 'src', 'components', 'screen-hud.tsx'), 'utf8');
+  check('⚠️⚠️ the band is CONDITIONAL — a camera screen must not get a paper strip across the viewfinder',
+    /band \? \(/.test(HUD_SRC) && HUD_SRC.includes('testID="hud-band"'));
+  check('⚠️ …and it is declared BEFORE the back circle, so it paints UNDER it rather than over it',
+    HUD_SRC.indexOf('hud-band') < HUD_SRC.indexOf('accessibilityLabel'));
+  check('⚠️ …and it is exactly the strip the screens reserve, so it never clips the first line at rest',
+    HUD_BAND_HEIGHT === HUD.touch.y + HUD.touch.size + 15
+      && hudScreenFiles.filter((s) => rootIsPaper(s.src))
+        .every((s) => s.src.includes('paddingTop: HUD.touch.y + HUD.touch.size + 15')),
+    `${HUD_BAND_HEIGHT}px`);
 
   /**
    * ⚠️ **THE TWO TONES ARE NOT INTERCHANGEABLE.** A light HUD on the camera is an ink ring on a dark

@@ -266,7 +266,7 @@ export default function SettingsScreen() {
         ) : null}
       </ScrollView>
 
-      <ScreenHud titleKey="settings.title" backTestID="settings-back" titleTestID="settings-title" />
+      <ScreenHud titleKey="settings.title" backTestID="settings-back" titleTestID="settings-title" band />
 
       <ConfirmCard
         visible={confirming}

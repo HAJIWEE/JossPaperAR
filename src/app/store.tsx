@@ -525,8 +525,9 @@ export default function StoreScreen() {
       {/** ⚠️ **THE STORE IS A TAB DESTINATION, so it carries the bar** (SCRUM-211). */}
       <TabBarBand />
 
-      {/** ⚠️ AFTER the ScrollView — see the Settings defect recorded in `history.tsx`. */}
-      <ScreenHud titleKey="store.title" backTestID="store-back" titleTestID="store-title" />
+      {/** ⚠️ AFTER the ScrollView — see the Settings defect recorded in `history.tsx`. `band` because this
+           screen is `surface.paper`: without it the cards scroll THROUGH the title (owner, 2026-11-09). */}
+      <ScreenHud titleKey="store.title" backTestID="store-back" titleTestID="store-title" band />
     </View>
   );
 }

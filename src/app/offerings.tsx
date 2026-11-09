@@ -144,7 +144,7 @@ export default function OfferingsScreen() {
       </ScrollView>
 
       {/** \u26a0\ufe0f AFTER the ScrollView \u2014 see the Settings defect recorded in `history.tsx`. */}
-      <ScreenHud titleKey="picker.title" backTestID="picker-back" titleTestID="picker-title" />
+      <ScreenHud titleKey="picker.title" backTestID="picker-back" titleTestID="picker-title" band />
     </View>
   );
 }
