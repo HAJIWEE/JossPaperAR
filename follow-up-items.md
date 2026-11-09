@@ -6,6 +6,18 @@
 
 ## 🎯 Immediate Actions (Next 1–2 Weeks)
 
+### 🟡 Altar customisation — deferred fine-tuning
+
+> **Owner, 2026-11-09: *"by eye ball this is good for now. we will fine tune this later and add more features."*** The surface is built and verified on glass (`SCRUM-205` In Review, `SCRUM-206` Done); these are the things knowingly left.
+
+- **🎨 The door gods have NO altar art.** `SET_SLOTS` gives them the couplets' trio shape (inferred — no board draws the door gods on an altar), and they reuse the **pair** motif on the sides and the **couplet banner** stretched at the top-middle. Needs a real port, or a decision that the shape differs.
+- **🚪 How a user ENTERS customising is undecided — `SCRUM-225`** (in Sprint 3). Today the temple chip toggles the zones, and its band (`28,214 224×22`) sits **inside** the top-left decoration's (`37,210 52×66`), so a decorated shrine shows the lantern through the label. `1d`/`1e` draw no chip at all.
+- **⚠️ `top_middle` serves TWO categories.** It is a **top** slot (so `1f3` offers lanterns there), yet the only set that draws in it is the couplets' 横批 — a **side** set. Tapping the middle and equipping lanterns lands them in the corners. Either the slot's offering rule changes, or the sheet says where a set will land.
+- **🎭 The Festive Set shows the COUPLETS on the sides, never the door gods** — both are `side` and replace each other (S14k), so a bundle that owns both still displays one. `1e` displays the couplets; confirm that is what a bundle buyer should see.
+- **🔢 Prices print without a thousands separator** — `1200 pts`, where the board draws `1,200 pts`. Affects the sheet **and** the store (both use `String(points)`).
+- **📐 The three new altar drawings are ports of the board's groups** (`COUPLET_SCROLL` 41×160 · `COUPLET_CROWN` 141×40 · `LANTERN_SINGLE` 52×66), measured from group bounds and token-mapped. Fine-tune against `1d`/`1e` at final size once the art is reviewed.
+- **⚠️ The equip ROUND-TRIP is verified on the LOCAL stack only.** A fresh hosted account owns nothing and cannot buy at 0 tribute, so `equip` → `re-read` has not run against hosted. Close it once the points rail is live end-to-end.
+
 ### 🔴 On the critical path
 
 - 🏮 **S71 (2026-10-31) — STEP 1 IS BUILT: the shrine, the altar, the tablet sheet and the tab bar are on glass. ⚠️ US$0.00 AI spend; one EAS `preview` build (`de4c1df9`).**
