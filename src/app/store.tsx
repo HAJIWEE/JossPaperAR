@@ -34,7 +34,7 @@ import { getOffering, type OfferingCode } from '@/domain/catalogue';
 import { collectedItemName } from '@/lib/collection';
 import { purchaseItem } from '@/lib/offerings-api';
 import { HUD } from '@/lib/profile';
-import { STORE, STORE_TABS, baseMetaValue, decorationList, pointsPrice, storeList, type StoreTabId } from '@/lib/store';
+import { STORE, STORE_SWITCHER, STORE_TABS, baseMetaValue, decorationList, pointsPrice, storeList, type StoreTabId } from '@/lib/store';
 import { DESIGN_REFERENCE_WIDTH, brand, fontSize, onColorCream, surface, text } from '@/theme/tokens';
 
 function scale(): number {
@@ -255,15 +255,31 @@ export default function StoreScreen() {
             {/* The pill BACKGROUND first — `switcher · category (bg)`, r19, ink 2.5. */}
             <View
               /**
-               * ⚠️⚠️ **GEOMETRY FROM THE BOARD, NOT FROM MEMORY** (`switcher · category (bg)` on `EN · 7b`):
-               * 350 × 38, r19, ink stroke 2.5, and the two segments sit inside it at 171 × 33 with **NO border
-               * of their own**. ⚠️ The first version bordered every pill, which grew each one by 4 px and pushed
-               * the pair into the container's own stroke — the misalignment the owner saw.
+               * ⚠️⚠️ **THE RADIUS IS DERIVED FROM THE PADDING, NOT TYPED** (owner on glass, 2026-11-09:
+               * *"the corner radius of the border and the buttons do not align well, please use the padding
+               * value to properly adjust the corner radius of the inner buttons"*).
+               *
+               * ⚠️ The track is r19 with a 2.5 ink stroke, and RN draws that stroke INSIDE the box — so a
+               * segment inset by `stroke + pad` from the OUTER edge must be `19 − (stroke + pad)` to nest.
+               * ⚠️ The previous build hard-coded `r16.5` (nested for the stroke alone) beside a 2.5
+               * `paddingHorizontal`, so the caps were drawn at a 5 px inset and each one left a crescent of
+               * track — and `171 + 171` overflowed the 340 content box by 2 px into the stroke.
+               * ⚠️ `STORE_SWITCHER` computes the inset, the radius, both segment dimensions and the gap from
+               * that one padding; `check:lib` §29 holds the rule.
                */
-              style={[styles.switcherBg, { width: 350 * s, height: 38 * s, borderRadius: 19 * s, borderWidth: 2.5 * s, paddingHorizontal: 2.5 * s }]}
+              style={[
+                styles.switcherBg,
+                {
+                  width: STORE_SWITCHER.w * s,
+                  height: STORE_SWITCHER.h * s,
+                  borderRadius: STORE_SWITCHER.radius * s,
+                  borderWidth: STORE_SWITCHER.stroke * s,
+                  padding: STORE_SWITCHER.pad * s,
+                },
+              ]}
               testID="store-switcher"
             >
-            <View style={styles.switcher}>
+            <View style={[styles.switcher, { gap: STORE_SWITCHER.gap * s }]}>
               {STORE_TABS.map((tab) => (
                 <Pressable
                   key={tab.id}
@@ -275,10 +291,15 @@ export default function StoreScreen() {
                    * day Decorations was enabled, BOTH drew as the active cinnabar segment. ⚠️ Two identical red
                    * pills is not a switcher; the state has to be `tab.id === tabId`.
                    * ⚠️ And no per-pill border: the board's only stroke is the container's.
+                   * ⚠️ The radius/height/width come from `STORE_SWITCHER` — see the track above.
                    */
                   style={[
                     styles.tab,
-                    { width: 171 * s, height: 33 * s, borderRadius: 16.5 * s },
+                    {
+                      width: STORE_SWITCHER.segmentW * s,
+                      height: STORE_SWITCHER.segmentH * s,
+                      borderRadius: STORE_SWITCHER.segmentRadius * s,
+                    },
                     tabId === tab.id ? styles.tabOn : styles.tabOff,
                   ]}
                 >

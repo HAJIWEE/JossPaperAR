@@ -2238,3 +2238,38 @@ message **through the app's own instance** and fails on a surviving brace or `[m
    Console). `SCRUM-212`.
 5. ⚠️ **Correct the stale "no policy" sentence** in `history.tsx` and `my_offerings.sql` (§3.1).
 
+## 📍 2026-11-09 — the store switcher's caps now NEST (the radius is derived from the padding)
+
+⚠️ **Owner on glass: *"the corner radius of the border and the buttons do not align well, please use the padding
+value to properly adjust the corner radius of the inner buttons."*** Two defects in one geometry, and **both were
+invisible to every gate** — `tsc` does not know what a rounded corner looks like.
+
+- **The radius was nested for the wrong inset.** The track (`switcher · category (bg)`) is **r19** with a **2.5 ink
+  stroke**, and the segments were hard-coded at **r16.5** — i.e. `19 − stroke`. ⚠️ But the row also carried
+  `paddingHorizontal: 2.5`, so RN *drew* them at a **5** px inset: each cap sat too round for its gap and left a
+  crescent of `paperDeep` between itself and the stroke.
+- **The row OVERFLOWED.** `171 + 171 = 342` inside a **340** content box (350 − 2×2.5 border − 2×2.5 padding), so the
+  right segment ran **2 px over the track's own stroke**.
+- ⚠️ **And `STORE.switcher.radius` said `10`** — a number that is **not on the board**. Read back off Penpot, the
+  board's `switcher · active segment` is **171×33 r16.5** (a full pill).
+
+**Fixed by deriving, not typing.** `STORE_SWITCHER` (in `src/lib/store.ts`, mirroring the existing `LOCALE_PILL`
+convention: `inset` + `segmentRadius`) computes **every** number from one padding:
+`inset = stroke + pad` → `segmentRadius = radius − inset` → **r14**, `segmentH = h − 2·inset` → **28** (so it is a
+pill again, `14 = 28/2`), and `segmentW = (350 − 2·inset − gap)/2` → **168.5**, which with the board's own 3 px gap
+fills the content box **exactly**. Both caps are then concentric.
+
+✅ **Proved on the floor device**, not by arithmetic alone: `uiautomator dump` reads the track at `[40,341][686,411]`
+and the active segment at `[49,350][360,402]` — an inset of **9 device px on ALL FOUR sides** (5 board px × 1.846),
+which is exactly the concentric condition; the Decorations side measures `[366,350][677,402]`, inset 9 on its right.
+⚠️ **Before the fix that inset was 9 horizontally and 5 vertically.**
+
+✅ `check:lib` §29 gained **5 checks** (905 total, all green): the nesting rule, the pill rule, the exact width
+budget, a **positive control** that the shipped r16.5/171 geometry FAILS both, and one that `store.tsx` really
+renders `STORE_SWITCHER` (a literal typed back in would otherwise pass). **Fault-tested three ways, all red** —
+hard-coding `segmentRadius: 16.5` (4 red) · `segmentW: 171` (width budget red) · `borderRadius: 16.5 * s` in the
+screen (spec check red). `npm run check` green across all suites. **US$0.00.**
+
+
+
+

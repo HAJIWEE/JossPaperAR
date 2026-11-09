@@ -45,7 +45,7 @@ import {
   rectsOverlap,
   sheetLayout,
 } from '../decorate.ts';
-import { CASH_IS_READABLE, FEATURED_CODE, STORE_TABS, baseMetaValue, pointsPrice, storeList } from '../store.ts';
+import { CASH_IS_READABLE, FEATURED_CODE, STORE_SWITCHER, STORE_TABS, baseMetaValue, pointsPrice, storeList } from '../store.ts';
 import { ART_BOX, artCodes, artSize, fitArt } from '../offering-art.ts';
 import { pickerGrid } from '../picker.ts';
 import {
@@ -3324,6 +3324,50 @@ function storeChecks(): void {
    */
   check('⚠️⚠️ both store tabs are LIVE — Decorations is no longer dark',
     STORE_TABS.every((tab) => tab.enabled));
+
+  /**
+   * ⚠️⚠️ **THE SWITCHER'S CAPS NEST, AND THE ROW FITS** (owner on glass, 2026-11-09: *"the corner radius
+   * of the border and the buttons do not align well, please use the padding value to properly adjust the
+   * corner radius of the inner buttons"*).
+   *
+   * ⚠️ TWO defects in ONE geometry, and neither is visible to `tsc`:
+   * - the segments were hard-coded **r16.5** — `19 − the 2.5 stroke`, i.e. nested for a **2.5** inset —
+   *   while the row carried its own `paddingHorizontal: 2.5`, so RN drew them at a **5** px inset and each
+   *   cap left a crescent of track between itself and the stroke;
+   * - `171 + 171 = 342` in a **340** content box, so the right segment ran **2 px over the track's stroke**.
+   *
+   * ⚠️ **Asserted as the RULE, not as the numbers** (`segmentRadius === radius − inset`, and
+   * `inset === stroke + pad`), so re-tuning the padding re-rounds the segments and this still holds —
+   * a gate pinned to `14` would pass a screen that had hard-coded it back.
+   */
+  check('⚠️⚠️ the switcher segment radius is DERIVED — the outer radius minus the WHOLE inset',
+    STORE_SWITCHER.segmentRadius === STORE_SWITCHER.radius - STORE_SWITCHER.inset
+      && STORE_SWITCHER.inset === STORE_SWITCHER.stroke + STORE_SWITCHER.pad,
+    `r${STORE_SWITCHER.segmentRadius} = r${STORE_SWITCHER.radius} − ${STORE_SWITCHER.inset}`);
+  check("…and a segment is a PILL inside that inset — never taller than the track's content box",
+    STORE_SWITCHER.segmentH === STORE_SWITCHER.segmentRadius * 2
+      && STORE_SWITCHER.segmentH === STORE_SWITCHER.h - STORE_SWITCHER.inset * 2,
+    `h${STORE_SWITCHER.segmentH} · r${STORE_SWITCHER.segmentRadius}`);
+  check('⚠️ …and two segments PLUS the gap fill the content box EXACTLY — no float, no overflow',
+    Math.abs(STORE_SWITCHER.segmentW * 2 + STORE_SWITCHER.gap - (STORE_SWITCHER.w - STORE_SWITCHER.inset * 2)) < 1e-9,
+    `${STORE_SWITCHER.segmentW}×2 + ${STORE_SWITCHER.gap} vs ${STORE_SWITCHER.w - STORE_SWITCHER.inset * 2}`);
+  /**
+   * ⚠️ POSITIVE CONTROL — the geometry that actually shipped must FAIL these, or the three checks above
+   * are arithmetic about nothing. The pre-fix numbers are re-stated here (r16.5 · 171 · a 5 px inset) and
+   * asserted to break BOTH the nesting rule and the width budget.
+   */
+  check('⚠️ guard: the pre-fix geometry (r16.5 beside a 2.5 padding, 171×33) FAILS both rules',
+    Math.abs(16.5 - STORE_SWITCHER.segmentRadius) > 1e-9
+      && 171 * 2 > STORE_SWITCHER.w - STORE_SWITCHER.inset * 2);
+  /**
+   * ⚠️ **AND THE SCREEN MUST RENDER THE SPEC** — the numbers are only derived if `store.tsx` reads them.
+   * A literal `borderRadius: 16.5` typed back into the switcher would pass every check above.
+   */
+  check('⚠️⚠️ the screen renders the DERIVED spec — the segment radius is not typed back in',
+    /borderRadius: STORE_SWITCHER\.segmentRadius/.test(storeSrc)
+      && /padding: STORE_SWITCHER\.pad/.test(storeSrc)
+      && !/borderRadius: 16\.5/.test(storeSrc)
+      && !/paddingHorizontal: 2\.5 \* s/.test(storeSrc));
   /**
    * ⚠️⚠️ **TRANSCRIBED FROM THE BOARD'S LAYER NAMES, NOT FROM THE CARD LAYOUT** — and the first version of
    * this table was wrong because it did the opposite. `EN · 7b` draws the four cards in a 2 × 2 grid, so the

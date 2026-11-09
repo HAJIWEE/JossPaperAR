@@ -27,8 +27,13 @@ export const STORE = {
    * `switcher · Offerings` 23,115 171×33 and `… Decorations` 197,115 171×33, inside a
    * `switcher · category (bg)` at **20,112 350×38** — fill `paperDeep`, stroke ink 2.5, **r19**,
    * i.e. a PILL. ⚠️ Without the outer pill the two segments read as two loose buttons.
+   *
+   * ⚠️ The board's `switcher · active segment` is **r16.5** — read back off the Penpot file, not
+   * inferred: 33 tall, so its caps are half-circles and it is a pill too. (This line said `radius: 10`
+   * until 2026-11-09; that figure was never on the board.) ⚠️ It is the BOARD's number, not the number
+   * this app draws — see `STORE_SWITCHER` for the one that must align with the track.
    */
-  switcher: { y: 115, w: 171, h: 33, radius: 10, xs: [23, 197] as const },
+  switcher: { y: 115, w: 171, h: 33, radius: 16.5, xs: [23, 197] as const },
   switcherBg: { w: 350, h: 38, radius: 19, stroke: 2.5 },
   /** `tag · FEATURED (bg)` — 30,174 86×22, fill **gold**, stroke ink 2, r8. */
   tag: { y: 174, w: 86, h: 22, radius: 8, stroke: 2 },
@@ -57,6 +62,54 @@ export const STORE = {
   card: { w: 165, xs: [20, 197] as const, ys: [396, 558] as const, artH: 72, name: 84, meta: 102, price: 122, pad: 12 },
   /** `note · store` — 24,806 342×34. */
   note: { y: 806 },
+} as const;
+
+/**
+ * ── THE SWITCHER'S INNER GEOMETRY — DERIVED FROM ONE PADDING VALUE ───────────
+ *
+ * ⚠️⚠️ **A SEGMENT'S CORNER RADIUS IS NOT AN INDEPENDENT NUMBER.** `switcher · category (bg)` is **r19**
+ * with a **2.5 ink stroke**, and its segments sit an `inset` inside that edge. For the two curves to run
+ * PARALLEL — so each segment's cap nests inside the track's cap instead of pinching against it — the
+ * inner radius must be the outer radius MINUS that whole inset:
+ *
+ *     inset        = stroke + pad            (RN draws the border AND the padding inside the box)
+ *     segmentRadius = radius − inset
+ *
+ * ⚠️ **The defect this replaces, found on glass** (owner, 2026-11-09: *"the corner radius of the border
+ * and the buttons do not align well, please use the padding value to properly adjust the corner radius
+ * of the inner buttons"*). The screen hard-coded the segments at **r16.5** — i.e. `19 − stroke`, nested
+ * for a **2.5** inset — while the row carried its own `paddingHorizontal: 2.5`, so they were *drawn* at a
+ * **5** px inset and each cap left a crescent of track between itself and the stroke.
+ * ⚠️ **And it overflowed**: `171 + 171 = 342` in a **340** content box, so the right segment ran 2 px
+ * over the track's own stroke.
+ *
+ * ⚠️ **So every number below is COMPUTED.** Change `pad` and the segments resize and re-round together;
+ * `check:lib` §29 asserts the rule (`segmentRadius === radius − inset`) and that the two widths plus the
+ * gap fill the content box exactly — so neither defect can come back by a single edited literal.
+ */
+const SWITCHER_PAD = 2.5;
+/** ⚠️ OUTER edge → a segment's outer edge. Border and padding both live inside the box. */
+const SWITCHER_INSET = STORE.switcherBg.stroke + SWITCHER_PAD;
+/** ⚠️ The board's own gap: `… Decorations` starts 3 px after `… Offerings` ends (197 − (23 + 171)). */
+const SWITCHER_GAP = STORE.switcher.xs[1] - (STORE.switcher.xs[0] + STORE.switcher.w);
+
+export const STORE_SWITCHER = {
+  /** The track, at the board's 350×38. */
+  w: STORE.switcherBg.w,
+  h: STORE.switcherBg.h,
+  radius: STORE.switcherBg.radius,
+  stroke: STORE.switcherBg.stroke,
+  /** ⚠️ The ONLY value to tune: the breathing room between a segment and the track's stroke. */
+  pad: SWITCHER_PAD,
+  /** ⚠️ Border + padding — what the radius and the widths are measured against. */
+  inset: SWITCHER_INSET,
+  gap: SWITCHER_GAP,
+  /** ⚠️ `radius − inset`: the caps are then concentric, which is the whole point. */
+  segmentRadius: STORE.switcherBg.radius - SWITCHER_INSET,
+  /** ⚠️ The track's content box, top to bottom — a segment may not stand proud of it. */
+  segmentH: STORE.switcherBg.h - SWITCHER_INSET * 2,
+  /** ⚠️ Two of these plus `gap` fill the track's content box EXACTLY — the old 171s did not. */
+  segmentW: (STORE.switcherBg.w - SWITCHER_INSET * 2 - SWITCHER_GAP) / 2,
 } as const;
 
 /**
