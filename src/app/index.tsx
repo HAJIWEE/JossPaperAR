@@ -14,7 +14,7 @@ import { ShrineBase } from '@/components/home/shrine-base';
 import { ShrineCanvas } from '@/components/home/shrine-canvas';
 import { TabBarBand } from '@/components/home/tab-bar-band';
 import { Tablet } from '@/components/home/tablet';
-import { altarCaption, altarView, carouselStage, pageStep, tabletBox } from '@/lib/altar';
+import { addTabletSlot, altarCaption, altarView, carouselStage, pageStep, peerSlot, tabletBox } from '@/lib/altar';
 import {
   ANCESTOR_CAP,
   GIVEN_NAME_MAX,
@@ -448,6 +448,21 @@ export default function HomeShrine() {
           view.kind === 'tablet' ? view.index : 0,
           view.kind === 'tablet' ? view.count : 0,
         );
+        /**
+         * ⚠️⚠️ **THE ＋ SITS IN THE THIRD TABLET'S SLOT** (owner, 2026-11-09: *"move the Add Ancestor + to where the 3rd
+         * tablet would've been"*). `peerSlot()` is the same geometry the peers use, so the control is exactly where the next
+         * tablet will appear — bottom-aligned on the table like one, and horizontally centred in the slot.
+         * ⚠️ 48 board px ≈ 44.3 dp at the 360 dp reference — the whole slot is 66.9 × 159.2, so a slot-sized target would be
+         * enormous; the pill is the control and the slot is only its address.
+         */
+        const plusRect = addTabletSlot(slot, 'right');
+        const addAt = {
+          position: 'absolute' as const,
+          left: plusRect.x * s,
+          top: plusRect.y * s,
+          width: plusRect.w * s,
+          height: plusRect.h * s,
+        };
         const tab = {
           x: stage.centre.x - slot.x,
           y: stage.centre.y - slot.y,
@@ -677,12 +692,7 @@ export default function HomeShrine() {
                 accessibilityRole="button"
                 accessibilityLabel={t('ancestor.titleAdd')}
                 onPress={() => openSheet(null)}
-                style={({ pressed }) => [
-                  styles.abs,
-                  bandRect(HOME_BANDS.addTablet, s),
-                  styles.addTablet,
-                  pressed && styles.pressed,
-                ]}
+                style={({ pressed }) => [addAt, styles.addTablet, pressed && styles.pressed]}
                 testID="home-add-tablet"
               >
                 {/**

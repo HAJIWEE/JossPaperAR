@@ -74,6 +74,47 @@ export const NEIGHBOUR_SCALE = 0.72;
 /** `92 / 129` — a neighbour's centre from the current tablet's centre, as a fraction of its width. */
 export const NEIGHBOUR_OFFSET = 0.713;
 
+/**
+ * The **geometric slot** of a neighbour, independent of whether that neighbour exists — `carouselStage()` uses it to decide
+ * *what to draw*, and the screen uses it to place the **＋ add-tablet** control where the third tablet would sit (owner,
+ * 2026-11-09: *"move the Add Ancestor + to where the 3rd tablet would've been"*).
+ * ⚠️ One function, so the ＋ can never be a few px off the slot it advertises.
+ */
+export function peerSlot(
+  band: { readonly x: number; readonly y: number; readonly w: number; readonly h: number },
+  side: 'left' | 'right',
+): Box {
+  const c = tabletBox(band);
+  const w = c.w * NEIGHBOUR_SCALE;
+  const h = c.h * NEIGHBOUR_SCALE;
+  const offset = c.w * NEIGHBOUR_OFFSET;
+  const midX = band.x + c.x + c.w / 2;
+  return { x: midX + (side === 'left' ? -offset : offset) - w / 2, y: band.y + c.y + c.h - h, w, h };
+}
+
+/**
+ * Where the **＋ add-tablet** control sits (owner, 2026-11-09: *"move the Add Ancestor + to where the 3rd tablet would've
+ * been"*): in the third tablet's slot, standing on its floor — but centred in the part of the slot that is **VISIBLE**.
+ * ⚠️ A peer is drawn BEHIND the centre, so the slot's overlap with the centre tablet never shows; the ＋ is drawn ON TOP, so
+ * centring it in the raw slot put its left edge 4 board px into the current tablet's border (measured on glass). ⚠️ So the
+ * exposed strip — from the centre's edge to the slot's outer edge — is what it is centred in, and if that strip is narrower
+ * than the control it falls back to the slot's own centre rather than drifting outside.
+ */
+export function addTabletSlot(
+  band: { readonly x: number; readonly y: number; readonly w: number; readonly h: number },
+  side: 'left' | 'right' = 'right',
+  plusSide = 48,
+): Box {
+  const c = tabletBox(band);
+  const centreRight = band.x + c.x + c.w;
+  const slot = peerSlot(band, side);
+  const lo = side === 'right' ? centreRight : slot.x;
+  const hi = side === 'right' ? slot.x + slot.w : band.x + c.x;
+  const strip = hi - lo;
+  const x = strip >= plusSide ? lo + (strip - plusSide) / 2 : slot.x + (slot.w - plusSide) / 2;
+  return { x, y: slot.y + slot.h - plusSide, w: plusSide, h: plusSide };
+}
+
 /** The three-tablet stage: the current tablet, plus whichever neighbours exist. Rects are BOARD-absolute. */
 export interface Stage {
   readonly centre: Box;
@@ -94,16 +135,10 @@ export function carouselStage(
 ): Stage {
   const c = tabletBox(band);
   const centre: Box = { x: band.x + c.x, y: band.y + c.y, w: c.w, h: c.h };
-  const floor = centre.y + centre.h;
-  const w = centre.w * NEIGHBOUR_SCALE;
-  const h = centre.h * NEIGHBOUR_SCALE;
-  const offset = centre.w * NEIGHBOUR_OFFSET;
-  const midX = centre.x + centre.w / 2;
-  const at = (dx: number): Box => ({ x: midX + dx - w / 2, y: floor - h, w, h });
   return {
     centre,
-    left: index > 0 ? at(-offset) : null,
-    right: index < count - 1 ? at(offset) : null,
+    left: index > 0 ? peerSlot(band, 'left') : null,
+    right: index < count - 1 ? peerSlot(band, 'right') : null,
   };
 }
 

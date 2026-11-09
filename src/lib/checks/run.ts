@@ -18,9 +18,11 @@ import { fileURLToPath } from 'node:url';
 import { isValidClanName } from '../clan-rules.ts';
 import {
   TABLET_SCALE,
+  addTabletSlot,
   NEIGHBOUR_SCALE,
   NEIGHBOUR_OFFSET,
   carouselStage,
+  peerSlot,
   tabletBox,
 } from '../altar.ts';
 import { PREPARING_PHASES, pipelineFailed } from '../../domain/slice.ts';
@@ -3440,26 +3442,43 @@ function storeChecks(): void {
     shrunk.length === 0, shrunk.join(', '));
 
   /**
-   * ⚠️⚠️ **THE ＋ ADD-TABLET CONTROL MUST NOT BE COVERED BY A DECORATION** (owner, 2026-11-09: *"GO WITH 1"* — a ＋ beside the
-   * carousel arrows). ⚠️ This is the assertion that stops the new control repeating the **defect it was built next to**: the
-   * arrows sit at `340,412 24×40`, inside the side banner's art, and because decorations are `Pressable` a tap on *next* opens
-   * the customiser instead. ⚠️ So the band is checked against **every decoration ART rect and the background ZONE** — the
-   * former because that is what is drawn, the latter because the print's zone is a tap target in customise mode.
-   * ⚠️ It is also checked for a real thumb: ≥ 44 dp at the 360 dp reference, and clear of the table it sits above.
+   * ⚠️⚠️ **THE ＋ SITS IN THE THIRD TABLET'S SLOT** (owner, 2026-11-09: *"move the Add Ancestor + to where the 3rd tablet
+   * would've been"*). ⚠️ Asserted against `peerSlot()` — the SAME function the peers are drawn from — so the control cannot
+   * drift from the place the next tablet will appear: inside the slot, horizontally centred, and standing on the slot's floor.
+   * ⚠️⚠️ **Clearance is asserted against the decoration ART rects, and NOT the print's tap zone** — this check used to include
+   * the zone, and moving the ＋ into the third slot makes it overlap that zone (`101..291 × 288..608`). That overlap is
+   * harmless and the comparison would have been wrong: a zone is a **customise-mode** target, and this control is rendered
+   * only when NOT customising (`!customize`, asserted above), while the decoration ART rects are the Pressables that exist in
+   * normal mode — the ones that could actually swallow the tap. ⚠️ Relaxed deliberately and narrowly, not to make it pass.
    */
-  const addBand = HOME_BANDS.addTablet;
-  const coveredBy = SLOTS.filter((s) => rectsOverlap(addBand, SLOT_ART[s])).concat(
-    rectsOverlap(addBand, SLOT_HIT.background) ? ['background-zone'] : [],
-  );
-  check('⚠️⚠️ the ＋ add-tablet control is clear of EVERY decoration and the print zone — not buried like the arrows',
-    coveredBy.length === 0
-      && !rectsOverlap(addBand, HOME_BANDS.carouselNext)
-      && !rectsOverlap(addBand, HOME_BANDS.carouselPrev)
-      && bandAbove(addBand, HOME_BANDS.shrineBase)
-      && addBand.x >= 0 && addBand.x + addBand.w <= DECOR_BOARD.w
+  const plusSlot = peerSlot(HOME_BANDS.addSlot, 'right');
+  const plusRect = addTabletSlot(HOME_BANDS.addSlot, 'right');
+  const stageForPlus = carouselStage(HOME_BANDS.addSlot, 1, 3);
+  /** ⚠️ Its OWN read of the screen, not the `homeSrc` further down: that one is declared after this check, and using it here
+   * threw `Cannot access 'homeSrc' before initialization` — a crash, not a red, which is the worst shape of failure. */
+  const plusSrc = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'app', 'index.tsx'), 'utf8'));
+  const plusCoveredBy = SLOTS.filter((s) => rectsOverlap(plusRect, SLOT_ART[s]));
+  check('⚠️⚠️ the ＋ sits in the THIRD tablet slot, on its floor, and clear of the current tablet and every decoration',
+    /**
+     * ⚠️⚠️ **The source must ASK for the right-hand slot.** The geometry below is derived from the same call, so on its own it
+     * is self-consistent and would stay green with the ＋ on the LEFT — measured. This clause makes the side testable.
+     */
+    plusSrc.includes("addTabletSlot(slot, 'right')")
+      && plusRect.x >= plusSlot.x && plusRect.x + plusRect.w <= plusSlot.x + plusSlot.w
+      /** Standing on the slot's floor, exactly like the peer tablet it advertises. */
+      && Math.abs(plusRect.y + plusRect.h - (plusSlot.y + plusSlot.h)) < 1e-9
+      /**
+       * ⚠️ **AND OFF THE CURRENT TABLET.** A peer hides behind the centre, so the slot's overlap never shows; the ＋ is painted
+       * on top, and centring it in the raw slot put its edge into the current tablet's border on glass. This is the assertion
+       * that keeps it in the VISIBLE part of the slot (`addTabletSlot`).
+       */
+      && !rectsOverlap(plusRect, stageForPlus.centre)
+      && plusCoveredBy.length === 0
+      && !rectsOverlap(plusRect, HOME_BANDS.carouselNextTouch)
+      && plusRect.x >= 0 && plusRect.x + plusRect.w <= DECOR_BOARD.w
       /** 44 dp minimum at 360 dp on a 390 board: 44 / (360/390) = 47.7 board px. */
-      && addBand.w >= (44 * DECOR_BOARD.w) / 360 && addBand.h >= (44 * DECOR_BOARD.w) / 360,
-    coveredBy.join(', ') || `${addBand.w}×${addBand.h} at ${addBand.x},${addBand.y}`);
+      && plusRect.w >= (44 * DECOR_BOARD.w) / 360,
+    plusCoveredBy.join(', ') || `${plusRect.w}×${plusRect.h} at ${plusRect.x.toFixed(1)},${plusRect.y.toFixed(1)} in slot ${plusSlot.x.toFixed(1)}..${(plusSlot.x + plusSlot.w).toFixed(1)}, centre ends ${(stageForPlus.centre.x + stageForPlus.centre.w).toFixed(1)}`);
 
   /**
    * ⚠️⚠️ **THE ＋ MUST BE DRAWN, NOT TYPED** (owner, 2026-11-09: *"The center alignment of the + is off"*).
