@@ -3399,10 +3399,22 @@ function storeChecks(): void {
       const opts = optionsForSlot(s, everyCode, null);
       return opts.length > 0 && opts.every((o) => o.decoration.category === SLOT_CATEGORY[s]);
     }));
-  // ⚠️ POSITIVE CONTROL — the filter is not empty-by-accident: the SIDE slots really do offer three (S14).
-  check('⚠️ guard: the side slots offer three sets (couplets · door gods · festive set), not zero',
-    optionsForSlot('side_left', everyCode, null).length === 3
+  // ⚠️ POSITIVE CONTROL — the filter is not empty-by-accident: the SIDE slots really do offer two (S14).
+  check('⚠️⚠️ the side slots offer the TWO placeable sets — and NEVER the Festive Set, which is a bundle',
+    optionsForSlot('side_left', everyCode, null).length === 2
+      && optionsForSlot('side_left', everyCode, null).every((o) => o.code !== 'festive_set')
       && optionsForSlot('background', everyCode, null).every((o) => o.code === 'zhong_kui'));
+  /**
+   * ⚠️⚠️ **A COMPOSED DECORATION IS A SKU, NOT A CHOICE** (owner, 2026-11-09). Asserted by `composedOf` rather than by
+   * the code, so a future bundle cannot sneak into a picker: whatever the catalogue marks composed must never appear in
+   * ANY slot's options, and must draw in no slot at all.
+   */
+  const composed = DECORATIONS.filter((d) => d.composedOf !== undefined);
+  check('⚠️⚠️ every COMPOSED decoration is absent from every slot\'s options',
+    composed.length === 1 && composed[0].code === 'festive_set'
+      && SLOTS.every((s) => optionsForSlot(s, everyCode, null).every((o) => o.decoration.composedOf === undefined)));
+  check('⚠️ …and it is made of the other four — the same set `decorations_catalog.composed_of` names',
+    composed[0].composedOf?.slice().sort().join(',') === 'door_gods,lanterns,spring_couplets,zhong_kui');
   check('⚠️ an UNOWNED item is listed but NOT selectable, and an equipped one is not re-equipable',
     (() => {
       const o = optionsForSlot('side_left', ['spring_couplets'], 'spring_couplets');
@@ -3457,15 +3469,8 @@ function storeChecks(): void {
   check('⚠️ the BACKGROUND print draws BEHIND the tablet — the z-order `1e` depends on',
     backgroundOnly.length === 1 && backgroundOnly[0].behind === true);
   const setPlan = drawPlan({ ...noDecor, side_left: 'festive_set' } as never);
-  check('⚠️⚠️ the FESTIVE SET lights ALL SIX slots — `1e` draws 横批, two lanterns, two couplets and the print',
-    setPlan.length === 6
-      && setPlan.map((p) => p.slot).join(',') === 'top_left,top_middle,top_right,side_left,side_right,background'
-      && setPlan.find((p) => p.slot === 'top_middle')?.code === 'spring_couplets'
-      && setPlan.find((p) => p.slot === 'top_left')?.code === 'lanterns');
-  const setPlusLantern = drawPlan({ ...noDecor, side_left: 'festive_set', top_left: 'lanterns' } as never);
-  check('⚠️ …and an explicitly equipped piece KEEPS its slot — a set never overwrites a choice',
-    setPlusLantern.filter((p) => p.slot === 'top_left').length === 1
-      && setPlusLantern.find((p) => p.slot === 'top_left')?.code === 'lanterns');
+  check('⚠️⚠️ the FESTIVE SET draws NOTHING — it is a bundle, not an altarpiece (owner, 2026-11-09)',
+    setPlan.length === 0, String(setPlan.length));
 
   /**
    * ⚠️⚠️ **A SET'S PIECE IS NOT ALWAYS THE SET'S FACE.** The couplets' top-middle piece is the **横批 banner**, not the

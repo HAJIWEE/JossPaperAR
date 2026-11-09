@@ -57,6 +57,15 @@ begin
     '{"provider":"anonymous","providers":["anonymous"]}', '{}', now(), now()
   );
 
+  -- ⚠️ PRE-CLEAN — make a RE-RUN safe after a FAILED run. Under `run-sql-tests.sh` psql
+  -- autocommits every statement, so a run that aborts at assertion N leaves the rows of steps
+  -- 1..N-1 COMMITTED and its teardown never executes. ⚠️ That is exactly what happened on
+  -- 2026-11-09: the Festive Set purchase had committed, so a key it had already used (`bundle-key-0003` collided with B3's plain-item key on the first attempt)
+  -- hit the REPLAY branch (which returns no `kind`) and the assertion failed for a reason that
+  -- had nothing to do with the code. Same lesson as `pr3_verification.sql`'s pre-clean.
+  delete from public.inventory     where user_id = v_u1;
+  delete from public.ledger_events where user_id = v_u1;
+
   -- ⚠️ the profile must exist before the funding row (FK) — the bootstrap trigger should have
   -- made it, but `ensure_profile` is the same call `purchase_item` makes, so this is exact.
   perform public.ensure_profile(v_u1);
@@ -131,6 +140,35 @@ begin
     (select count(*) from public.ledger_events
       where user_id = v_u1 and idempotency_key = 'bundle-key-0001') = 1,
     'B4  …and wrote no second debit');
+
+
+  -- ── B6/B7 · THE FESTIVE SET IS A BUNDLE TOO (owner, 2026-11-09) ──────────
+  /**
+   * ⚠️⚠️ *"Festive Set is just the rest of the decorations being sold together as a set, it should not be a selectable
+   * item for the decorations. when a user buys the Festive set he is getting all the other decorations in one shot."*
+   *
+   * ⚠️ Before `20261109110000` this purchase took the DECORATION branch and wrote a **`festive_set` inventory row** — an
+   * item no slot can hold — because the composition was only ever read from `offerings_catalog`. Same defect as the
+   * wealth bundle, on the other catalogue.
+   */
+  v_r := public.purchase_item('festive_set', 'bundle-key-0003');
+  perform pg_temp.assert_true(v_r->>'kind' = 'decoration',
+    'B6  the Festive Set is still a DECORATION (got ' || coalesce(v_r::text, 'NULL') || ')');
+  perform pg_temp.assert_true((v_r->>'price')::int = 3000,
+    'B6  charged its own price (3,000), re-read server-side');
+  perform pg_temp.assert_true(
+    (select array_agg(x order by x) from jsonb_array_elements_text(v_r->'granted') x)
+      = array['door_gods', 'lanterns', 'spring_couplets', 'zhong_kui'],
+    'B6  the receipt reports the four decorations as `granted` (got ' || (v_r->'granted')::text || ')');
+  perform pg_temp.assert_true(
+    (select count(*) from public.inventory where user_id = v_u1 and item_code = 'festive_set') = 0,
+    'B6  ⚠️⚠️ and NEVER a `festive_set` row — it is not placeable, so it must not be holdable');
+  perform pg_temp.assert_true(
+    (select count(*) from public.inventory
+      where user_id = v_u1
+        and item_code in ('door_gods', 'lanterns', 'spring_couplets', 'zhong_kui')) = 4,
+    'B6  all four decorations landed in the inventory (which is what `equip_decoration` checks)');
+
 end
 $body$;
 
@@ -151,6 +189,15 @@ begin
   perform pg_temp.assert_true(
     (select count(*) from public.offerings_catalog where composed_of is not null) = 1,
     'B5  …and it is the ONLY composed item — the other four are plain');
+
+  select composed_of into v_comp from public.decorations_catalog where code = 'festive_set';
+  perform pg_temp.assert_true(
+    (select array_agg(x order by x) from unnest(v_comp) x)
+      = array['door_gods', 'lanterns', 'spring_couplets', 'zhong_kui'],
+    'B7  the SQL mirror carries it — `decorations_catalog.composed_of` names the four');
+  perform pg_temp.assert_true(
+    (select count(*) from public.decorations_catalog where composed_of is not null) = 1,
+    'B7  …and it is the ONLY composed decoration — the other four are plain pieces');
 end
 $mirror$;
 

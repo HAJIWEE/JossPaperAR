@@ -43,6 +43,11 @@ on conflict (code) do update set
 -- Names are locked (S14). Prices come from `EN · 7b` / `ZH · 7b`, adopted as-is by the owner
 -- (2026-11-08), and they MUST match `DECORATIONS` in src/domain/catalogue.ts.
 --
+-- ⚠️⚠️ **THE FESTIVE SET IS A BUNDLE, NOT AN ALTTARPIECE** (owner, 2026-11-09): *"it should not be a
+-- selectable item for the decorations. when a user buys the Festive set he is getting all the other
+-- decorations in one shot."* So `composed_of` names the four it is made of — the same column, and the
+-- same `purchase_item` path, as `wealth_bundle` on the offerings side.
+--
 -- ⚠️⚠️ **THESE ARE SEEDED WITH THEIR PRICES ON PURPOSE.** They used to be inserted as NULL, and that made
 -- the LOCAL database a different product from the hosted one: the pricing migrations run BEFORE the seed, so
 -- on a fresh `supabase db reset` their UPDATEs matched no rows and every decoration stayed unpriced —
@@ -52,18 +57,20 @@ on conflict (code) do update set
 --
 -- ⚠️ Pairing is asserted in `check:lib` against the board's own layer names, not against this file. It is
 -- stated here because it was got wrong once (2026-11-09): DOOR GODS $1.49 / 1,200 · LANTERNS $1.99 / 1,600.
-insert into public.decorations_catalog (code, slot_category, name_en, name_zh, price) values
-  ('spring_couplets', 'side',       'Spring Couplets', '春联',     800),
-  ('zhong_kui',       'background', 'Zhong Kui Print', '鍾馗像',  1000),
-  ('door_gods',       'side',       'Door Gods',       '门神',    1200),
-  ('lanterns',        'top',        'Lanterns',        '灯笼',    1600),
-  ('festive_set',     'side',       'Festive Set',     '新春套装', 3000)
+insert into public.decorations_catalog (code, slot_category, name_en, name_zh, price, composed_of) values
+  ('spring_couplets', 'side',       'Spring Couplets', '春联',     800, null),
+  ('zhong_kui',       'background', 'Zhong Kui Print', '鍾馗像',  1000, null),
+  ('door_gods',       'side',       'Door Gods',       '门神',    1200, null),
+  ('lanterns',        'top',        'Lanterns',        '灯笼',    1600, null),
+  ('festive_set',     'side',       'Festive Set',     '新春套装', 3000,
+     array['lanterns', 'spring_couplets', 'zhong_kui', 'door_gods'])
 on conflict (code) do update set
   slot_category = excluded.slot_category,
   name_en       = excluded.name_en,
   name_zh       = excluded.name_zh,
   -- ⚠️ price is part of the upsert: re-seeding must CORRECT a row, not quietly leave the old number.
-  price         = excluded.price;
+  price         = excluded.price,
+  composed_of   = excluded.composed_of;
 
 -- ── Sanity check (visible in `supabase db reset` output) ───────────────────
 do $$
@@ -104,6 +111,16 @@ begin
       or (code = 'festive_set'     and price is distinct from 3000);
   if bad > 0 then
     raise exception 'seed: % decoration(s) do not carry the board price (EN-7b: 800 · 1000 · 1200 · 1600 · 3000)', bad;
+  end if;
+  -- ⚠️ the Festive Set is a BUNDLE (owner, 2026-11-09) — it must name its four, and nothing else may.
+  select count(*) into bad from public.decorations_catalog
+   where (code = 'festive_set'
+          and (composed_of is null
+               or (select array_agg(x order by x) from unnest(composed_of) x)
+                  <> array['door_gods', 'lanterns', 'spring_couplets', 'zhong_kui']))
+      or (code <> 'festive_set' and composed_of is not null);
+  if bad > 0 then
+    raise exception 'seed: festive_set must be the ONLY composed decoration, made of the other four';
   end if;
   raise notice 'seed ok — % offerings · % decorations · every base_value = 1.2 x price', n_offer, n_decor;
 end;

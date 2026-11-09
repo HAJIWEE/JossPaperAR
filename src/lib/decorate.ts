@@ -194,11 +194,18 @@ export function optionsForSlot(
   equipped: DecorationCode | null,
 ): readonly DecorOption[] {
   const category = SLOT_CATEGORY[slot];
-  return DECORATIONS.filter((d) => d.category === category).map((d) => {
-    const isOwned = owned.includes(d.code);
-    const state: DecorState = equipped === d.code ? 'equipped' : isOwned ? 'owned' : 'unowned';
-    return { code: d.code, decoration: d, state, selectable: isOwned && equipped !== d.code };
-  });
+  return DECORATIONS
+    /**
+     * ⚠️⚠️ **A COMPOSED SET IS A SKU, NOT A CHOICE** (owner, 2026-11-09). The Festive Set is the other four sold
+     * together — buying it grants them, so a picker row for the set itself would offer something that cannot be placed
+     * and is not owned as an item. Filtered on `composedOf`, not on the code, so a future bundle is excluded too.
+     */
+    .filter((d) => d.composedOf === undefined && d.category === category)
+    .map((d) => {
+      const isOwned = owned.includes(d.code);
+      const state: DecorState = equipped === d.code ? 'equipped' : isOwned ? 'owned' : 'unowned';
+      return { code: d.code, decoration: d, state, selectable: isOwned && equipped !== d.code };
+    });
 }
 
 export interface DrawPlan {
@@ -266,23 +273,12 @@ const SET_SLOTS: Record<DecorationCode, readonly DecorationSlot[]> = {
   /** one print, behind the tablet */
   zhong_kui: ['background'],
   /**
-   * ⚠️ **THE FESTIVE SET IS AN AMALGAMATION — the four others put together** (owner, 2026-11-08), and `EN · 1e` is the
-   * board that proves it: it draws 横批 top-middle, a lantern in each corner, a couplet down each side and Zhong Kui
-   * behind the tablet — i.e. all six slots.
-   * ⚠️ The SIDES show the couplets, not the door gods: they are the same category and replace each other (S14k), so a
-   * set that owns both still displays one. `1e` displays the couplets.
+   * ⚠️⚠️ **THE FESTIVE SET IS A BUNDLE, SO IT DRAWS NOWHERE** (owner, 2026-11-09): buying it grants the four
+   * decorations it is made of, and those are equipped individually. ⚠️ An empty list is deliberate and stronger than
+   * the previous expansion — there is no `festive_set` inventory row to equip, and `purchase_item` never writes one
+   * (`decorations_catalog.composed_of`). If such a row somehow existed, drawing nothing is the honest outcome.
    */
-  festive_set: ['top_left', 'top_middle', 'top_right', 'side_left', 'side_right', 'background'],
-};
-
-/** Which of the set's own motifs draws in each slot it fills — the amalgamation, slot by slot (`1e`). */
-const FESTIVE_PARTS: Partial<Record<DecorationSlot, DecorationCode>> = {
-  top_left: 'lanterns',
-  top_middle: 'spring_couplets',
-  top_right: 'lanterns',
-  side_left: 'spring_couplets',
-  side_right: 'spring_couplets',
-  background: 'zhong_kui',
+  festive_set: [],
 };
 
 /**
@@ -313,22 +309,11 @@ export function drawPlan(
     taken.add(slot);
   };
 
-  // 1 · explicit pieces first — each fills ITS set's slots (a pair fills two).
+  // ⚠️ ONE loop: a piece fills ITS set's slots (a pair fills two, a trio three). A COMPOSED set has none — it is a SKU.
   for (const slot of DECORATION_SLOTS) {
     const code = equipped[slot];
     if (code === null || code === undefined) continue;
-    if (code === 'festive_set') continue; // the amalgamation is applied last
     for (const target of SET_SLOTS[code]) add(target, code);
-  }
-
-  // 2 · the Festive Set fills whatever is left of its five slots.
-  for (const slot of DECORATION_SLOTS) {
-    if (equipped[slot] !== 'festive_set') continue;
-    const parts = FESTIVE_PARTS;
-    for (const target of SET_SLOTS.festive_set) {
-      const part = parts[target];
-      if (part !== undefined) add(target, part);
-    }
   }
 
   return plan;

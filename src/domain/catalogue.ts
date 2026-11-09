@@ -167,6 +167,16 @@ export interface Decoration {
   readonly price: number | null;
   /** ⚠️ CASH, in CENTS (the board's `$3.99` = 399). Integer, so no float touches money. */
   readonly cashPrice: number | null;
+  /**
+   * ⚠️⚠️ **A SET, NOT A PIECE** (owner, 2026-11-09): *"Festive Set is just the rest of the decorations being sold
+   * together as a set, it should not be a selectable item for the decorations. when a user buys the Festive set he is
+   * getting all the other decorations in one shot."*
+   *
+   * ⚠️ So a composed decoration is **never offered in a slot picker and never drawn on the altar** — it is a SKU. Its
+   * mirror is `decorations_catalog.composed_of`, and `purchase_item` grants one of each component and **never a row
+   * for the set itself**, exactly as `wealth_bundle` does on the offerings side.
+   */
+  readonly composedOf?: readonly DecorationCode[];
 }
 
 export const DECORATIONS: readonly Decoration[] = [
@@ -174,5 +184,8 @@ export const DECORATIONS: readonly Decoration[] = [
   { code: 'zhong_kui', name: { en: 'Zhong Kui Print', zh: '钟馗像' }, category: 'background', price: 1000, cashPrice: 129 },
   { code: 'door_gods', name: { en: 'Door Gods', zh: '门神' }, category: 'side', price: 1200, cashPrice: 149 },
   { code: 'lanterns', name: { en: 'Lanterns', zh: '灯笼' }, category: 'top', price: 1600, cashPrice: 199 },
-  { code: 'festive_set', name: { en: 'Festive Set', zh: '新春套装' }, category: 'side', price: 3000, cashPrice: 399 },
+  { code: 'festive_set', name: { en: 'Festive Set', zh: '新春套装' }, category: 'side', price: 3000, cashPrice: 399,
+    // ⚠️ A BUNDLE, not an altarpiece (owner, 2026-11-09) — buying it grants these four, and it is never offered in a
+    // slot picker nor drawn on the shrine. `decorations_catalog.composed_of` is the SQL mirror.
+    composedOf: ['lanterns', 'spring_couplets', 'zhong_kui', 'door_gods'] },
 ] as const;
