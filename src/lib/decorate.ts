@@ -320,9 +320,31 @@ export function drawPlan(
 }
 
 
+/** Do two board rects overlap? ⚠️ Strict: touching edges do not count. */
+export function rectsOverlap(a: Rect, b: Rect): boolean {
+  return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+}
+
+/**
+ * ⚠️⚠️ **IS THE CHIP'S BAND CLEAR?** (owner, 2026-11-09 — the answer to `SCRUM-225`)
+ *
+ * > *"If that position is empty then show the Chip, else clicking on the decoration enters the customizing workflow too."*
+ *
+ * ⚠️ The chip (`zone · customizable temple (label)`, 28,214 224×22) sits **inside** the top decoration band — the
+ * top-left lantern draws at 37,210 52×66 and the couplets' 横批 at 125,213 141×40, so both run **through** the label.
+ * `1d`/`1e` draw no chip at all for exactly that reason.
+ *
+ * So the chip is the **empty-state** affordance and the DECORATION takes over the tap once one is there: this function
+ * decides which of the two the shrine shows, from what it is about to draw — one rule, one place.
+ */
+export function chipBandClear(plan: readonly DrawPlan[], band: Rect): boolean {
+  return plan.every((p) => !rectsOverlap(p.rect, band));
+}
+
 /** Which category a slot belongs to — re-exported so a caller cannot import a second copy of the rule. */
 export function categoryOf(slot: DecorationSlot): DecorationSlotCategory {
   return SLOT_CATEGORY[slot];
 }
+
 
 

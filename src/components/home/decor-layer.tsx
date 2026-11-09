@@ -22,6 +22,7 @@ import {
   SLOT_HIT,
   categoryOf,
   drawPlan,
+  rectsOverlap,
   type Rect,
 } from '@/lib/decorate';
 import { t } from '@/lib/i18n';
@@ -34,44 +35,96 @@ function boxOf(r: Rect, s: number) {
   return { position: 'absolute' as const, left: r.x * s, top: r.y * s, width: r.w * s, height: r.h * s };
 }
 
-function Piece({ code, rect, s, art }: { code: DecorationCode; rect: Rect; s: number; art?: ArtVariant }) {
-  return (
-    <View style={boxOf(rect, s)} pointerEvents="none">
-      {/* ⚠️ The rect is the ART's own (`1d`/`1e`), and the art fills it — see `DecorationArt`'s `box` note. */}
-      <DecorationArt
-        code={code}
-        size={Math.max(rect.w, rect.h) * s}
-        box={{ w: rect.w * s, h: rect.h * s }}
-        art={art}
-      />
-    </View>
+function Piece({
+  code,
+  rect,
+  s,
+  art,
+  onPress,
+  testID,
+}: {
+  code: DecorationCode;
+  rect: Rect;
+  s: number;
+  art?: ArtVariant;
+  /** ⚠️ Given only when this piece IS the way into customising — see `DecorBack`/`DecorFront`. */
+  onPress?: () => void;
+  testID?: string;
+}) {
+  const inner = (
+    <DecorationArt
+      code={code}
+      size={Math.max(rect.w, rect.h) * s}
+      box={{ w: rect.w * s, h: rect.h * s }}
+      art={art}
+    />
   );
+  if (onPress === undefined) {
+    return (
+      <View style={boxOf(rect, s)} pointerEvents="none">
+        {/* ⚠️ The rect is the ART's own (`1d`/`1e`), and the art fills it — see `DecorationArt`'s `box` note. */}
+        {inner}
+      </View>
+    );
+  }
+  /**
+   * ⚠️⚠️ **THE DECORATION IS THE BUTTON** (owner, 2026-11-09 — `SCRUM-225`): *"If that position is empty then show the
+   * Chip, else clicking on the decoration enters the customizing workflow too."* ⚠️ Its accessible name is the chip's
+   * own promise (*"Everything here is customizable"*) rather than new copy — it is the same control, worn by the thing
+   * that now occupies the space.
+   */
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t('home.templeChip')}
+      onPress={onPress}
+      testID={testID}
+      style={({ pressed }) => [boxOf(rect, s), pressed && { opacity: 0.75 }]}
+    >
+      {inner}
+    </Pressable>
+  );
+}
+
+/**
+ * Everything the shrine should draw, from what the server said is equipped.
+ *
+ * ⚠️ `band` + `onEnter` exist for ONE reason: a piece that runs through the temple chip's band becomes the way in
+ * (`chipBandClear` decides whether the chip is shown at all). Without them the art is inert, which is what every other
+ * piece wants to be — a decoration must not steal a tap from the altar behind it.
+ */
+interface LayerProps {
+  scale: number;
+  equipped: EquippedMap;
+  band?: Rect;
+  onEnter?: () => void;
+}
+
+function piecesIn(plan: readonly { slot: DecorationSlot; code: DecorationCode; rect: Rect; art?: ArtVariant }[], { scale, band, onEnter }: LayerProps) {
+  return plan.map((p) => {
+    const inBand = band !== undefined && onEnter !== undefined && rectsOverlap(p.rect, band);
+    return (
+      <Piece
+        key={`${p.slot}:${p.code}`}
+        code={p.code}
+        rect={p.rect}
+        s={scale}
+        art={p.art}
+        onPress={inBand ? onEnter : undefined}
+        testID={inBand ? `decor-piece-${p.slot}` : undefined}
+      />
+    );
+  });
 }
 
 /** The prints that sit BEHIND the tablet — mounted before the altar art. */
-export function DecorBack({ scale, equipped }: { scale: number; equipped: EquippedMap }) {
-  return (
-    <>
-      {drawPlan(equipped)
-        .filter((p) => p.behind)
-        .map((p) => (
-          <Piece key={`${p.slot}:${p.code}`} code={p.code} rect={p.rect} s={scale} art={p.art} />
-        ))}
-    </>
-  );
+export function DecorBack(props: LayerProps) {
+  return <>{piecesIn(drawPlan(props.equipped).filter((p) => p.behind), props)}</>;
 }
 
 /** Everything that sits IN FRONT of the altar art — mounted after it, before the CTA. */
-export function DecorFront({ scale, equipped }: { scale: number; equipped: EquippedMap }) {
-  return (
-    <>
-      {drawPlan(equipped)
-        .filter((p) => !p.behind)
-        .map((p) => (
-          <Piece key={`${p.slot}:${p.code}`} code={p.code} rect={p.rect} s={scale} art={p.art} />
-        ))}
-    </>
-  );
+export function DecorFront(props: LayerProps) {
+  return <>{piecesIn(drawPlan(props.equipped).filter((p) => !p.behind), props)}</>;
 }
 
 /**

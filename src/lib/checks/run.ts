@@ -24,8 +24,10 @@ import {
   SLOT_ART,
   SLOT_HIT,
   artVariantFor,
+  chipBandClear,
   drawPlan,
   optionsForSlot,
+  rectsOverlap,
   sheetLayout,
 } from '../decorate.ts';
 import { CASH_IS_READABLE, FEATURED_CODE, STORE_TABS, baseMetaValue, pointsPrice, storeList } from '../store.ts';
@@ -3471,6 +3473,30 @@ function storeChecks(): void {
   const setPlan = drawPlan({ ...noDecor, side_left: 'festive_set' } as never);
   check('⚠️⚠️ the FESTIVE SET draws NOTHING — it is a bundle, not an altarpiece (owner, 2026-11-09)',
     setPlan.length === 0, String(setPlan.length));
+
+  /**
+   * ⚠️⚠️ **THE CHIP IS THE EMPTY-STATE AFFORDANCE** — `SCRUM-225`, answered by the owner 2026-11-09: *"If that position
+   * is empty then show the Chip, else clicking on the decoration enters the customizing workflow too."*
+   *
+   * ⚠️ Asserted as a RULE (`chipBandClear`), not as a style flag: the chip is shown when nothing is drawn through its
+   * band, and the piece that IS there becomes the button. ⚠️ The overlap itself is asserted too — if a future decoration
+   * stops intersecting the band, this decision becomes pointless and the check should say so rather than pass quietly.
+   */
+  check('⚠️ the chip\'s band really does sit inside the top decoration band (why SCRUM-225 existed)',
+    rectsOverlap(SLOT_ART.top_left, HOME_BANDS.templeChip)
+      && rectsOverlap(SLOT_ART.top_middle, HOME_BANDS.templeChip));
+  check('⚠️⚠️ an EMPTY altar keeps the chip — it is the only way in when nothing is drawn there',
+    chipBandClear([], HOME_BANDS.templeChip) && chipBandClear(backgroundOnly, HOME_BANDS.templeChip));
+  check('⚠️⚠️ a TOP decoration HIDES the chip — the piece becomes the way in (the owner\'s rule)',
+    !chipBandClear(lanternOnly, HOME_BANDS.templeChip)
+      && !chipBandClear(coupletsOnly, HOME_BANDS.templeChip));
+  check('⚠️ …and the screen follows the rule rather than always drawing the chip or always hiding it',
+    (() => {
+      const src = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'app', 'index.tsx'), 'utf8'));
+      return src.includes('chipBandClear(plan, HOME_BANDS.templeChip)')
+        && /showChip \? \(/.test(src)
+        && src.includes('onEnter={enterCustomize}');
+    })());
 
   /**
    * ⚠️⚠️ **A SET'S PIECE IS NOT ALWAYS THE SET'S FACE.** The couplets' top-middle piece is the **横批 banner**, not the

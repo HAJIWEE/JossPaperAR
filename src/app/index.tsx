@@ -35,6 +35,7 @@ import {
   type Ancestor,
 } from '@/lib/clan-api';
 import { PILL_X_ON_REFERENCE, type PillClan } from '@/lib/clan-pill';
+import { chipBandClear, drawPlan } from '@/lib/decorate';
 import { equipDecoration, readMyDecorations, type MyDecorations } from '@/lib/decorations';
 import type { DecorationCode, DecorationSlot } from '@/domain/catalogue';
 import { readFirstRun } from '@/lib/first-run';
@@ -412,6 +413,20 @@ export default function HomeShrine() {
       // ── altar · the halo, the offerings, the shrine base and the tablet ───
       case 'altar': {
         const view = altarView(ancestors.length, page);
+        /**
+         * ⚠️⚠️ **`SCRUM-225` IS ANSWERED** (owner, 2026-11-09): *"If that position is empty then show the Chip, else
+         * clicking on the decoration enters the customizing workflow too."*
+         *
+         * ⚠️ The chip's band (`28,214 224×22`) sits INSIDE the top decoration band — the lantern draws 37,210 52×66 and
+         * the couplets' 横批 125,213 141×40 — so the two cannot both own that space. The rule is therefore:
+         *   · nothing drawn through the band → the CHIP is the way in;
+         *   · something drawn there → it is hidden and **that piece** is the way in.
+         * ⚠️ While CUSTOMISING the chip is always shown, because it is also the way OUT and the decorations sit under
+         * the zones there (a hidden chip would strand the user in the mode).
+         */
+        const plan = decor === null ? [] : drawPlan(decor.equipped);
+        const showChip = customize || chipBandClear(plan, HOME_BANDS.templeChip);
+        const enterCustomize = () => setCustomize(true);
         // ⚠️ The board draws the ＋ slot and the CENTRE TABLET on the SAME band
         // (131,285 129×307) — see `altar.ts`. They swap in place; nothing below moves.
         const slot = HOME_BANDS.addSlot;
@@ -430,7 +445,9 @@ export default function HomeShrine() {
               <ShrineBase />
             </View>
             {/* ⚠️ BEFORE the tablet: `EN · 1e` paints `decor · 鍾馗像 (background)` behind it. */}
-            {decor === null ? null : <DecorBack scale={s} equipped={decor.equipped} />}
+            {decor === null ? null : (
+              <DecorBack scale={s} equipped={decor.equipped} band={HOME_BANDS.templeChip} onEnter={enterCustomize} />
+            )}
             {/* ⚠️ The ALTAR-STATE CAPTION — `caption · altar state`. `altarCaption()` chooses the
                 EMPTY line, the board's FILLED line, or the singular; ⚠️ the screen used to render
                 the empty line unconditionally, so a shrine holding three tablets still read
@@ -535,7 +552,9 @@ export default function HomeShrine() {
             ) : null}
 
             {/* ⚠️ AFTER the art: `1d` draws the lanterns and couplets in FRONT of the table. */}
-            {decor === null ? null : <DecorFront scale={s} equipped={decor.equipped} />}
+            {decor === null ? null : (
+              <DecorFront scale={s} equipped={decor.equipped} band={HOME_BANDS.templeChip} onEnter={enterCustomize} />
+            )}
             {/* ⚠️ `1f` — the six dashed zones, only while customising. */}
             {customize ? (
               <DecorSlots
@@ -545,19 +564,16 @@ export default function HomeShrine() {
               />
             ) : null}
 
-            {/* ⚠️⚠️ **THE ENTRY TO CUSTOMISING, AND IT IS THE CHIP THAT ALREADY SAID SO.**
-                `zone · customizable temple (label)` reads *"Everything here is customizable"* — a label that
-                promised a control the app did not have. ⚠️ **No board draws an entry** (the `1f` family has no
-                route in, and its interactions point nowhere), so the least invented option is to make the
-                promise itself the control: tapping it toggles the six zones from `1f`. ⚠️ That adds NOTHING to a
-                signed-off Home — no new band, no moved layer — which is the constraint S36 measured the header
-                row to satisfy. ⚠️ Filed as the PM decision **`SCRUM-225`** rather than assumed settled.
+            {/* ⚠️⚠️ **THE ENTRY TO CUSTOMISING — AND WHO WEARS IT IS `SCRUM-225`'s ANSWER** (owner, 2026-11-09):
+                *"If that position is empty then show the Chip, else clicking on the decoration enters the customizing
+                workflow too."* ⚠️ So the chip renders ONLY when nothing is drawn through its band (`chipBandClear`),
+                and while customising (it is also the way out). Its band (`28,214 224×22`) sits inside the top
+                decoration band — that collision is the whole reason the decision existed.
 
-                ⚠️⚠️ **RENDERED LAST, AND THAT IS ON GLASS.** The chip's band (`28,214 224×22`) sits INSIDE the
-                top-left zone (`30,210 66×66`), so painting it before the zones put its text UNDERNEATH the dashed
-                border — measured 2026-11-09. ⚠️ It also has to stay TAPPABLE: it is the only way back out of
-                customising mode, since no board draws a Done control. So it paints on top, with a solid
+                ⚠️⚠️ **RENDERED LAST, AND THAT IS ON GLASS.** Painting it before the zones put its text UNDERNEATH the
+                dashed border (measured 2026-11-09), and it must stay TAPPABLE. So it paints on top, with a solid
                 `paperDeep` fill while the zones are up so the label is legible over them. */}
+            {showChip ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('home.templeChip')}
@@ -576,6 +592,7 @@ export default function HomeShrine() {
                 {t('home.templeChip')}
               </Text>
             </Pressable>
+            ) : null}
           </>
         );
       }
