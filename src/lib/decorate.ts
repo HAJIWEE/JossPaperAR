@@ -58,7 +58,12 @@ export const DECOR_BOARD = { w: 390, h: 844 } as const;
  * The six **tap zones** — `1f`'s `slot · …` rects, board-relative.
  * ⚠️ Zones, not art: they are deliberately larger than the drawing they hold.
  */
-export const SLOT_HIT: Record<DecorationSlot, Rect> = {
+/**
+ * ⚠️ **THE BOARD'S OWN TAP ZONES (`1f`), UNTOUCHED — the floor every zone is derived from.**
+ * ⚠️ Exported for the gate, which asserts no zone is ever SMALLER than these: a zone that shrank below the board's own
+ * rect would be a control the drawing did not ask for.
+ */
+export const BOARD_HIT: Record<DecorationSlot, Rect> = {
   top_left: { x: 30, y: 210, w: 66, h: 66 },
   top_middle: { x: 118, y: 210, w: 154, h: 46 },
   top_right: { x: 294, y: 210, w: 66, h: 66 },
@@ -66,6 +71,58 @@ export const SLOT_HIT: Record<DecorationSlot, Rect> = {
   side_right: { x: 314, y: 300, w: 46, h: 160 },
   background: { x: 101, y: 288, w: 190, h: 320 },
 };
+
+/**
+ * ⚠️⚠️ **HOW MUCH BIGGER THE BANNERS ARE DRAWN THAN THE BOARD'S RECTS** (owner, 2026-11-09: *"Make the Side banners 20%
+ * bigger. Top banner 15% bigger. maintain the top center alignment."*).
+ *
+ * ⚠️ **ANCHORED TOP-CENTRE, which is the whole of "maintain the top center alignment":** the top edge and the horizontal
+ * centre are held and the piece grows DOWNWARD and OUTWARD. ⚠️ Growing about the centre instead would lift the top edge by
+ * half the growth every time the number changed — the same drift the background print's anchor was built to stop.
+ * ⚠️ The factors are named here rather than baked into six numbers, so the provenance survives: the rects below still read
+ * as the board's measurements, with a stated multiplier on three of them.
+ */
+export const BANNER_GROWTH = { top: 1.15, side: 1.2 } as const;
+
+/**
+ * The board's own `decor · …` art rects (`1d`/`1e`), BEFORE the owner's size changes — the base every grown rect is
+ * derived from, and what the gate compares against.
+ * ⚠️ `top_middle`'s 141 × 40 was measured on a `横批` — a wide scroll this catalogue does not sell yet. It is reused for
+ * whatever TOP decoration lands there, which is the only honest option: the board has never drawn another item in that
+ * slot, and a made-up rect would look measured.
+ */
+export const BOARD_ART: Record<DecorationSlot, Rect> = {
+  top_left: { x: 37, y: 210, w: 52, h: 66 },
+  top_middle: { x: 125, y: 213, w: 141, h: 40 },
+  top_right: { x: 301, y: 210, w: 52, h: 66 },
+  side_left: { x: 33, y: 300, w: 41, h: 160 },
+  side_right: { x: 317, y: 300, w: 41, h: 160 },
+  background: { x: 101, y: 367, w: 190, h: 161 },
+};
+
+/**
+ * Grow a rect about its **TOP-CENTRE**: the top edge and the horizontal centre stay, the width and the bottom move.
+ * ⚠️ This is what "maintain the top center alignment" means in arithmetic, and it is the opposite of `overshoot()`.
+ */
+export function growTopCentre(r: Rect, factor: number): Rect {
+  const w = r.w * factor;
+  const h = r.h * factor;
+  return { x: r.x - (w - r.w) / 2, y: r.y, w, h };
+}
+
+/**
+ * The tap zone for a grown piece: the board's zone, widened **only as far as the art now needs**, never narrowed.
+ * ⚠️ A grown banner that pokes outside its dashed outline is a piece whose edge cannot be tapped in customise mode — the
+ * zone exists to be bigger than the art, so when the art grows the zone has to follow. ⚠️ The 3 px margin keeps the zone
+ * from ever being exactly the art.
+ */
+export function zoneFor(board: Rect, art: Rect, pad = 3): Rect {
+  const x = Math.min(board.x, art.x - pad);
+  const y = Math.min(board.y, art.y - pad);
+  const right = Math.max(board.x + board.w, art.x + art.w + pad);
+  const bottom = Math.max(board.y + board.h, art.y + art.h + pad);
+  return { x, y, w: right - x, h: bottom - y };
+}
 
 /**
  * ⚠️⚠️ **THE PRINT HANGS FROM ITS ZONE'S TOP-CENTRE, AT `BACKGROUND_OVERSHOOT` OF THE ZONE** (owner, 2026-11-09:
@@ -112,24 +169,38 @@ export function hungFrom(zone: Rect, factor: number, topOffset: number): Rect {
 }
 
 /**
- * The six **art rects** — `1d` / `1e`'s `decor · …` groups, board-relative.
+ * The six **art rects** — `1d` / `1e`'s `decor · …` groups, board-relative, with the owner's banner sizes applied.
  *
- * ⚠️ `top_middle`'s 141 × 40 was measured on a `横批` — a wide scroll this catalogue does not sell yet. It is
- * reused for whatever TOP decoration lands there, which is the only honest option: the board has never drawn
- * another item in that slot, and a made-up rect would look measured.
+ * ⚠️ Three of them are `growTopCentre(BOARD_ART[slot], BANNER_GROWTH.…)`: the side banners **+20 %** and the top banner
+ * **+15 %**, anchored so the top edge and the horizontal centre do not move. The other three are the board's rects
+ * unchanged — a size change was asked of two sets, not of the whole altar.
  */
 export const SLOT_ART: Record<DecorationSlot, Rect> = {
-  top_left: { x: 37, y: 210, w: 52, h: 66 },
-  top_middle: { x: 125, y: 213, w: 141, h: 40 },
-  top_right: { x: 301, y: 210, w: 52, h: 66 },
-  side_left: { x: 33, y: 300, w: 41, h: 160 },
-  side_right: { x: 317, y: 300, w: 41, h: 160 },
+  top_left: BOARD_ART.top_left,
+  top_middle: growTopCentre(BOARD_ART.top_middle, BANNER_GROWTH.top),
+  top_right: BOARD_ART.top_right,
+  side_left: growTopCentre(BOARD_ART.side_left, BANNER_GROWTH.side),
+  side_right: growTopCentre(BOARD_ART.side_right, BANNER_GROWTH.side),
   /** `decor · 鍾馗像 (background)` — ⚠️ **HUNG FROM THE ZONE'S TOP-CENTRE, and nothing else** (owner, 2026-11-09:
    * *"further reduce the size of the zhong kui art by 15% and bring it down back 15%"*).
    * ⚠️ One step again, after two commits of a second one: `hungFrom()` is the whole placement — `BACKGROUND_OVERSHOOT` for
    * size, `BACKGROUND_TOP_OFFSET` for the edge it hangs from. A lift on top of an anchor was two controls for one edge, and
    * the second is what walked the print into the chip band. */
-  background: hungFrom(SLOT_HIT.background, BACKGROUND_OVERSHOOT, BACKGROUND_TOP_OFFSET),
+  background: hungFrom(BOARD_HIT.background, BACKGROUND_OVERSHOOT, BACKGROUND_TOP_OFFSET),
+};
+
+/**
+ * The six **tap zones** — the board's `1f` rects, widened only where a grown banner needs it, never narrowed.
+ * ⚠️ Derived, not a second table: the invariant `1f` depends on (*"the zone is bigger than the piece"*) is now maintained by
+ * construction for the pieces that grew, instead of being quietly broken by a hand-edited number.
+ */
+export const SLOT_HIT: Record<DecorationSlot, Rect> = {
+  top_left: BOARD_HIT.top_left,
+  top_middle: zoneFor(BOARD_HIT.top_middle, SLOT_ART.top_middle),
+  top_right: BOARD_HIT.top_right,
+  side_left: zoneFor(BOARD_HIT.side_left, SLOT_ART.side_left),
+  side_right: zoneFor(BOARD_HIT.side_right, SLOT_ART.side_right),
+  background: BOARD_HIT.background,
 };
 
 /** `slot · hint (how it works)` — 20,618 350×18, drawn only in customise mode. */

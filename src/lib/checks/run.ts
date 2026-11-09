@@ -24,6 +24,9 @@ import {
   DECOR_BOARD,
   SLOT_ART,
   SLOT_HIT,
+  BANNER_GROWTH,
+  BOARD_ART,
+  BOARD_HIT,
   BACKGROUND_OVERSHOOT,
   BACKGROUND_TOP_OFFSET,
   artVariantFor,
@@ -3396,6 +3399,40 @@ function storeChecks(): void {
   const topAllowance: Partial<Record<DecorationSlot, number>> = {
     background: SLOT_HIT.background.h * BACKGROUND_TOP_OFFSET,
   };
+  /**
+   * ⚠️⚠️ **THE BANNERS GREW BY THE ASKED FACTOR, ANCHORED TOP-CENTRE** (owner, 2026-11-09: *"Make the Side banners 20%
+   * bigger. Top banner 15% bigger. maintain the top center alignment."*).
+   * ⚠️ Asserted as **size × the named factor AND top edge unmoved AND centre-x unmoved** — the three things that sentence
+   * says. ⚠️ A resize that grew about the centre would pass a size check and fail this one, which is the point: the drift was
+   * the hidden half of the previous background change.
+   */
+  const grewRight = (slot: DecorationSlot, factor: number) => {
+    const base = BOARD_ART[slot];
+    const art = SLOT_ART[slot];
+    return Math.abs(art.w - base.w * factor) < 1e-9
+      && Math.abs(art.h - base.h * factor) < 1e-9
+      && art.y === base.y
+      && Math.abs((art.x + art.w / 2) - (base.x + base.w / 2)) < 1e-9;
+  };
+  check('⚠️⚠️ the side banners are 20 % bigger and the top banner 15 %, both with their TOP edge held',
+    BANNER_GROWTH.side === 1.2 && BANNER_GROWTH.top === 1.15
+      && grewRight('side_left', BANNER_GROWTH.side) && grewRight('side_right', BANNER_GROWTH.side)
+      && grewRight('top_middle', BANNER_GROWTH.top),
+    `side ${SLOT_ART.side_left.w.toFixed(1)}×${SLOT_ART.side_left.h.toFixed(1)} · top ${SLOT_ART.top_middle.w.toFixed(1)}×${SLOT_ART.top_middle.h.toFixed(1)}`);
+
+  /**
+   * ⚠️⚠️ **NO ZONE SHRANK BELOW THE BOARD'S OWN RECT.** Zones are derived from `BOARD_HIT` now, so this is the assertion that
+   * keeps the derivation honest: widening to follow a grown banner is allowed, narrowing one is not — a zone smaller than
+   * `1f`'s own rect removes a control the board draws.
+   */
+  const shrunk = SLOTS.filter((s) => {
+    const b = BOARD_HIT[s];
+    const z = SLOT_HIT[s];
+    return z.x > b.x || z.y > b.y || z.x + z.w < b.x + b.w || z.y + z.h < b.y + b.h;
+  });
+  check('⚠️⚠️ no tap zone is smaller than the board\'s own (zones may grow to follow art, never shrink)',
+    shrunk.length === 0, shrunk.join(', '));
+
   const outsideZone = SLOTS.filter((s) => {
     const z = SLOT_HIT[s];
     const a = SLOT_ART[s];
@@ -3626,13 +3663,20 @@ function storeChecks(): void {
   check('⚠️⚠️ a LANTERN on the altar is ONE lantern — the pair motif is the store card\'s',
     artVariantFor('lanterns', 'top_left') === 'single' && artVariantFor('lanterns', 'top_right') === 'single');
   const ART_SRC_TXT = readFileSync(join(PROJECT_ROOT, 'src', 'components', 'decoration-art.tsx'), 'utf8');
-  check('⚠️ …and every second drawing is the board\'s own box, matching the rect it is drawn into',
+  /**
+   * ⚠️ **Re-pointed at `BOARD_ART` when the banners grew.** This asserted `SLOT_ART === the ported box`, which held only
+   * while the altar drew every piece at the board's size; the owner's +20 %/+15 % broke that equality **on purpose**, and a
+   * stretched piece is now the expected state (`preserveAspectRatio="none"`). What the check is really protecting is that
+   * the ported drawing was traced at the **board's** measurement rather than invented — so it compares against `BOARD_ART`,
+   * and the growth check above carries the rect from there.
+   */
+  check('⚠️ …and every second drawing is ported at the board\'s own box (the altar then scales it)',
     ART_SRC_TXT.includes('box: [141, 40]') && ART_SRC_TXT.includes('box: [52, 66]')
       && ART_SRC_TXT.includes('box: [41, 160]')
-      && SLOT_ART.top_middle.w === 141 && SLOT_ART.top_middle.h === 40
-      && SLOT_ART.top_left.w === 52 && SLOT_ART.top_left.h === 66
-      && SLOT_ART.side_left.w === 41 && SLOT_ART.side_left.h === 160,
-    `${SLOT_ART.top_middle.w}×${SLOT_ART.top_middle.h} · ${SLOT_ART.top_left.w}×${SLOT_ART.top_left.h} · ${SLOT_ART.side_left.w}×${SLOT_ART.side_left.h}`);
+      && BOARD_ART.top_middle.w === 141 && BOARD_ART.top_middle.h === 40
+      && BOARD_ART.top_left.w === 52 && BOARD_ART.top_left.h === 66
+      && BOARD_ART.side_left.w === 41 && BOARD_ART.side_left.h === 160,
+    `${BOARD_ART.top_middle.w}×${BOARD_ART.top_middle.h} · ${BOARD_ART.top_left.w}×${BOARD_ART.top_left.h} · ${BOARD_ART.side_left.w}×${BOARD_ART.side_left.h}`);
   check('⚠️ …and the altar passes the variant through, so the banner is not silently replaced',
     readFileSync(join(PROJECT_ROOT, 'src', 'components', 'home', 'decor-layer.tsx'), 'utf8').includes('art={p.art}'));
   /**
