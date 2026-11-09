@@ -2273,3 +2273,46 @@ screen (spec check red). `npm run check` green across all suites. **US$0.00.**
 
 
 
+## 📍 2026-11-09 (later) — the store's cards: the cash rail, the pill on the border, and bare text where a pill belonged
+
+⚠️ **Three owner findings on ONE screen, all the same shape: the price existed in the catalogue and not on the
+glass.** `tsc` cannot see a missing pill; every gate was green through all three.
+
+- **The offerings had no cash rail at all.** `catalogue.ts` said the cash prices *"are the next read"* — and an
+  unread price looks exactly like an undecided one. ⚠️ **`EN · 7 Store` and `ZH · 7 商店` both draw TWO pills on
+  every card and NAME the item in the layer** (`card · Gold Bar cash` = `$1.99`). Read: **$0.99 · $1.99 · $1.49
+  · featured $2.99**, in cents. ⚠️ **The House stays `null`** — its card is drawn OWNED (`card · House owned`),
+  with no cash layer on any board; ≈$2.98 is *inferable* from the three singles and inferring it is inventing
+  money. That needs a PM number, not arithmetic — **`SCRUM-229`** (`🎯 Decide:`, sprint 3).
+- **The featured card's last child sat on its own stroke.** It had `paddingHorizontal` + `paddingTop` and no
+  bottom inset. `card · featured` leaves **14 px** under the pill row (row ends 518, card ends 532) — on BOTH
+  store boards, and both tabs had the defect.
+- **The decorations drew their "buy" figures as bare `<Text>`** while the offerings drew gold pills. Same
+  numbers, two treatments, because each block hand-rolled its own row. There is now **one `PricePill`** used 8
+  times, at the board's two sizes: small **68×24 r12** gap 5, featured **72/74×30 r15** gap 6 right-aligned.
+
+⚠️⚠️ **AND ONE DEFECT WAS MINE, CAUGHT ONLY BY MEASURING.** The first pass at the pills **overflowed the card**
+and the screenshot looked fine. ⚠️ **My own budget gate was arithmetically TRUE and modelled the WRONG BOX** —
+it asserted the board's `12 + 68 + 5 + 68 + 12 = 165`, but **RN draws `borderWidth` INSIDE the width**, so the
+content box is `165 − 2×2.5 = 160` for 141 of pill. Measured: the right pill sat **18** device px from the border
+while its twin sat **27**. Fixed with `card.padH = pad − stroke = 9.5` and the gate now asserts the **border-box**
+sum (`2·stroke + 2·padH + 2·pill + gap`). ⚠️ **Eighth sighting of the recurring class**: a check that cannot fail
+the right way because it trusts a model instead of the rendering model.
+
+✅ **Measured on `HN615L005386`** (`uiautomator dump`, after a fresh Metro bundle — ⚠️ CI-mode Metro served a
+STALE bundle first and the numbers did not move; `--clear` + a restart is what made the fix observable): small
+card **left 22 / right 23**, gap 9; featured **32 device px** under the pill row (14 board px + 3 stroke).
+
+✅ `check:lib` **905 → 916**, **fault-tested four ways, all red** (cash `199→189` · a featured card losing
+`paddingBottom` · `gap 5→8` · `padH 9.5→12`). `npm run check` green, `tsc` clean.
+
+⚠️⚠️ **FOUND AND DELIBERATELY NOT FIXED: the offerings' POINTS pairing is transposed vs both boards.** The
+boards say **Gold Bar 800 pts (base 960)** and **Phone 600 pts (base 720)**; this catalogue has `gold_bar` 600 and
+`smartphone` 800 — so the app charges **600 for a gold bar and 800 for a phone**. Same class as `SCRUM-204`, same
+cause: a `priceSource: 'derived'` pairing assigned by list position. ⚠️ It is what `purchase_item` charges, so it
+needs the catalogue + `seed.sql` + the `offerings_catalog` mirror + a NEW migration + a re-push, plus a product
+call — **not a ride along a layout change.** Recorded in `catalogue.ts`; raised as **SCRUM-230**.
+
+**US$0.00** — boards read through the Penpot MCP, device verified over the local Metro loop.
+
+

@@ -84,7 +84,7 @@ export function baseValueOf(price: number): number {
  * that admits it *"still needs a PM confirmation"*. ⚠️ **NOT CHANGED HERE.** Points are what `purchase_item`
  * actually charges — fixing them means the catalogue, `seed.sql`, the `offerings_catalog` mirror, a NEW
  * migration (an applied one is never edited) and a re-push, plus a product call between doc 07 §5.3's derived
- * pairing and the board. It needs its own ticket, not a ride along a layout change.
+ * pairing and the board. It needs its own ticket, not a ride along a layout change — raised as **SCRUM-230**.
  */
 export const OFFERINGS: readonly Offering[] = [
   {
@@ -123,7 +123,8 @@ export const OFFERINGS: readonly Offering[] = [
      * OWNED state (`card · House owned (bg)` 82×24 reading `Owned`, `已拥有` on `ZH · 7`) with no cash and no
      * points pill, and no other board prices it either. ⚠️ A cash price could be *inferred* from the three
      * singles (≈ $2.98 at the board's ~403 pts/$) and that is exactly what must not happen: a derived dollar
-     * amount beside a real one is an invented price. It stays `null` until the PM gives it one.
+     * amount beside a real one is an invented price. It stays `null` until the PM gives it one — raised as
+     * **SCRUM-229** (`🎯 Decide:`), because a dollar figure is a revenue decision, not a transcription.
      */
     cashPrice: null,
     name: { en: 'House', zh: '楼房' },
