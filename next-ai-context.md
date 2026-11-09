@@ -9,6 +9,14 @@
 ## 📌 Quick Reference
 
 - **Project** — Joss Paper AR, an AR app that replaces physical joss-paper burning with a digital ritual
+- **Session S79q · 2026-11-09 — 🖼️ THREE TABLETS AT ONCE (`EN · 1b`), not one.**
+  - ⚠️ **The board draws `tablet · centre (陈大文)` `131,285 129×307`, `tablet · left (陈德海)` `57,369 93×221`, `tablet · right (陈氏)` `240,369 93×221`.** One centred tablet was a layout miss, not a paging one.
+  - ⚠️⚠️ **KEPT AS RATIOS, NOT SIZES:** `93/129 = 0.721` · `221/307 = 0.720` · `92/129 = 0.713`. ⚠️ `1b`'s centre is **full-band** size, but this app's centre is `TABLET_SCALE = 0.72` because the owner shrank it separately — copying the board's absolute `93×221` would have drawn **three equal tablets** and destroyed the hierarchy. So `NEIGHBOUR_SCALE = 0.72` and `NEIGHBOUR_OFFSET = 0.713` are applied to the *drawn* centre: **92.9×221.0 board with peers at 66.9×159.2**.
+  - ⚠️ **Bottom-aligned, not top** — the board's feet are `590` vs the centre's `592`: all three stand on the table line. ⚠️ **Ends are ends**: no left peer on the first tablet, no right on the last. ⚠️ Peers paint **before** the centre and carry `pointerEvents="none"` — `1b` gives only the centre a `touch · tablet` layer, so a peer is art, not a control.
+  - ✅ **`carouselStage(band, index, count)`** is the one pure function behind all three rects; gates **896 → 899**, all fault-tested (scale `0.9`, `left: null` always, top-aligned peers → each red on its own assertion). ✅ **On glass:** `陳大文 / 陳玉蘭 / 陳建國` on one stage, feet on the table (`/tmp/stage_p1.png`).
+  - ⚠️ **Measurement honesty:** the tablet widths could NOT be pixel-verified — the gold inscription panels break any single-row colour run, so the 0.72 is asserted against the board's ratios in `check:lib` and the composition eyeballed, not "measured" on glass. Say which of the two it is.
+
+
 - **Session S79p · 2026-11-09 — 🎠 THE TABLET CAROUSEL, BUILT TO `EN · 1b` (owner: *"Refer to En -1b on penpot… there should be a carrousel to scroll thru, build this"*).**
   - ⚠️ **The board was READ, not remembered** (Penpot, `EN · 1b Home / tablets (carousel)`, 390×844): `nav · carousel prev` `26,412 24×40` · `nav · carousel next` `340,412 24×40` · **`touch · carousel next` `330,410 44×44` (invisible)** · `touch · tablet centre` `125,279 141×319`.
   - ⚠️⚠️ **THE MISSING PIECE WAS THE TOUCH TARGET, not the arrows.** The Pressable *was* the glyph's box, so the hit area was **24 dp wide** — the narrowest control on the screen. It is now the board's `44×44`, centred on the glyph (`330+22 = 352` = the glyph's centre). ⚠️ `prev`'s layer is the board's rect **mirrored** to `16,410 44×44`; `1b` draws only `next`'s, and an asymmetric pair is a bug either way — recorded in the constant.
