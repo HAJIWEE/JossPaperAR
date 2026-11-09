@@ -765,14 +765,19 @@ settings gear, halo, offerings, the tablet, the tribute/streak panels and the ta
 ported from the boards and on glass — and the altar can finally **hold a tablet**.
 
 ```
-`SCRUM-146` ✅ Done   (+ 165 cap · 166 read · 167 display · 168 sheet)
+`SCRUM-146` ✅ Done   the tablet sheet (+ 165 cap · 168 sheet)  ⚠️ its own TITLE still says "4-then-overflow"
 `SCRUM-161` ✅ Done   tribute + streak panels live
-`SCRUM-162` ✅ Done   the Penpot port
-`SCRUM-164` 🔄 In Progress   tab bar built · **Book entry + way back still missing**
-`SCRUM-148` 🔄 In Progress   ⚠️ NOT done — 163 + 164 remain
-`SCRUM-163` ⏳ To Do        the geometry gate (360 dp assertions)
-`SCRUM-208` ⏳ To Do        ⚠️ yours: the board's active tab is 1.44:1
+`SCRUM-164` ✅ Done   Book + League entries, each with a way back
+`SCRUM-163` 🔄 In Review   the geometry gate (360 dp assertions) — on `cline/8d819`
+`SCRUM-162` 🔄 In Review   the Penpot port / altar art — ⚠️ NOT "4 tablet slots": the stage shows **three**
+`SCRUM-167` ⏳ To Do    ⚠️ **re-scope or close** — "4 visible + an honest overflow" is superseded by three-and-swipe
+`SCRUM-148` 🔄 In Progress   ⚠️ 162 + 163 are In Review; 167 wants re-scoping before this can close
+`SCRUM-208` ✅ Done   the Home board's active tab (decided)
 ```
+
+⚠️ **That block was four statuses out of date until 2026-11-09** (162 said ✅ Done when it was `In Progress`,
+164 and 208 said not-started when both were `Done`). ⚠️ **Read it from Jira, do not trust it** — it is a
+hand-kept snapshot and it drifts.
 
 **Pushed to glass:** EAS `preview` build **`de4c1df9`**, commit **`89d15cd`**, project
 `josspaperar/joss-paper-ar`. ⚠️ Verify the install off `dumpsys package app.josspaperar | grep
@@ -797,12 +802,16 @@ Every one was found by **looking at the phone**, with `tsc` and 515+ checks gree
   4.90:1, so neither "copy the board" nor "nudge it back" passes silently.
 
 ## Next, in order
-1. **`SCRUM-163`** — geometry gate, 360 dp. Cheap, and it guards the class above.
-2. **`SCRUM-164`** — the Book entry + a way back (the tab bar is not the whole ticket).
-3. **`SCRUM-151`** — Profile & Settings, **including the language switcher** the app still lacks.
-4. **`SCRUM-147`** onboarding → **`150`** store → **`149`** item burn → **`155`** seed → **`157`** demo run.
+1. **Merge `PR #85`** — `SCRUM-204` · `162` · `163` · `231` all wait on it, and none of it is on `main`.
+2. **`SCRUM-226`** — the door gods' generated art (two leaves drawn at **41 × 160**). ⚠️ If the two leaves turn
+   out to be **genuinely different drawings**, `side_right`'s `mirror` flag must be dropped **in the same
+   commit** — the gate asserts the flag, not the art under it.
+3. **`SCRUM-167`** — **re-scope or close**: its "4 visible + honest overflow" brief is superseded by what the
+   app now does (three on the stage, the swipe reaching all ten — `SCRUM-231`).
+4. **`SCRUM-151`** — Profile & Settings, **including the language switcher** the app still lacks.
+5. **`SCRUM-147`** onboarding → **`150`** store → **`149`** item burn → **`155`** seed → **`157`** demo run.
 
-⚠️ **`SCRUM-12`** is still blocked on the **`SCRUM-159`** decision, and **`SCRUM-208`** is yours.
+⚠️ **`SCRUM-12`** is still blocked on the **`SCRUM-159`** decision.
 
 ### 📲 The APK for the off-session review
 ⚠️ EAS `preview` builds sit in the queue for **30–40 min** (measured twice). The build was still
