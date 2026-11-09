@@ -21,7 +21,7 @@ import { ShrineBase } from '@/components/home/shrine-base';
 import { ShrineCanvas } from '@/components/home/shrine-canvas';
 import { TabBarBand } from '@/components/home/tab-bar-band';
 import { Tablet, TabletGhost } from '@/components/home/tablet';
-import { altarCaption, altarView, carouselStage, pageAfterSwipe, pageStep, peerSlot, stageBounds, tabletBox } from '@/lib/altar';
+import { altarCaption, altarView, carouselStage, pageAfterSwipe, peerSlot, stageBounds, tabletBox } from '@/lib/altar';
 import {
   ANCESTOR_CAP,
   GIVEN_NAME_MAX,
