@@ -9,6 +9,14 @@
 ## 📌 Quick Reference
 
 - **Project** — Joss Paper AR, an AR app that replaces physical joss-paper burning with a digital ritual
+- **Session S79r · 2026-11-09 — ➕ THE ADD-TABLET ＋ MOVED INTO THE THIRD TABLET'S SLOT.**
+  - `peerSlot(band, side)` gives a neighbour's slot whether or not a neighbour exists · `addTabletSlot(band)` places the ＋ inside it · `carouselStage()` is now built on `peerSlot()`, so the ＋ and the peers share one geometry and cannot drift.
+  - ⚠️⚠️ **The slot OVERLAPS the centre tablet (`13.7` board px) — fine for a PEER, which is drawn behind it, but the ＋ is drawn ON TOP**, so centring it in the raw slot put its edge `4` px into the current tablet's border. It is centred in the **VISIBLE** part of the slot instead (`53.3` wide against a `48` control), and it stands on the slot's **floor** so it sits exactly where a tablet would. `HOME_BANDS.addTablet` is **deleted** — it was a second source of truth for the same control.
+  - ⚠️⚠️ **A GATE THAT AGREED WITH ITSELF, CAUGHT BY ITS OWN FAULT TEST:** the first version derived both the slot and the ＋ rect from the same call, so it **stayed green with the ＋ on the LEFT**. It now also pins `addTabletSlot(slot, 'right')` in the source. ⚠️ And the clearance comparison **dropped the print's zone** (kept the ART rects) — the ＋ now overlaps that zone, which is harmless because a zone is a **customise-mode** target and this control renders only when *not* customising; the art rects are the normal-mode Pressables that could actually swallow the tap. Relaxed narrowly, reason written at the check.
+  - ⚠️ **A crash is worse than a red:** the check read `homeSrc` before its declaration → `Cannot access 'homeSrc' before initialization`, and the suite reported 570 "passes" instead of a failure. Each check now re-reads what it needs.
+  - ✅ **On glass:** last of three tablets (`陳建國`) with its left peer (`陳玉蘭`), and the ＋ standing in the empty third slot on the table line, clear of the tablet (`/tmp/plus_last.png`).
+
+
 - **Session S79q · 2026-11-09 — 🖼️ THREE TABLETS AT ONCE (`EN · 1b`), not one.**
   - ⚠️ **The board draws `tablet · centre (陈大文)` `131,285 129×307`, `tablet · left (陈德海)` `57,369 93×221`, `tablet · right (陈氏)` `240,369 93×221`.** One centred tablet was a layout miss, not a paging one.
   - ⚠️⚠️ **KEPT AS RATIOS, NOT SIZES:** `93/129 = 0.721` · `221/307 = 0.720` · `92/129 = 0.713`. ⚠️ `1b`'s centre is **full-band** size, but this app's centre is `TABLET_SCALE = 0.72` because the owner shrank it separately — copying the board's absolute `93×221` would have drawn **three equal tablets** and destroyed the hierarchy. So `NEIGHBOUR_SCALE = 0.72` and `NEIGHBOUR_OFFSET = 0.713` are applied to the *drawn* centre: **92.9×221.0 board with peers at 66.9×159.2**.
