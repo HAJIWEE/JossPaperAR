@@ -9,6 +9,14 @@
 ## 📌 Quick Reference
 
 - **Project** — Joss Paper AR, an AR app that replaces physical joss-paper burning with a digital ritual
+- **Session S79o · 2026-11-09 — ➕ THE ADD-TABLET ＋ NOW EXISTS ON A POPULATED ALTAR (owner: *"GO WITH 1"*). `HOME_BANDS.addTablet = 330,494 48×48`, rendered on the LAST tablet.**
+  - ⚠️ **The gap it closed:** `home-add-slot` renders only for `view.kind === 'empty'`, and `openSheet(null)` had exactly one call site — that ＋. So from the first enshrined ancestor onward there was **no add control anywhere** while `clans.ancestor_cap` is 10.
+  - ⚠️⚠️ **TWO PLACEMENT RULES, both learned from this week's sweep:** it renders **after `DecorFront`** (the arrows are painted before the decorations and are covered by a side banner — a tap on *next* opens the customiser), and the band is **asserted clear of all six `SLOT_ART` rects + the print's zone** so a future band edit cannot bury it. Also gated: normal mode only, `mayEdit`, and `!capReached(view.count)` — the same helper the server's `ancestors_enforce_cap` mirrors.
+  - ✅ **Gates 892 → 893, fault-tested three ways:** band at `y 470` → red naming `side_right`; band at `30×30` → red on the 44 dp floor; `!customize` removed → red on the two-modes check. ⚠️ One check **rewritten**: *"customising HIDES the ＋ and the carousel"* counted `!customize && view.kind === 'tablet'` and expected exactly **2** — a number that broke on a third control without saying whether it was guarded; it now pins each control's own clause by shape.
+  - ✅ **On glass:** ＋ visible below the banner / above the table with couplets equipped; tap → **"Add an ancestor"** sheet with the surname + given + relationship form and a live tablet preview; in customise mode the pill is gone (its black ring pixel becomes the zone's colour).
+  - ⚠️ **Still open (recorded, not fixed):** the carousel arrows remain covered by a side banner — the ＋ avoided that defect but did not repair it.
+
+
 - **Session S79n · 2026-11-09 — 📐 BANNERS GREW (+20 % sides, +15 % top, tops held) and ⚠️ **THERE IS NO ADD-TABLET UI ONCE ONE ANCESTOR EXISTS.**
   - ✅ **The size change is `BANNER_GROWTH = { top: 1.15, side: 1.2 }` + `growTopCentre()`** — top edge and centre-x held, width and bottom move. ⚠️ Measured on glass vs the pre-change render: sides 53→63 wide / 261→314 tall (×1.19, ×1.20), top 235→271 / 49→57 (×1.15, ×1.16), **both top edges unmoved**.
   - ⚠️⚠️ **THE TAP ZONES HAD TO FOLLOW, and the fix is structural.** The invariant *"a piece outside its tap zone cannot be tapped"* was already gated, and +20 % on a `41×160` scroll inside a `46×160` zone breaks it on every side. So `SLOT_HIT` is now **derived**: `zoneFor(BOARD_HIT[slot], SLOT_ART[slot], pad 3)` — the board's `1f` rect widened only as far as a grown piece needs, **never narrowed** (new gate: no zone smaller than the board's own). `BOARD_HIT` / `BOARD_ART` keep the board's numbers as the base, so provenance survives the arithmetic.
