@@ -44,9 +44,40 @@ export const STORE = {
    * prices float on the page with nothing holding them — the defect the owner caught on glass.
    */
   cardFrame: { w: 165, h: 150, radius: 14, stroke: 2.5 },
-  featuredFrame: { w: 354, h: 190, radius: 18, stroke: 3 },
-  /** `card · <name> points (bg)` — 68×24, fill **gold**, stroke ink 2, r12. */
-  pricePill: { w: 68, h: 24, radius: 12, stroke: 2 },
+  /**
+   * ⚠️ **`padBottom` is why this constant is an object and not three numbers** (owner on glass, 2026-11-09:
+   * *"the wealth Bundle's points value button is also too close to the bottom border"*).
+   *
+   * ⚠️ The card was rendered with `paddingHorizontal` and `paddingTop` only — so the price pill, the LAST
+   * child, sat flush on the card's own 3 px stroke. ⚠️ The board leaves a gap: `card · featured` spans
+   * **342 → 532** and its pill row ends at **518**, i.e. **14 px** below the pill, on BOTH `EN · 7 Store`
+   * and `EN · 7b`.
+   */
+  featuredFrame: { w: 354, h: 190, radius: 18, stroke: 3, padBottom: 14 },
+  /**
+   * `card · <name> cash (bg)` / `… points (bg)` — **68×24, fill gold, stroke ink 2, r12**, at **+12** and
+   * **+85** inside a 165-wide card, so the gap between them is **5**.
+   *
+   * ⚠️ **The three numbers are one budget** — but *not* the board's own sums, because **RN draws
+   * `borderWidth` INSIDE the box**. The board's `card · X (bg)` is 165 wide with a **centred** 2.5 stroke, so
+   * its pills sit 12 from the OUTER edge; in RN that is `12 − 2.5 = 9.5` of padding:
+   * `2.5 + 9.5 + 68 + 5 + 68 + 9.5 + 2.5 = 165` exactly. ⚠️ Taking `12` as the padding (which is what the
+   * board reads as) leaves 136 of content for 141 of pill and overflows by 5 — measured on glass before this
+   * was corrected: the right pill sat **18** device px from the border while its twin sat **27** from the left.
+   * ⚠️ That is the same mistake the switcher made with its 171s, and `check:lib` now asserts the border-box sum
+   * rather than the board's.
+   */
+  pricePill: { w: 68, h: 24, radius: 12, stroke: 2, gap: 5 },
+  /**
+   * `card · featured cash (bg)` **72×30 r15** at **+196** and `… points (bg)` **74×30 r15** at **+274**,
+   * inside `card · featured` — so a gap of **6**, right-aligned against the card's 6 px inset.
+   *
+   * ⚠️ **The featured pills are NOT the small cards' pills.** Before this the featured card borrowed
+   * `pricePill` (68×24), so the one card the board draws largest had the smallest price readout.
+   * ⚠️ The two widths differ (72 vs 74) because the board sizes each to its own text — `$2.99` is one
+   * character shorter than `2,000 pts`. Transcribed, not tidied.
+   */
+  featuredPill: { cashW: 72, pointsW: 74, h: 30, radius: 15, gap: 6 },
   /** `art · wealth bundle (ingots)` — 85,195 220×106. */
   featuredArt: { y: 195, w: 220, h: 106 },
   /** `card · featured name` 30,308 · `… value` 30,330. */
@@ -59,7 +90,27 @@ export const STORE = {
    * FRAME's top (396), not from the art: art at **+9** (`art · Cash Bundle` is at 405), name at
    * **+84** (480), meta at **+102** (498), the price row at **+122** (518).
    */
-  card: { w: 165, xs: [20, 197] as const, ys: [396, 558] as const, artH: 72, name: 84, meta: 102, price: 122, pad: 12 },
+  card: {
+    w: 165,
+    xs: [20, 197] as const,
+    ys: [396, 558] as const,
+    artH: 72,
+    name: 84,
+    meta: 102,
+    price: 122,
+    /** `art · …` and the text sit **12 px from the card's OUTER edge** on the board. */
+    pad: 12,
+    /**
+     * ⚠️ **the actual horizontal padding: `pad − stroke`.**
+     *
+     * RN draws the border INSIDE the box, so the board's 12-from-the-edge is **9.5** of padding once the 2.5
+     * stroke is accounted for — and the card's two price pills have no slack to absorb the difference:
+     * `2.5 + 9.5 + 68 + 5 + 68 + 9.5 + 2.5 = 165` exactly. ⚠️ Using `pad` here instead (which reads as the
+     * right number off the board) overflows the content box by 5 px, and the right-hand pill ends up visibly
+     * closer to the border than the left-hand one — measured on glass before this line existed.
+     */
+    padH: 9.5,
+  },
   /** `note · store` — 24,806 342×34. */
   note: { y: 806 },
 } as const;
@@ -198,4 +249,18 @@ export function baseMetaValue(offering: Offering): number {
  */
 export function pointsPrice(offering: Offering): string | null {
   return Number.isFinite(offering.price) && offering.price > 0 ? `${offering.price}` : null;
+}
+
+/**
+ * The cash price as the two decimals the copy key wants (`$%{cash}`), or `null` where there is none.
+ *
+ * ⚠️ **`null` is the House, and it must stay a skip rather than an empty pill.** Its card is drawn in the
+ * board's OWNED state with no cash layer at all (see `catalogue.ts`), so the screen renders one pill, not a
+ * blank one — an empty `$` is the kind of plausible-looking placeholder this project treats as a lie.
+ * ⚠️ Cents are **integers** in the catalogue; a float here would be a catalogue bug, and returning `null`
+ * makes it visible as a missing pill rather than as `$0.9900000001` on a store card.
+ */
+export function cashText(cashPrice: number | null): string | null {
+  if (cashPrice === null || !Number.isInteger(cashPrice) || cashPrice < 0) return null;
+  return (cashPrice / 100).toFixed(2);
 }

@@ -45,7 +45,7 @@ import {
   rectsOverlap,
   sheetLayout,
 } from '../decorate.ts';
-import { CASH_IS_READABLE, FEATURED_CODE, STORE_SWITCHER, STORE_TABS, baseMetaValue, pointsPrice, storeList } from '../store.ts';
+import { CASH_IS_READABLE, FEATURED_CODE, STORE, STORE_SWITCHER, STORE_TABS, baseMetaValue, cashText, pointsPrice, storeList } from '../store.ts';
 import { ART_BOX, artCodes, artSize, fitArt } from '../offering-art.ts';
 import { pickerGrid } from '../picker.ts';
 import {
@@ -3368,6 +3368,92 @@ function storeChecks(): void {
       && /padding: STORE_SWITCHER\.pad/.test(storeSrc)
       && !/borderRadius: 16\.5/.test(storeSrc)
       && !/paddingHorizontal: 2\.5 \* s/.test(storeSrc));
+
+  /**
+   * ⚠️⚠️ **THE LISTINGS' CASH RAIL** (owner on glass, 2026-11-09: *"In the offerings store, the Cash option is
+   * missing for the items on offer"*).
+   *
+   * ⚠️ It was absent because `catalogue.ts` said the cash prices *"are the next read"* — and an unread price
+   * looks exactly like an undecided one. `EN · 7 Store` and `ZH · 7 商店` both draw **two pills on every card**
+   * and **name the item in the layer** (`card · Gold Bar cash` = `$1.99`), which is the pairing that can be
+   * trusted. That is SCRUM-204's lesson, already paid for once: pair by LAYER NAME, never by grid position.
+   *
+   * ⚠️ **No two offerings may share a cash price** — with four distinct values a transposition changes which
+   * CODE carries which number; with a duplicate this table would stop discriminating and agree with itself.
+   */
+  const BOARD_OFFERING_CASH: Record<string, number | null> = {
+    joss_paper_stack: 99,
+    gold_bar: 199,
+    smartphone: 149,
+    wealth_bundle: 299,
+    house: null,
+  };
+  check('⚠️⚠️ every offering carries EXACTLY the cash price `EN · 7 Store` draws — in cents',
+    OFFERINGS.every((o) => o.cashPrice === BOARD_OFFERING_CASH[o.code]),
+    OFFERINGS.map((o) => `${o.code}=${o.cashPrice}`).join(' '));
+  check('⚠️ …and NO two offerings share one — a transposition would otherwise be invisible',
+    (() => {
+      const priced = OFFERINGS.map((o) => o.cashPrice).filter((c): c is number => c !== null);
+      return priced.length === 4 && new Set(priced).size === 4;
+    })(),
+    OFFERINGS.map((o) => `${o.code}=${o.cashPrice}`).join(' '));
+  check('⚠️ …and the HOUSE stays `null` — the board draws it OWNED, with no cash layer (never invent one)',
+    getOffering('house').cashPrice === null);
+  check('⚠️ …and every cash price is WHOLE cents — no float may ever reach money',
+    OFFERINGS.every((o) => o.cashPrice === null || (Number.isInteger(o.cashPrice) && o.cashPrice > 0)));
+  check('…and `cashText` gives the copy key two decimals, and refuses a null or a float rather than a `$`',
+    cashText(99) === '0.99' && cashText(149) === '1.49' && cashText(null) === null && cashText(99.5) === null);
+
+  /**
+   * ⚠️⚠️ **THE PRICE-PILL BUDGET — the switcher's 171s in a different disguise.**
+   *
+   * `EN · 7b` and `EN · 7` put the two pills at **dx 12** and **dx 85** inside a 165-wide card, i.e.
+   * `12 + 68 + 5 + 68 + 12`. ⚠️ `styles.chips` carries `gap: 8` (sized for the two balance chips at the top of
+   * the page), so reusing that row here puts the pair **3 px over the card's content box** — which is why the
+   * pills got their own gap rather than being dropped into the existing row.
+   */
+  check("⚠️⚠️ two price pills fit a small card EXACTLY — the BORDER-BOX sum, 165, not the board's 12+68+5+68+12",
+    /** ⚠️ `2·stroke + 2·padH + 2·pill + gap`: RN draws the stroke INSIDE the 165, which the board's own sum ignores. */
+    2 * STORE.cardFrame.stroke + 2 * STORE.card.padH + 2 * STORE.pricePill.w + STORE.pricePill.gap === STORE.cardFrame.w
+      /** ⚠️ …and `padH` IS `pad − stroke`, so the two can never drift apart. */
+      && STORE.card.padH === STORE.card.pad - STORE.cardFrame.stroke,
+    `2×${STORE.cardFrame.stroke} + 2×${STORE.card.padH} + 2×${STORE.pricePill.w} + ${STORE.pricePill.gap} vs ${STORE.cardFrame.w}`);
+  check("⚠️ …and the featured pair fits its card, and is BIGGER than a small card's",
+    STORE.featuredPill.cashW + STORE.featuredPill.gap + STORE.featuredPill.pointsW <= STORE.featuredFrame.w - 2 * 12
+      && STORE.featuredPill.h > STORE.pricePill.h
+      && STORE.featuredPill.radius > STORE.pricePill.radius,
+    `featured ${STORE.featuredPill.cashW}+${STORE.featuredPill.gap}+${STORE.featuredPill.pointsW}×${STORE.featuredPill.h}`);
+
+  /**
+   * ⚠️⚠️ **BOTH FEATURED CARDS LEAVE ROOM UNDER THE PILL ROW** (owner: *"the wealth Bundle's points value
+   * button is also too close to the bottom border"*).
+   *
+   * ⚠️ The featured card is **content-sized** (no `height`), so the only thing between its last child and its
+   * own stroke is this padding — and it was simply **absent**, on both tabs. `card · featured` leaves 14 px
+   * under the pill row (row ends 518, card ends 532).
+   * ⚠️ Asserted on the SOURCE as well as the constant: `STORE.featuredFrame.padBottom` being 14 while no card
+   * passes it is exactly the state this check has to fail in.
+   */
+  const padBottomUses = (stripComments(storeSrc).match(/paddingBottom: STORE\.featuredFrame\.padBottom/g) ?? []).length;
+  check('⚠️⚠️ both featured cards pass a BOTTOM inset — the property that was missing entirely',
+    STORE.featuredFrame.padBottom > 0 && padBottomUses === 2,
+    `padBottom ${STORE.featuredFrame.padBottom} · ${padBottomUses} call sites`);
+
+  /**
+   * ⚠️ **AND THE PILLS ARE ACTUALLY DRAWN, FROM DATA.** All three defects behind this block are the same shape
+   * — *the price exists in the catalogue but not on the screen* — which no type and no unit check can see: a
+   * card compiles perfectly while printing a bare `<Text>` where a pill belongs.
+   */
+  const storeCode = stripComments(storeSrc);
+  check('⚠️⚠️ BOTH tabs draw a CASH pill AND a points pill on every card — bare price text is the defect',
+    (storeCode.match(/store-(?:item|decor)-\$\{item\.code\}-cash/g) ?? []).length === 2
+      && (storeCode.match(/store-(?:item|decor)-\$\{item\.code\}-points/g) ?? []).length === 2,
+    `cash ${(storeCode.match(/-\$\{item\.code\}-cash/g) ?? []).length} · points ${(storeCode.match(/-\$\{item\.code\}-points/g) ?? []).length}`);
+  check('⚠️ …and every pill goes through ONE component, so a card cannot lose its background again',
+    (storeCode.match(/<PricePill /g) ?? []).length >= 8,
+    `${(storeCode.match(/<PricePill /g) ?? []).length} pills`);
+  check('⚠️ …and NO cash figure is typed into the screen — it comes from the catalogue via `cashText`',
+    /cashText\(/.test(storeCode) && !/\$\d+\.\d\d/.test(storeCode));
   /**
    * ⚠️⚠️ **TRANSCRIBED FROM THE BOARD'S LAYER NAMES, NOT FROM THE CARD LAYOUT** — and the first version of
    * this table was wrong because it did the opposite. `EN · 7b` draws the four cards in a 2 × 2 grid, so the

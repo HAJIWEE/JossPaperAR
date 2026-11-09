@@ -29,6 +29,18 @@ export interface Offering {
   readonly code: OfferingCode;
   readonly tier: number;
   readonly price: number;
+  /**
+   * The CASH price in **whole cents**, or `null` where the board draws none.
+   *
+   * ⚠️ **Read off the board 2026-11-09** — the store drew no cash price for any offering for months because
+   * a note here said *"I have not read them"*, and an unread price is not the same as an absent design.
+   * `EN · 7 Store` and `ZH · 7 商店` both draw TWO pills per card and **name the item in the layer**
+   * (`card · Gold Bar cash` = `$1.99`), which is the pairing to trust — see the block comment below.
+   * ⚠️ `null` is a real answer, never a placeholder: the House's card is drawn in its **owned** state
+   * (`card · House owned` = `Owned` / `已拥有`) and carries no cash or points layer, so its cash price has
+   * never been designed. Inventing one would be a product decision, not a transcription.
+   */
+  readonly cashPrice: number | null;
   readonly name: { readonly en: string; readonly zh?: string };
   readonly priceSource: 'documented' | 'derived';
   /** The wealth bundle is the four composed into one (S13). */
@@ -53,11 +65,34 @@ export function baseValueOf(price: number): number {
  * the board calls this item **"Cash Bundle"** in EN where the catalogue says *"Joss Paper
  * Stack"*, and the House is **楼房** in the store but **祖屋** in the collection board.
  */
+/**
+ * ⚠️⚠️ **THE OFFERINGS' CASH RAIL WAS UNREAD UNTIL 2026-11-09, AND IT WAS DESIGNED ALL ALONG.**
+ *
+ * The store drew a points pill and no cash pill, because a note here said the cash prices *"are the next
+ * read"* — the same mistake the decorations made (SCRUM-204): an unread price is not an absent design.
+ * `EN · 7 Store` and `ZH · 7 商店` both draw **two pills on every card**, and the layer NAMES state the
+ * pairing outright, which is what makes it trustworthy:
+ *   `card · Joss Paper Stack cash = $0.99` · `card · Gold Bar cash = $1.99` · `card · Phone cash = $1.49`
+ *   `card · featured cash = $2.99`         (`ZH` agrees: `$0.99 / $1.99 / $1.49 / $2.99`)
+ * ⚠️ **The House is the exception and stays unpriced** — its card is drawn OWNED, with no cash layer.
+ *
+ * ⚠️⚠️ **AND THE READ EXPOSED A REAL DEFECT, WHICH IS RECORDED HERE RATHER THAN QUIETLY FIXED.** The boards
+ * pair **Gold Bar = 800 pts (base 960)** and **Phone = 600 pts (base 720)**. This catalogue has them the
+ * OTHER WAY ROUND — `gold_bar` 600/base 720, `smartphone` 800/base 960 — so the app charges 600 for the gold
+ * bar and 800 for the phone. ⚠️ That is the **same class as SCRUM-204** (Door Gods ↔ Lanterns), and it came
+ * from the same shape of mistake: the pairing was assigned by *list position* under a `priceSource: 'derived'`
+ * that admits it *"still needs a PM confirmation"*. ⚠️ **NOT CHANGED HERE.** Points are what `purchase_item`
+ * actually charges — fixing them means the catalogue, `seed.sql`, the `offerings_catalog` mirror, a NEW
+ * migration (an applied one is never edited) and a re-push, plus a product call between doc 07 §5.3's derived
+ * pairing and the board. It needs its own ticket, not a ride along a layout change.
+ */
 export const OFFERINGS: readonly Offering[] = [
   {
     code: 'joss_paper_stack',
     tier: 1,
     price: 400,
+    /** `card · Joss Paper Stack cash` = `$0.99`. */
+    cashPrice: 99,
     name: { en: 'Joss Paper Stack', zh: '金银纸' },
     priceSource: 'documented',
   },
@@ -65,6 +100,8 @@ export const OFFERINGS: readonly Offering[] = [
     code: 'gold_bar',
     tier: 2,
     price: 600,
+    /** `card · Gold Bar cash` = `$1.99`. */
+    cashPrice: 199,
     name: { en: 'Gold Bar', zh: '金条' },
     priceSource: 'documented',
   },
@@ -72,6 +109,8 @@ export const OFFERINGS: readonly Offering[] = [
     code: 'smartphone',
     tier: 3,
     price: 800,
+    /** `card · Phone cash` = `$1.49`. */
+    cashPrice: 149,
     name: { en: 'Smartphone', zh: '手机' },
     priceSource: 'documented',
   },
@@ -79,6 +118,14 @@ export const OFFERINGS: readonly Offering[] = [
     code: 'house',
     tier: 4,
     price: 1200,
+    /**
+     * ⚠️ **`null` ON PURPOSE — the board prices no cash for the House.** `EN · 7 Store` draws its card in the
+     * OWNED state (`card · House owned (bg)` 82×24 reading `Owned`, `已拥有` on `ZH · 7`) with no cash and no
+     * points pill, and no other board prices it either. ⚠️ A cash price could be *inferred* from the three
+     * singles (≈ $2.98 at the board's ~403 pts/$) and that is exactly what must not happen: a derived dollar
+     * amount beside a real one is an invented price. It stays `null` until the PM gives it one.
+     */
+    cashPrice: null,
     name: { en: 'House', zh: '楼房' },
     priceSource: 'derived',
   },
@@ -86,6 +133,8 @@ export const OFFERINGS: readonly Offering[] = [
     code: 'wealth_bundle',
     tier: 5,
     price: 2000,
+    /** `card · featured cash` = `$2.99` (the featured card carries the bundle's own cash price). */
+    cashPrice: 299,
     name: { en: 'Wealth Bundle', zh: '财富套装' },
     priceSource: 'documented',
     composedOf: ['joss_paper_stack', 'gold_bar', 'smartphone', 'house'],
