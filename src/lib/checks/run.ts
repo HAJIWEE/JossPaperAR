@@ -3419,8 +3419,8 @@ function storeChecks(): void {
   const bgTop = SLOT_HIT.background.y - SLOT_HIT.background.h * BACKGROUND_TOP_OFFSET;
   // ⚠️ The constants lead the failure text on purpose: when only a knob moved, the rect follows it, so `want === got`
   // below would read like a pass. Measured by moving each knob — see the fault test.
-  check('⚠️⚠️ the background print hangs from its zone\'s TOP-CENTRE at 70.4 % — the top edge never drifts',
-    BACKGROUND_OVERSHOOT === 0.704 && BACKGROUND_TOP_OFFSET === 0.028
+  check('⚠️⚠️ the background print hangs from its zone\'s TOP-CENTRE at 81 % — the top edge never drifts',
+    BACKGROUND_OVERSHOOT === 0.8096 && BACKGROUND_TOP_OFFSET === 0.028
       && Math.abs(bgArt.w - bgW) < 1e-9 && Math.abs(bgArt.h - bgH) < 1e-9
       && Math.abs(bgArt.x - bgX) < 1e-9 && Math.abs(bgArt.y - bgTop) < 1e-9
       // ⚠️ Top-CENTRE, so the two side margins are equal — a left anchor would pass the width check and walk sideways.

@@ -80,9 +80,13 @@ export const SLOT_HIT: Record<DecorationSlot, Rect> = {
  * Removed rather than left at 0, so there is one way to position this print and not two that disagree.
  *
  * ⚠️ Provenance of the number, so the next cut has its history: `1.0` (the zone) → `1.1` (+10 %) → `0.88` (−20 %) →
- * **`0.704`** (another −20 %, i.e. `0.88 × 0.8`).
+ * `0.704` (another −20 %) → **`0.8096`** (+15 %, i.e. `0.704 × 1.15`).
+ * ⚠️ **"Bring up X %" is read as SIZE here, not as a vertical raise** — the owner asked in the same breath to *"maintain
+ * top center alignment"*, and a raise is the one thing that breaks it: 15 % of this print's height would lift its top
+ * `33.8` board px, off the edge the anchor holds. Growing keeps the top and moves the bottom, which is the whole point of
+ * `BACKGROUND_TOP_OFFSET`.
  */
-export const BACKGROUND_OVERSHOOT = 0.704;
+export const BACKGROUND_OVERSHOOT = 0.8096;
 
 /**
  * ⚠️⚠️ **THE PRINT'S TOP EDGE, held as a fraction of the ZONE'S height above the zone's top** (`0.028` = `8.96` board px).
