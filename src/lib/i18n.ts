@@ -148,7 +148,11 @@ export const MESSAGES = {
     'decor.slotHint': 'Tap a slot to place a decoration',
     'decor.emptyHint': 'No decorations yet — every slot is empty.',
     'decor.sheetTitleSide': 'Side decorations',
-    'decor.sheetSubSide': 'Both sets are yours — the altar shows one set per category.',
+    // ⚠️ `decor.sheetSubSide` is NOT the board's `1f2` line. That one reads *"Both sets are yours — the altar shows
+    // one set per category."* — true when `1f2` was drawn (two side items) and FALSE now the catalogue holds three
+    // (couplets · door gods · festive set): the sheet renders three rows under it. ⚠️ NEW COPY, flagged for review —
+    // count-neutral, so adding a fourth side item cannot make it lie again.
+    'decor.sheetSubSide': 'Each category shows one set at a time.',
     'decor.sheetTitleTop': 'Top decorations',
     'decor.sheetSubTop': 'Lanterns and the wide centre slot — one set per slot.',
     'decor.sheetTitleBackground': 'Background',
@@ -639,7 +643,7 @@ export const MESSAGES = {
     'decor.slotHint': '轻点格子，安放装饰',
     'decor.emptyHint': '还没有装饰——每个格子都是空的。',
     'decor.sheetTitleSide': '侧边装饰',
-    'decor.sheetSubSide': '两套都已拥有 —— 每类仅展示一套。',
+    'decor.sheetSubSide': '每类每次仅展示一套。',
     'decor.sheetTitleTop': '顶部装饰',
     'decor.sheetSubTop': '灯笼与横批——每格一套。',
     'decor.sheetTitleBackground': '背景',

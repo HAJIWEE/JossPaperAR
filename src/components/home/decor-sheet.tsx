@@ -23,7 +23,7 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { DecorationArt } from '@/components/decoration-art';
+import { DecorationArt, isComposed } from '@/components/decoration-art';
 import type { DecorationCode, DecorationSlot } from '@/domain/catalogue';
 import {
   CATEGORY_COPY,
@@ -150,8 +150,12 @@ export function DecorSheet({
                   pressed && styles.pressed,
                 ]}
               >
-                <View style={{ width: 64 * scale, height: 54 * scale }}>
-                  <DecorationArt code={o.code} size={54 * scale} />
+                <View style={{ width: 64 * scale, height: 54 * scale, alignItems: 'center', justifyContent: 'center' }}>
+                  {/**
+                   * ⚠️ A composed set draws ≈ 2.08 × its `size` wide (four motifs in a row), so the 64 dp well gets a
+                   * 26 dp size for it — the 54 dp that fits a single motif clipped the leftmost lantern on glass.
+                   */}
+                  <DecorationArt code={o.code} size={(isComposed(o.code) ? 26 : 54) * scale} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 12 * scale }}>
                   <Text numberOfLines={1} style={[styles.name, { fontSize: 14 * scale }]}>

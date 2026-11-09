@@ -210,25 +210,42 @@ export interface DrawPlan {
 }
 
 /**
- * ⚠️⚠️ **THE FESTIVE SET IS AN AMALGAMATION — the four other decorations put together** (owner, 2026-11-08),
- * and `EN · 1e` is the board that proves it: the "festive set" screen draws Zhong Kui behind the tablet, a
- * lantern in each top corner and a couplet down each side. So equipping it lights **every slot its components
- * live in**, instead of squeezing four motifs into one 41 × 160 side slot.
+ * ⚠️⚠️ **WHERE A DECORATION ACTUALLY DRAWS — and it is not "the slot it is stored in".**
  *
- * ⚠️ Where an explicit piece and the set's own component land on the SAME slot, **the explicitly equipped
- * decoration wins** — it is the more specific instruction the user gave, and a set must not quietly overwrite a
- * choice.
- * ⚠️ The *replacement* half of S14k (one set per category) is the SERVER's: `equip_decoration` clears the other
- * slot in the category. This function only decides what to draw from what the server returned.
+ * `EN · 1d` is the proof: one `lanterns` equip lights **both** top corners (a `decor · lantern (top-left)` AND a
+ * `decor · lantern (top-right)`), and one `spring_couplets` hangs **both** sides. ⚠️ `equip_decoration` stores a
+ * SINGLE row per set — it clears the other slot in the category (S14k, one set per category) — so a renderer that
+ * draws only the stored slot lights ONE corner of a two-corner set.
+ *
+ * ⚠️ That is not a guess about intent: it is what the boards draw, and it is what "one SET per category" means —
+ * the set is the thing that is equipped, and a set of couplets is a pair.
+ * ⚠️ Measured on glass 2026-11-09: with `lanterns` in `top_left`, only the left corner lit — the defect this table
+ * fixes.
  */
-const SET_PARTS: Partial<Record<DecorationCode, Partial<Record<DecorationSlot, DecorationCode>>>> = {
-  festive_set: {
-    top_left: 'lanterns',
-    top_right: 'lanterns',
-    side_left: 'spring_couplets',
-    side_right: 'door_gods',
-    background: 'zhong_kui',
-  },
+const SET_SLOTS: Record<DecorationCode, readonly DecorationSlot[]> = {
+  /** a PAIR in the two top corners — `1d` draws both */
+  lanterns: ['top_left', 'top_right'],
+  /** a PAIR hanging down both sides */
+  spring_couplets: ['side_left', 'side_right'],
+  door_gods: ['side_left', 'side_right'],
+  /** one print, behind the tablet */
+  zhong_kui: ['background'],
+  /**
+   * ⚠️ **THE FESTIVE SET IS AN AMALGAMATION — the four others put together** (owner, 2026-11-08), and `EN · 1e`
+   * is the board that proves it: it draws Zhong Kui behind the tablet, a lantern in each corner and a couplet down
+   * each side. So the set lights every slot its components live in, rather than squeezing four motifs into one
+   * 41 × 160 side slot.
+   */
+  festive_set: ['top_left', 'top_right', 'side_left', 'side_right', 'background'],
+};
+
+/** Which of the set's own motifs draws in each slot it fills — the amalgamation, slot by slot (`1e`). */
+const FESTIVE_PARTS: Partial<Record<DecorationSlot, DecorationCode>> = {
+  top_left: 'lanterns',
+  top_right: 'lanterns',
+  side_left: 'spring_couplets',
+  side_right: 'door_gods',
+  background: 'zhong_kui',
 };
 
 /**
@@ -236,6 +253,9 @@ const SET_PARTS: Partial<Record<DecorationCode, Partial<Record<DecorationSlot, D
  *
  * ⚠️ Pure and total: it never throws, and an absent/unknown slot is simply not drawn — a row the client cannot
  * name is a row it must not draw (`decorations.ts` drops those before they get here).
+ * ⚠️ **An explicitly equipped piece wins its slot**: if a category holds one set (the server guarantees it) the
+ * only way two codes meet is the Festive Set plus an explicit piece, and the explicit choice is the more specific
+ * instruction — a set must not quietly overwrite it.
  * ⚠️ The order is stable (the catalogue's slot order) so a screenshot diff means a change, not a reshuffle.
  */
 export function drawPlan(
@@ -244,37 +264,33 @@ export function drawPlan(
   const plan: DrawPlan[] = [];
   const taken = new Set<DecorationSlot>();
 
-  // 1 · the explicitly equipped pieces first — they own their slot.
-  for (const slot of DECORATION_SLOTS) {
-    const code = equipped[slot];
-    if (code === null || code === undefined) continue;
-    if (SET_PARTS[code] !== undefined) continue; // a composed set expands in step 2
+  const add = (slot: DecorationSlot, code: DecorationCode) => {
+    if (taken.has(slot)) return;
     plan.push({ slot, code, rect: SLOT_ART[slot], behind: SLOT_CATEGORY[slot] === 'background' });
     taken.add(slot);
-  }
+  };
 
-  // 2 · a composed set fills the slots its components live in, except where one is already taken.
+  // 1 · explicit pieces first — each fills ITS set's slots (a pair fills two).
   for (const slot of DECORATION_SLOTS) {
     const code = equipped[slot];
     if (code === null || code === undefined) continue;
-    const parts = SET_PARTS[code];
-    if (parts === undefined) continue;
-    for (const target of DECORATION_SLOTS) {
-      if (taken.has(target)) continue;
+    if (code === 'festive_set') continue; // the amalgamation is applied last
+    for (const target of SET_SLOTS[code]) add(target, code);
+  }
+
+  // 2 · the Festive Set fills whatever is left of its five slots.
+  for (const slot of DECORATION_SLOTS) {
+    if (equipped[slot] !== 'festive_set') continue;
+    const parts = FESTIVE_PARTS;
+    for (const target of SET_SLOTS.festive_set) {
       const part = parts[target];
-      if (part === undefined) continue;
-      plan.push({
-        slot: target,
-        code: part,
-        rect: SLOT_ART[target],
-        behind: SLOT_CATEGORY[target] === 'background',
-      });
-      taken.add(target);
+      if (part !== undefined) add(target, part);
     }
   }
 
   return plan;
 }
+
 
 /** Which category a slot belongs to — re-exported so a caller cannot import a second copy of the rule. */
 export function categoryOf(slot: DecorationSlot): DecorationSlotCategory {

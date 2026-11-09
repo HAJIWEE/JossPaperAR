@@ -222,6 +222,17 @@ const COMPOSED: Record<DecorationCode, readonly DecorationCode[] | undefined> = 
   door_gods: undefined,
 };
 
+/**
+ * ⚠️ **A COMPOSED code draws WIDER than the `size` it is given** — the set is a row of four motifs at `0.52 × size`
+ * each, so it occupies ≈ `2.08 × size`. That is right where the caller has a wide well (the store's 220×106
+ * featured card) and **wrong in a square one**: the picker's 64 dp icon clipped the leftmost lantern on glass
+ * (2026-11-09). So a caller with a small square box asks here first rather than guessing from the code.
+ */
+export function isComposed(code: DecorationCode): boolean {
+  return COMPOSED[code] !== undefined;
+}
+
+
 export function DecorationArt({
   code,
   size,

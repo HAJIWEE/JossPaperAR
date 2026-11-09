@@ -3438,8 +3438,15 @@ function storeChecks(): void {
   check('⚠️ nothing equipped draws NOTHING — the shrine is not decorated by default',
     drawPlan(noDecor as never).length === 0);
   const lanternOnly = drawPlan({ ...noDecor, top_left: 'lanterns' } as never);
-  check('⚠️ a TOP piece draws in front, in its own slot, and nowhere else',
-    lanternOnly.length === 1 && lanternOnly[0].slot === 'top_left' && lanternOnly[0].behind === false);
+  check('⚠️⚠️ a TOP set lights BOTH corners — `1d` draws a lantern in each, from ONE equip',
+    lanternOnly.length === 2
+      && lanternOnly.map((p) => p.slot).join(',') === 'top_left,top_right'
+      && lanternOnly.every((p) => p.behind === false),
+    lanternOnly.map((p) => `${p.slot}:${p.code}`).join(' '));
+  const coupletsOnly = drawPlan({ ...noDecor, side_right: 'spring_couplets' } as never);
+  check('⚠️ …and a SIDE set hangs down BOTH sides, whichever slot the server stored it in',
+    coupletsOnly.length === 2
+      && coupletsOnly.map((p) => p.slot).join(',') === 'side_left,side_right');
   const backgroundOnly = drawPlan({ ...noDecor, background: 'zhong_kui' } as never);
   check('⚠️ the BACKGROUND print draws BEHIND the tablet — the z-order `1e` depends on',
     backgroundOnly.length === 1 && backgroundOnly[0].behind === true);

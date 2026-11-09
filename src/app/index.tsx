@@ -457,31 +457,9 @@ export default function HomeShrine() {
 
             {/* ⚠️ `zone · customizable temple (label)` — the chip that tells the owner the altar is
                 theirs. ⚠️ Only the LABEL is drawn: the chip's own background fill could not be read
-                from the plugin yet, and a guessed chip is worse than a bare line. */}
-            {/* ⚠️⚠️ **THE ENTRY TO CUSTOMISING, AND IT IS THE CHIP THAT ALREADY SAID SO.**
-                `zone · customizable temple (label)` reads *"Everything here is customizable"* — a label that
-                promised a control the app did not have. ⚠️ **No board draws an entry** (the `1f` family has no
-                route in, and its interactions point nowhere), so the least invented option is to make the
-                promise itself the control: tapping it toggles the six zones from `1f`. ⚠️ That adds NOTHING to a
-                signed-off Home — no new band, no moved layer — which is the constraint S36 measured the header
-                row to satisfy. ⚠️ Filed as the PM decision **`SCRUM-225`** rather than assumed settled. */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('home.templeChip')}
-              accessibilityState={{ selected: customize }}
-              onPress={() => setCustomize((on) => !on)}
-              style={({ pressed }) => [
-                styles.abs,
-                bandRect(HOME_BANDS.templeChip, s),
-                styles.chip,
-                pressed && styles.pressed,
-              ]}
-              testID="home-temple-chip"
-            >
-              <Text numberOfLines={1} style={{ color: text.gold, fontSize: 10.5 * s }}>
-                {t('home.templeChip')}
-              </Text>
-            </Pressable>
+                from the plugin yet, and a guessed chip is worse than a bare line. ⚠️ It is an entry AND the
+                way back out of customising, so it is rendered LAST in this region (after the zones) to stay on
+                top and tappable — see the block at the foot of `altar`. */}
 
             {/* ⚠️ EMPTY → the ＋ slot. The `＋` is the add affordance the board draws
                 (`slot · ＋ add a tablet`), and since the sheet now lives on THIS screen it has a
@@ -566,6 +544,38 @@ export default function HomeShrine() {
                 onPick={pickSlot}
               />
             ) : null}
+
+            {/* ⚠️⚠️ **THE ENTRY TO CUSTOMISING, AND IT IS THE CHIP THAT ALREADY SAID SO.**
+                `zone · customizable temple (label)` reads *"Everything here is customizable"* — a label that
+                promised a control the app did not have. ⚠️ **No board draws an entry** (the `1f` family has no
+                route in, and its interactions point nowhere), so the least invented option is to make the
+                promise itself the control: tapping it toggles the six zones from `1f`. ⚠️ That adds NOTHING to a
+                signed-off Home — no new band, no moved layer — which is the constraint S36 measured the header
+                row to satisfy. ⚠️ Filed as the PM decision **`SCRUM-225`** rather than assumed settled.
+
+                ⚠️⚠️ **RENDERED LAST, AND THAT IS ON GLASS.** The chip's band (`28,214 224×22`) sits INSIDE the
+                top-left zone (`30,210 66×66`), so painting it before the zones put its text UNDERNEATH the dashed
+                border — measured 2026-11-09. ⚠️ It also has to stay TAPPABLE: it is the only way back out of
+                customising mode, since no board draws a Done control. So it paints on top, with a solid
+                `paperDeep` fill while the zones are up so the label is legible over them. */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('home.templeChip')}
+              accessibilityState={{ selected: customize }}
+              onPress={() => setCustomize((on) => !on)}
+              style={({ pressed }) => [
+                styles.abs,
+                bandRect(HOME_BANDS.templeChip, s),
+                styles.chip,
+                customize && { backgroundColor: surface.paperDeep },
+                pressed && styles.pressed,
+              ]}
+              testID="home-temple-chip"
+            >
+              <Text numberOfLines={1} style={{ color: text.gold, fontSize: 10.5 * s }}>
+                {t('home.templeChip')}
+              </Text>
+            </Pressable>
           </>
         );
       }
