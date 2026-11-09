@@ -212,7 +212,7 @@ export default function SettingsScreen() {
             and a press ripple for a tap that does nothing — the SCRUM-145 defect. */}
         <SettingRow
           labelKey="settings.language"
-          subKey="settings.notBuilt"
+          subKey="settings.languageSub"
           dim={false}
           testID="settings-language"
           trailing={<LocaleToggle />}
