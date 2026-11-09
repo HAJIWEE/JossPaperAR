@@ -498,32 +498,34 @@ export default function HomeShrine() {
                   · the tablet stays VISIBLE — it is the art the background is drawn behind, and hiding it would empty
                     the shrine — but it is INERT, so it cannot open the ancestor sheet underneath a zone;
                   · the carousel arrows go too (they sit inside the background zone as well). */}
-            {customize ? null : view.kind === 'empty' ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('ancestor.titleAdd')}
-                accessibilityState={{ disabled: !mayEdit }}
-                disabled={!mayEdit}
-                onPress={() => openSheet(null)}
-                style={[
-                  styles.abs,
-                  bandRect(slot, s),
-                  styles.reserved,
-                  styles.slotCentre,
-                  // ⚠️ 40 board px down, NOT centred: the slot band's lower half is where the
-                  // burner and its smoke sit, so a centred ＋ reads as a cross floating in the
-                  // smoke. Measured on glass 2026-10-31.
-                  { paddingTop: 40 * s },
-                ]}
-                testID="home-add-slot"
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={{ color: text.gold, fontSize: 44 * s, fontWeight: '300' }}
+            {view.kind === 'empty' ? (
+              customize ? null : (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('ancestor.titleAdd')}
+                  accessibilityState={{ disabled: !mayEdit }}
+                  disabled={!mayEdit}
+                  onPress={() => openSheet(null)}
+                  style={[
+                    styles.abs,
+                    bandRect(slot, s),
+                    styles.reserved,
+                    styles.slotCentre,
+                    // ⚠️ 40 board px down, NOT centred: the slot band's lower half is where the
+                    // burner and its smoke sit, so a centred ＋ reads as a cross floating in the
+                    // smoke. Measured on glass 2026-10-31.
+                    { paddingTop: 40 * s },
+                  ]}
+                  testID="home-add-slot"
                 >
-                  ＋
-                </Text>
-              </Pressable>
+                  <Text
+                    allowFontScaling={false}
+                    style={{ color: text.gold, fontSize: 44 * s, fontWeight: '300' }}
+                  >
+                    ＋
+                  </Text>
+                </Pressable>
+              )
             ) : (
               <Pressable
                 accessibilityRole="button"

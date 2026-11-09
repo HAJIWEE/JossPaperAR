@@ -3527,8 +3527,18 @@ function storeChecks(): void {
   check('⚠️⚠️ customising HIDES the add-tablet ＋ and the carousel, and makes the tablet inert',
     (() => {
       const src = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'app', 'index.tsx'), 'utf8'));
-      return src.includes('{customize ? null : view.kind === \'empty\' ? (')
-        && src.includes('disabled={!mayEdit || customize}')
+      /** ⚠️ Whitespace-flattened so the shape is what is asserted, not the indentation. */
+      const flat = src.replace(/\s+/g, ' ');
+      /**
+       * ⚠️⚠️ **THE GUARD GOES INSIDE THE EMPTY BRANCH, AND GLASS FOUND OUT WHY.** The first cut wrote
+       * `{customize ? null : view.kind === 'empty' ? (＋) : (tablet)}` — an OUTER guard that short-circuits BOTH
+       * branches, so entering customising **deleted the tablet** instead of making it inert. ⚠️ This check passed anyway
+       * because it only matched source strings; it now pins the STRUCTURE and forbids the broken shape by name.
+       */
+      return flat.includes("{view.kind === 'empty' ? ( customize ? null : (")
+        && !flat.includes('customize ? null : view.kind === ')
+        && flat.includes('disabled={!mayEdit || customize}')
+        && flat.includes('testID="home-tablet"')
         && (src.match(/!customize && view\.kind === 'tablet'/g) ?? []).length === 2;
     })());
 
