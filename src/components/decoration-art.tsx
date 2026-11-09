@@ -59,7 +59,71 @@ const C = (k: TokenKey): string =>
  * hanging cords are `#121418`, which is darker than any token; they are drawn as `ink` rather than adding a
  * one-off hex, so the art stays inside the token set.
  */
-const LANTERN: { box: readonly [number, number]; inks: readonly Ink[]; trails: readonly Trail[] } = {
+/** One drawing: a source box, its rectangles, and any traced paths. */
+interface Motif {
+  readonly box: readonly [number, number];
+  readonly inks: readonly Ink[];
+  readonly trails: readonly Trail[];
+  /**
+   * ⚠️ **Paint the traced paths BEFORE the rectangles.** The default is the opposite — `offering-art.tsx`'s reasoning,
+   * *"traces last, so a body is never covered by a later rectangle"* — which holds for a foil strip laid ON a body.
+   * The single lantern is the counter-example: its hexagon IS the body, and the rib/base/bead sit on it.
+   */
+  readonly pathsFirst?: boolean;
+}
+
+/**
+ * ⚠️ **THE COUPLETS' THIRD PIECE — the 横批 (horizontal banner)**, ported 2026-11-09 from `EN · 1e`'s
+ * `decor · 横批 (top-middle) @125,213 141×40`. It is a SEPARATE drawing, not the pair of scrolls: the owner's
+ * correction (*"the Spring Couplets consist of a trio of objects … one for the top middle … one for the left … one
+ * for the right"*) is what made the absence visible — the first build stretched the pair motif into 141 × 40 and it
+ * read as two squashed scrolls on glass.
+ * ⚠️ Its shape is the board's own: a cinnabar banner with **three** gold panels, which is why it is not simply the
+ * side motif rotated.
+ */
+const COUPLET_CROWN: Motif = {
+  box: [141, 40],
+  inks: [
+    { x: 4.7, y: 4.7, w: 131.6, h: 30.6, rx: 3, fill: 'cinnabar', stroke: 'ink', sw: 3 },
+    { x: 28.2, y: 12.9, w: 23.5, h: 14.1, fill: 'goldBright', stroke: 'ink', sw: 2 },
+    { x: 58.8, y: 12.9, w: 23.5, h: 14.1, fill: 'goldBright', stroke: 'ink', sw: 2 },
+    { x: 89.3, y: 12.9, w: 23.5, h: 14.1, fill: 'goldBright', stroke: 'ink', sw: 2 },
+  ],
+  trails: [],
+};
+
+/**
+ * ⚠️ **ONE LANTERN — what a corner of the altar holds** (`EN · 1d` `decor · lantern (top-left)`, 52 × 66), ported
+ * 2026-11-09. ⚠️ **NOT the same drawing as `LANTERN`:** that one is a PAIR (two lanterns side by side, 85.1 × 72) and
+ * it belongs on a STORE CARD. The owner's correction — *"the lanterns is also a pair one for each side"* — is about the
+ * SET (two objects, one per side), not about a card illustration, so the altar needs one object per corner. Before this
+ * the pair motif was drawn twice, i.e. **four** lanterns on a two-lantern set.
+ * ⚠️ The body is a hexagon PATH, and it has to be painted BEFORE the rib/base/bead — hence `pathsFirst`.
+ */
+const LANTERN_SINGLE: Motif = {
+  box: [52, 66],
+  pathsFirst: true,
+  inks: [
+    { x: 24.7, y: 1.7, w: 2.6, h: 10.4, fill: 'ink' },
+    { x: 19.1, y: 12.2, w: 13.9, h: 5.2, rx: 2, fill: 'goldDeep', stroke: 'ink', sw: 2 },
+    { x: 25.3, y: 17.4, w: 1.4, h: 24.3, fill: 'goldBright' },
+    { x: 20.8, y: 40.8, w: 10.4, h: 4.3, rx: 2, fill: 'goldDeep', stroke: 'ink', sw: 2 },
+    { x: 23.4, y: 45.2, w: 5.2, h: 5.2, rx: 2.6, fill: 'goldBright' },
+    { x: 24.7, y: 49.5, w: 2.6, h: 13.9, fill: 'goldBright' },
+  ],
+  trails: [
+    {
+      d: 'M205.6666717529297,11459.5263671875L214.3333282470703,11447.3681640625L231.6666717529297,11447.3681640625L240.3333282470703,11459.5263671875L231.6666717529297,11471.6845703125L214.3333282470703,11471.6845703125Z',
+      dx: -196.97,
+      dy: -11442.13,
+      fill: 'cinnabar',
+      stroke: 'ink',
+      sw: 3,
+    },
+  ],
+};
+
+const LANTERN: Motif = {
   box: [85.1, 72],
   inks: [
     { x: 10.5, y: 3.9, w: 64.2, h: 3.3, rx: 2.5, fill: 'goldDeep', stroke: 'ink', sw: 2 },
@@ -168,7 +232,7 @@ const DOORGODS: { box: readonly [number, number]; inks: readonly Ink[]; trails: 
   ],
 };
 
-const MOTIFS: Record<DecorationCode, { box: readonly [number, number]; inks: readonly Ink[]; trails: readonly Trail[] } | null> = {
+const MOTIFS: Record<DecorationCode, Motif | null> = {
   lanterns: LANTERN,
   spring_couplets: COUPLET,
   zhong_kui: ZHONGKUI,
@@ -228,6 +292,9 @@ const COMPOSED: Record<DecorationCode, readonly DecorationCode[] | undefined> = 
  * featured card) and **wrong in a square one**: the picker's 64 dp icon clipped the leftmost lantern on glass
  * (2026-11-09). So a caller with a small square box asks here first rather than guessing from the code.
  */
+/** ⚠️ A second drawing for the same code, chosen by the SLOT (see `decorate.ts#artVariantFor`). */
+export type ArtVariant = 'crown' | 'single';
+
 export function isComposed(code: DecorationCode): boolean {
   return COMPOSED[code] !== undefined;
 }
@@ -237,6 +304,7 @@ export function DecorationArt({
   code,
   size,
   box,
+  art,
 }: {
   code: DecorationCode;
   size: number;
@@ -249,6 +317,11 @@ export function DecorationArt({
    * cards and the picker rows want.
    */
   box?: { readonly w: number; readonly h: number };
+  /**
+   * ⚠️ **A SECOND DRAWING FOR THE SAME CODE** — the couplets' top-middle piece is the 横批 banner (`1e`), not the
+   * pair of scrolls the sides use. Chosen by SLOT in `decorate.ts#artVariantFor`, never by the caller guessing.
+   */
+  art?: ArtVariant;
 }) {
   const parts = COMPOSED[code];
   if (parts !== undefined) {
@@ -261,7 +334,7 @@ export function DecorationArt({
       </View>
     );
   }
-  const motif = MOTIFS[code];
+  const motif = art === 'crown' ? COUPLET_CROWN : art === 'single' ? LANTERN_SINGLE : MOTIFS[code];
   if (motif === null) {
     // ⚠️ A placeholder that LOOKS like a placeholder — never a stand-in motif.
     return (
@@ -274,6 +347,18 @@ export function DecorationArt({
   /** ⚠️ `box` wins over `size`: the caller measured this piece's rect off the board. */
   const w = box?.w ?? bw * Math.min(size / bw, size / bh);
   const h = box?.h ?? bh * Math.min(size / bw, size / bh);
+  /** ⚠️ Built once, so `pathsFirst` can put the SAME nodes before or after the rectangles. */
+  const paths = motif.trails.map((t, i) => (
+    <G key={`t${i}`} transform={`translate(${t.dx}, ${t.dy})`}>
+      <Path
+        d={t.d}
+        fill={t.fill === null ? 'none' : C(t.fill)}
+        stroke={t.stroke === undefined ? undefined : C(t.stroke)}
+        strokeWidth={t.sw ?? 0}
+        strokeLinejoin="round"
+      />
+    </G>
+  ));
   return (
     <Svg
       width={w}
@@ -281,6 +366,8 @@ export function DecorationArt({
       viewBox={`0 0 ${bw} ${bh}`}
       preserveAspectRatio={box === undefined ? undefined : 'none'}
     >
+      {/* ⚠️ Traces last BY DEFAULT, so a body is never covered by a later rectangle — `pathsFirst` inverts it. */}
+      {motif.pathsFirst === true ? paths : null}
       {motif.inks.map((r, i) => (
         <Rect
           key={i}
@@ -294,18 +381,7 @@ export function DecorationArt({
           strokeWidth={r.sw ?? 0}
         />
       ))}
-      {/* ⚠️ Traced paths last, so a body is never covered by a later rectangle. */}
-      {motif.trails.map((t, i) => (
-        <G key={`t${i}`} transform={`translate(${t.dx}, ${t.dy})`}>
-          <Path
-            d={t.d}
-            fill={t.fill === null ? 'none' : C(t.fill)}
-            stroke={t.stroke === undefined ? undefined : C(t.stroke)}
-            strokeWidth={t.sw ?? 0}
-            strokeLinejoin="round"
-          />
-        </G>
-      ))}
+      {motif.pathsFirst === true ? null : paths}
     </Svg>
   );
 }

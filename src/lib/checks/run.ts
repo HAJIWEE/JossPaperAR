@@ -23,6 +23,7 @@ import {
   DECOR_BOARD,
   SLOT_ART,
   SLOT_HIT,
+  artVariantFor,
   drawPlan,
   optionsForSlot,
   sheetLayout,
@@ -3444,25 +3445,51 @@ function storeChecks(): void {
       && lanternOnly.every((p) => p.behind === false),
     lanternOnly.map((p) => `${p.slot}:${p.code}`).join(' '));
   const coupletsOnly = drawPlan({ ...noDecor, side_right: 'spring_couplets' } as never);
-  check('⚠️ …and a SIDE set hangs down BOTH sides, whichever slot the server stored it in',
-    coupletsOnly.length === 2
-      && coupletsOnly.map((p) => p.slot).join(',') === 'side_left,side_right');
+  check('⚠️⚠️ a COUPLET SET is a TRIO — 横批 across the top-middle plus a scroll down each side',
+    coupletsOnly.length === 3
+      && coupletsOnly.map((p) => p.slot).join(',') === 'top_middle,side_left,side_right',
+    coupletsOnly.map((p) => p.slot).join(','));
+  const doorGodsOnly = drawPlan({ ...noDecor, side_left: 'door_gods' } as never);
+  check('⚠️ …and DOOR GODS are a trio too (assumed to share the couplets\' shape — see `SET_SLOTS`)',
+    doorGodsOnly.length === 3
+      && doorGodsOnly.map((p) => p.slot).join(',') === 'top_middle,side_left,side_right');
   const backgroundOnly = drawPlan({ ...noDecor, background: 'zhong_kui' } as never);
   check('⚠️ the BACKGROUND print draws BEHIND the tablet — the z-order `1e` depends on',
     backgroundOnly.length === 1 && backgroundOnly[0].behind === true);
   const setPlan = drawPlan({ ...noDecor, side_left: 'festive_set' } as never);
-  check('⚠️⚠️ the FESTIVE SET lights the five slots its components live in, not one',
-    setPlan.length === 5
-      && setPlan.map((p) => p.slot).join(',') === 'top_left,top_right,side_left,side_right,background');
+  check('⚠️⚠️ the FESTIVE SET lights ALL SIX slots — `1e` draws 横批, two lanterns, two couplets and the print',
+    setPlan.length === 6
+      && setPlan.map((p) => p.slot).join(',') === 'top_left,top_middle,top_right,side_left,side_right,background'
+      && setPlan.find((p) => p.slot === 'top_middle')?.code === 'spring_couplets'
+      && setPlan.find((p) => p.slot === 'top_left')?.code === 'lanterns');
   const setPlusLantern = drawPlan({ ...noDecor, side_left: 'festive_set', top_left: 'lanterns' } as never);
   check('⚠️ …and an explicitly equipped piece KEEPS its slot — a set never overwrites a choice',
     setPlusLantern.filter((p) => p.slot === 'top_left').length === 1
       && setPlusLantern.find((p) => p.slot === 'top_left')?.code === 'lanterns');
 
   /**
+   * ⚠️⚠️ **A SET'S PIECE IS NOT ALWAYS THE SET'S FACE.** The couplets' top-middle piece is the **横批 banner**, not the
+   * pair of scrolls — the owner's correction, and `1e` draws it at 141 × 40 (a squat banner, not a scroll). ⚠️ So the
+   * drawing is chosen by SLOT, and the banner has art of its own rather than the pair stretched into a wide box —
+   * which is exactly how it looked on glass before this.
+   */
+  check('⚠️⚠️ the COUPLETS\' top-middle piece uses the 横批 drawing, and only that slot does',
+    artVariantFor('spring_couplets', 'top_middle') === 'crown'
+      && artVariantFor('spring_couplets', 'side_left') === undefined);
+  check('⚠️⚠️ a LANTERN on the altar is ONE lantern — the pair motif is the store card\'s',
+    artVariantFor('lanterns', 'top_left') === 'single' && artVariantFor('lanterns', 'top_right') === 'single');
+  const ART_SRC_TXT = readFileSync(join(PROJECT_ROOT, 'src', 'components', 'decoration-art.tsx'), 'utf8');
+  check('⚠️ …and each second drawing is the board\'s own box, matching the rect it is drawn into',
+    ART_SRC_TXT.includes('box: [141, 40]') && ART_SRC_TXT.includes('box: [52, 66]')
+      && SLOT_ART.top_middle.w === 141 && SLOT_ART.top_middle.h === 40
+      && SLOT_ART.top_left.w === 52 && SLOT_ART.top_left.h === 66,
+    `${SLOT_ART.top_middle.w}×${SLOT_ART.top_middle.h} · ${SLOT_ART.top_left.w}×${SLOT_ART.top_left.h}`);
+  check('⚠️ …and the altar passes the variant through, so the banner is not silently replaced',
+    readFileSync(join(PROJECT_ROOT, 'src', 'components', 'home', 'decor-layer.tsx'), 'utf8').includes('art={p.art}'));
+  /**
    * ⚠️⚠️ **THE SLOT→CATEGORY RULE IS NOT COPIED.** `domain/catalogue.ts` owns `SLOT_CATEGORY` (S14j/S14k) and
-   * `equip_decoration` enforces it; a second table here or in `decorate.ts` would be the "two implementations of one
-   * rule" this project keeps deleting — and the day they disagree, a slot offers what the server will refuse.
+   * `equip_decoration` enforces it; a second table in `decorate.ts` would be the "two implementations of one rule"
+   * this project keeps deleting — and the day they disagree, a slot offers what the server will refuse.
    */
   const DECORATE_SRC = readFileSync(join(PROJECT_ROOT, 'src', 'lib', 'decorate.ts'), 'utf8');
   check('⚠️⚠️ `decorate.ts` IMPORTS SLOT_CATEGORY — it does not restate the slot→category map',

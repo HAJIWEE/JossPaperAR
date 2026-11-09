@@ -207,44 +207,81 @@ export interface DrawPlan {
   readonly rect: Rect;
   /** ⚠️ `true` for the background print: `1e` paints it BEHIND the tablet. */
   readonly behind: boolean;
+  /**
+   * ⚠️ **A SET'S PIECE IS NOT ALWAYS THE SET'S FACE.** The couplets are a trio and the top-middle one is the 横批 — a
+   * banner, not a scroll — so the drawing is chosen by SLOT as well as by code. `undefined` = the code's own motif.
+   */
+  readonly art?: 'crown' | 'single';
+}
+
+/**
+ * Which drawing a piece uses in a given slot.
+ *
+ * ⚠️ Only the couplets have a second drawing so far (the 横批, ported from `1e`). The door gods' third piece has no
+ * art of its own — the board never draws the door gods on an altar — so it borrows the side motif and that is
+ * recorded as owed rather than invented.
+ */
+export function artVariantFor(code: DecorationCode, slot: DecorationSlot): 'crown' | 'single' | undefined {
+  /** the couplets' 横批 banner, only in the top-middle */
+  if (code === 'spring_couplets' && slot === 'top_middle') return 'crown';
+  /** ⚠️ ONE lantern per corner: the pair motif belongs on a store card, not on the altar */
+  if (code === 'lanterns') return 'single';
+  return undefined;
 }
 
 /**
  * ⚠️⚠️ **WHERE A DECORATION ACTUALLY DRAWS — and it is not "the slot it is stored in".**
  *
- * `EN · 1d` is the proof: one `lanterns` equip lights **both** top corners (a `decor · lantern (top-left)` AND a
- * `decor · lantern (top-right)`), and one `spring_couplets` hangs **both** sides. ⚠️ `equip_decoration` stores a
- * SINGLE row per set — it clears the other slot in the category (S14k, one set per category) — so a renderer that
- * draws only the stored slot lights ONE corner of a two-corner set.
+ * ⚠️ **CORRECTED 2026-11-09 BY THE OWNER, who eyeballed the shrine** — and it is a composition fact that was not
+ * written down anywhere: *"the Spring Couplets consist of a trio of objects as a set one for the top middle of the
+ * shrine, one for the left of the shrine and one for the right of the shrine. Similarly the lanterns is also a pair
+ * one for each side, The door Gods is also a trio one."*
  *
- * ⚠️ That is not a guess about intent: it is what the boards draw, and it is what "one SET per category" means —
- * the set is the thing that is equipped, and a set of couplets is a pair.
- * ⚠️ Measured on glass 2026-11-09: with `lanterns` in `top_left`, only the left corner lit — the defect this table
- * fixes.
+ * | set | pieces | slots |
+ * |---|---|---|
+ * | Spring Couplets | **3** — 横批 + a scroll each side | `top_middle` · `side_left` · `side_right` |
+ * | Door Gods | **3** | `top_middle` · `side_left` · `side_right` |
+ * | Lanterns | **2** — one each side (the upper corners) | `top_left` · `top_right` |
+ * | Zhong Kui | 1 — the print behind the tablet | `background` |
+ *
+ * ⚠️ **The board corroborates the third couplet:** `EN · 1e` draws `decor · 横批 (top-middle) @125,213 141×40` —
+ * 横批 *is* the horizontal banner of a couplet set. `1d` omits it, which is why the first pass read the set as a pair.
+ * ⚠️ **`equip_decoration` stores ONE row per set** (S14k clears the other slot in the category), so this table is the
+ * only place the pieces-per-set fact can live. ⚠️ Measured on glass 2026-11-09: with `lanterns` in `top_left` only one
+ * corner lit — the defect that started this.
+ * ⚠️ **Door Gods' trio shape is ASSUMED to match the couplets'** (same category, same three positions). No board
+ * draws the door gods on an altar, so this is the one line here that is inference rather than measurement.
  */
 const SET_SLOTS: Record<DecorationCode, readonly DecorationSlot[]> = {
-  /** a PAIR in the two top corners — `1d` draws both */
+  /** a PAIR, one hanging each side — the upper corners (`1d` draws both) */
   lanterns: ['top_left', 'top_right'],
-  /** a PAIR hanging down both sides */
-  spring_couplets: ['side_left', 'side_right'],
-  door_gods: ['side_left', 'side_right'],
+  /**
+   * a TRIO: 横批 across the top + a scroll down each side.
+   * ⚠️ The top-middle piece is drawn with the pair's motif stretched into 141 × 40 — the 横批 has **no ported art of
+   * its own** yet (`1e` has it as raw shapes). Filed rather than faked with a second motif.
+   */
+  spring_couplets: ['top_middle', 'side_left', 'side_right'],
+  /** a TRIO, the couplets' shape — see the caveat above */
+  door_gods: ['top_middle', 'side_left', 'side_right'],
   /** one print, behind the tablet */
   zhong_kui: ['background'],
   /**
-   * ⚠️ **THE FESTIVE SET IS AN AMALGAMATION — the four others put together** (owner, 2026-11-08), and `EN · 1e`
-   * is the board that proves it: it draws Zhong Kui behind the tablet, a lantern in each corner and a couplet down
-   * each side. So the set lights every slot its components live in, rather than squeezing four motifs into one
-   * 41 × 160 side slot.
+   * ⚠️ **THE FESTIVE SET IS AN AMALGAMATION — the four others put together** (owner, 2026-11-08), and `EN · 1e` is the
+   * board that proves it: it draws 横批 top-middle, a lantern in each corner, a couplet down each side and Zhong Kui
+   * behind the tablet — i.e. all six slots.
+   * ⚠️ The SIDES show the couplets, not the door gods: they are the same category and replace each other (S14k), so a
+   * set that owns both still displays one. `1e` displays the couplets.
    */
-  festive_set: ['top_left', 'top_right', 'side_left', 'side_right', 'background'],
+  festive_set: ['top_left', 'top_middle', 'top_right', 'side_left', 'side_right', 'background'],
 };
 
 /** Which of the set's own motifs draws in each slot it fills — the amalgamation, slot by slot (`1e`). */
 const FESTIVE_PARTS: Partial<Record<DecorationSlot, DecorationCode>> = {
   top_left: 'lanterns',
+  top_middle: 'spring_couplets',
   top_right: 'lanterns',
   side_left: 'spring_couplets',
-  side_right: 'door_gods',
+  side_right: 'spring_couplets',
   background: 'zhong_kui',
 };
 
@@ -266,7 +303,13 @@ export function drawPlan(
 
   const add = (slot: DecorationSlot, code: DecorationCode) => {
     if (taken.has(slot)) return;
-    plan.push({ slot, code, rect: SLOT_ART[slot], behind: SLOT_CATEGORY[slot] === 'background' });
+    plan.push({
+      slot,
+      code,
+      rect: SLOT_ART[slot],
+      behind: SLOT_CATEGORY[slot] === 'background',
+      art: artVariantFor(code, slot),
+    });
     taken.add(slot);
   };
 

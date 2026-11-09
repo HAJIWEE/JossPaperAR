@@ -14,7 +14,7 @@
 
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { DecorationArt } from '@/components/decoration-art';
+import { DecorationArt, type ArtVariant } from '@/components/decoration-art';
 import { DECORATION_SLOTS, type DecorationCode, type DecorationSlot } from '@/domain/catalogue';
 import {
   CATEGORY_LABEL_KEY,
@@ -34,11 +34,16 @@ function boxOf(r: Rect, s: number) {
   return { position: 'absolute' as const, left: r.x * s, top: r.y * s, width: r.w * s, height: r.h * s };
 }
 
-function Piece({ code, rect, s }: { code: DecorationCode; rect: Rect; s: number }) {
+function Piece({ code, rect, s, art }: { code: DecorationCode; rect: Rect; s: number; art?: ArtVariant }) {
   return (
     <View style={boxOf(rect, s)} pointerEvents="none">
       {/* ⚠️ The rect is the ART's own (`1d`/`1e`), and the art fills it — see `DecorationArt`'s `box` note. */}
-      <DecorationArt code={code} size={Math.max(rect.w, rect.h) * s} box={{ w: rect.w * s, h: rect.h * s }} />
+      <DecorationArt
+        code={code}
+        size={Math.max(rect.w, rect.h) * s}
+        box={{ w: rect.w * s, h: rect.h * s }}
+        art={art}
+      />
     </View>
   );
 }
@@ -50,7 +55,7 @@ export function DecorBack({ scale, equipped }: { scale: number; equipped: Equipp
       {drawPlan(equipped)
         .filter((p) => p.behind)
         .map((p) => (
-          <Piece key={`${p.slot}:${p.code}`} code={p.code} rect={p.rect} s={scale} />
+          <Piece key={`${p.slot}:${p.code}`} code={p.code} rect={p.rect} s={scale} art={p.art} />
         ))}
     </>
   );
@@ -63,7 +68,7 @@ export function DecorFront({ scale, equipped }: { scale: number; equipped: Equip
       {drawPlan(equipped)
         .filter((p) => !p.behind)
         .map((p) => (
-          <Piece key={`${p.slot}:${p.code}`} code={p.code} rect={p.rect} s={scale} />
+          <Piece key={`${p.slot}:${p.code}`} code={p.code} rect={p.rect} s={scale} art={p.art} />
         ))}
     </>
   );
