@@ -3307,9 +3307,23 @@ function storeChecks(): void {
    */
   check('⚠️⚠️ both store tabs are LIVE — Decorations is no longer dark',
     STORE_TABS.every((tab) => tab.enabled));
+  /**
+   * ⚠️⚠️ **TRANSCRIBED FROM THE BOARD'S LAYER NAMES, NOT FROM THE CARD LAYOUT** — and the first version of
+   * this table was wrong because it did the opposite. `EN · 7b` draws the four cards in a 2 × 2 grid, so the
+   * two that sit on the LEFT (`Spring Couplets`, `Door Gods`) and the two on the RIGHT (`Zhong Kui Print`,
+   * `Lanterns`) are trivially easy to pair by position — and Door Gods / Lanterns got swapped. ⚠️ **Because
+   * this table was written from the same wrong pass as the catalogue, it PASSED**: it asserted the defect
+   * back to itself. The authority is the layer NAME, which states its own item:
+   *   `card · Door Gods cash = $1.49` · `card · Door Gods points = 1,200 pts`
+   *   `card · Lanterns cash  = $1.99` · `card · Lanterns points  = 1,600 pts`
+   * and `ZH · 7b` carries the same pairing (门神 $1.49 / 1,200 · 灯笼 $1.99 / 1,600).
+   *
+   * ⚠️ The real tripwire is that **no two decorations may share a price pair** — a transposition is then a
+   * change of which CODE carries which number, and this table is the only thing that notices.
+   */
   const BOARD_DECOR_PRICES: Record<string, readonly [number, number]> = {
     festive_set: [3000, 399], spring_couplets: [800, 99], zhong_kui: [1000, 129],
-    door_gods: [1600, 199], lanterns: [1200, 149],
+    door_gods: [1200, 149], lanterns: [1600, 199],
   };
   check('⚠️⚠️ every decoration is priced EXACTLY as `EN · 7b` draws it — points AND cash, in cents',
     DECORATIONS.length === 5
@@ -3321,6 +3335,17 @@ function storeChecks(): void {
   // ⚠️ POSITIVE CONTROL — cash is INTEGER CENTS, so no float can ever reach a price.
   check('⚠️ guard: cash prices are whole cents, never a decimal',
     DECORATIONS.every((d) => Number.isInteger(d.cashPrice)));
+  /**
+   * ⚠️⚠️ **NO TWO DECORATIONS MAY SHARE A PRICE PAIR — this is the check that would have caught the
+   * Door Gods / Lanterns transposition.** With five distinct pairs, a swapped row changes which CODE
+   * carries which number; with a duplicated pair the swap would be a no-op and the table above could
+   * silently stop discriminating. ⚠️ Asserted as a CONTROL on the table, not on the catalogue, so a
+   * typo in `BOARD_DECOR_PRICES` cannot make it vacuous.
+   */
+  const pairs = Object.values(BOARD_DECOR_PRICES).map((p) => `${p[0]}/${p[1]}`);
+  check('⚠️ guard: every board price PAIR is unique, so a transposition cannot hide',
+    new Set(pairs).size === pairs.length && pairs.length === 5,
+    pairs.join(' '));
   check('⚠️⚠️ the CASH rail is now DRAWN — the old "omit the chip" rule is retired',
     readFileSync(join(PROJECT_ROOT, 'src', 'app', 'store.tsx'), 'utf8').includes('store-cash-chip'));
 

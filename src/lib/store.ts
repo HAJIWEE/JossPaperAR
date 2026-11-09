@@ -89,10 +89,10 @@ export const POINTS_CURRENCY = 'tribute';
 export const FEATURED_CODE: OfferingCode = 'wealth_bundle';
 
 /**
- * The two switcher tabs. ⚠️ **`decorations` is DISABLED**, and that is the honest state: the
- * catalogue's decoration prices are **NULL until the economy pass prices them**
- * (`decorations_catalog.price` — *"inventing a store price is a product decision, not a build
- * one"*), so a decoration card could show no price at all.
+ * The two switcher tabs. ⚠️ **BOTH ARE LIVE** since 2026-11-08. `decorations` used to be DISABLED because
+ * `decorations_catalog.price` was NULL (*"inventing a store price is a product decision"*) — and that was
+ * wrong twice over: the board `EN · 7b` HAD the prices all along, so the tab hid a finished design behind a
+ * TODO of mine. The prices are in `catalogue.ts` and in the database now.
  */
 export const STORE_TABS = [
   { id: 'offerings', labelKey: 'store.tabOfferings', enabled: true },

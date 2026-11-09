@@ -40,19 +40,30 @@ on conflict (code) do update set
   composed_of = excluded.composed_of;
 
 -- ── Decorations — permanent, NEVER burn (a points SINK) ────────────────────
--- Names are locked (S14). `price` stays NULL: no doc states a decoration price,
--- and inventing one is a product decision, not a build decision. The column
--- allows NULL precisely so this is not silently guessed.
+-- Names are locked (S14). Prices come from `EN · 7b` / `ZH · 7b`, adopted as-is by the owner
+-- (2026-11-08), and they MUST match `DECORATIONS` in src/domain/catalogue.ts.
+--
+-- ⚠️⚠️ **THESE ARE SEEDED WITH THEIR PRICES ON PURPOSE.** They used to be inserted as NULL, and that made
+-- the LOCAL database a different product from the hosted one: the pricing migrations run BEFORE the seed, so
+-- on a fresh `supabase db reset` their UPDATEs matched no rows and every decoration stayed unpriced —
+-- `purchase_item` answered *"has no price yet"* and `equip_decoration` could never be reached. ⚠️ It also
+-- made `pr3_verification.sql`'s "an unpriced decoration fails loudly" assertion pass for a reason that did
+-- not exist on the hosted project.
+--
+-- ⚠️ Pairing is asserted in `check:lib` against the board's own layer names, not against this file. It is
+-- stated here because it was got wrong once (2026-11-09): DOOR GODS $1.49 / 1,200 · LANTERNS $1.99 / 1,600.
 insert into public.decorations_catalog (code, slot_category, name_en, name_zh, price) values
-  ('spring_couplets', 'side',       'Spring Couplets', '春联',     null),
-  ('zhong_kui',       'background', 'Zhong Kui Print', '鍾馗像',   null),
-  ('door_gods',       'side',       'Door Gods',       '门神',     null),
-  ('lanterns',        'top',        'Lanterns',        '灯笼',     null),
-  ('festive_set',     'side',       'Festive Set',     '新春套装', null)
+  ('spring_couplets', 'side',       'Spring Couplets', '春联',     800),
+  ('zhong_kui',       'background', 'Zhong Kui Print', '鍾馗像',  1000),
+  ('door_gods',       'side',       'Door Gods',       '门神',    1200),
+  ('lanterns',        'top',        'Lanterns',        '灯笼',    1600),
+  ('festive_set',     'side',       'Festive Set',     '新春套装', 3000)
 on conflict (code) do update set
   slot_category = excluded.slot_category,
   name_en       = excluded.name_en,
-  name_zh       = excluded.name_zh;
+  name_zh       = excluded.name_zh,
+  -- ⚠️ price is part of the upsert: re-seeding must CORRECT a row, not quietly leave the old number.
+  price         = excluded.price;
 
 -- ── Sanity check (visible in `supabase db reset` output) ───────────────────
 do $$
@@ -82,6 +93,17 @@ begin
              <> array['gold_bar', 'house', 'joss_paper_stack', 'smartphone']);
   if bad > 0 then
     raise exception 'seed: wealth_bundle must be non-burnable and composed of the other four';
+  end if;
+  -- ⚠️ the decoration prices must be the BOARD's pairing (`EN · 7b`), not merely non-null. The Door Gods /
+  -- Lanterns transposition (fixed 2026-11-09) survived because no check compared the numbers to the board.
+  select count(*) into bad from public.decorations_catalog
+   where (code = 'spring_couplets' and price is distinct from  800)
+      or (code = 'zhong_kui'       and price is distinct from 1000)
+      or (code = 'door_gods'       and price is distinct from 1200)
+      or (code = 'lanterns'        and price is distinct from 1600)
+      or (code = 'festive_set'     and price is distinct from 3000);
+  if bad > 0 then
+    raise exception 'seed: % decoration(s) do not carry the board price (EN-7b: 800 · 1000 · 1200 · 1600 · 3000)', bad;
   end if;
   raise notice 'seed ok — % offerings · % decorations · every base_value = 1.2 x price', n_offer, n_decor;
 end;
