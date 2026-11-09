@@ -18,6 +18,7 @@ import { DecorationArt, type ArtVariant } from '@/components/decoration-art';
 import { DECORATION_SLOTS, type DecorationCode, type DecorationSlot } from '@/domain/catalogue';
 import {
   CATEGORY_LABEL_KEY,
+  DECOR_BOARD,
   SLOT_HINT,
   SLOT_HIT,
   categoryOf,
@@ -139,13 +140,32 @@ export function DecorSlots({
   scale,
   ownedCount,
   onPick,
+  onExit,
 }: {
   scale: number;
   ownedCount: number;
   onPick: (slot: DecorationSlot) => void;
+  /** ⚠️ A tap anywhere outside the zones — and off the chip — leaves customising. */
+  onExit: () => void;
 }) {
   return (
     <>
+      {/**
+       * ⚠️⚠️ **TAP ANYWHERE ELSE TO LEAVE** (owner, 2026-11-09: *"Tapping outside of the customization options should
+       * return me to normal mode with the tablets and tablet controls"*). An **invisible full-board scrim**, painted
+       * FIRST so the six zones sit above it — a slot tap opens its picker, never the exit.
+       * ⚠️ Invisible on purpose: `1f` draws the shrine at full strength behind the zones, so a dimming scrim would be a
+       * different screen from the board. ⚠️ `DECOR_BOARD` is the canvas `ShrineCanvas` gives this component, so the
+       * catcher covers the board and nothing more. ⚠️ The chip and the picker sheet are painted after this overlay and
+       * therefore stay on top of it. ⚠️ Its accessible name is the dismiss verb the sheet's scrim already uses.
+       */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('common.cancel')}
+        testID="decor-scrim-outside"
+        onPress={onExit}
+        style={{ position: 'absolute', left: 0, top: 0, width: DECOR_BOARD.w * scale, height: DECOR_BOARD.h * scale }}
+      />
       {DECORATION_SLOTS.map((slot) => {
         const r = SLOT_HIT[slot];
         const labelKey = CATEGORY_LABEL_KEY[categoryOf(slot)];

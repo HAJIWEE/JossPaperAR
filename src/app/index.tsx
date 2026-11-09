@@ -294,6 +294,13 @@ export default function HomeShrine() {
       })();
       return () => {
         cancelled = true;
+        /**
+         * ⚠️ **LEAVING THE SCREEN LEAVES CUSTOMISING.** ⚠️ The full-board tap catcher sits inside the `altar` region, so
+         * the CTA and the tab bar paint ABOVE it — a tap there navigates rather than exiting, and coming back would show
+         * the zones again over a screen the user had left. Resetting on blur makes "away and back" mean normal mode,
+         * which is what the owner's rule implies (*"return me to normal mode with the tablets and tablet controls"*).
+         */
+        setCustomize(false);
       };
     }, []),
   );
@@ -572,6 +579,7 @@ export default function HomeShrine() {
                 scale={s}
                 ownedCount={decor === null ? 0 : decor.owned.length}
                 onPick={pickSlot}
+                onExit={() => setCustomize(false)}
               />
             ) : null}
 

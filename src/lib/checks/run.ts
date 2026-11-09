@@ -3518,6 +3518,25 @@ function storeChecks(): void {
     })());
 
   /**
+   * ⚠️⚠️ **TAP OUTSIDE TO LEAVE** (owner, 2026-11-09): *"Tapping outside of the customization options should return me to
+   * normal mode with the tablets and tablet controls."*
+   *
+   * ⚠️ Order is the whole correctness argument: the catcher must be painted BEFORE the six zones (or a slot tap would exit
+   * instead of opening its picker), and the chip and the sheet are painted after the overlay so they stay on top. ⚠️ And
+   * leaving the SCREEN has to leave the mode too, because the CTA and the tab bar paint above the catcher — asserted here
+   * so a refactor cannot quietly drop either half.
+   */
+  check('⚠️⚠️ the tap-outside catcher exists, sits UNDER the zones, and exits customising',
+    (() => {
+      const src = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'components', 'home', 'decor-layer.tsx'), 'utf8'));
+      const catcher = src.indexOf('decor-scrim-outside');
+      const firstZone = src.indexOf('decor-slot-${slot}');
+      return catcher > 0 && firstZone > catcher && src.includes('onPress={onExit}');
+    })());
+  check('⚠️ …and leaving the screen resets the mode (the CTA and tab bar paint above the catcher)',
+    stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'app', 'index.tsx'), 'utf8')).includes('setCustomize(false)'));
+
+  /**
    * ⚠️⚠️ **A SET'S PIECE IS NOT ALWAYS THE SET'S FACE.** The couplets' top-middle piece is the **横批 banner**, not the
    * pair of scrolls — the owner's correction, and `1e` draws it at 141 × 40 (a squat banner, not a scroll). ⚠️ So the
    * drawing is chosen by SLOT, and the banner has art of its own rather than the pair stretched into a wide box —
