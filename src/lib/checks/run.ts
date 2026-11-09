@@ -24,12 +24,12 @@ import {
   DECOR_BOARD,
   SLOT_ART,
   SLOT_HIT,
+  BACKGROUND_LIFT,
   BACKGROUND_OVERSHOOT,
   artVariantFor,
   chipBandClear,
   drawPlan,
   optionsForSlot,
-  overshoot,
   rectsOverlap,
   sheetLayout,
 } from '../decorate.ts';
@@ -3386,10 +3386,10 @@ function storeChecks(): void {
    * first. ⚠️ Asserted per slot, so re-measuring one cannot quietly break another.
    */
   /**
-   * ⚠️⚠️ **THE ZONE MUST CONTAIN THE ART — EXCEPT THE BACKGROUND, WHICH OVERHANGS ON PURPOSE.** `1f` draws the tap targets
-   * larger than the pieces; the day one is smaller, the piece is drawn outside the thing that selects it. ⚠️ The
-   * background is the deliberate exception (owner, 2026-11-09): the print runs 5 % past its zone on every side so it reads
-   * as a backdrop, and its zone is still the tap target underneath it.
+   * ⚠️⚠️ **THE ZONE MUST CONTAIN THE ART — EXCEPT THE BACKGROUND, WHICH RIDES ABOVE ITS ZONE ON PURPOSE.** `1f` draws
+   * the tap targets larger than the pieces; the day one is smaller, the piece is drawn outside the thing that selects it.
+   * ⚠️ The background is the deliberate exception (owner, 2026-11-09): at 88 % it fits its zone horizontally, but
+   * `BACKGROUND_LIFT` raises it so its top crosses the zone's top edge — the tap target is still the zone underneath it.
    */
   const outsideZone = SLOTS.filter((s) => {
     if (s === 'background') return false;
@@ -3400,23 +3400,23 @@ function storeChecks(): void {
   check('⚠️⚠️ each ART rect sits INSIDE its own tap zone — a piece outside its zone cannot be tapped',
     outsideZone.length === 0, outsideZone.join(' '));
   /**
-   * ⚠️⚠️ **THE BACKGROUND PRINT IS THE ZONE PLUS 10 %** (owner, 2026-11-09): *"enlarge the background decoration to occupy
-   * the entirety of the marked background decoration space"*, then *"bring up the background decoration by 10%"*. ⚠️ The
-   * board's own group is `101,367 190×161` — a print that sat inside a tablet's footprint; filling the zone made it a
-   * backdrop and the overhang keeps it off the outline. ⚠️ Asserted as the RELATIONSHIP (`overshoot(zone, OVER)`) plus the
-   * constant, not as four numbers, so a re-measure of the zone carries the print with it.
+   * ⚠️⚠️ **THE BACKGROUND PRINT: SIZE `BACKGROUND_OVERSHOOT`, THEN RAISED `BACKGROUND_LIFT`** (owner, 2026-11-09):
+   * *"shrink the background decoration size by 20% and bring it up another 10%"*. ⚠️ Two knobs asserted separately — the
+   * first is size (0.88 of the zone, i.e. 20 % below the 1.1 overhang), the second is HEIGHT (10 % of its own height). ⚠️
+   * Folding them into one number would have shipped a 12 % shrink wearing the owner's words.
    */
-  const wantBg = overshoot(SLOT_HIT.background, BACKGROUND_OVERSHOOT);
-  const overLeft = SLOT_HIT.background.x - SLOT_ART.background.x;
-  const overRight = SLOT_ART.background.x + SLOT_ART.background.w - (SLOT_HIT.background.x + SLOT_HIT.background.w);
-  check('⚠️⚠️ the background print is its zone PLUS 10 %, evenly overhanging on every side',
-    BACKGROUND_OVERSHOOT === 1.1
-      && Math.abs(SLOT_ART.background.x - wantBg.x) < 1e-9
-      && Math.abs(SLOT_ART.background.y - wantBg.y) < 1e-9
-      && Math.abs(SLOT_ART.background.w - wantBg.w) < 1e-9
-      && Math.abs(SLOT_ART.background.h - wantBg.h) < 1e-9
-      && Math.abs(overLeft - overRight) < 1e-9,
-    `${SLOT_ART.background.w.toFixed(1)}×${SLOT_ART.background.h.toFixed(1)} vs zone ${SLOT_HIT.background.w}×${SLOT_HIT.background.h} · overhang ${overLeft.toFixed(1)}/${overRight.toFixed(1)}`);
+  const bgArt = SLOT_ART.background;
+  const bgW = SLOT_HIT.background.w * BACKGROUND_OVERSHOOT;
+  const bgH = SLOT_HIT.background.h * BACKGROUND_OVERSHOOT;
+  const bgX = SLOT_HIT.background.x + (SLOT_HIT.background.w - bgW) / 2;
+  const bgY = SLOT_HIT.background.y + (SLOT_HIT.background.h - bgH) / 2 - bgH * BACKGROUND_LIFT;
+  check('⚠️⚠️ the background print is 88 % of its zone (centred) and raised 10 % of its own height',
+    BACKGROUND_OVERSHOOT === 0.88 && BACKGROUND_LIFT === 0.1
+      && Math.abs(bgArt.w - bgW) < 1e-9 && Math.abs(bgArt.h - bgH) < 1e-9
+      && Math.abs(bgArt.x - bgX) < 1e-9 && Math.abs(bgArt.y - bgY) < 1e-9,
+    // ⚠️ The constants are printed FIRST: a knob moved without the rect following it still reads as "want === got" below,
+    // because both sides of that sum are derived from the knob. Measured by moving each one — see the fault test.
+    `overshoot ${BACKGROUND_OVERSHOOT} · lift ${BACKGROUND_LIFT} · ${bgArt.w.toFixed(1)}×${bgArt.h.toFixed(1)} at y ${bgArt.y.toFixed(1)} (want ${bgW.toFixed(1)}×${bgH.toFixed(1)} at y ${bgY.toFixed(1)})`);
   /**
    * ⚠️ **THE TABLET DRAWS AT 72 % OF ITS BAND** — 20 % then a further 10 % (owner). ⚠️ Bottom-anchored: it gives up the
    * height from the TOP so its plinth stays on the table. ⚠️ The band itself must NOT shrink — it is also the ＋ slot's

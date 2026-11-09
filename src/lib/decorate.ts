@@ -68,17 +68,30 @@ export const SLOT_HIT: Record<DecorationSlot, Rect> = {
 };
 
 /**
- * ⚠️ **THE BACKGROUND PRINT OVERHANGS ITS ZONE BY 10 %** (owner, 2026-11-09: *"bring up the background decoration by
- * 10%"*). ⚠️ It is 10 % of the PRINT, not a nudge of the whole shrine: the zone is the marked space, and the print runs
- * 5 % past it on every side so it reads as a backdrop rather than a picture pinned to an outline.
+ * ⚠️ **THE BACKGROUND PRINT'S SIZE, THEN ITS HEIGHT — two separate knobs** (owner, 2026-11-09):
+ * *"shrink the background decoration size by 20% and bring it up another 10%"*.
+ *
+ * ⚠️ `BACKGROUND_OVERSHOOT` is **size** relative to the marked zone: it was 1.1 (a 5 % overhang each side), now **0.88**
+ * — i.e. 20 % smaller than that, so the print sits just inside the zone it belongs to.
+ * ⚠️ `BACKGROUND_LIFT` is **position**: the print rises by 10 % of its own height. ⚠️ It is a separate constant from the
+ * size on purpose — the two were asked for in one sentence and mean different things, and folding `−20 %/+10 %` into one
+ * number would have been a 12 % shrink wearing the owner's words.
  */
-export const BACKGROUND_OVERSHOOT = 1.1;
+export const BACKGROUND_OVERSHOOT = 0.88;
+
+/** ⚠️ Fraction of the print's own height that it rises above the zone's centre line. */
+export const BACKGROUND_LIFT = 0.1;
 
 /** A rect grown by `factor` about its own centre — both overhangs equal, so the composition stays symmetrical. */
 export function overshoot(r: Rect, factor: number): Rect {
   const w = r.w * factor;
   const h = r.h * factor;
   return { x: r.x - (w - r.w) / 2, y: r.y - (h - r.h) / 2, w, h };
+}
+
+/** Raise a rect by `factor` of its OWN height — the unit the owner asked in ("bring it up another 10 %"). */
+export function lift(r: Rect, factor: number): Rect {
+  return { x: r.x, y: r.y - r.h * factor, w: r.w, h: r.h };
 }
 
 /**
@@ -94,12 +107,10 @@ export const SLOT_ART: Record<DecorationSlot, Rect> = {
   top_right: { x: 301, y: 210, w: 52, h: 66 },
   side_left: { x: 33, y: 300, w: 41, h: 160 },
   side_right: { x: 317, y: 300, w: 41, h: 160 },
-  /** `decor · 鍾馗像 (background)` — ⚠️ **THE WHOLE ZONE, PLUS 10 %** (owner, 2026-11-09): *"enlarge the background
-   * decoration to occupy the entirety of the marked background decoration space"*, then *"bring up the background
-   * decoration by 10%"*. The board's own group is `101,367 190×161`, which left the print buried behind a tablet; filling
-   * the zone made it a backdrop, and the 10 % overhang lets it read as one instead of stopping exactly on the outline.
-   * ⚠️ Scaled about the ZONE'S CENTRE, so both overhangs are 5 % and the composition stays symmetrical. */
-  background: overshoot(SLOT_HIT.background, BACKGROUND_OVERSHOOT),
+  /** `decor · 鍾馗像 (background)` — ⚠️ **SIZE `BACKGROUND_OVERSHOOT` of its zone, then RAISED `BACKGROUND_LIFT`** (owner,
+   * 2026-11-09). ⚠️ Two knobs: the first is size (0.88 = a 20 % reduction from the 1.1 overhang), the second is height
+   * (10 % of the print's own height). ⚠️ Raised AFTER the size, so the lift is a fraction of what the print actually is. */
+  background: lift(overshoot(SLOT_HIT.background, BACKGROUND_OVERSHOOT), BACKGROUND_LIFT),
 };
 
 /** `slot · hint (how it works)` — 20,618 350×18, drawn only in customise mode. */
