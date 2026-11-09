@@ -22,8 +22,10 @@ import {
   NEIGHBOUR_OFFSET,
   carouselStage,
   peerSlot,
+  stageBounds,
   tabletBox,
-} from '../altar.ts';
+  swipeStep,
+  pageAfterSwipe,} from '../altar.ts';
 import { PREPARING_PHASES, pipelineFailed } from '../../domain/slice.ts';
 import { NAV_TABS, activeTabKey, isSamePath, tabPressIsNoop } from '../nav.ts';
 import { COLLECTION, COLLECTION_SLOTS, collectionGrid, collectionOverflows, collectedItemName, displayBurnCount } from '../collection.ts';
@@ -1533,7 +1535,7 @@ function shrineGeometryChecks(): void {
   // loosening it. Assert the names exist BEFORE asserting anything about their values.
   const REQUIRED_BANDS = [
     'headerMark', 'settings', 'tribute', 'streak', 'caption', 'hintCta', 'halo', 'addSlot',
-    'carouselPrev', 'carouselNext', 'templeChip', 'offerings', 'shrineBase', 'cta', 'tabbar',
+    'templeChip', 'offerings', 'shrineBase', 'cta', 'tabbar',
     'sheetPanel', 'sheetPreview',
   ] as const;
   const missingBands = REQUIRED_BANDS.filter((name) => !(name in HOME_BANDS));
@@ -1574,10 +1576,7 @@ function shrineGeometryChecks(): void {
   // ── every altar band lives INSIDE the altar region ────────────────────────
   const altarTop = HOME_BANDS.caption.y;
   const altarBottom = HOME_BANDS.shrineBase.y + HOME_BANDS.shrineBase.h;
-  const ALTAR_BANDS = [
-    'caption', 'hintCta', 'halo', 'templeChip', 'addSlot', 'carouselPrev', 'carouselNext',
-    'offerings', 'shrineBase',
-  ] as const;
+  const ALTAR_BANDS = ['caption', 'hintCta', 'halo', 'templeChip', 'addSlot', 'offerings', 'shrineBase'] as const;
   const strayed = ALTAR_BANDS.filter((name) => {
     const band = HOME_BANDS[name];
     return band.y < altarTop || band.y + band.h > altarBottom;
@@ -1593,18 +1592,12 @@ function shrineGeometryChecks(): void {
   check('…and 4 is the board frame that draws it (`EN · 1c Home / full (4 tablets)`)',
     ALTAR_DISPLAY_SLOTS === 4 && ALTAR_DISPLAY_SLOTS < ANCESTOR_CAP);
 
-  // ── the carousel arrows FLANK the slot, and stay on the board ─────────────
-  const slot = HOME_BANDS.addSlot;
-  check('the prev arrow sits LEFT of the tablet slot',
-    HOME_BANDS.carouselPrev.x + HOME_BANDS.carouselPrev.w <= slot.x,
-    `prev ends ${HOME_BANDS.carouselPrev.x + HOME_BANDS.carouselPrev.w}, slot starts ${slot.x}`);
-  check('the next arrow sits RIGHT of the tablet slot',
-    HOME_BANDS.carouselNext.x >= slot.x + slot.w,
-    `next starts ${HOME_BANDS.carouselNext.x}, slot ends ${slot.x + slot.w}`);
-  check('…and neither arrow runs off the 390 board',
-    HOME_BANDS.carouselNext.x + HOME_BANDS.carouselNext.w <= REFERENCE_WIDTH);
-  check('the two arrows share one y (a pair, not two decisions)',
-    HOME_BANDS.carouselPrev.y === HOME_BANDS.carouselNext.y);
+  // ── ⚠️ THE ARROWS ARE GONE (owner, 2026-11-09) — the carousel is a SWIPE ──
+  // ⚠️ These four checks used to assert that `carouselPrev`/`carouselNext` flanked the tablet slot. They are replaced by
+  // the swipe's own guarantees (a real, three-slot-wide surface — see the carousel section), because a band that no longer
+  // exists cannot be flanking anything, and keeping the assertions would have been keeping the bands alive by accident.
+  check('⚠️ …and the arrow bands are GONE — the carousel is a swipe, not two buttons',
+    !('carouselPrev' in HOME_BANDS) && !('carouselNext' in HOME_BANDS));
 
   // ── ⚠️ POSITIVE CONTROLS — the predicates must FIRE on the defect they exist for ──
   // ⚠️ THIS IS THE SHIPPED CLASS, REPRODUCED: the CTA dragged up into the header band.
@@ -3440,42 +3433,60 @@ function storeChecks(): void {
   check('⚠️⚠️ no tap zone is smaller than the board\'s own (zones may grow to follow art, never shrink)',
     shrunk.length === 0, shrunk.join(', '));
 
+  /** ⚠️ The screen's source, read ONCE for every assertion below — declared before its first use, because a late `const` here
+   * throws `Cannot access … before initialization`, which is a CRASH, not a red. */
+  const homeSrc = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'app', 'index.tsx'), 'utf8'));
+  const flatHome = homeSrc.replace(/\s+/g, ' ');
+
   /**
-   * ⚠️⚠️ **THE ＋ IS NOW A GHOST TABLET — THE CONTROL IS THE THIRD SLOT ITSELF** (owner, 2026-11-09: *"redesign the '+' for
-   * adding new ancestor so that its following the tablet shape"*). ⚠️ Asserted against `peerSlot()` — the SAME function the
-   * peers are drawn from — so the thing that advertises the next tablet occupies exactly the next tablet's footprint.
-   * ⚠️⚠️ **The old "clear of every decoration ART rect" clause is GONE, deliberately:** a slot-sized control necessarily
-   * overlaps the print's art, and clearance is the wrong rule for it. What keeps it usable is the **paint order** (it renders
-   * after `DecorFront`, asserted above) — a decoration can no longer swallow the tap. ⚠️ And the ＋ MARK must not be hidden
-   * behind the current tablet, which is asserted as the slot's centre sitting beyond the centre tablet's right edge.
+   * ⚠️⚠️ **A GHOST IN EVERY EMPTY SLOT — AND THE SWIPE'S DIRECTION IS A PURE FUNCTION** (owner, 2026-11-09: *"there is still a bug
+   * where i am toggling thru the same 2 sets. differentiate the swipe if its from left to right or right to left … also i noticed
+   * if i swipe to the left there is no + Ancestor UI on the left"*).
+   *
+   * ⚠️ **The toggle bug, reproduced as a test rather than described:** the first cut read `g.dx` inside a `setPage` updater, which
+   * React runs later, after RN had reset the reused `gestureState` — so `dx` read 0, the direction was always "previous", forward
+   * swipes clamped at the first tablet, and the carousel appeared to swap two tablets forever. ⚠️ `swipeStep` is pure now, and these
+   * assertions walk the sequence the owner described.
    */
-  const plusSlot = peerSlot(HOME_BANDS.addSlot, 'right');
-  const stageForPlus = carouselStage(HOME_BANDS.addSlot, 1, 3);
-  /** ⚠️ Its OWN read of the screen, not the `homeSrc` further down: that one is declared after this check, and using it here
-   * threw `Cannot access 'homeSrc' before initialization` — a crash, not a red, which is the worst shape of failure. */
-  const plusSrc = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'app', 'index.tsx'), 'utf8'));
-  check('⚠️⚠️ the ＋ is a ghost tablet occupying the THIRD slot exactly, its mark clear of the current tablet',
-    /**
-     * ⚠️ **The source must ask for the right-hand slot AND draw the ghost** — the geometry below is derived from the same call,
-     * so on its own it is self-consistent and would stay green with the ＋ on the LEFT (measured).
-     */
-    plusSrc.includes("peerSlot(slot, 'right')")
-      && plusSrc.includes('<TabletGhost')
-      /**
-       * ⚠️ **AND IT MUST BE PAINTED BETWEEN THE PRINT AND THE CURRENT TABLET.** `DecorBack` (the print) before it, so the print
-       * cannot steal a tap on the ghost's left third; the centre tablet after it, so the slot's 13.7 px overlap with the current
-       * tablet is COVERED instead of crossing its face — which is what a peer looks like, and what the first cut got wrong.
-       */
-      && plusSrc.indexOf('<DecorBack') < plusSrc.indexOf('testID="home-add-tablet"')
-      && plusSrc.indexOf('testID="home-add-tablet"') < plusSrc.indexOf('testID="home-tablet"')
-      && Math.abs(plusSlot.x - peerSlot(HOME_BANDS.addSlot, 'right').x) < 1e-9
-      /** The mark is drawn at the plaque's centre, which is the slot's centre — it must clear the current tablet. */
-      && plusSlot.x + plusSlot.w / 2 > stageForPlus.centre.x + stageForPlus.centre.w
-      && Math.abs((plusSlot.y + plusSlot.h) - (stageForPlus.centre.y + stageForPlus.centre.h)) < 1e-9
-      && plusSlot.x >= 0 && plusSlot.x + plusSlot.w <= DECOR_BOARD.w
-      /** 44 dp minimum at 360 dp on a 390 board: 44 / (360/390) = 47.7 board px. */
-      && plusSlot.w >= (44 * DECOR_BOARD.w) / 360 && plusSlot.h >= (44 * DECOR_BOARD.w) / 360,
-    `${plusSlot.w.toFixed(1)}×${plusSlot.h.toFixed(1)} at ${plusSlot.x.toFixed(1)},${plusSlot.y.toFixed(1)} · slot centre ${(plusSlot.x + plusSlot.w / 2).toFixed(1)} · tablet ends ${(stageForPlus.centre.x + stageForPlus.centre.w).toFixed(1)}`);
+  check('⚠️⚠️ a LEFT swipe advances and a RIGHT swipe goes back — and repeated left swipes keep advancing, never toggle',
+    swipeStep(-120, 40) === 1
+      && swipeStep(120, 40) === -1
+      && swipeStep(-10, 40) === 0
+      /** ⚠️ THE REGRESSION: four left swipes from the first tablet must reach 4, not bounce between 0 and 1. */
+      && pageAfterSwipe(0, 6, -120, 40) === 1
+      && [0, 1, 2, 3].reduce((p) => pageAfterSwipe(p, 6, -120, 40), 0) === 4
+      /** ⚠️ And backwards the same way, clamped at both ends (the ends are ends). */
+      && [4, 3, 2, 1].reduce((p) => pageAfterSwipe(p, 6, 120, 40), 5) === 1
+      && pageAfterSwipe(0, 6, 120, 40) === 0
+      && pageAfterSwipe(5, 6, -120, 40) === 5);
+
+  /**
+   * ⚠️⚠️ **AND THE SCREEN MUST NOT RE-READ `g.dx` LATE.** The source is asserted directly: the decision goes through
+   * `pageAfterSwipe(page, …)` with the release's own `g.dx`, and no updater form (`setPage((p) => …`) appears in the handler — that
+   * form is exactly what made the direction a constant.
+   */
+  check('⚠️⚠️ the swipe handler decides from the release’s dx — never inside a state updater',
+    flatHome.includes('pageAfterSwipe(page, ancestors.length, g.dx, SWIPE_COMMIT)')
+      && !flatHome.includes('setPage((p) =>'));
+
+  /**
+   * ⚠️⚠️ **THE GHOST SITS IN WHICHEVER SLOT IS EMPTY.** ⚠️ The first cut put it only in the third slot, so at the FIRST tablet — the
+   * state reached by swiping right — the left slot had nothing in it (the owner found it). ⚠️ Left is gated on `count > 1` because
+   * with one tablet BOTH sides are empty and two identical controls would be a puzzle rather than a choice.
+   */
+  const plusL = peerSlot(HOME_BANDS.addSlot, 'left');
+  const plusR = peerSlot(HOME_BANDS.addSlot, 'right');
+  const stC = carouselStage(HOME_BANDS.addSlot, 1, 3).centre;
+  const mid = (r: { x: number; w: number }) => r.x + r.w / 2;
+  check('⚠️⚠️ a ghost tablet fills each EMPTY slot, slot-sized and on the floor, clear of the current tablet’s mark',
+    flatHome.includes('testID="home-add-tablet-left"')
+      && flatHome.includes("!view.hasPrev && view.count > 1")
+      && flatHome.includes('!view.hasNext ?')
+      && Math.abs(plusL.y + plusL.h - (stC.y + stC.h)) < 1e-9
+      && Math.abs(plusR.y + plusR.h - (stC.y + stC.h)) < 1e-9
+      && mid(plusL) < stC.x && mid(plusR) > stC.x + stC.w
+      && plusL.x >= 0 && plusR.x + plusR.w <= DECOR_BOARD.w,
+    `left ${plusL.w.toFixed(1)}×${plusL.h.toFixed(1)} · right ${plusR.w.toFixed(1)}×${plusR.h.toFixed(1)}`);
 
   /**
    * ⚠️⚠️ **THE ＋ IS DRAWN, NOT TYPED** (owner, 2026-11-09: *"The center alignment of the + is off"*). ⚠️ A `Text` glyph is
@@ -3493,35 +3504,59 @@ function storeChecks(): void {
     ghostBlock.length === 0 ? 'TabletGhost not found' : `${ghostBlock.length} chars`);
 
   /**
-   * ⚠️⚠️ **THE CAROUSEL IS `EN · 1b`'s, NOT AN ARROW GLYPH WITH A HIT BOX** (owner: *"Refer to EN -1b on penpot… there should
-   * be a carousel to scroll thru, build this"*). ⚠️ `1b` draws `nav · carousel prev/next` as 24×40 TEXT and adds an invisible
-   * `touch · carousel next` of **44×44 centred on the glyph** — the first cut used the glyph's own box as the Pressable, i.e. a
-   * 24 dp-wide control. ⚠️ `prev`'s touch layer is **derived by mirror symmetry** (`1b` draws only `next`'s); the assertion
-   * holds both to the same rule, because an asymmetric pair of hit areas is a bug in either direction.
+   * ⚠️⚠️ **SWIPE REPLACED THE ARROWS** (owner, 2026-11-09: *"remove the < and > buttons and instead design a swiping motion to
+   * scroll thru the tablets. Note to make a hint to user on this mechanism"*).
+   * ⚠️ **A DELIBERATE DEVIATION FROM `1b`**, which draws `nav · carousel prev/next` and a `touch · carousel next` layer — both
+   * removed at the owner's instruction, and `HOME_BANDS.carouselNext/PrevTouch` deleted with them so no dead bands survive.
+   * ⚠️ What must remain true of the replacement: the arrows are ABSENT, the swipe surface is an ANCESTOR of the tablets (so a tap
+   * still reaches the sheet and the ＋), it claims only on a MOVEMENT that is horizontal and dominant, it commits on RELEASE at the
+   * larger threshold, and it pages through `pageStep` so the ends clamp instead of wrapping.
    */
-  const midOf = (r: { x: number; y: number; w: number; h: number }) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
-  const centredOn = (touch: { x: number; y: number; w: number; h: number }, glyph: { x: number; y: number; w: number; h: number }) =>
-    Math.abs(midOf(touch).x - midOf(glyph).x) < 1e-9 && Math.abs(midOf(touch).y - midOf(glyph).y) < 1e-9;
-  check('⚠️⚠️ the carousel arrows carry the board\'s 44×44 touch targets, centred on their glyphs',
-    HOME_BANDS.carouselPrevTouch.w === 44 && HOME_BANDS.carouselPrevTouch.h === 44
-      && HOME_BANDS.carouselNextTouch.w === 44 && HOME_BANDS.carouselNextTouch.h === 44
-      && centredOn(HOME_BANDS.carouselPrevTouch, HOME_BANDS.carouselPrev)
-      && centredOn(HOME_BANDS.carouselNextTouch, HOME_BANDS.carouselNext),
-    `prev ${midOf(HOME_BANDS.carouselPrevTouch).x}/${midOf(HOME_BANDS.carouselPrev).x} · next ${midOf(HOME_BANDS.carouselNextTouch).x}/${midOf(HOME_BANDS.carouselNext).x}`);
+  /** ⚠️ Both locales, by KEY, for the hint below — a copy that exists in one language teaches a gesture only to half the users. */
+  const EN_KEYS = Object.keys(MESSAGES.en as unknown as Record<string, string>);
+  const ZH_KEYS = Object.keys(MESSAGES.zh as unknown as Record<string, string>);
+  check('⚠️⚠️ the arrows are GONE and a swipe surface wraps the tablets — claim on move, commit on release, ends clamp',
+    !homeSrc.includes('home-tablet-next')
+      && !homeSrc.includes('home-tablet-prev')
+      && !homeSrc.includes('carouselNextTouch')
+      && flatHome.includes('testID="home-tablet-stage"')
+      && flatHome.includes('{...swipe.panHandlers}')
+      && flatHome.includes('onMoveShouldSetPanResponder')
+      && flatHome.includes('onPanResponderRelease')
+      /** Claimed only for a horizontal, dominant movement — otherwise a diagonal drag on a scrolling screen turns a page. */
+      && flatHome.includes('Math.abs(g.dx) > SWIPE_CLAIM && Math.abs(g.dx) > Math.abs(g.dy) * 1.4')
+      && flatHome.includes('onMoveShouldSetPanResponderCapture')
+      /** ⚠️ The commit + clamp live in `pageAfterSwipe` now — asserted by the direction check below. */
+      && flatHome.includes('pageAfterSwipe(page, ancestors.length'),
+    `arrows=${homeSrc.includes('home-tablet-next')} stage=${flatHome.includes('testID="home-tablet-stage"')}`);
 
   /**
-   * ⚠️⚠️ **AND IT MUST SURVIVE A DECORATED ALTAR.** The arrows were painted BEFORE `DecorFront`, so a side banner covered them
-   * and a tap meant for *next* opened the customiser — measured on glass 2026-11-09, and the reason paging died the moment a
-   * side set was equipped. ⚠️ Asserted as SOURCE ORDER, the only thing that can express a paint order.
+   * ⚠️⚠️ **THE SWIPE SURFACE MUST COVER ALL THREE SLOTS AND HAVE REAL AREA.** ⚠️ Every child of the stage is absolutely
+   * positioned, so a zero-size wrapper would receive no touch at all — the failure would look like "swipe does nothing".
+   * ⚠️ And it is measured over the slots that ALWAYS exist, not the neighbours that happen to: on the first and last tablet a
+   * peer is missing, yet the finger still lands where that slot is.
    */
-  const homeSrc = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'app', 'index.tsx'), 'utf8'));
-  const decorAt = homeSrc.indexOf('<DecorFront');
-  check('⚠️⚠️ the carousel paints AFTER the decorations, so a banner cannot swallow the tap',
-    decorAt > 0
-      && homeSrc.indexOf('testID="home-tablet-next"') > decorAt
-      && homeSrc.indexOf('testID="home-tablet-prev"') > decorAt
-      && homeSrc.includes('bandRect(HOME_BANDS.carouselNextTouch')
-      && homeSrc.includes('bandRect(HOME_BANDS.carouselPrevTouch'));
+  const sb = stageBounds(HOME_BANDS.addSlot);
+  const slotL = peerSlot(HOME_BANDS.addSlot, 'left');
+  const slotR = peerSlot(HOME_BANDS.addSlot, 'right');
+  const slotC = carouselStage(HOME_BANDS.addSlot, 1, 3).centre;
+  check('⚠️⚠️ the swipe surface spans the three-tablet stage with real area, not a zero-size box',
+    sb.w > 0 && sb.h > 0
+      && sb.x <= Math.min(slotL.x, slotC.x, slotR.x) + 1e-9
+      && sb.x + sb.w >= Math.max(slotL.x + slotL.w, slotC.x + slotC.w, slotR.x + slotR.w) - 1e-9
+      && sb.y <= slotC.y + 1e-9 && sb.y + sb.h >= slotC.y + slotC.h - 1e-9,
+    `${sb.w.toFixed(1)}×${sb.h.toFixed(1)} at ${sb.x.toFixed(1)},${sb.y.toFixed(1)}`);
+
+  /**
+   * ⚠️⚠️ **THE HINT IS THE BOARD'S OWN COPY, AND ONLY WHEN THERE IS SOMETHING TO SWIPE.**
+   * `EN · 1b` sets `hint · cta` to *"Swipe to bring a tablet forward"* exactly where `1a` sets *"Offer something meaningful, once a
+   * day"* — so this is a board string, not invented copy. ⚠️ With ONE tablet a swipe instruction would be a lie, which is why the
+   * count guard exists; and both locales must carry the key, or one language teaches a gesture the other does not.
+   */
+  check('⚠️⚠️ the swipe hint shows for 2+ tablets, uses the board\'s copy, and exists in both locales',
+    flatHome.includes("view.kind === 'tablet' && view.count > 1 ? 'home.swipeHint' : 'home.ctaHint'")
+      && EN_KEYS.includes('home.swipeHint') && ZH_KEYS.includes('home.swipeHint'),
+    `${EN_KEYS.includes('home.swipeHint')}/${ZH_KEYS.includes('home.swipeHint')}`);
 
   /**
    * ⚠️⚠️ **THE THREE-TABLET STAGE IS `EN · 1b`'s, CHECKED AGAINST THE BOARD'S OWN RECTS** (owner: *"Refer to En-1b i should
@@ -3745,7 +3780,7 @@ function storeChecks(): void {
    */
   check('⚠️ the background zone really does cover the ＋ slot (why the two modes were needed)',
     rectsOverlap(SLOT_HIT.background, HOME_BANDS.addSlot));
-  check('⚠️⚠️ customising HIDES the add-tablet ＋ and the carousel, and makes the tablet inert',
+  check('⚠️⚠️ customising HIDES the add-tablet ＋ and makes the tablet inert',
     (() => {
       const src = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'app', 'index.tsx'), 'utf8'));
       /** ⚠️ Whitespace-flattened so the shape is what is asserted, not the indentation. */
@@ -3766,9 +3801,7 @@ function storeChecks(): void {
          * moment the add-tablet ＋ arrived, without saying anything about whether the new control was guarded. Pinning each
          * control's own clause says *what* must be hidden and fails only if one of them loses its guard.
          */
-        && flat.includes("!customize && view.kind === 'tablet' && view.hasPrev")
-        && flat.includes("!customize && view.kind === 'tablet' && view.hasNext")
-        && flat.includes("!customize && view.kind === 'tablet' && !view.hasNext && mayEdit");
+        && flat.includes("!customize && view.kind === 'tablet' && mayEdit && !capReached(view.count)");
     })());
 
   /**

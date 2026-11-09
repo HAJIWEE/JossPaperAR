@@ -92,6 +92,25 @@ export function peerSlot(
   return { x: midX + (side === 'left' ? -offset : offset) - w / 2, y: band.y + c.y + c.h - h, w, h };
 }
 
+/**
+ * **The area a swipe may start in** — the three-tablet stage, whether or not the neighbours exist (the ＋ slot included).
+ * ⚠️ A gesture needs REAL bounds; every piece of the stage is absolutely positioned, so without this the responder would be
+ * attached to a zero-size box and never see a touch.
+ * ⚠️ Always the full three-slot width, not "the tablets that exist": the swipe must work on the FIRST and LAST tablet too, where
+ * a peer is missing but its slot is still where the finger lands.
+ */
+export function stageBounds(band: { readonly x: number; readonly y: number; readonly w: number; readonly h: number }): Box {
+  const c = tabletBox(band);
+  const centre = { x: band.x + c.x, y: band.y + c.y, w: c.w, h: c.h };
+  const left = peerSlot(band, 'left');
+  const right = peerSlot(band, 'right');
+  const x = Math.min(left.x, centre.x, right.x);
+  const y = Math.min(left.y, centre.y, right.y);
+  const r = Math.max(left.x + left.w, centre.x + centre.w, right.x + right.w);
+  const b = Math.max(left.y + left.h, centre.y + centre.h, right.y + right.h);
+  return { x, y, w: r - x, h: b - y };
+}
+
 /** The three-tablet stage: the current tablet, plus whichever neighbours exist. Rects are BOARD-absolute. */
 export interface Stage {
   readonly centre: Box;
@@ -150,6 +169,28 @@ export function altarView(count: number, index: number): AltarView {
 export function pageStep(index: number, count: number, delta: number): number {
   if (count <= 0) return 0;
   return Math.min(Math.max(0, index + delta), count - 1);
+}
+
+/**
+ * ⚠️⚠️ **WHICH WAY A HORIZONTAL DRAG PAGES — one pure function, because getting it wrong is invisible.**
+ * (owner, 2026-11-09: *"there is still a bug where i am toggling thru the same 2 sets. differentiate the swipe if its from left
+ * to right or right to left and how it should increment or decrement the tablets"*).
+ *
+ * ⚠️ **`dx` is the finger's travel**: a swipe whose finger goes right→left has a NEGATIVE `dx` and must **advance** (+1, the next
+ * tablet comes forward from the right), exactly as a page in a book moves. Left→right goes **back** (−1).
+ * ⚠️ Below `commit` the answer is **0** — no page change — so a small drag is not a gesture.
+ * ⚠️ This is a pure function and not an inline ternary **because the first cut read `dx` inside a `setPage` updater**: React runs
+ * that later, RN reuses and RESETS one `gestureState` per gesture, so `dx` was 0 by then and the direction was always −1 — swiping
+ * forward clamped at the first tablet and the carousel looked like it toggled between two. Logged proof: `page 0 -> 0 of 6 dx=0`.
+ */
+export function swipeStep(dx: number, commit: number): -1 | 0 | 1 {
+  if (Math.abs(dx) < commit) return 0;
+  return dx < 0 ? 1 : -1;
+}
+
+/** The page a swipe lands on. ⚠️ `pageStep` clamps, so the ends are ends rather than a wrap. */
+export function pageAfterSwipe(page: number, count: number, dx: number, commit: number): number {
+  return pageStep(page, count, swipeStep(dx, commit));
 }
 
 /**

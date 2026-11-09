@@ -1,5 +1,12 @@
-import { Fragment, useCallback, useState } from 'react';
-import { Alert, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+/**
+ * Swipe thresholds, in dp. ⚠️ CLAIM is small enough to feel instant and large enough that a tap's own wobble never becomes a
+ * gesture; COMMIT is 3x larger, so a page turns only when the finger meant it.
+ */
+const SWIPE_CLAIM = 12;
+const SWIPE_COMMIT = 40;
+
+import { Fragment, useCallback, useMemo, useState } from 'react';
+import { Alert, Dimensions, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { ClanPill } from '@/components/clan-pill';
@@ -14,7 +21,7 @@ import { ShrineBase } from '@/components/home/shrine-base';
 import { ShrineCanvas } from '@/components/home/shrine-canvas';
 import { TabBarBand } from '@/components/home/tab-bar-band';
 import { Tablet, TabletGhost } from '@/components/home/tablet';
-import { altarCaption, altarView, carouselStage, pageStep, peerSlot, tabletBox } from '@/lib/altar';
+import { altarCaption, altarView, carouselStage, pageAfterSwipe, pageStep, peerSlot, stageBounds, tabletBox } from '@/lib/altar';
 import {
   ANCESTOR_CAP,
   GIVEN_NAME_MAX,
@@ -45,6 +52,8 @@ import { tabletName } from '@/lib/tablet-name';
 import {
   HOME_BANDS,
   HOME_REGION_ORDER,
+  REFERENCE_HEIGHT,
+  REFERENCE_WIDTH,
   bandRect,
   homeFitScale,
   shrineBleedDp,
@@ -106,6 +115,49 @@ export default function HomeShrine() {
    * the pill shows, so the shrine and the sheet can never disagree about which clan is open.
    */
   const [activeClanId, setActiveClanId] = useState<string | null>(null);
+  /**
+   * ⚠️⚠️ **SWIPE BROWSES THE TABLETS — THE ARROWS ARE GONE** (owner, 2026-11-09: *"remove the < and > buttons and instead design a
+   * swiping motion to scroll thru the tablets. Note to make a hint to user on this mechanism"*).
+   *
+   * ⚠️ **An ANCESTOR of the tablets, never an overlay.** The responder is attached to a view that CONTAINS the centre tablet, the
+   * peers and the ＋, and it claims only once the finger has MOVED — which is what lets a tap still open the tablet's sheet and a
+   * tap still reach the ＋. An overlay on top would have had to fight both.
+   * ⚠️ Claiming needs a horizontal threshold AND dominance over the vertical axis, or a diagonal drag on a screen that also
+   * scrolls would turn a page.
+   * ⚠️ Committed on RELEASE at a larger threshold than the claim: a 12 dp wobble starts the gesture, 40 dp turns the page.
+   * ⚠️ `pageStep` CLAMPS, so a swipe past either end is a no-op rather than a wrap — the rule the arrows had.
+   */
+  /** ⚠️ ONE predicate for both phases: horizontal, past the claim threshold, and dominant over the vertical axis. */
+  const shouldSwipe = (_e: unknown, g: { dx: number; dy: number }) =>
+    ancestors.length > 1 && Math.abs(g.dx) > SWIPE_CLAIM && Math.abs(g.dx) > Math.abs(g.dy) * 1.4;
+
+  const swipe = useMemo(
+    () =>
+      PanResponder.create({
+        /**
+         * ⚠️⚠️ **CAPTURE, NOT JUST BUBBLE — measured on glass.** With only `onMoveShouldSetPanResponder`, the FIRST swipe after the
+         * screen loads was lost: the touch starts on the tablet's own `Pressable`, which becomes the responder on touch-DOWN, and
+         * the parent's bubble-phase claim is not reliably granted against it. Subsequent swipes worked, so the first-gesture
+         * failure is the kind that feels like "sometimes it doesn't respond". ⚠️ Capture is asked during the MOVE phase only, so a
+         * tap (no movement) never triggers it and the tablet/＋ still receive their taps.
+         */
+        onMoveShouldSetPanResponderCapture: shouldSwipe,
+        onMoveShouldSetPanResponder: shouldSwipe,
+        onPanResponderRelease: (_e, g) => {
+          /**
+           * ⚠️⚠️ **THE DIRECTION IS DECIDED NOW, NOT INSIDE A STATE UPDATER — the fix for "toggling thru the same 2 sets"**
+           * (owner, 2026-11-09). `setPage(fn)` runs `fn` LATER, and RN reuses and RESETS one `gestureState` per gesture, so
+           * reading `g.dx` in there read **0** every time: the direction was always −1, forward swipes clamped at the first
+           * tablet, and the carousel looked like it only ever swapped between two. Logged proof: `page 0 -> 0 of 6 dx=0`.
+           * ⚠️ `swipeStep`/`pageAfterSwipe` are pure and gate-tested, so the rule is testable instead of inferred from behaviour;
+           * this line only hands them a number that is still true at the moment of release.
+           */
+          const next = pageAfterSwipe(page, ancestors.length, g.dx, SWIPE_COMMIT);
+          if (next !== page) setPage(next);
+        },
+      }),
+    [ancestors.length, page],
+  );
   /** ⚠️ The ONLY place the panel state is decided — `ready` · `loading` · `failed`. */
   const panels = homePanels(summary);
 
@@ -460,14 +512,28 @@ export default function HomeShrine() {
          * (owner, 2026-11-09: *"redesign the '+' … so that its following the tablet shape"*). It is slot-sized, so the thing
          * that advertises the next tablet IS the next tablet's footprint; `peerSlot()` owns that geometry for both.
          */
-        const plusRect = peerSlot(slot, 'right');
-        const addAt = {
-          position: 'absolute' as const,
-          left: plusRect.x * s,
-          top: plusRect.y * s,
-          width: plusRect.w * s,
-          height: plusRect.h * s,
+        /**
+         * ⚠️⚠️ **A GHOST IN EVERY EMPTY SLOT, NOT JUST THE RIGHT ONE** (owner, 2026-11-09: *"if i swipe to the left there is no \+
+         * Ancestor UI on the left"*). ⚠️ The first cut put the control only in the third slot, so at the FIRST tablet — the state
+         * you reach by swiping right — the left slot sat empty with nothing in it. ⚠️ The rule is now per SIDE: an empty side gets
+         * the ghost, a side with a neighbour does not. ⚠️ With a single tablet BOTH sides are empty, and two identical controls
+         * would be a puzzle rather than a choice — the right one is kept, and the left one is gated on `count > 1`.
+         */
+        const slotFor = (side: 'left' | 'right') => {
+          const r = peerSlot(slot, side);
+          return {
+            rect: r,
+            style: {
+              position: 'absolute' as const,
+              left: r.x * s,
+              top: r.y * s,
+              width: r.w * s,
+              height: r.h * s,
+            },
+          };
         };
+        const addLeft = slotFor('left');
+        const addRight = slotFor('right');
         const tab = {
           x: stage.centre.x - slot.x,
           y: stage.centre.y - slot.y,
@@ -523,7 +589,13 @@ export default function HomeShrine() {
             {/* ⚠️ `hint · cta` — the line the board sets above the offer button. */}
             <View style={[styles.abs, bandRect(HOME_BANDS.hintCta, s)]} testID="home-hint-band">
               <Text numberOfLines={1} style={{ color: text.inkSoft, fontSize: 12 * s }}>
-                {t('home.ctaHint')}
+                {/*
+                 * ⚠️⚠️ **`hint · cta` TELLS THE USER ABOUT THE SWIPE** (owner: *"make a hint to user on this mechanism"*). The copy
+                 * is the BOARD's own: `EN · 1b` sets this line to *"Swipe to bring a tablet forward"* exactly where `1a` sets
+                 * *"Offer something meaningful, once a day"* — so the two states are the board's, not a string I invented.
+                 * ⚠️ It shows only when there is something to swipe through: with one tablet a swipe instruction would be a lie.
+                 */}
+                {t(view.kind === 'tablet' && view.count > 1 ? 'home.swipeHint' : 'home.ctaHint')}
               </Text>
             </View>
 
@@ -555,6 +627,14 @@ export default function HomeShrine() {
               * control — tapping one must not open a sheet for an ancestor you can barely see.
               * ⚠️ A peer exists only where the board shows one: no left on the first tablet, no right on the last.
               */}
+            {/* ⚠️⚠️ **THE SWIPE SURFACE** — an ANCESTOR of the tablets, so a tap still reaches the tablet's sheet and the ＋,
+                and only a MOVED finger turns the page. It spans the whole canvas because every child inside is positioned in
+                board coordinates; a zero-size wrapper would never receive a touch at all. */}
+            <View
+              style={{ position: 'absolute', left: 0, top: 0, width: REFERENCE_WIDTH * s, height: REFERENCE_HEIGHT * s }}
+              {...swipe.panHandlers}
+              testID="home-tablet-stage"
+            >
             {stage.left === null && stage.right === null ? null : (
               <View style={styles.abs} pointerEvents="none" testID="home-tablet-peers">
                 {([['left', stage.left, view.kind === 'tablet' ? view.index - 1 : -1],
@@ -586,16 +666,31 @@ export default function HomeShrine() {
                 decorations and are consequently covered by a side banner — measured 2026-11-09, a tap on *next* opens the
                 customiser. A new control must not inherit that defect, so it paints on top *and* sits clear of every
                 decoration rect (asserted in `check:lib`, not just intended). */}
-            {!customize && view.kind === 'tablet' && !view.hasNext && mayEdit && !capReached(view.count) ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('ancestor.titleAdd')}
-                onPress={() => openSheet(null)}
-                style={({ pressed }) => [addAt, pressed && styles.pressed]}
-                testID="home-add-tablet"
-              >
-                <TabletGhost width={plusRect.w * s} height={plusRect.h * s} />
-              </Pressable>
+            {!customize && view.kind === 'tablet' && mayEdit && !capReached(view.count) ? (
+              <>
+                {!view.hasPrev && view.count > 1 ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('ancestor.titleAdd')}
+                    onPress={() => openSheet(null)}
+                    style={({ pressed }) => [addLeft.style, pressed && styles.pressed]}
+                    testID="home-add-tablet-left"
+                  >
+                    <TabletGhost width={addLeft.rect.w * s} height={addLeft.rect.h * s} />
+                  </Pressable>
+                ) : null}
+                {!view.hasNext ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('ancestor.titleAdd')}
+                    onPress={() => openSheet(null)}
+                    style={({ pressed }) => [addRight.style, pressed && styles.pressed]}
+                    testID="home-add-tablet"
+                  >
+                    <TabletGhost width={addRight.rect.w * s} height={addRight.rect.h * s} />
+                  </Pressable>
+                ) : null}
+              </>
             ) : null}
 
             {view.kind === 'empty' ? (
@@ -658,52 +753,12 @@ export default function HomeShrine() {
               </Pressable>
             )}
 
+            </View>
+
             {/* ⚠️ AFTER the art: `1d` draws the lanterns and couplets in FRONT of the table. */}
             {decor === null ? null : (
               <DecorFront scale={s} equipped={decor.equipped} onEnter={customize ? undefined : enterCustomize} />
             )}
-            {/* ⚠️⚠️ **THE CAROUSEL IS PAINTED AFTER `DecorFront`, WITH THE BOARD'S 44×44 TOUCH TARGETS** (`EN · 1b`).
-                ⚠️ Two defects this fixes, both measured on glass 2026-11-09:
-                  1. the Pressable used to be the GLYPH's box (`24×40`), so the hit area was 24 dp wide — the board draws an
-                     invisible `touch · carousel next` of `44×44` centred on the glyph, and that is now the control;
-                  2. the arrows were painted BEFORE the decorations, so a side banner covered them and a tap meant for *next*
-                     opened the customiser. Paging must survive a decorated altar, so they paint on top.
-                ⚠️ The ends are ends — no wrap (`pageStep` clamps), which is why each arrow is conditional. */}
-            {!customize && view.kind === 'tablet' && view.hasPrev ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('home.prevTablet')}
-                onPress={() => setPage(pageStep(view.index, view.count, -1))}
-                style={({ pressed }) => [
-                  styles.abs,
-                  bandRect(HOME_BANDS.carouselPrevTouch, s),
-                  styles.carousel,
-                  styles.carouselChip,
-                  pressed && styles.pressed,
-                ]}
-                testID="home-tablet-prev"
-              >
-                <Text style={[styles.carouselGlyph, { fontSize: 28 * s }]}>{'\u2039'}</Text>
-              </Pressable>
-            ) : null}
-            {!customize && view.kind === 'tablet' && view.hasNext ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('home.nextTablet')}
-                onPress={() => setPage(pageStep(view.index, view.count, 1))}
-                style={({ pressed }) => [
-                  styles.abs,
-                  bandRect(HOME_BANDS.carouselNextTouch, s),
-                  styles.carousel,
-                  styles.carouselChip,
-                  pressed && styles.pressed,
-                ]}
-                testID="home-tablet-next"
-              >
-                <Text style={[styles.carouselGlyph, { fontSize: 28 * s }]}>{'\u203A'}</Text>
-              </Pressable>
-            ) : null}
-
             {customize ? (
               <DecorSlots
                 scale={s}
@@ -895,20 +950,6 @@ const styles = StyleSheet.create({
   },
   ctaLabel: { color: onColorCream, fontWeight: '600' },
   clanEntry: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  carousel: { alignItems: 'center', justifyContent: 'center' },
-  /**
-   * ⚠️ **A SOFT BACKING BEHIND EACH ARROW — a deviation from `1b`, and a needed one.** `1b` draws `nav · carousel prev/next`
-   * as bare glyphs because that board carries no decorations; on a decorated altar the chevron lands ON a red couplet and
-   * disappears into it. The chip is `paperDeep` at 82 % so the arrow reads over art while the art still shows through, and the
-   * board's 44×44 touch target is unchanged.
-   */
-  carouselChip: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(250, 248, 244, 0.82)',
-    borderRadius: 999,
-  },
-  carouselGlyph: { color: text.inkSoft, fontWeight: '700' },
   /** `btn · settings` — paperDeep fill, ink stroke; radius + width are scaled inline. */
   settingsBtn: {
     backgroundColor: surface.paperDeep,
