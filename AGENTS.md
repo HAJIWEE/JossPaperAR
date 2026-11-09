@@ -264,6 +264,24 @@ adb exec-out screencap -p > /tmp/shot.png
 adb shell uiautomator dump /sdcard/ui.xml     # machine-readable bounds + testIDs
 ```
 
+⚠️⚠️ **IN A WORKTREE, USE A NON-DEFAULT PORT. `8081` IS NOT YOURS.** (Measured **2026-11-09**.) `npx expo start`
+defaults to **8081** and `adb reverse tcp:8081` is per-**DEVICE**, not per-worktree — so if a sibling worktree already
+holds 8081, **the device runs that sibling's code and every "verified on glass" is about a tree you did not edit.** It
+happened here: the device was on `…/worktrees/3bdcf/` while the session believed it was on `8d819`, and a fix "did not
+appear" on screen after five reloads, reading exactly like a broken Fast Refresh. ⚠️ **A stale Metro is invisible:**
+`curl localhost:8081/status` answers `packager-status:running` and says **nothing** about whose code it is.
+
+```bash
+ss -ltnp | grep ':8081'                  # → node pid
+readlink /proc/<pid>/cwd                 # → WHICH WORKTREE is actually serving the device  ⚠️ run this FIRST
+npx expo start --port 8084               # …then work on a port no sibling holds,
+adb reverse tcp:8084 tcp:8084            # …and reverse THAT one
+adb shell am start -a android.intent.action.VIEW -d "exp://127.0.0.1:8084/--/settings"
+```
+
+⚠️ **A route deep link needs the `/--/` separator** (`exp://…:8084/--/settings`), otherwise Expo Go opens the app root
+and the "wrong screen" gets blamed on the router.
+
 It bundled **4.8 s / 2094 modules**, and Fast Refresh applied a fix with no rebuild. ⚠️ **It verifies the ACTUAL working tree**, which is stronger evidence than an APK built from a past commit.
 
 ⚠️ **`uiautomator dump` is how a layout claim becomes checkable.** It prints each `testID` as `resource-id` with `bounds`, so *"the regions render in order"* becomes a table instead of an opinion — that is what caught the clipped art below.
