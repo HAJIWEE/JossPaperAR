@@ -598,7 +598,34 @@ export default function HomeShrine() {
             {decor === null ? null : (
               <DecorFront scale={s} equipped={decor.equipped} onEnter={customize ? undefined : enterCustomize} />
             )}
-            {/* ⚠️ `1f` — the six dashed zones, only while customising. */}
+            {/* ⚠️⚠️ **THE ONLY WAY TO ADD A TABLET ONCE ONE EXISTS** (owner, 2026-11-09: *"GO WITH 1"* — a ＋ beside the
+                carousel arrows). ⚠️ The empty altar's ＋ is `home-add-slot`, rendered ONLY for `view.kind === 'empty'`, so from
+                the first enshrined ancestor onward there was **no add control at all** while `ancestor_cap` is 10.
+                ⚠️ Shown on the LAST tablet (where "next" has run out and the eye is looking for what comes after), never while
+                customising, and not once the cap is reached (`capReached`, the same helper the server enforces).
+                ⚠️⚠️ **RENDERED AFTER `DecorFront`, and that placement is the point:** the arrows above are painted BEFORE the
+                decorations and are consequently covered by a side banner — measured 2026-11-09, a tap on *next* opens the
+                customiser. A new control must not inherit that defect, so it paints on top *and* sits clear of every
+                decoration rect (asserted in `check:lib`, not just intended). */}
+            {!customize && view.kind === 'tablet' && !view.hasNext && mayEdit && !capReached(view.count) ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('ancestor.titleAdd')}
+                onPress={() => openSheet(null)}
+                style={({ pressed }) => [
+                  styles.abs,
+                  bandRect(HOME_BANDS.addTablet, s),
+                  styles.addTablet,
+                  pressed && styles.pressed,
+                ]}
+                testID="home-add-tablet"
+              >
+                <Text allowFontScaling={false} style={{ color: text.gold, fontSize: 26 * s, fontWeight: '300' }}>
+                  ＋
+                </Text>
+              </Pressable>
+            ) : null}
+
             {customize ? (
               <DecorSlots
                 scale={s}
@@ -792,6 +819,15 @@ const styles = StyleSheet.create({
   clanEntry: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   carousel: { alignItems: 'center', justifyContent: 'center' },
   carouselGlyph: { color: text.inkSoft, fontWeight: '700' },
+  /** `nav · ＋ add a tablet` — a small round pill, so it reads as a CONTROL beside the arrows rather than altar art. */
+  addTablet: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: surface.paperDeep,
+    borderWidth: 1.5,
+    borderColor: brand.ink,
+    borderRadius: 999,
+  },
   /** `btn · settings` — paperDeep fill, ink stroke; radius + width are scaled inline. */
   settingsBtn: {
     backgroundColor: surface.paperDeep,

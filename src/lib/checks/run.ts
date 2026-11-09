@@ -3433,6 +3433,28 @@ function storeChecks(): void {
   check('⚠️⚠️ no tap zone is smaller than the board\'s own (zones may grow to follow art, never shrink)',
     shrunk.length === 0, shrunk.join(', '));
 
+  /**
+   * ⚠️⚠️ **THE ＋ ADD-TABLET CONTROL MUST NOT BE COVERED BY A DECORATION** (owner, 2026-11-09: *"GO WITH 1"* — a ＋ beside the
+   * carousel arrows). ⚠️ This is the assertion that stops the new control repeating the **defect it was built next to**: the
+   * arrows sit at `340,412 24×40`, inside the side banner's art, and because decorations are `Pressable` a tap on *next* opens
+   * the customiser instead. ⚠️ So the band is checked against **every decoration ART rect and the background ZONE** — the
+   * former because that is what is drawn, the latter because the print's zone is a tap target in customise mode.
+   * ⚠️ It is also checked for a real thumb: ≥ 44 dp at the 360 dp reference, and clear of the table it sits above.
+   */
+  const addBand = HOME_BANDS.addTablet;
+  const coveredBy = SLOTS.filter((s) => rectsOverlap(addBand, SLOT_ART[s])).concat(
+    rectsOverlap(addBand, SLOT_HIT.background) ? ['background-zone'] : [],
+  );
+  check('⚠️⚠️ the ＋ add-tablet control is clear of EVERY decoration and the print zone — not buried like the arrows',
+    coveredBy.length === 0
+      && !rectsOverlap(addBand, HOME_BANDS.carouselNext)
+      && !rectsOverlap(addBand, HOME_BANDS.carouselPrev)
+      && bandAbove(addBand, HOME_BANDS.shrineBase)
+      && addBand.x >= 0 && addBand.x + addBand.w <= DECOR_BOARD.w
+      /** 44 dp minimum at 360 dp on a 390 board: 44 / (360/390) = 47.7 board px. */
+      && addBand.w >= (44 * DECOR_BOARD.w) / 360 && addBand.h >= (44 * DECOR_BOARD.w) / 360,
+    coveredBy.join(', ') || `${addBand.w}×${addBand.h} at ${addBand.x},${addBand.y}`);
+
   const outsideZone = SLOTS.filter((s) => {
     const z = SLOT_HIT[s];
     const a = SLOT_ART[s];
@@ -3628,7 +3650,15 @@ function storeChecks(): void {
         && !flat.includes('customize ? null : view.kind === ')
         && flat.includes('disabled={!mayEdit || customize}')
         && flat.includes('testID="home-tablet"')
-        && (src.match(/!customize && view\.kind === 'tablet'/g) ?? []).length === 2;
+        /**
+         * ⚠️ **Three controls must hide while customising, asserted BY SHAPE, not by a count.** This used to count the
+         * occurrences of `!customize && view.kind === 'tablet'` and expect exactly 2 (the arrows) — a number that broke the
+         * moment the add-tablet ＋ arrived, without saying anything about whether the new control was guarded. Pinning each
+         * control's own clause says *what* must be hidden and fails only if one of them loses its guard.
+         */
+        && flat.includes("!customize && view.kind === 'tablet' && view.hasPrev")
+        && flat.includes("!customize && view.kind === 'tablet' && view.hasNext")
+        && flat.includes("!customize && view.kind === 'tablet' && !view.hasNext && mayEdit");
     })());
 
   /**

@@ -99,6 +99,10 @@ export const HOME_BANDS = {
   carouselPrev: { x: 26, y: 412, w: 24, h: 40 },
   /** `nav · carousel next` — 340,412 24×40. */
   carouselNext: { x: 340, y: 412, w: 24, h: 40 },
+  /** `nav · ＋ add a tablet (tap)` — 330,494 48×48, beside the carousel arrows (last tablet only).
+   * ⚠️ Placed BELOW the grown side banner (`y 492`) and clear of the background zone (`x 291`), because a control
+   * under a decoration is a control that opens the decoration instead — measured 2026-11-09 on the arrows themselves. */
+  addTablet: { x: 330, y: 494, w: 48, h: 48 },
   /** `zone · customizable temple (label)` — 28,214 224×22. */
   templeChip: { x: 28, y: 214, w: 224, h: 22 },
   /** `art · offerings (front)` — 30,434 330×170. */
