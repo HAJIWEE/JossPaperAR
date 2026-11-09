@@ -24,8 +24,8 @@ import {
   DECOR_BOARD,
   SLOT_ART,
   SLOT_HIT,
-  BACKGROUND_LIFT,
   BACKGROUND_OVERSHOOT,
+  BACKGROUND_TOP_OFFSET,
   artVariantFor,
   chipBandClear,
   drawPlan,
@@ -3386,37 +3386,47 @@ function storeChecks(): void {
    * first. ⚠️ Asserted per slot, so re-measuring one cannot quietly break another.
    */
   /**
-   * ⚠️⚠️ **THE ZONE MUST CONTAIN THE ART — EXCEPT THE BACKGROUND, WHICH RIDES ABOVE ITS ZONE ON PURPOSE.** `1f` draws
-   * the tap targets larger than the pieces; the day one is smaller, the piece is drawn outside the thing that selects it.
-   * ⚠️ The background is the deliberate exception (owner, 2026-11-09): at 88 % it fits its zone horizontally, but
-   * `BACKGROUND_LIFT` raises it so its top crosses the zone's top edge — the tap target is still the zone underneath it.
+   * ⚠️⚠️ **EVERY ZONE CONTAINS ITS ART — and the one departure is BOUNDED, not exempted.** `1f` draws the tap targets
+   * larger than the pieces; the day one is smaller, the piece is drawn outside the thing that selects it.
+   * ⚠️ The background print hangs `BACKGROUND_TOP_OFFSET` above its zone's top edge (the edge the owner aligned), so a bare
+   * containment test would fail it. ⚠️ **It is allowed exactly that much and no more:** a declared allowance keeps the rule
+   * universal — the print cannot grow past its zone sideways, and cannot climb above its allowance — where skipping the
+   * slot behind a `=== 'background'` carve-out (the first cut) would have let any background change through unexamined.
    */
+  const topAllowance: Partial<Record<DecorationSlot, number>> = {
+    background: SLOT_HIT.background.h * BACKGROUND_TOP_OFFSET,
+  };
   const outsideZone = SLOTS.filter((s) => {
-    if (s === 'background') return false;
     const z = SLOT_HIT[s];
     const a = SLOT_ART[s];
-    return !(a.x >= z.x && a.y >= z.y && a.x + a.w <= z.x + z.w && a.y + a.h <= z.y + z.h);
+    const up = topAllowance[s] ?? 0;
+    return !(a.x >= z.x && a.y >= z.y - up && a.x + a.w <= z.x + z.w && a.y + a.h <= z.y + z.h);
   });
   check('⚠️⚠️ each ART rect sits INSIDE its own tap zone — a piece outside its zone cannot be tapped',
     outsideZone.length === 0, outsideZone.join(' '));
   /**
-   * ⚠️⚠️ **THE BACKGROUND PRINT: SIZE `BACKGROUND_OVERSHOOT`, THEN RAISED `BACKGROUND_LIFT`** (owner, 2026-11-09):
-   * *"shrink the background decoration size by 20% and bring it up another 10%"*. ⚠️ Two knobs asserted separately — the
-   * first is size (0.88 of the zone, i.e. 20 % below the 1.1 overhang), the second is HEIGHT (10 % of its own height). ⚠️
-   * Folding them into one number would have shipped a 12 % shrink wearing the owner's words.
+   * ⚠️⚠️ **THE BACKGROUND PRINT HANGS FROM THE ZONE'S TOP-CENTRE AT `BACKGROUND_OVERSHOOT`** (owner, 2026-11-09:
+   * *"maintain top center alignment but reduce the background decoration another 20%"*).
+   * ⚠️ **The TOP EDGE is asserted as the held value, not as a number** — that is what "maintain top center alignment"
+   * means, and it is the assertion that would have caught the drift the centred shrink caused (it dropped the top ~13 px
+   * while the body rose). ⚠️ The horizontal centre is asserted the same way, as an equality, so a future size change
+   * cannot walk the print sideways either.
    */
   const bgArt = SLOT_ART.background;
   const bgW = SLOT_HIT.background.w * BACKGROUND_OVERSHOOT;
   const bgH = SLOT_HIT.background.h * BACKGROUND_OVERSHOOT;
   const bgX = SLOT_HIT.background.x + (SLOT_HIT.background.w - bgW) / 2;
-  const bgY = SLOT_HIT.background.y + (SLOT_HIT.background.h - bgH) / 2 - bgH * BACKGROUND_LIFT;
-  check('⚠️⚠️ the background print is 88 % of its zone (centred) and raised 10 % of its own height',
-    BACKGROUND_OVERSHOOT === 0.88 && BACKGROUND_LIFT === 0.1
+  const bgTop = SLOT_HIT.background.y - SLOT_HIT.background.h * BACKGROUND_TOP_OFFSET;
+  // ⚠️ The constants lead the failure text on purpose: when only a knob moved, the rect follows it, so `want === got`
+  // below would read like a pass. Measured by moving each knob — see the fault test.
+  check('⚠️⚠️ the background print hangs from its zone\'s TOP-CENTRE at 70.4 % — the top edge never drifts',
+    BACKGROUND_OVERSHOOT === 0.704 && BACKGROUND_TOP_OFFSET === 0.028
       && Math.abs(bgArt.w - bgW) < 1e-9 && Math.abs(bgArt.h - bgH) < 1e-9
-      && Math.abs(bgArt.x - bgX) < 1e-9 && Math.abs(bgArt.y - bgY) < 1e-9,
-    // ⚠️ The constants are printed FIRST: a knob moved without the rect following it still reads as "want === got" below,
-    // because both sides of that sum are derived from the knob. Measured by moving each one — see the fault test.
-    `overshoot ${BACKGROUND_OVERSHOOT} · lift ${BACKGROUND_LIFT} · ${bgArt.w.toFixed(1)}×${bgArt.h.toFixed(1)} at y ${bgArt.y.toFixed(1)} (want ${bgW.toFixed(1)}×${bgH.toFixed(1)} at y ${bgY.toFixed(1)})`);
+      && Math.abs(bgArt.x - bgX) < 1e-9 && Math.abs(bgArt.y - bgTop) < 1e-9
+      // ⚠️ Top-CENTRE, so the two side margins are equal — a left anchor would pass the width check and walk sideways.
+      && Math.abs((bgArt.x - SLOT_HIT.background.x)
+        - (SLOT_HIT.background.x + SLOT_HIT.background.w - (bgArt.x + bgArt.w))) < 1e-9,
+    `overshoot ${BACKGROUND_OVERSHOOT} · top ${BACKGROUND_TOP_OFFSET} · ${bgArt.w.toFixed(1)}×${bgArt.h.toFixed(1)} at (${bgArt.x.toFixed(1)}, ${bgArt.y.toFixed(1)}) (want ${bgW.toFixed(1)}×${bgH.toFixed(1)} at (${bgX.toFixed(1)}, ${bgTop.toFixed(1)}))`);
   /**
    * ⚠️ **THE TABLET DRAWS AT 72 % OF ITS BAND** — 20 % then a further 10 % (owner). ⚠️ Bottom-anchored: it gives up the
    * height from the TOP so its plinth stays on the table. ⚠️ The band itself must NOT shrink — it is also the ＋ slot's

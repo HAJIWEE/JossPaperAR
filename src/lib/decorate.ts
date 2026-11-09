@@ -68,30 +68,41 @@ export const SLOT_HIT: Record<DecorationSlot, Rect> = {
 };
 
 /**
- * ⚠️ **THE BACKGROUND PRINT'S SIZE, THEN ITS HEIGHT — two separate knobs** (owner, 2026-11-09):
- * *"shrink the background decoration size by 20% and bring it up another 10%"*.
+ * ⚠️⚠️ **THE PRINT HANGS FROM ITS ZONE'S TOP-CENTRE, AT `BACKGROUND_OVERSHOOT` OF THE ZONE** (owner, 2026-11-09:
+ * *"shrink the background decoration size by 20% and bring it up another 10%"*, then *"maintain top center alignment but
+ * reduce the background decoration another 20%"*).
  *
- * ⚠️ `BACKGROUND_OVERSHOOT` is **size** relative to the marked zone: it was 1.1 (a 5 % overhang each side), now **0.88**
- * — i.e. 20 % smaller than that, so the print sits just inside the zone it belongs to.
- * ⚠️ `BACKGROUND_LIFT` is **position**: the print rises by 10 % of its own height. ⚠️ It is a separate constant from the
- * size on purpose — the two were asked for in one sentence and mean different things, and folding `−20 %/+10 %` into one
- * number would have been a 12 % shrink wearing the owner's words.
+ * ⚠️ **THE ANCHOR IS THE LESSON, not the number.** Shrinking about the CENTRE moved the TOP EDGE every time the size
+ * changed — the previous cut dropped it ~13 px while the body rose, which is exactly the drift *"maintain top center
+ * alignment"* is asking to stop. So the top edge and the horizontal centre are now HELD, and a size change moves only the
+ * width and the bottom edge.
+ * ⚠️ That also **retires `BACKGROUND_LIFT`**: a lift exists to nudge a centred print, and an anchored one needs no nudge.
+ * Removed rather than left at 0, so there is one way to position this print and not two that disagree.
+ *
+ * ⚠️ Provenance of the number, so the next cut has its history: `1.0` (the zone) → `1.1` (+10 %) → `0.88` (−20 %) →
+ * **`0.704`** (another −20 %, i.e. `0.88 × 0.8`).
  */
-export const BACKGROUND_OVERSHOOT = 0.88;
+export const BACKGROUND_OVERSHOOT = 0.704;
 
-/** ⚠️ Fraction of the print's own height that it rises above the zone's centre line. */
-export const BACKGROUND_LIFT = 0.1;
+/**
+ * ⚠️⚠️ **THE PRINT'S TOP EDGE, held as a fraction of the ZONE'S height above the zone's top** (`0.028` = `8.96` board px).
+ * ⚠️ **A fraction of the ZONE, never of the print** — a fraction of the print moves the top every time the size changes,
+ * which is the drift *"maintain top center alignment"* exists to stop. That is the whole lesson of this constant.
+ * ⚠️ Where `0.028` comes from, so it is a measurement and not a taste: the owner's earlier *"bring it up another 10 %"*
+ * lifted the 0.88 print by 10 % of its own height (`28.16`) from a centred position `35.2` below the zone's top, so
+ * `35.2 − 28.16 = 8.96`, and `8.96 / 320 = 0.028` exactly. **The top edge the owner is looking at is the one this holds.**
+ */
+export const BACKGROUND_TOP_OFFSET = 0.028;
 
-/** A rect grown by `factor` about its own centre — both overhangs equal, so the composition stays symmetrical. */
-export function overshoot(r: Rect, factor: number): Rect {
-  const w = r.w * factor;
-  const h = r.h * factor;
-  return { x: r.x - (w - r.w) / 2, y: r.y - (h - r.h) / 2, w, h };
-}
-
-/** Raise a rect by `factor` of its OWN height — the unit the owner asked in ("bring it up another 10 %"). */
-export function lift(r: Rect, factor: number): Rect {
-  return { x: r.x, y: r.y - r.h * factor, w: r.w, h: r.h };
+/**
+ * A rect hung from the **TOP-CENTRE** of `zone`: horizontally centred, `factor` of the zone's size, its top edge
+ * `topOffset` of the zone's height above the zone's top (negative values drop it below).
+ * ⚠️ Top-centre, not top-left: the zone is symmetric about the shrine, and a left anchor would walk the print sideways.
+ */
+export function hungFrom(zone: Rect, factor: number, topOffset: number): Rect {
+  const w = zone.w * factor;
+  const h = zone.h * factor;
+  return { x: zone.x + (zone.w - w) / 2, y: zone.y - zone.h * topOffset, w, h };
 }
 
 /**
@@ -107,10 +118,11 @@ export const SLOT_ART: Record<DecorationSlot, Rect> = {
   top_right: { x: 301, y: 210, w: 52, h: 66 },
   side_left: { x: 33, y: 300, w: 41, h: 160 },
   side_right: { x: 317, y: 300, w: 41, h: 160 },
-  /** `decor · 鍾馗像 (background)` — ⚠️ **SIZE `BACKGROUND_OVERSHOOT` of its zone, then RAISED `BACKGROUND_LIFT`** (owner,
-   * 2026-11-09). ⚠️ Two knobs: the first is size (0.88 = a 20 % reduction from the 1.1 overhang), the second is height
-   * (10 % of the print's own height). ⚠️ Raised AFTER the size, so the lift is a fraction of what the print actually is. */
-  background: lift(overshoot(SLOT_HIT.background, BACKGROUND_OVERSHOOT), BACKGROUND_LIFT),
+  /** `decor · 鍾馗像 (background)` — ⚠️ **HUNG FROM THE ZONE'S TOP-CENTRE at `BACKGROUND_OVERSHOOT`** (owner, 2026-11-09:
+   * *"maintain top center alignment but reduce the background decoration another 20%"*). ⚠️ Anchor first, size second: the
+   * top edge (`BACKGROUND_TOP_OFFSET`) and the horizontal centre are HELD, so this — and every future — size change moves
+   * only the width and the bottom edge. */
+  background: hungFrom(SLOT_HIT.background, BACKGROUND_OVERSHOOT, BACKGROUND_TOP_OFFSET),
 };
 
 /** `slot · hint (how it works)` — 20,618 350×18, drawn only in customise mode. */

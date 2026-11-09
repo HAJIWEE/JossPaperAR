@@ -437,7 +437,7 @@ export default function HomeShrine() {
         // ⚠️ The board draws the ＋ slot and the CENTRE TABLET on the SAME band
         // (131,285 129×307) — see `altar.ts`. They swap in place; nothing below moves.
         const slot = HOME_BANDS.addSlot;
-        /** ⚠️ The tablet draws at 80 % of its band, bottom-anchored - see `tabletBox`. */
+        /** ⚠️ The tablet draws at `TABLET_SCALE` (72 %) of its band, bottom-anchored - see `tabletBox`. */
         const tab = tabletBox(slot);
         const current = view.kind === 'tablet' ? ancestors[view.index] : null;
         /** ⚠️ The caption is the altar's OWN state, so it is chosen from the count — see `altar.ts`. */
@@ -451,11 +451,13 @@ export default function HomeShrine() {
              * ⚠️⚠️ **THE PRINT GOES BEHIND THE ALTAR, ABOVE THE HALO** (owner, 2026-11-09: *"the background decoration Z
              * layer needs to be pushed back as well as currently its in front of the altar"*).
              *
-             * ⚠️ It used to mount after `home-shrine-base`, so an enlarged print painted OVER the table — a poster pasted
-             * on the altar instead of a backdrop behind it. ⚠️ Note the board's own order (`1e`) puts the print AFTER the
-             * table, which was harmless while the group was `190×161` and stopped at `y 528`, well above the table at 588;
-             * filling the zone (`288..608`) made it overlap, and a 10 % overshoot overlaps more. So the owner's order
-             * wins over the board's, and the reason is the size change, not a disagreement with the drawing.
+             * ⚠️ It used to mount after `home-shrine-base`, so a print that filled its zone painted OVER the table — a
+             * poster pasted on the altar instead of a backdrop behind it. ⚠️ Note the board's own order (`1e`) puts the
+             * print AFTER the table; harmless while the group was `190×161` and stopped at `y 528`, wrong once it filled
+             * the zone.
+             * ⚠️ **The overlap is gone at 70.4 %** (the print now ends at `y 513`, above the table at 588), so this is no
+             * longer a size fix — the order is kept on purpose: a backdrop belongs behind, the board (`1e`) puts the print
+             * behind the TABLET, and a future enlargement must not paste it on top of the altar again.
              */}
             {decor === null ? null : (
               <DecorBack scale={s} equipped={decor.equipped} onEnter={customize ? undefined : enterCustomize} />
