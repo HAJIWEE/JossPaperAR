@@ -139,6 +139,8 @@ export const MESSAGES = {
     // were MISSING from the build until the owner diffed it against the board.
     'home.altarEmpty': 'Your altar is empty — tap ＋ to add a tablet.',
     'home.ctaHint': 'Offer something meaningful, once a day',
+    /** `EN · 1b`'s `hint · cta` — the line that teaches the carousel's gesture. ⚠️ Only when there is more than one tablet. */
+    'home.swipeHint': 'Swipe to bring a tablet forward',
     'home.templeChip': 'Everything here is customizable',
     // ── the decoration picker — `EN · 1f` / `1f2` / `1f3` / `1f4` / `1f5`, copy taken from the boards
     //    (SCRUM-205). ⚠️ Item NAMES are not here: they are `DECORATIONS[].name`, read through `localized()`. ──
@@ -638,6 +640,7 @@ export const MESSAGES = {
     // ⚠️ Board copy — `ZH · 1 Home / 首页` (Penpot, 2026-10-31).
     'home.altarEmpty': '尚未安奉牌位 — 轻点 ＋ 安放',
     'home.ctaHint': '每日供奉一件有意义之物',
+    'home.swipeHint': '左右滑动切换牌位',
     'home.templeChip': '此处一切皆可自定义',
     // ── 装饰选择器 — `ZH · 1f` / `1f2` / `1f3` / `1f4` / `1f5`（SCRUM-205）。⚠️ 图片名称不在此处。 ──
     'decor.slotTop': '顶部',

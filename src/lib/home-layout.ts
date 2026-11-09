@@ -95,20 +95,6 @@ export const HOME_BANDS = {
   halo: { x: 18, y: 160, w: 354, h: 420 },
   /** `slot · ＋ add a tablet (tap)` — 131,285 129×307 (empty altar only). */
   addSlot: { x: 131, y: 285, w: 129, h: 307 },
-  /** `nav · carousel prev` — 26,412 24×40. Only when there is more than one tablet. */
-  carouselPrev: { x: 26, y: 412, w: 24, h: 40 },
-  /** `nav · carousel next` — 340,412 24×40. */
-  carouselNext: { x: 340, y: 412, w: 24, h: 40 },
-  /**
-   * `touch · carousel next (44, invisible)` — **330,410 44×44**, straight off `EN · 1b`.
-   * ⚠️⚠️ **THE GLYPH IS NOT THE CONTROL.** `nav · carousel next` is a 24×40 TEXT box; the board gives it a 44×44 invisible
-   * touch layer, centred on the glyph (330 + 22 = 352 = the glyph's own centre). Tapping the glyph's box meant a 24 px-wide
-   * target — the narrowest control on the screen.
-   * ⚠️ `prev` is the board's `next` **mirrored** (16,410 44×44, centre 38 = the `‹` glyph's centre): `1b` draws only the
-   * `next` touch layer, and an asymmetric pair of hit areas would be a bug either way. Recorded, not hidden.
-   */
-  carouselPrevTouch: { x: 16, y: 410, w: 44, h: 44 },
-  carouselNextTouch: { x: 330, y: 410, w: 44, h: 44 },
   /** `zone · customizable temple (label)` — 28,214 224×22. */
   templeChip: { x: 28, y: 214, w: 224, h: 22 },
   /** `art · offerings (front)` — 30,434 330×170. */
