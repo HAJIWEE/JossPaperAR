@@ -1528,7 +1528,7 @@ function homeShrineScaleChecks(): void {
  * demanded no overlap there would fight the design; it is used between REGIONS instead.
  */
 function shrineGeometryChecks(): void {
-  section("25 · The shrine's bands stack in the right order — and the altar holds 4 (SCRUM-163)");
+  section("25 · The shrine's bands stack in the right order — and the altar shows THREE, paging by one (SCRUM-163 · 231)");
 
   // ── ⚠️ THE READER CONTROL, FIRST ───────────────────────────────────────────
   // ⚠️ A renamed or dropped band reads as `undefined`, and `undefined <= undefined` is FALSE — so
