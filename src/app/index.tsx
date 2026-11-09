@@ -478,10 +478,20 @@ export default function HomeShrine() {
                 way back out of customising, so it is rendered LAST in this region (after the zones) to stay on
                 top and tappable — see the block at the foot of `altar`. */}
 
-            {/* ⚠️ EMPTY → the ＋ slot. The `＋` is the add affordance the board draws
-                (`slot · ＋ add a tablet`), and since the sheet now lives on THIS screen it has a
-                destination — so it is a real control, not the reserved band it used to be. */}
-            {view.kind === 'empty' ? (
+            {/* ⚠️⚠️ **THE TWO MODES, AND THEY CANNOT SHARE THIS RECTANGLE** (owner, 2026-11-09): *"the shrine
+                customization for the Background and the Add new tablet UI now overlaps and this is an issue… in
+                customization mode, the add tablet interface should be hidden from sight, and the shrine customization
+                should be shown, while in normal mode the customization options should be hidden."*
+
+                ⚠️ The numbers are the reason: the background zone is `101,288 190×320` and the ＋ slot is
+                `131,285 129×307` — the SAME space. `1f` draws both because it is the EMPTY-altar board, but a ＋ floating
+                inside a "place a decoration here" outline asks the user to choose between two things one tap apart.
+                So while customising the altar's OWN controls are hidden and the six zones own the scene:
+                  · the ＋ (add tablet) is not rendered at all;
+                  · the tablet stays VISIBLE — it is the art the background is drawn behind, and hiding it would empty
+                    the shrine — but it is INERT, so it cannot open the ancestor sheet underneath a zone;
+                  · the carousel arrows go too (they sit inside the background zone as well). */}
+            {customize ? null : view.kind === 'empty' ? (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t('ancestor.titleAdd')}
@@ -511,8 +521,9 @@ export default function HomeShrine() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t('ancestor.titleEdit')}
-                accessibilityState={{ disabled: !mayEdit }}
-                disabled={!mayEdit}
+                accessibilityState={{ disabled: !mayEdit || customize }}
+                /** ⚠️ INERT while customising — the background zone is over it, and the tablet must not open a sheet. */
+                disabled={!mayEdit || customize}
                 onPress={() => openSheet(current ? current.id : null)}
                 style={[styles.abs, bandRect(slot, s)]}
                 testID="home-tablet"
@@ -530,7 +541,7 @@ export default function HomeShrine() {
 
             {/* ⚠️ A carousel, never a "+N more": at the cap of 10 every tablet must be reachable
                 (the board draws prev/next at 26,412 and 340,412). The ends are ends — no wrap. */}
-            {view.kind === 'tablet' && view.hasPrev ? (
+            {!customize && view.kind === 'tablet' && view.hasPrev ? (
               <Pressable
                 accessibilityRole="button"
                 testID="home-tablet-prev"
@@ -540,7 +551,7 @@ export default function HomeShrine() {
                 <Text style={[styles.carouselGlyph, { fontSize: 28 * s }]}>{'\u2039'}</Text>
               </Pressable>
             ) : null}
-            {view.kind === 'tablet' && view.hasNext ? (
+            {!customize && view.kind === 'tablet' && view.hasNext ? (
               <Pressable
                 accessibilityRole="button"
                 testID="home-tablet-next"

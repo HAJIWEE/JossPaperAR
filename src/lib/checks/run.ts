@@ -3499,6 +3499,25 @@ function storeChecks(): void {
     })());
 
   /**
+   * ⚠️⚠️ **TWO MODES, ONE RECTANGLE** (owner, 2026-11-09): *"the shrine customization for the Background and the Add new
+   * tablet UI now overlaps and this is an issue… in customization mode, the add tablet interface should be hidden."*
+   *
+   * ⚠️ The background zone (`101,288 190×320`) sits ON TOP of the ＋ slot (`131,285 129×307`) — asserted here, because
+   * that overlap is the reason the split exists and a future re-measure should not silently un-justify it. ⚠️ The rest
+   * is source-level: the ＋ is not rendered while customising, the tablet stays visible but INERT (hiding the art would
+   * empty the shrine), and the carousel goes with the ＋.
+   */
+  check('⚠️ the background zone really does cover the ＋ slot (why the two modes were needed)',
+    rectsOverlap(SLOT_HIT.background, HOME_BANDS.addSlot));
+  check('⚠️⚠️ customising HIDES the add-tablet ＋ and the carousel, and makes the tablet inert',
+    (() => {
+      const src = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'app', 'index.tsx'), 'utf8'));
+      return src.includes('{customize ? null : view.kind === \'empty\' ? (')
+        && src.includes('disabled={!mayEdit || customize}')
+        && (src.match(/!customize && view\.kind === 'tablet'/g) ?? []).length === 2;
+    })());
+
+  /**
    * ⚠️⚠️ **A SET'S PIECE IS NOT ALWAYS THE SET'S FACE.** The couplets' top-middle piece is the **横批 banner**, not the
    * pair of scrolls — the owner's correction, and `1e` draws it at 141 × 40 (a squat banner, not a scroll). ⚠️ So the
    * drawing is chosen by SLOT, and the banner has art of its own rather than the pair stretched into a wide box —
