@@ -14,7 +14,7 @@ import { ShrineBase } from '@/components/home/shrine-base';
 import { ShrineCanvas } from '@/components/home/shrine-canvas';
 import { TabBarBand } from '@/components/home/tab-bar-band';
 import { Tablet } from '@/components/home/tablet';
-import { altarCaption, altarView, pageStep, tabletBox } from '@/lib/altar';
+import { altarCaption, altarView, carouselStage, pageStep, tabletBox } from '@/lib/altar';
 import {
   ANCESTOR_CAP,
   GIVEN_NAME_MAX,
@@ -438,7 +438,22 @@ export default function HomeShrine() {
         // (131,285 129×307) — see `altar.ts`. They swap in place; nothing below moves.
         const slot = HOME_BANDS.addSlot;
         /** ⚠️ The tablet draws at `TABLET_SCALE` (72 %) of its band, bottom-anchored - see `tabletBox`. */
-        const tab = tabletBox(slot);
+        /**
+         * ⚠️⚠️ **THE STAGE IS THREE TABLETS, `EN · 1b`** (owner: *"Refer to En-1b i should see 3 tablets"*). `carouselStage()`
+         * returns the centre plus whichever neighbours exist, all BOARD-absolute; the centre is then made band-relative again
+         * for the Pressable that already lives on the band (`tab`), so one function still owns the geometry of all three.
+         */
+        const stage = carouselStage(
+          slot,
+          view.kind === 'tablet' ? view.index : 0,
+          view.kind === 'tablet' ? view.count : 0,
+        );
+        const tab = {
+          x: stage.centre.x - slot.x,
+          y: stage.centre.y - slot.y,
+          w: stage.centre.w,
+          h: stage.centre.h,
+        };
         const current = view.kind === 'tablet' ? ancestors[view.index] : null;
         /** ⚠️ The caption is the altar's OWN state, so it is chosen from the count — see `altar.ts`. */
         const caption = altarCaption(ancestors.length);
@@ -511,6 +526,37 @@ export default function HomeShrine() {
                   · the tablet stays VISIBLE — it is the art the background is drawn behind, and hiding it would empty
                     the shrine — but it is INERT, so it cannot open the ancestor sheet underneath a zone;
                   · the carousel arrows go too (they sit inside the background zone as well). */}
+            {/**
+              * ⚠️⚠️ **THE PEERS — `EN · 1b` DRAWS THREE TABLETS, NOT ONE** (owner: *"Refer to En-1b i should see 3 tablets"*).
+              * The current tablet sits centre-on-top; each existing neighbour peeks from behind at `NEIGHBOUR_SCALE` of its
+              * size, bottom-aligned so all three stand on the same table line (the board's own ratios, see `altar.ts`).
+              * ⚠️ Painted BEFORE the centre Pressable so the current tablet is never obscured by its neighbours, and with
+              * `pointerEvents="none"`: the board gives ONLY the centre a `touch · tablet` layer, so a peer is art, not a
+              * control — tapping one must not open a sheet for an ancestor you can barely see.
+              * ⚠️ A peer exists only where the board shows one: no left on the first tablet, no right on the last.
+              */}
+            {stage.left === null && stage.right === null ? null : (
+              <View style={styles.abs} pointerEvents="none" testID="home-tablet-peers">
+                {([['left', stage.left, view.kind === 'tablet' ? view.index - 1 : -1],
+                   ['right', stage.right, view.kind === 'tablet' ? view.index + 1 : -1]] as const).map(([side, r, at]) => {
+                  const peer = at >= 0 ? ancestors[at] : undefined;
+                  if (r === null || peer === undefined) return null;
+                  return (
+                    <View
+                      key={side}
+                      testID={`home-tablet-peer-${side}`}
+                      style={{ position: 'absolute', left: r.x * s, top: r.y * s, width: r.w * s, height: r.h * s }}
+                    >
+                      <Tablet
+                        name={tabletName(peer.surname, peer.givenName)}
+                        width={r.w * s}
+                        height={r.h * s}
+                      />
+                    </View>
+                  );
+                })}
+              </View>
+            )}
             {view.kind === 'empty' ? (
               customize ? null : (
                 <Pressable

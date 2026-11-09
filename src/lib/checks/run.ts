@@ -16,7 +16,13 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { isValidClanName } from '../clan-rules.ts';
-import { TABLET_SCALE, tabletBox } from '../altar.ts';
+import {
+  TABLET_SCALE,
+  NEIGHBOUR_SCALE,
+  NEIGHBOUR_OFFSET,
+  carouselStage,
+  tabletBox,
+} from '../altar.ts';
 import { PREPARING_PHASES, pipelineFailed } from '../../domain/slice.ts';
 import { NAV_TABS, activeTabKey, isSamePath, tabPressIsNoop } from '../nav.ts';
 import { COLLECTION, COLLECTION_SLOTS, collectionGrid, collectionOverflows, collectedItemName, displayBurnCount } from '../collection.ts';
@@ -3502,6 +3508,48 @@ function storeChecks(): void {
       && homeSrc.indexOf('testID="home-tablet-prev"') > decorAt
       && homeSrc.includes('bandRect(HOME_BANDS.carouselNextTouch')
       && homeSrc.includes('bandRect(HOME_BANDS.carouselPrevTouch'));
+
+  /**
+   * ⚠️⚠️ **THE THREE-TABLET STAGE IS `EN · 1b`'s, CHECKED AGAINST THE BOARD'S OWN RECTS** (owner: *"Refer to En-1b i should
+   * see 3 tablets"*). ⚠️ The board draws `tablet · centre` `129×307`, `tablet · left/right` `93×221`, at centres `±92` apart.
+   * ⚠️ Those become ratios here — `93/129`, `221/307`, `92/129` — because this app's centre is drawn at `TABLET_SCALE` (the
+   * owner shrank it separately), so copying the board's absolute pixels would draw three tablets the SAME size and lose the
+   * hierarchy. ⚠️ Asserted against the board's numbers so the ratios cannot drift away from the source.
+   */
+  check('⚠️⚠️ the neighbour ratios ARE the board\'s (93/129 · 221/307 · 92/129)',
+    Math.abs(NEIGHBOUR_SCALE - 93 / 129) < 0.002
+      && Math.abs(NEIGHBOUR_SCALE - 221 / 307) < 0.002
+      && Math.abs(NEIGHBOUR_OFFSET - 92 / 129) < 0.002,
+    `${NEIGHBOUR_SCALE} vs ${(93 / 129).toFixed(4)}/${(221 / 307).toFixed(4)} · offset ${NEIGHBOUR_OFFSET} vs ${(92 / 129).toFixed(4)}`);
+
+  /**
+   * ⚠️ **THREE IN THE MIDDLE, TWO AT THE ENDS** — and never a ghost: a neighbour exists only where an ancestor exists.
+   */
+  const st0 = carouselStage(HOME_BANDS.addSlot, 0, 3);
+  const st1 = carouselStage(HOME_BANDS.addSlot, 1, 3);
+  const st2 = carouselStage(HOME_BANDS.addSlot, 2, 3);
+  const stOnly = carouselStage(HOME_BANDS.addSlot, 0, 1);
+  check('⚠️⚠️ the stage shows THREE tablets in the middle, TWO at the first and last, ONE when alone',
+    st0.left === null && st0.right !== null
+      && st1.left !== null && st1.right !== null
+      && st2.left !== null && st2.right === null
+      && stOnly.left === null && stOnly.right === null);
+
+  /**
+   * ⚠️ **THE PEERS ARE SMALLER, SIT ON THE SAME FLOOR, AND MIRROR** — the three facts the board draws. A peer that floated,
+   * or matched the centre's size, would not be `1b`.
+   */
+  const floorOf = (b: { y: number; h: number }) => b.y + b.h;
+  const midOfBox = (b: { x: number; w: number }) => b.x + b.w / 2;
+  check('⚠️⚠️ each peer is 0.72 of the centre, stands on the same floor, and mirrors its twin',
+    st1.left !== null && st1.right !== null
+      && Math.abs(st1.left.w - st1.centre.w * NEIGHBOUR_SCALE) < 1e-9
+      && Math.abs(st1.left.h - st1.centre.h * NEIGHBOUR_SCALE) < 1e-9
+      && Math.abs(floorOf(st1.left) - floorOf(st1.centre)) < 1e-9
+      && Math.abs(floorOf(st1.right) - floorOf(st1.centre)) < 1e-9
+      && Math.abs((midOfBox(st1.centre) - midOfBox(st1.left)) - (midOfBox(st1.right) - midOfBox(st1.centre))) < 1e-9
+      && st1.left.x >= 0 && st1.right !== null && st1.right.x + st1.right.w <= DECOR_BOARD.w,
+    `left ${st1.left?.x.toFixed(1)} · centre ${midOfBox(st1.centre).toFixed(1)} · right ${(st1.right?.x ?? 0).toFixed(1)}`);
 
   const outsideZone = SLOTS.filter((s) => {
     const z = SLOT_HIT[s];

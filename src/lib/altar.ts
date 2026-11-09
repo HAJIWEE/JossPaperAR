@@ -58,6 +58,55 @@ export function tabletBox(band: { readonly w: number; readonly h: number }): Box
 }
 
 
+/**
+ * ⚠️⚠️ **THE CAROUSEL SHOWS THREE TABLETS AT ONCE — `EN · 1b` draws left + centre + right** (owner, 2026-11-09: *"Refer to
+ * En-1b i should see 3 tablets"*). ⚠️ The board's own rects are `tablet · centre (陈大文)` `131,285 129×307`,
+ * `tablet · left (陈德海)` `57,369 93×221` and `tablet · right (陈氏)` `240,369 93×221`.
+ *
+ * ⚠️⚠️ **THEY ARE RECORDED AS RATIOS, NOT AS SIZES, and that is deliberate.** Measured off the board: `93/129 = 0.721` and
+ * `221/307 = 0.720` — the neighbours are **0.72 of the centre**, and their centres sit **±92** from the centre's, i.e.
+ * `92/129 = 0.713` of its width. ⚠️ The board's centre is full-band-size, but this app's centre is drawn at `TABLET_SCALE`
+ * (0.72) because the owner shrank it separately — copying the board's absolute `93×221` would therefore draw three tablets
+ * the SAME size and lose the hierarchy the board is showing. Ratios keep the picture and the owner's size.
+ */
+export const NEIGHBOUR_SCALE = 0.72;
+
+/** `92 / 129` — a neighbour's centre from the current tablet's centre, as a fraction of its width. */
+export const NEIGHBOUR_OFFSET = 0.713;
+
+/** The three-tablet stage: the current tablet, plus whichever neighbours exist. Rects are BOARD-absolute. */
+export interface Stage {
+  readonly centre: Box;
+  readonly left: Box | null;
+  readonly right: Box | null;
+}
+
+/**
+ * ⚠️ **Bottom-aligned, not top-aligned**: the board puts the neighbours' feet at `590` against the centre's `592`, so all three
+ * stand on the same table line — the 2 px is the board's own slack, and aligning exactly is the honest reading of it.
+ * ⚠️ Ends are ends: no left neighbour on the first tablet, no right on the last (`1b` draws all three because it is the
+ * middle state).
+ */
+export function carouselStage(
+  band: { readonly x: number; readonly y: number; readonly w: number; readonly h: number },
+  index: number,
+  count: number,
+): Stage {
+  const c = tabletBox(band);
+  const centre: Box = { x: band.x + c.x, y: band.y + c.y, w: c.w, h: c.h };
+  const floor = centre.y + centre.h;
+  const w = centre.w * NEIGHBOUR_SCALE;
+  const h = centre.h * NEIGHBOUR_SCALE;
+  const offset = centre.w * NEIGHBOUR_OFFSET;
+  const midX = centre.x + centre.w / 2;
+  const at = (dx: number): Box => ({ x: midX + dx - w / 2, y: floor - h, w, h });
+  return {
+    centre,
+    left: index > 0 ? at(-offset) : null,
+    right: index < count - 1 ? at(offset) : null,
+  };
+}
+
 export type AltarView =
   | { readonly kind: 'empty' }
   | {
