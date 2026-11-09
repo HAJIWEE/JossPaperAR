@@ -166,7 +166,7 @@ import {
   dotSitsOnTray,
 } from '../offerings-layout.ts';
 import { formatPoints, homePanels } from '../home-panels.ts';
-import { ALTAR_DISPLAY_SLOTS, altarCaption, altarView, pageStep } from '../altar.ts';
+import { altarCaption, altarView, pageStep } from '../altar.ts';
 import { BULK_PREFIX, createSplitStorage, bulkKey } from '../split-storage.ts';
 import {
   MAX_ATTEMPTS,
@@ -1585,13 +1585,18 @@ function shrineGeometryChecks(): void {
   check(`every altar band is inside the altar region (${altarTop}→${altarBottom})`,
     strayed.length === 0, `strayed: ${strayed.join(', ')}`);
 
-  // ── the altar holds FOUR, and that is not the clan cap ────────────────────
-  check('the altar displays 4 tablets before it pages', ALTAR_DISPLAY_SLOTS === 4,
-    `${ALTAR_DISPLAY_SLOTS}`);
-  check('⚠️ …and 4 is NOT the clan cap of 10 — the board pages, it does not refuse',
-    ALTAR_DISPLAY_SLOTS !== ANCESTOR_CAP);
-  check('…and 4 is the board frame that draws it (`EN · 1c Home / full (4 tablets)`)',
-    ALTAR_DISPLAY_SLOTS === 4 && ALTAR_DISPLAY_SLOTS < ANCESTOR_CAP);
+  // ── ⚠️ THE ALTAR SHOWS THREE AND PAGES BY ONE — there is no page size of four ──
+  // ⚠️ These three checks used to guard `ALTAR_DISPLAY_SLOTS === 4` — **a constant NO SCREEN IMPORTED**. The stage draws
+  // three (`carouselStage`) and a swipe moves ONE tablet (`pageStep`), so the checks asserted a number nothing rendered while
+  // the real behaviour went unasserted here. They now read the functions the screen actually calls.
+  // (owner, 2026-11-09: *"i believe its already correct at 3"* — the 4 came from a board's NAME, not a request.)
+  const stageThree = carouselStage(HOME_BANDS.addSlot, 1, 3);
+  check('the altar stage is THREE tablets — centre + left + right (`EN · 1b`), not a page of four',
+    [stageThree.centre, stageThree.left, stageThree.right].filter((b) => b !== null).length === 3);
+  check('…and a page moves ONE tablet, not a page of four',
+    pageStep(0, 10, 1) === 1 && pageStep(9, 10, 1) === 9);
+  check('⚠️ …and the cap of 10 is REACHABLE by paging — the carousel pages to the tenth, it never refuses it',
+    pageStep(8, ANCESTOR_CAP, 1) === ANCESTOR_CAP - 1 && pageStep(0, ANCESTOR_CAP, -1) === 0);
 
   // ── ⚠️ THE ARROWS ARE GONE (owner, 2026-11-09) — the carousel is a SWIPE ──
   // ⚠️ These four checks used to assert that `carouselPrev`/`carouselNext` flanked the tablet slot. They are replaced by

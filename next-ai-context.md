@@ -916,8 +916,12 @@ characters. No given name → 姓 + 氏…"* — the limit is stated for the fir
 
 **`check:lib` 559 → 581.** §18 asserts every band **fits the canvas** — ⚠️ **and a band dragged into
 the wrong place still fits.** So §25 asserts **PAIRS**: `a` is above `b`, or two regions do not
-overlap. New pure helpers: `bandAbove` · `bandsOverlap` · `HOME_REGION_TOPS` · `regionsStackDown` ·
-`ALTAR_DISPLAY_SLOTS`.
+overlap. New pure helpers: `bandAbove` · `bandsOverlap` · `HOME_REGION_TOPS` · `regionsStackDown`.
+⚠️ **`ALTAR_DISPLAY_SLOTS = 4` was listed here and has since been DELETED** — it was a constant **no
+screen imported**, guarded by three §25 checks, transcribed from a board's NAME (`EN · 1c Home / full
+(4 tablets)`) rather than requested (owner, 2026-11-09: *"i believe its already correct at 3"*). The
+altar stage draws **three** (`carouselStage`) and pages by **one** (`pageStep`); the clan cap is **10**.
+Those three checks now read the functions the screen calls.
 
 ⚠️ **`bandsOverlap` is deliberately NOT applied inside the altar** — `halo` (160→580) and
 `offerings` (434→604) overlap because the offerings are painted IN FRONT of the halo. A gate

@@ -20,17 +20,20 @@
  */
 
 /**
- * ⚠️ How many tablets the BOARD draws before it pages — **4**, and it is NOT the clan cap.
+ * ⚠️⚠️ **THE ALTAR SHOWS THREE AND PAGES BY ONE — THERE IS NO PAGE SIZE OF FOUR.**
+ * (owner, 2026-11-09: *"i believe its already correct at 3"* — confirmed against the code, not taken on trust.)
  *
- * `ancestors.sequence` keeps **10** live rows (`slot 0..9`, `ancestor_cap`), while the altar
- * DISPLAYS four and pages for the rest — `ancestor_cap`'s own comment in `slice_schema` says so
- * explicitly, and `EN · 1c Home / full (4 tablets)` is the board that draws it. Conflating the two
- * would either strand tablets or refuse the tenth for no reason.
+ * `carouselStage()` draws **centre + left + right** (`EN · 1b`) and `pageStep()` moves **one** tablet per swipe, so the stage
+ * REPORTS three and the only limit is the list's length. The **clan cap is 10** (`ancestor_cap`, `ANCESTOR_CAP`): the carousel
+ * pages to the tenth, it does not refuse it.
  *
- * ⚠️ It is a **page size, not a width budget**: four 129-wide tablets do not fit across 390. The
- * centre slot plus the peeking neighbours are what "4" counts.
+ * ⚠️⚠️ **A DEAD `ALTAR_DISPLAY_SLOTS = 4` USED TO SIT HERE, AND THREE GATES GUARDED IT.** It was transcribed from a board's own
+ * NAME (`EN · 1c Home / full (4 tablets)`) rather than decided — the owner never asked for four — and **nothing ever rendered
+ * it**: `index.tsx` imports seven things from this file and that was not one of them. So the checks asserted a number no screen
+ * read, while the behaviour that *is* real (three on the stage, one page per swipe) was covered by the stage geometry instead.
+ * That is the vacuous-gate class: **a gate is only worth its line if the thing it reads is the thing that renders.**
+ * ⚠️ Deleting the constant is what makes "how many are on screen" and "how many a clan may hold" impossible to conflate again.
  */
-export const ALTAR_DISPLAY_SLOTS = 4;
 
 /**
  * ⚠️ **THE TABLET DRAWS AT 72 % OF ITS BAND** (owner, 2026-11-09: *"the tablet is also too big now… reduce the tablet
