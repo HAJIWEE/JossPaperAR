@@ -211,20 +211,29 @@ const COUPLET: { box: readonly [number, number]; inks: readonly Ink[]; trails: r
  * ⚠️ The board draws the small mark at (38, 36.7) as a STROKE-ONLY rect; it is a filled `ink` rect here, because
  * a no-fill shape would need a bare "none" literal and the token lookup is typed on `brand`'s keys.
  */
-const ZHONGKUI: { box: readonly [number, number]; inks: readonly Ink[]; trails: readonly Trail[] } = {
-  box: [85.1, 72],
+/**
+ * ⚠️⚠️ **RE-BASED TO ITS INK BOUNDS** (2026-11-09). As the board draws it, the group is `101,367 190×161` but the ART
+ * inside occupies only `x 35..155, y 9..139` of that group — the rest is an invisible `base-background`. Stretching the
+ * board's box therefore stretched the MARGIN: asked to fill the background zone, the print still floated in a ring of empty
+ * paper. ⚠️ So the motif's box is now the ink's own bounds (`53.7 × 62.2`, every coordinate shifted by `−15.7, −3.9`),
+ * which makes "fill the rect you are given" true rather than approximately true.
+ * ⚠️ A tight box also improves the store card and the picker row: they contain the motif in a square, so the old margin
+ * made the print look small there too.
+ */
+const ZHONGKUI: Motif = {
+  box: [53.7, 62.2],
   inks: [
-    { x: 15.7, y: 3.9, w: 53.7, h: 4.6, rx: 3, fill: 'goldDeep', stroke: 'ink', sw: 2 },
-    { x: 18.3, y: 8.5, w: 48.4, h: 57.6, rx: 3, fill: 'paper', stroke: 'ink', sw: 3 },
-    { x: 20.9, y: 11.1, w: 43.2, h: 52.4, rx: 2, fill: 'paper', stroke: 'cinnabar', sw: 2 },
-    { x: 38, y: 36.7, w: 9.2, h: 3.9, fill: 'ink' },
-    { x: 36.7, y: 25.5, w: 11.8, h: 11.8, rx: 5.9, fill: 'paper', stroke: 'ink', sw: 2.5 },
+    { x: 0, y: 0, w: 53.7, h: 4.6, rx: 3, fill: 'goldDeep', stroke: 'ink', sw: 2 },
+    { x: 2.6, y: 4.6, w: 48.4, h: 57.6, rx: 3, fill: 'paper', stroke: 'ink', sw: 3 },
+    { x: 5.2, y: 7.2, w: 43.2, h: 52.4, rx: 2, fill: 'paper', stroke: 'cinnabar', sw: 2 },
+    { x: 22.3, y: 32.8, w: 9.2, h: 3.9, fill: 'ink' },
+    { x: 21, y: 21.6, w: 11.8, h: 11.8, rx: 5.9, fill: 'paper', stroke: 'ink', sw: 2.5 },
   ],
   trails: [
-    { d: 'M4262.58447265625,639.9818115234375L4269.130859375,613.7999877929688L4273.05859375,611.1818237304688L4266.51220703125,638.6727294921875Z', dx: -4236.4, dy: -585, fill: 'goldDeep', stroke: 'ink', sw: 2 },
-    { d: 'M4266.51220703125,646.5272827148438L4291.3876953125,646.5272827148438L4288.11474609375,624.272705078125L4269.78515625,624.272705078125Z', dx: -4236.4, dy: -585, fill: 'cinnabar', stroke: 'ink', sw: 2.5 },
-    { d: 'M4273.05859375,613.1454467773438L4284.84130859375,613.1454467773438L4282.22314453125,605.9454345703125L4275.6767578125,605.9454345703125Z', dx: -4236.4, dy: -585, fill: 'ink', stroke: 'ink', sw: 2.5 },
-    { d: 'M4275.0224609375,621L4282.8779296875,621L4278.9501953125,629.5090942382812Z', dx: -4236.4, dy: -585, fill: 'ink', sw: 0 },
+    { d: 'M4262.58447265625,639.9818115234375L4269.130859375,613.7999877929688L4273.05859375,611.1818237304688L4266.51220703125,638.6727294921875Z', dx: -4252.1, dy: -588.9, fill: 'goldDeep', stroke: 'ink', sw: 2 },
+    { d: 'M4266.51220703125,646.5272827148438L4291.3876953125,646.5272827148438L4288.11474609375,624.272705078125L4269.78515625,624.272705078125Z', dx: -4252.1, dy: -588.9, fill: 'cinnabar', stroke: 'ink', sw: 2.5 },
+    { d: 'M4273.05859375,613.1454467773438L4284.84130859375,613.1454467773438L4282.22314453125,605.9454345703125L4275.6767578125,605.9454345703125Z', dx: -4252.1, dy: -588.9, fill: 'ink', stroke: 'ink', sw: 2.5 },
+    { d: 'M4275.0224609375,621L4282.8779296875,621L4278.9501953125,629.5090942382812Z', dx: -4252.1, dy: -588.9, fill: 'ink', sw: 0 },
   ],
 };
 

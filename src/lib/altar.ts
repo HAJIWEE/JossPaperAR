@@ -32,6 +32,32 @@
  */
 export const ALTAR_DISPLAY_SLOTS = 4;
 
+/**
+ * ⚠️ **THE TABLET DRAWS AT 80 % OF ITS BAND** (owner, 2026-11-09: *"the tablet is also too big now… reduce the tablet
+ * size by 20%"*).
+ *
+ * ⚠️ The BAND (`slot · ＋ add a tablet` / the centre tablet, `131,285 129×307`) is **not** the drawing: it is also the ＋
+ * slot's tap target, so shrinking the band would shrink the control and move the carousel. Only the ART shrinks.
+ * ⚠️ Bottom-aligned, not centred: the tablet's plinth must stay resting on the table (`y 588`), so it loses its height
+ * from the TOP. Centring it would float the plaque off the burner.
+ */
+export const TABLET_SCALE = 0.8;
+
+export interface Box {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+}
+
+/** Where the tablet draws inside its band: `TABLET_SCALE` of it, centred horizontally and sitting on the band's floor. */
+export function tabletBox(band: { readonly w: number; readonly h: number }): Box {
+  const w = band.w * TABLET_SCALE;
+  const h = band.h * TABLET_SCALE;
+  return { x: (band.w - w) / 2, y: band.h - h, w, h };
+}
+
+
 export type AltarView =
   | { readonly kind: 'empty' }
   | {

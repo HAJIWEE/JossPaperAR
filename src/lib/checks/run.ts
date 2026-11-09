@@ -16,6 +16,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { isValidClanName } from '../clan-rules.ts';
+import { TABLET_SCALE, tabletBox } from '../altar.ts';
 import { PREPARING_PHASES, pipelineFailed } from '../../domain/slice.ts';
 import { NAV_TABS, activeTabKey, isSamePath, tabPressIsNoop } from '../nav.ts';
 import { COLLECTION, COLLECTION_SLOTS, collectionGrid, collectionOverflows, collectedItemName, displayBurnCount } from '../collection.ts';
@@ -3389,6 +3390,32 @@ function storeChecks(): void {
   });
   check('⚠️⚠️ each ART rect sits INSIDE its own tap zone — a piece outside its zone cannot be tapped',
     outsideZone.length === 0, outsideZone.join(' '));
+  /**
+   * ⚠️⚠️ **THE BACKGROUND PRINT FILLS ITS MARKED SPACE** (owner, 2026-11-09: *"enlarge the background decoration to occupy
+   * the entirety of the marked background decoration space"*). ⚠️ The board's own group is `101,367 190×161` — a print that
+   * sat entirely inside a tablet's footprint, so a decorated altar showed two dark slivers instead of a backdrop. ⚠️ Equality
+   * is asserted, not containment: the point is that the art and the zone are the SAME rect, so a future re-measure of one
+   * cannot leave the other behind.
+   */
+  check('⚠️⚠️ the background print is the WHOLE marked zone, not a picture inside it',
+    SLOT_ART.background.x === SLOT_HIT.background.x
+      && SLOT_ART.background.y === SLOT_HIT.background.y
+      && SLOT_ART.background.w === SLOT_HIT.background.w
+      && SLOT_ART.background.h === SLOT_HIT.background.h,
+    `${SLOT_ART.background.w}×${SLOT_ART.background.h} vs ${SLOT_HIT.background.w}×${SLOT_HIT.background.h}`);
+  /**
+   * ⚠️ **THE TABLET DRAWS AT 80 % OF ITS BAND** (owner, 2026-11-09: *"reduce the tablet size by 20%"*), and it gives up
+   * that size from the TOP — its plinth has to stay on the table. ⚠️ The band itself must NOT shrink: it is also the ＋
+   * slot's tap target and the carousel's anchor.
+   */
+  const tab = tabletBox(HOME_BANDS.addSlot);
+  check('⚠️⚠️ the tablet is 80 % of its band, centred, and still resting on the band floor',
+    Math.abs(tab.w - HOME_BANDS.addSlot.w * 0.8) < 1e-9
+      && Math.abs(tab.h - HOME_BANDS.addSlot.h * 0.8) < 1e-9
+      && Math.abs(tab.x * 2 + tab.w - HOME_BANDS.addSlot.w) < 1e-9
+      && Math.abs(tab.y + tab.h - HOME_BANDS.addSlot.h) < 1e-9
+      && TABLET_SCALE === 0.8,
+    `${tab.w.toFixed(1)}×${tab.h.toFixed(1)} in ${HOME_BANDS.addSlot.w}×${HOME_BANDS.addSlot.h}`);
 
   /**
    * ⚠️⚠️ **ONLY THE SLOT'S OWN CATEGORY IS OFFERED** — the acceptance line SCRUM-205 exists for. ⚠️ Asserted by

@@ -14,7 +14,7 @@ import { ShrineBase } from '@/components/home/shrine-base';
 import { ShrineCanvas } from '@/components/home/shrine-canvas';
 import { TabBarBand } from '@/components/home/tab-bar-band';
 import { Tablet } from '@/components/home/tablet';
-import { altarCaption, altarView, pageStep } from '@/lib/altar';
+import { altarCaption, altarView, pageStep, tabletBox } from '@/lib/altar';
 import {
   ANCESTOR_CAP,
   GIVEN_NAME_MAX,
@@ -437,6 +437,8 @@ export default function HomeShrine() {
         // ⚠️ The board draws the ＋ slot and the CENTRE TABLET on the SAME band
         // (131,285 129×307) — see `altar.ts`. They swap in place; nothing below moves.
         const slot = HOME_BANDS.addSlot;
+        /** ⚠️ The tablet draws at 80 % of its band, bottom-anchored - see `tabletBox`. */
+        const tab = tabletBox(slot);
         const current = view.kind === 'tablet' ? ancestors[view.index] : null;
         /** ⚠️ The caption is the altar's OWN state, so it is chosen from the count — see `altar.ts`. */
         const caption = altarCaption(ancestors.length);
@@ -540,11 +542,21 @@ export default function HomeShrine() {
                 {/* ⚠️ `tabletName()`, NOT `surname + givenName`. The board paints 陈氏 for a
                     tablet with no given name, and the sheet's preview uses the SAME function —
                     two call sites building the string is how a preview and its result drift. */}
-                <Tablet
-                  name={current ? tabletName(current.surname, current.givenName) : ''}
-                  width={slot.w * s}
-                  height={slot.h * s}
-                />
+                <View
+                  style={{
+                    position: 'absolute',
+                    left: tab.x * s,
+                    top: tab.y * s,
+                    width: tab.w * s,
+                    height: tab.h * s,
+                  }}
+                >
+                  <Tablet
+                    name={current ? tabletName(current.surname, current.givenName) : ''}
+                    width={tab.w * s}
+                    height={tab.h * s}
+                  />
+                </View>
               </Pressable>
             )}
 

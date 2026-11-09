@@ -80,7 +80,10 @@ export const SLOT_ART: Record<DecorationSlot, Rect> = {
   top_right: { x: 301, y: 210, w: 52, h: 66 },
   side_left: { x: 33, y: 300, w: 41, h: 160 },
   side_right: { x: 317, y: 300, w: 41, h: 160 },
-  background: { x: 101, y: 367, w: 190, h: 161 },
+  /** `decor · 鍾馗像 (background)` — ⚠️ **NOW THE WHOLE ZONE** (owner, 2026-11-09: *"enlarge the background decoration to
+   * occupy the entirety of the marked background decoration space"*). The board's own group is `101,367 190×161`, which
+   * left the print buried behind a tablet with only slivers showing; filling the marked space makes it a backdrop. */
+  background: { x: 101, y: 288, w: 190, h: 320 },
 };
 
 /** `slot · hint (how it works)` — 20,618 350×18, drawn only in customise mode. */
