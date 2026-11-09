@@ -9,6 +9,18 @@
 ## 📌 Quick Reference
 
 - **Project** — Joss Paper AR, an AR app that replaces physical joss-paper burning with a digital ritual
+- **Session S79w · 2026-11-09 — ✅ PR #85 MERGED (`1bcb234`), NINE tickets closed, and the "4 tablet" myth killed at its last three hiding places.**
+  - ✅ **The merge, verified rather than announced:** `git merge-base --is-ancestor cline/8d819 origin/main` → **exit 0**, `origin/main` = `1bcb234 "Merge pull request #85"`. ⚠️ **The same `git fetch --prune` deleted `origin/cline/8d819`** — which is exactly why the check must run against the **local** branch, never `origin/<branch>`.
+  - ✅ **Jira brought in line, each with its own evidence comment:** `204` · `162` · `163` · `230` → **Done** (all four sat at `In Review` solely on this merge). Earlier in the session `151` + children `182`–`186` closed, and `231` was filed *and* answered. **Every status read back, sequenced after its write.**
+  - ⚠️⚠️ **THE "4 TABLETS" WAS NEVER REQUESTED AND NEVER RENDERED.** The owner: *"i do not remember requesting for a 4 tablet layout."* He was right twice over — it was transcribed from **the board's own name** (`EN · 1c Home / full (4 tablets)`), and `ALTAR_DISPLAY_SLOTS = 4` was **imported by no screen**: `carouselStage()` draws **three**, `pageStep()` moves **one**. ✅ `SCRUM-231` (🎯 Decide) asked; the owner answered *"i believe its already correct at 3"*; the constant is **deleted** (`71c690d`).
+  - ⚠️ **It had three hiding places, and the third was a GATE TITLE.** `check:lib` §25 was named *"…and the altar holds **4**"* while **three of its own checks guarded the dead constant** — a gate naming a number in its title had been quietly certifying it. All three fixed: the constant, the section title, and `SCRUM-162`'s title (retitled to *"(3 on the stage)"*, deliberately **not** "the 3", because at that moment the **board still drew four**).
+  - ⚠️⚠️ **AND THEN THE BOARD CHANGED UNDER THE RECORD — the owner renamed `EN · 1c` to `(3 tablets)`, and measuring it settles the artwork but NOT the word.** Measured by layer name and bounds: `1c` draws **two** tablets (`tablet · left (陈德海)` **93×221 @rel57** · `tablet · centre (陈秀英)` **129×307 @rel131**) while `1b` draws **three** (`tablet · right (陈氏)` at **rel240**). ⚠️ **That difference is CORRECT, not an omission:** `1c` is the **full** board — the last tablet — and `carouselStage` returns `right: index < count - 1 ? … : null`, so **the last tablet has no right neighbour**. `1b` is the middle state, where both exist. ⚠️ **I called it half-finished off the layer count alone, and had to retract it** — **a layer count is only evidence once the board's state is known.** ⚠️ **What the rename does NOT settle:** whether **"3"** is *three on screen* (the display — what the app does) or *the altar holds three* (**capacity**, which would contradict `ancestor_cap = 10`). The old name was equally ambiguous: `full (4 tablets)` never said which — **and that ambiguity is what let the number travel.** ⚠️ `ZH · 1c 首页 / 牌位已满` still carries the old name and copy.
+  - 🐛 **A real defect found by driving the app, not reading it:** the **Language** row rendered *"Not built yet" / 尚未实现* beside a **working** `EN ↔ 中文` toggle — the only *live* row still carrying `settings.notBuilt`, when the rule two lines away (`settings.tsx:240`) says a live row names its **consequence**. Fixed in both locales; **fault-tested** — deleting the Chinese half turned **3 of 940 red** (the three locale-parity checks) → restored **byte-identical** (`sha256 03421b96`) → **940 green**.
+  - ✅ **`SCRUM-182`'s cold restart — the one clause no source could settle — PROVEN ON GLASS:** EN → tap 中文 → every string switched → `am force-stop` (focus fell back to the launcher, so the app was genuinely dead) → relaunch → **Chinese at first paint, no English flash**. ⚠️ **That absence is the proof:** a flash would mean `resolveInitialLocale` ran in an effect after paint.
+  - ⚠️⚠️ **THE TRAP OF THE SESSION: a worktree does not own port 8081.** `adb reverse tcp:8081` pointed at a Metro owned by **`worktrees/3bdcf/`**, so the device was running a **sibling tree** and *every* "verified on glass" was about code this session had not edited. ✅ The tell: `ss -ltnp | grep ':8081'` → `readlink /proc/<pid>/cwd`; now in **`AGENTS.md`**. ⚠️ **And a stale Metro module graph made a correct fix look broken FOUR times** (Fast Refresh · relaunch · `--clear` · `pm clear host.exp.exponent`) until a **fresh Metro on a new port** rendered it first time — ⚠️ **a change that does not appear is not evidence the change is wrong.**
+  - ⚠️ **Two smaller traps, both cost real time:** the Jira connector **silently mangles compound JQL** — `parent in (…)` returns *parents as if they were children*, and `issuetype = Subtask` returns Tasks — so only **single-clause** filters are trustworthy; the board audit became a per-ticket sweep of all **37** `To Do` tickets. And **a read-back batched in parallel with the write races it**: `SCRUM-151` read back `In Progress` because the `GET` ran alongside the transition; sequenced, it was `Done`.
+  - 📊 **Gates:** `check:lib` **940** · `tsc` 0 · `npm run check` **EXIT 0**. Fault tests this session: `pageStep` stepping by 4 → **2 of 940 red**, a missing translation → **3 of 940 red**; both restored byte-identical. **Spend US$0.00** — no provider call was made.
+
 - **Session S79v · 2026-11-09 — ✅ PR #83 MERGED, `SCRUM-205` → Done, and one question MOVED OUT of a comment into a ticket.**
   - ✅ **The merge, verified rather than announced:** PR #83 merged by the owner at `06:33:24Z`, merge commit **`14e2f0d`**. ⚠️ The remote branch was **already deleted**, so `git fetch origin main` + **`git merge-base --is-ancestor 8a051c7 origin/main` → YES** (and `a4c603e`) is the check that proves the code landed — *not* the merge API, and not `origin/<branch>`, which `fetch --prune` removes.
   - ✅ **Jira brought in line:** `SCRUM-205` → **Done** (transition id **41**), read back for **status *and* resolution** (both `Done`), still in Sprint 3. Closing comment carries the merge evidence, the delivered state and what is carried forward. `SCRUM-206` / `SCRUM-225` were already Done.
@@ -768,18 +780,21 @@ ported from the boards and on glass — and the altar can finally **hold a table
 `SCRUM-146` ✅ Done   the tablet sheet (+ 165 cap · 168 sheet)  ⚠️ its own TITLE still says "4-then-overflow"
 `SCRUM-161` ✅ Done   tribute + streak panels live
 `SCRUM-164` ✅ Done   Book + League entries, each with a way back
-`SCRUM-163` 🔄 In Review   the geometry gate (360 dp assertions) — on `cline/8d819`
-`SCRUM-162` 🔄 In Review   the Penpot port / altar art — ⚠️ NOT "4 tablet slots": the stage shows **three**
-`SCRUM-167` ⏳ To Do    ⚠️ **re-scope or close** — "4 visible + an honest overflow" is superseded by three-and-swipe
-`SCRUM-148` 🔄 In Progress   ⚠️ 162 + 163 are In Review; 167 wants re-scoping before this can close
+`SCRUM-163` ✅ Done   the geometry gate (§25) — fault-tested, on `main` since **PR #85**
+`SCRUM-162` ✅ Done   the Penpot port / altar art — ⚠️ NOT "4 tablet slots": the stage shows **three**
+`SCRUM-204` ✅ Done   the owned-decorations read — `items: code · qty · category`
+`SCRUM-230` ✅ Done   the Gold Bar / Phone transposition — catalogue + seed + migration, applied to hosted
+`SCRUM-231` ✅ Done   🎯 Decide: **the altar shows three** — `ALTAR_DISPLAY_SLOTS = 4` deleted as dead code
 `SCRUM-208` ✅ Done   the Home board's active tab (decided)
-`SCRUM-151` ✅ Done   ⚠️ **step 6 is COMPLETE** — children **182** switcher · **183** delete · **184**
-                      /settings · **185** history · **186** gates all ✅ **Done** (2026-11-09), and the
-                      parent closed with them. ⚠️ All five had sat at `To Do` for shipped work whose
-                      briefs had gone stale (*"the route does not exist at all today"*, *"`delete_my_data()`
-                      has never had a caller"* — both false for weeks). The one branch item is a
-                      one-line label fix riding in PR #85.
+`SCRUM-151` ✅ Done   ⚠️ **step 6 COMPLETE** — children **182**–**186** all Done; ★ **none of it was waiting on a
+                      branch.** ⚠️ All five had sat at `To Do` for shipped work whose briefs had gone stale
+                      (*"the route does not exist at all today"*, *"`delete_my_data()` has never had a caller"* —
+                      both false for weeks).
+`SCRUM-167` ⏳ To Do    ⚠️ **re-scope or close** — "4 visible + an honest overflow" is superseded by three-and-swipe
+`SCRUM-148` 🔄 In Progress   the shrine umbrella — 162 + 163 are Done; 167 wants re-scoping before this can close
 ```
+
+★ **PR #85 is merged** (`1bcb234`) — everything above is on `main`.
 
 ⚠️ **That block was four statuses out of date until 2026-11-09** (162 said ✅ Done when it was `In Progress`,
 164 and 208 said not-started when both were `Done`). ⚠️ **Read it from Jira, do not trust it** — it is a
@@ -808,14 +823,14 @@ Every one was found by **looking at the phone**, with `tsc` and 515+ checks gree
   4.90:1, so neither "copy the board" nor "nudge it back" passes silently.
 
 ## Next, in order
-1. **Merge `PR #85`** — `SCRUM-204` · `162` · `163` · `231` all wait on it, and none of it is on `main`.
-2. **`SCRUM-226`** — the door gods' generated art (two leaves drawn at **41 × 160**). ⚠️ If the two leaves turn
+1. **`SCRUM-226`** — the door gods' generated art (two leaves drawn at **41 × 160**). ⚠️ If the two leaves turn
    out to be **genuinely different drawings**, `side_right`'s `mirror` flag must be dropped **in the same
    commit** — the gate asserts the flag, not the art under it.
-3. **`SCRUM-167`** — **re-scope or close**: its "4 visible + honest overflow" brief is superseded by what the
+2. **`SCRUM-167`** — **re-scope or close**: its "4 visible + honest overflow" brief is superseded by what the
    app now does (three on the stage, the swipe reaching all ten — `SCRUM-231`).
-4. **`SCRUM-151`** — Profile & Settings, **including the language switcher** the app still lacks.
-5. **`SCRUM-147`** onboarding → **`150`** store → **`149`** item burn → **`155`** seed → **`157`** demo run.
+3. **`SCRUM-147`** onboarding → **`150`** store → **`149`** item burn → **`155`** seed → **`157`** demo run.
+   ⚠️ **Each already has 3–4 sub-tasks and every one is `To Do`** — verified exhaustively 2026-11-09: **no
+   `To Do` parent in the project has finished children**, so nothing was promoted to `In Review`.
 
 ⚠️ **`SCRUM-12`** is still blocked on the **`SCRUM-159`** decision.
 

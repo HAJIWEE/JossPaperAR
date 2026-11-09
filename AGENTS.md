@@ -81,6 +81,29 @@ Three real cases the audit caught on 2026-10-05: **SCRUM-53** (moved to `In Prog
 
 **Why it matters:** the sprint board is the PM's only honest view of the work. A ticket in the backlog and a ticket in the sprint are different claims about priority, and the board is where the PM looks to see what is actually moving.
 
+### ⚠️ Reading Jira: only **single-clause** JQL is trustworthy
+
+**Measured 2026-11-09.** The Jira connector **silently mangles compound JQL** — both of these look like
+successful queries, and both return the wrong set:
+
+| you write | it returns |
+|---|---|
+| `parent in (SCRUM-1, SCRUM-2, …)` | **the parents themselves**, as if they were the children |
+| `issuetype = Subtask` | plain **Tasks** alongside subtasks |
+
+✅ Exact and trustworthy: `parent = SCRUM-X` · `status = "To Do"` · key ranges
+(`key > SCRUM-72 AND key < SCRUM-154`).
+
+⚠️ **So a board roll-up is a per-ticket sweep, not one clever query** — the 2026-11-09 audit of every
+`To Do` ticket took **37 individual `parent = X` checks**. ⚠️ **The response envelope runs ~700 characters
+per issue, so a 30-issue result truncates mid-list**; page it with key ranges rather than trusting a long
+result to be complete.
+
+⚠️ **And never batch a read-back in parallel with the write it verifies.** A `GET` issued in the same
+parallel call as a transition **races it** and reports the *old* status — `SCRUM-151` read back
+`In Progress` one call after its transition had succeeded, which reads exactly like a failed write.
+Read back **sequenced**, and only then record the outcome.
+
 ### Branching and merging
 
 - Work on a **`cline/<id>` branch in a worktree**, then **open a PR into `main`**. Never push to `main` directly; never merge without being asked.

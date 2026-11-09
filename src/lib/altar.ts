@@ -33,6 +33,10 @@
  * read, while the behaviour that *is* real (three on the stage, one page per swipe) was covered by the stage geometry instead.
  * That is the vacuous-gate class: **a gate is only worth its line if the thing it reads is the thing that renders.**
  * ⚠️ Deleting the constant is what makes "how many are on screen" and "how many a clan may hold" impossible to conflate again.
+ * ⚠️ **The board was RENAMED to `EN · 1c Home / full (3 tablets)` on 2026-11-09.** Measured by layer name: `1c` draws **two**
+ * tablets (left + centre) and `1b` three — ⚠️ **and that is CORRECT**: `1c` is the FULL state, i.e. the last tablet, where
+ * `carouselStage` returns `right: null`. ⚠️ **What the name does NOT settle is whether "3" is the display or the CAPACITY** —
+ * `full (4 tablets)` was equally ambiguous, and that ambiguity is what let the number travel into three places here.
  */
 
 /**
