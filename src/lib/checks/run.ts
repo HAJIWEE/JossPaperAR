@@ -3259,6 +3259,12 @@ function storeChecks(): void {
     DECOR_LIB.includes("rpc('equip_decoration', { p_slot: slot, p_item_code: code })")
       && /function public\.equip_decoration\(p_slot text, p_item_code text\)/.test(EQUIP_SQL));
   check('⚠️⚠️ …and does NOT re-implement the slot/category rule client-side — the server owns it',
+    /**
+     * ⚠️ This is about the RULE (`equip_decoration` refusing a category mismatch), not about the word "category".
+     * Since 2026-11-09 the read also carries each owned item's category **for DISPLAY grouping**, taken from the
+     * catalogue — the same mirror `decor-sheet` already groups by. That is not a second opinion about what may be
+     * equipped; the client still asks the server and reports its answer.
+     */
     !/slot_category/.test(stripComments(DECOR_LIB)));
   check('⚠️ reads are RLS reads of the caller’s own rows, not a privileged RPC',
     DECOR_LIB.includes("from('inventory')") && DECOR_LIB.includes("from('equipped_decorations')"));
@@ -3268,6 +3274,35 @@ function storeChecks(): void {
   check('⚠️⚠️ all FIVE decorations are priced server-side — without it nothing can be owned',
     ['festive_set', 'spring_couplets', 'zhong_kui', 'door_gods', 'lanterns']
       .every((c) => new RegExp(`code = '${c}'`).test(PRICE_SQL)));
+
+  /**
+   * ⚠️⚠️ **SCRUM-204's OWN ACCEPTANCE CRITERION: "a read of owned decorations returns quantity and category per
+   * item."** ⚠️ The quantity was **selected and then thrown away** — the old code mapped `item_code` alone — and
+   * the category was never carried at all. That is the half-done read that leaves a picker unable to tell a side
+   * piece from a background one, and ⚠️ **no static type can see it**: `owned: readonly DecorationCode[]`
+   * compiles perfectly while discarding what it just fetched.
+   *
+   * ⚠️ And the category must come from the CATALOGUE: `inventory` is `(user_id, item_code, qty)`, so selecting a
+   * `category` from it would fail at runtime on a column that does not exist.
+   */
+  const DECOR_LIB_CODE = stripComments(DECOR_LIB);
+  /** ⚠️ The shape, as one predicate, so the positive control below exercises the SAME test. */
+  const exposesQtyAndCategory = (src: string): boolean =>
+    /readonly items: readonly OwnedDecoration\[\]/.test(src)
+      && /readonly qty: number/.test(src)
+      && /readonly category: DecorationSlotCategory/.test(src);
+  check('⚠️⚠️ the owned read SELECTS qty — not just the code', DECOR_LIB_CODE.includes("select('item_code, qty')"));
+  check('⚠️⚠️ …and EXPOSES both per item — `code · qty · category` (SCRUM-204)', exposesQtyAndCategory(DECOR_LIB_CODE));
+  check('⚠️⚠️ …and the CATEGORY comes from the catalogue, never from a column that does not exist',
+    DECOR_LIB_CODE.includes('CATEGORY_BY_CODE')
+      && /DECORATIONS[\s\S]{0,80}composedOf === undefined/.test(DECOR_LIB_CODE)
+      /** ⚠️ The select must not ask `inventory` for a `category`. */
+      && !/select\('item_code[^']*category/.test(DECOR_LIB_CODE));
+  check('⚠️ …and a COMPOSED SKU never reads as an owned altarpiece (`festive_set` is a SKU, all four pieces are it)',
+    DECOR_LIB_CODE.includes('d.composedOf === undefined'));
+  // ⚠️ POSITIVE CONTROL — the interface that SHIPPED must fail the shape test, or it proves nothing.
+  check('⚠️ guard: a read exposing only codes WOULD fail the qty/category check',
+    !exposesQtyAndCategory('export interface MyDecorations { readonly owned: readonly DecorationCode[]; }'));
 
   const STORE_SCREEN_JS = stripComments(
     readFileSync(join(PROJECT_ROOT, 'src', 'app', 'store.tsx'), 'utf8'),
@@ -3446,7 +3481,8 @@ function storeChecks(): void {
    * ⚠️ It was absent because `catalogue.ts` said the cash prices *"are the next read"* — and an unread price
    * looks exactly like an undecided one. `EN · 7 Store` and `ZH · 7 商店` both draw **two pills on every card**
    * and **name the item in the layer** (`card · Gold Bar cash` = `$1.99`), which is the pairing that can be
-   * trusted. That is SCRUM-204's lesson, already paid for once: pair by LAYER NAME, never by grid position.
+   * trusted. That is the decoration price transposition's lesson (Door Gods ↔ Lanterns, fixed under SCRUM-204),
+   * already paid for once: pair by LAYER NAME, never by grid position.
    *
    * ⚠️ **No two offerings may share a cash price** — with four distinct values a transposition changes which
    * CODE carries which number; with a duplicate this table would stop discriminating and agree with itself.

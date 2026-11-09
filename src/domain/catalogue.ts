@@ -78,7 +78,8 @@ export function baseValueOf(price: number): number {
  * ⚠️⚠️ **THE OFFERINGS' CASH RAIL WAS UNREAD UNTIL 2026-11-09, AND IT WAS DESIGNED ALL ALONG.**
  *
  * The store drew a points pill and no cash pill, because a note here said the cash prices *"are the next
- * read"* — the same mistake the decorations made (SCRUM-204): an unread price is not an absent design.
+ * read"* — the same mistake the decoration price pass made (a transposition, fixed under SCRUM-204): an unread
+ * price is not an absent design.
  * `EN · 7 Store` and `ZH · 7 商店` both draw **two pills on every card**, and the layer NAMES state the
  * pairing outright, which is what makes it trustworthy:
  *   `card · Joss Paper Stack cash = $0.99` · `card · Gold Bar cash = $1.99` · `card · Phone cash = $1.49`
@@ -97,7 +98,8 @@ export function baseValueOf(price: number): number {
  * ⚠️⚠️ **AND THE READ EXPOSED A REAL DEFECT, WHICH IS RECORDED HERE RATHER THAN QUIETLY FIXED.** The boards
  * pair **Gold Bar = 800 pts (base 960)** and **Phone = 600 pts (base 720)**. This catalogue has them the
  * OTHER WAY ROUND — `gold_bar` 600/base 720, `smartphone` 800/base 960 — so the app charges 600 for the gold
- * bar and 800 for the phone. ⚠️ That is the **same class as SCRUM-204** (Door Gods ↔ Lanterns), and it came
+ * bar and 800 for the phone. ⚠️ That is the **same class as the decoration price transposition** (Door Gods ↔
+ * Lanterns, fixed under SCRUM-204), and it came
  * from the same shape of mistake: the pairing was assigned by *list position* under a `priceSource: 'derived'`
  * that admits it *"still needs a PM confirmation"*. ⚠️ **NOT CHANGED HERE.** Points are what `purchase_item`
  * actually charges — fixing them means the catalogue, `seed.sql`, the `offerings_catalog` mirror, a NEW

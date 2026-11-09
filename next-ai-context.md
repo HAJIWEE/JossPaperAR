@@ -128,7 +128,7 @@
     - **Then it was too high: −15 % and the lift reverted** (*"further reduce the size … by 15% and bring it down back 15% cos now its encroaching on the top banner"*). `BACKGROUND_OVERSHOOT` **0.68816**; **`BACKGROUND_RAISE` deleted** (reversing the lift), so `SLOT_ART.background` is a single `hungFrom()` again. ⚠️ **The revert is the fix, not the shrink:** the top returns to the alignment edge (`279.04`); −15 % size alone would have left it `38.86` board px high. ⚠️ **Diagnosis worth keeping: two vertical controls (an anchor AND a lift) fought over one edge, and the lift lost** — one control per edge is the rule. ✅ **On glass: top 443 → 515 px (−72, back on the edge), width 282 → 240 (×0.851), and the BOTTOM edge unmoved at `499.25` board px both ways** — the lift and the shrink are both 15 % of the same height, so the print shrank with its bottom pinned and the altar line stayed put.
     - ⚠️⚠️ **THE TRAP THAT MADE THIS EXPENSIVE: this worktree's Metro did NOT notice THIS turn's edit.** The device kept serving the previous bundle — the new screenshots were **byte-identical apart from the clock**, which `ImageChops.difference(...).getbbox()` proves in one line (`(110,35,598,58)` = the status bar and nothing else). ⚠️ **A "verified on glass" claim is only as good as the bundle**, and the tell is a diff, not a look. ✅ **The rule: after editing, restart Metro and prove the screenshot MOVED.** A `force-stop` + `am start` is not enough when the server predates the edit. ⚠️ **Grepping the bundle for an identifier is not a usable check** — dev bundles come back minified, so `BACKGROUND_OVERSHOOT` reads **0 hits while the code is present**; diff the *pixels*, not the JS. ⚠️ **And do not over-correct: the stale one was this turn's edit, not last turn's.** The pre-change shot measured the print at **209 board px = 1.1 × 190**, which is proof the earlier +10 % *had* reached the glass — the measurement is what distinguishes the two cases.
   - ✅ **TAP OUTSIDE TO LEAVE** (owner: *"Tapping outside of the customization options should return me to normal mode with the tablets and tablet controls"*). An **invisible full-board catcher** is painted FIRST inside the overlay, so the six zones sit above it — a slot tap opens its picker, never the exit — and the chip and the sheet paint after it, so both stay live. ⚠️ The catcher lives in the `altar` region, so the **CTA and tab bar paint above it**; that is why leaving the screen also resets the mode (on blur), otherwise navigating away and back would return to a screen still wearing zones. `check:lib` **885 → 887**, both assertions fault-tested red. Verified on glass: tapping the table area leaves customising and the ＋/tablet controls come back.
-- **Session S79k · 2026-11-09 — 🖼️ `SCRUM-204` · THE DECORATION PRICES WERE A TRANSPOSITION: DOOR GODS and LANTERNS were swapped, and THE GATE AGREED WITH THE DEFECT. ⚠️ US$0.00 — no AI call.**
+- **Session S79k · 2026-11-09 — 🖼️ under `SCRUM-204` (the customisation workstream; that ticket's own scope is the `equip_decoration` wiring) · THE DECORATION PRICES WERE A TRANSPOSITION: DOOR GODS and LANTERNS were swapped, and THE GATE AGREED WITH THE DEFECT. ⚠️ US$0.00 — no AI call.**
   - ⚠️ **`EN · 7b` was authoritative all along, and it states the pairing in its own layer NAMES:** `card · Door Gods cash = $1.49` / `points = 1,200 pts`, `card · Lanterns cash = $1.99` / `points = 1,600 pts`. `ZH · 7b` agrees (门神 $1.49 / 1,200 · 灯笼 $1.99 / 1,600). ⚠️ The first pass paired the four cards by their **POSITION** in the 2 × 2 grid and swapped the two that share a row — so the **lanterns charged 400 points too much** and the **door gods 400 too little**.
   - ⚠️⚠️ **`check:lib`'s `BOARD_DECOR_PRICES` was transcribed from the same wrong pass, so it PASSED over the defect** — *a table that restates its input cannot catch a transposition*. Corrected, plus **a new control: no two decorations may share a price pair**, so a swap necessarily changes which code carries which number. Fault-tested three ways — full transposition → **RED** · one row duplicated → **RED** (the price check **and** the new guard) · restored → **857 green**.
   - ✅ **Corrected in four places at once, because they are ONE decision:** `src/domain/catalogue.ts` · `supabase/seed.sql` · **new migration `20261109100000_decoration_price_swap`** (never an edit to the applied `20261108160000`) · the gate table.
@@ -2315,7 +2315,7 @@ card **left 22 / right 23**, gap 9; featured **32 device px** under the pill row
 
 ⚠️⚠️ **FOUND AND DELIBERATELY NOT FIXED: the offerings' POINTS pairing is transposed vs both boards.** The
 boards say **Gold Bar 800 pts (base 960)** and **Phone 600 pts (base 720)**; this catalogue has `gold_bar` 600 and
-`smartphone` 800 — so the app charges **600 for a gold bar and 800 for a phone**. Same class as `SCRUM-204`, same
+`smartphone` 800 — so the app charges **600 for a gold bar and 800 for a phone**. Same class as the decoration price transposition (Door Gods ↔ Lanterns, fixed under `SCRUM-204`), same
 cause: a `priceSource: 'derived'` pairing assigned by list position. ⚠️ It is what `purchase_item` charges, so it
 needs the catalogue + `seed.sql` + the `offerings_catalog` mirror + a NEW migration + a re-push, plus a product
 call — **not a ride along a layout change.** Recorded in `catalogue.ts`; raised as **SCRUM-230**.
@@ -2364,5 +2364,32 @@ visible bar — it is the page's own colour.
 (a cream strip would land on the viewfinder) · the height off by one. `npm run check` green, `tsc` clean, CI green.
 
 **US$0.00.**
+
+
+## 📍 2026-11-09 (S80, cont.) — SCRUM-204's last criterion, and a citation that pointed at the wrong ticket
+
+**SCRUM-204 is the `equip_decoration` WIRING ticket, not the price transposition.** ⚠️ Seven places in the repo said
+"SCRUM-204" while meaning the Door Gods ↔ Lanterns swap — `catalogue.ts` ×2, `checks/run.ts`, two doc lines and the
+cost row. ⚠️ **The citation was not invented**: that swap really was fixed *inside 204's comment trail*, which is how
+`project-costs.md` attributed it — but read cold, it says the wiring ticket *is* the price ticket, which it is not.
+Reworded to *"the decoration price transposition (…, fixed under SCRUM-204)"* everywhere, and the two citations that
+**are** correct (`decorations.ts`'s header, the shrine-customisation gate) were left alone. ⚠️ There is still **no
+ticket of its own** for that swap — a JQL search for Door Gods / Lanterns / decoration price / transposition returns
+only SCRUM-228 and SCRUM-226.
+
+**204's one open acceptance criterion is now met:** *"a read of owned decorations returns quantity and category per
+item."* ⚠️ `qty` **was selected and then thrown away** (the old map took `item_code` alone) and the category was never
+carried — ⚠️ **and no static type can see either**, because `owned: readonly DecorationCode[]` compiles perfectly while
+discarding what it just fetched. `MyDecorations` now carries `items: OwnedDecoration[]` = **`code · qty · category`**,
+with `owned` **derived from it** so the two cannot disagree.
+
+⚠️ Two traps built in: the category comes from the **catalogue** (`CATEGORY_BY_CODE`), never from `inventory`, which is
+`(user_id, item_code, qty)` — selecting a `category` there would fail at runtime on a column that does not exist; and
+**composed SKUs are excluded**, so `festive_set` (a bundle, `purchase_item` never writes a row for it) can never read
+as an altarpiece you own.
+
+✅ `check:lib` **926 → 931**, fault-tested three ways, all red: the select dropping `qty` again · asking `inventory`
+for a `category` · removing the composed-SKU guard. Verified on glass that Home still loads and the shrine's read
+returns. **US$0.00.**
 
 
