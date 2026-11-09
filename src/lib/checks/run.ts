@@ -3372,6 +3372,27 @@ function storeChecks(): void {
   check('⚠️ guard: the catalogue still carries five decorations, so the registry cannot drift silently',
     DECORATIONS.length === 5);
 
+  /**
+   * ⚠️⚠️ **THE DOOR GODS ARE TWO LEAVES, NOT THREE** (owner, 2026-11-09: *"The door gods object has 3 objects it
+   * should only have 2, the 2 from the left. the 3rd should be removed."*).
+   *
+   * ⚠️ The motif carried a THIRD panel's robe (`x 70.5 w 14.6`) and gold torso (`x 67.7 w 12.3`) — at the trio's
+   * 32.5 pitch that is a third leaf, and its FRAME falls outside the 85.1 box, so it drew as a red-and-gold block
+   * **floating beside the pair**. It was the last ghost of the trio assumption SCRUM-228 reversed.
+   * ⚠️ **Asserted on the ART DATA, not on the comment**: every ink in `DOORGODS` must end inside the second leaf
+   * (which ends at 60.5). A shape creeping right is exactly the defect, and no type can see it.
+   */
+  const doorgodsBlock = /const DOORGODS[\s\S]*?\n\};/.exec(DECOR_CODE)?.[0] ?? '';
+  const inkRightEdges = [...doorgodsBlock.matchAll(/x: ([\d.]+), y: [\d.]+, w: ([\d.]+)/g)]
+    .map((m) => Number(m[1]) + Number(m[2]));
+  check('⚠️⚠️ the DOOR GODS motif is TWO leaves — nothing is drawn past the second panel (SCRUM-228)',
+    /** ⚠️ The length guard is what stops `Math.max([])` (−Infinity) from passing vacuously. */
+    inkRightEdges.length >= 8 && Math.max(...inkRightEdges) <= 60.6,
+    `${inkRightEdges.length} shapes · furthest right edge ${Math.max(...inkRightEdges).toFixed(1)} (second leaf ends 60.5)`);
+  // ⚠️ POSITIVE CONTROL — the shape that shipped must FAIL the bound, or the check proves nothing.
+  check('⚠️ guard: the third leaf that shipped (x 70.5 + w 14.6 = 85.1) WOULD fail that bound',
+    70.5 + 14.6 > 60.6 && inkRightEdges.every((e) => e <= 60.6));
+
 
   // `offerings_catalog.composed_of` — the SQL twin of this code field — and grants one of each
   // component, never the bundle itself. The SERVER behaviour is asserted in

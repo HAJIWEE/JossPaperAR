@@ -2431,6 +2431,33 @@ it as "the push did nothing".
 ⚠️ **And `cashPrice` deliberately did NOT move** — the cash rail is a separate pairing and it was already right.
 
 **US$0.00.**
+## 📍 2026-11-09 (S80, cont.) — the door gods motif's THIRD leaf deleted
+
+⚠️ **Owner: *"The door gods object has 3 objects it should only have 2, the 2 from the left. the 3rd should be
+removed."*** — the drawing, not the slot map (that was the previous fix).
+
+**WHAT IT WAS.** `DOORGODS` carried a **third panel's** robe (`x 70.5 w 14.6`) and gold torso (`x 67.7 w 12.3`).
+At the trio's **32.5 pitch** that is a third leaf, and its FRAME falls outside the **85.1** box — so it was clipped
+mid-shape and drew as a **red-and-gold block floating beside the pair**. ⚠️ The last ghost of the trio assumption
+`SCRUM-228` reversed an hour earlier.
+
+⚠️ **I rendered the motif before cutting, and that is what identified the shapes** — a throwaway SVG built from the
+motif's own numbers, rasterised with ImageMagick (`convert`/`magick` are on this box; there is **no** cairosvg, and
+`sprite-render.ts` is about the burnt offering, not motifs). ⚠️ **Without a picture this would have been guesswork**:
+ten of the twelve shapes are inside the two leaves, and the two that are not are exactly the stray object.
+
+**THE TRADE-OFF, stated plainly:** the removed block WAS the right leaf's robe, so that leaf now keeps its frame,
+cinnabar border, head and face disc but no robe — **the pair is asymmetric** (visible at card size on
+`HN615L005386`). ⚠️ Symmetric art is `SCRUM-226`'s generated pair; a one-edit stopgap would be to mirror the left
+leaf's robe/gold into the right instead of deleting them. Recorded, not assumed.
+
+✅ `check:lib` **932 → 934**, and the assertion reads the **art data**, not the comment: nothing in `DOORGODS` may end
+past the second leaf (`x + w ≤ 60.6`, with a length guard so `Math.max([])` cannot pass vacuously). Fault-tested —
+restoring the two shapes reports *"12 shapes · furthest right edge 85.1"* and goes **red**.
+
+**US$0.00.**
+
+## 📍 2026-11-09 (S80, cont.) — SCRUM-228 answered: **Door Gods are a PAIR, left and right, no top piece**
 ## 📍 2026-11-09 (S80, cont.) — SCRUM-228 answered: **Door Gods are a PAIR, left and right, no top piece**
 
 ⚠️ **Owner, verbatim: *"No door god is a left right only, no top"*** — the ticket's **option A**.

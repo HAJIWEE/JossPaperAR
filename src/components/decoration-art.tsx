@@ -240,6 +240,13 @@ const ZHONGKUI: Motif = {
 /**
  * `art · Door Gods` — 85.1 × 72. TWO paper panels side by side, each with a cinnabar inner border, a robed figure,
  * a pale face disc and a spear traced as a path. Read off `EN · 7b`, 2026-11-08.
+ *
+ * ⚠️⚠️ **A THIRD LEAF WAS TRANSCRIBED AND HAS BEEN REMOVED** (owner, 2026-11-09: *"The door gods object has 3
+ * objects it should only have 2, the 2 from the left. the 3rd should be removed."*). The motif carries a THIRD
+ * panel's robe (`x 70.5`) and gold torso panel (`x 67.7`) — at the trio's 32.5 pitch that is the third leaf, whose
+ * frame sits past the 85.1 box and is therefore clipped, so it rendered as a **red-and-gold block floating beside the
+ * pair**. ⚠️ It was a ghost of the same trio assumption SCRUM-228 has since reversed: door gods are a PAIR.
+ * ⚠️ `check:lib` now asserts nothing in this motif lives past the second leaf, so a third cannot creep back.
  */
 const DOORGODS: { box: readonly [number, number]; inks: readonly Ink[]; trails: readonly Trail[] } = {
   box: [85.1, 72],
@@ -252,8 +259,6 @@ const DOORGODS: { box: readonly [number, number]; inks: readonly Ink[]; trails: 
     { x: 13.4, y: 26.8, w: 6.7, h: 7.9, rx: 3.35, fill: 'paper', stroke: 'ink', sw: 2 },
     { x: 38.1, y: 7.9, w: 22.4, h: 56.3, rx: 2, fill: 'paper', stroke: 'ink', sw: 3 },
     { x: 39.8, y: 9.8, w: 19, h: 52.4, rx: 2, fill: 'paper', stroke: 'cinnabar', sw: 2 },
-    { x: 70.5, y: 36.7, w: 14.6, h: 17, rx: 2, fill: 'cinnabar', stroke: 'ink', sw: 2.5 },
-    { x: 67.7, y: 22.3, w: 12.3, h: 14.4, rx: 2, fill: 'goldDeep', stroke: 'ink', sw: 2 },
     { x: 55.4, y: 15.7, w: 3.9, h: 6.5, rx: 2, fill: 'cinnabar', stroke: 'ink', sw: 2 },
     { x: 45.9, y: 26.8, w: 6.7, h: 7.9, rx: 3.35, fill: 'paper', stroke: 'ink', sw: 2 },
   ],
