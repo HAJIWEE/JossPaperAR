@@ -3559,6 +3559,30 @@ function storeChecks(): void {
     `${EN_KEYS.includes('home.swipeHint')}/${ZH_KEYS.includes('home.swipeHint')}`);
 
   /**
+   * ⚠️⚠️ **THE CTA'S SHAPE IS THE BOARD'S, NOT A PILL** (owner, 2026-11-09: *"the \"Begin an offering\" button style doesn't match the
+   * penpot design. the corner radius and the border"*).
+   *
+   * ⚠️ `EN · 1b`'s `btn · Make an Offering · 献供` is `20,676 350×66` with **radius 18**, fill `#c23b22`, **stroke `#1a1a1a` 2.5
+   * INNER**, plus a separate `btn · Make an Offering (shadow)` at `20,680` filled `#9a2b18` — a **solid lip 4 board px lower**.
+   * ⚠️ The app had `radius.pill` (999) and **no border**: exactly the two things the owner named. ⚠️ Asserted against the token AND
+   * the source, because the failure was a *style value*, which nothing else in the suite looks at.
+   */
+  const tokenSrc = readFileSync(join(PROJECT_ROOT, 'src', 'theme', 'tokens.ts'), 'utf8');
+  check('⚠️⚠️ the CTA is the board\'s shape: radius 18, a 2.5 inner ink stroke, and a solid lip 4 px below',
+    radius.xl === 18
+      && /\n  xl: 18,/.test(tokenSrc)
+      && flatHome.includes('const CTA_STROKE = 2.5')
+      && flatHome.includes('const CTA_LIP = 4')
+      && flatHome.includes('borderColor: brand.ink')
+      && flatHome.includes('ctaShape(s)')
+      /** ⚠️ The pill radius must be GONE from the CTA — that was the mismatch. */
+      && !flatHome.includes('radius.pill * s')
+      && flatHome.includes('styles.ctaLip')
+      /** ⚠️ The lip is the board's own `+4`, not an eyeballed offset. */
+      && flatHome.includes('HOME_BANDS.cta.y + CTA_LIP'),
+    `xl=${radius.xl} stroke=${flatHome.includes('const CTA_STROKE = 2.5')} lip=${flatHome.includes('const CTA_LIP = 4')} pillGone=${!flatHome.includes('radius.pill * s')}`);
+
+  /**
    * ⚠️⚠️ **THE THREE-TABLET STAGE IS `EN · 1b`'s, CHECKED AGAINST THE BOARD'S OWN RECTS** (owner: *"Refer to En-1b i should
    * see 3 tablets"*). ⚠️ The board draws `tablet · centre` `129×307`, `tablet · left/right` `93×221`, at centres `±92` apart.
    * ⚠️ Those become ratios here — `93/129`, `221/307`, `92/129` — because this app's centre is drawn at `TABLET_SCALE` (the

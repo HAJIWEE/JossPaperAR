@@ -80,7 +80,15 @@ export const disc = {
 export const TOUCH_TARGET = 44;
 export const TOUCH_GAP = 8;
 
-export const radius = { sm: 6, md: 10, lg: 16, pill: 999 } as const;
+export const radius = {
+  sm: 6,
+  md: 10,
+  lg: 16,
+  /** `18` — `btn · Make an Offering · 献供` on `EN · 1b`, read 2026-11-09. ⚠️ Not `pill`: the CTA is a rounded
+   * rectangle in the design, and the app had been drawing it at `pill` (999), which is the mismatch the owner saw. */
+  xl: 18,
+  pill: 999,
+} as const;
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 20, xl: 32 } as const;
 

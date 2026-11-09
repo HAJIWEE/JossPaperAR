@@ -5,6 +5,25 @@
 const SWIPE_CLAIM = 12;
 const SWIPE_COMMIT = 40;
 
+/**
+ * ⚠️⚠️ **THE CTA'S SHAPE, READ OFF `EN · 1b`** (owner, 2026-11-09: *"the "Begin an offering" button style doesn't match the penpot
+ * design. the corner radius and the border"*).
+ *
+ * ⚠️ The board's `btn · Make an Offering · 献供` is `20,676 350×66`: **radius 18**, fill `#c23b22`, **stroke `#1a1a1a` at 2.5, INNER**
+ * — and a separate `btn · Make an Offering (shadow)` at `20,680` filled `#9a2b18`, i.e. a **solid darker lip 4 board px lower**, not a
+ * blurred shadow. ⚠️ The app had been drawing `radius.pill` (999) with **no border at all**, which is exactly the two things that
+ * looked wrong; the colours were already the tokens' (`cinnabar` `#C23B22`, `cinnabarDeep` `#9A2B18`, `ink` `#1A1A1A`).
+ * ⚠️ RN's `borderWidth` is painted INSIDE the box, which is the board's `strokeAlignment: inner` — so the button keeps its 350×66.
+ * ⚠️ The board's drop-shadow effect (`0 12 26` @ 20 %) is NOT reproduced: RN has no cross-platform blur without a library, and the
+ * design already draws the visible edge as that solid lip.
+ */
+const CTA_RADIUS = radius.xl;
+const CTA_STROKE = 2.5;
+const CTA_LIP = 4;
+function ctaShape(s: number) {
+  return { borderRadius: CTA_RADIUS * s, borderWidth: CTA_STROKE * s, borderColor: brand.ink };
+}
+
 import { Fragment, useCallback, useMemo, useState } from 'react';
 import { Alert, Dimensions, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -809,6 +828,11 @@ export default function HomeShrine() {
         // offering the burn first would be the wrong primary action — and replacing
         // it *in place* means nothing on the shrine moves.
         return clans.length === 0 ? (
+          <>
+          <View
+            style={[styles.abs, bandRect({ ...HOME_BANDS.cta, y: HOME_BANDS.cta.y + CTA_LIP }, s), styles.ctaLip, { borderRadius: CTA_RADIUS * s }]}
+            testID="home-cta-lip"
+          />
           <Pressable
             accessibilityRole="button"
             testID="home-clan-entry"
@@ -818,7 +842,7 @@ export default function HomeShrine() {
               bandRect(HOME_BANDS.cta, s),
               styles.cta,
               styles.clanEntry,
-              { borderRadius: radius.pill * s },
+              ctaShape(s),
               pressed && styles.pressed,
             ]}
           >
@@ -826,7 +850,13 @@ export default function HomeShrine() {
               {t('home.clanEntry')}
             </Text>
           </Pressable>
+          </>
         ) : (
+          <>
+          <View
+            style={[styles.abs, bandRect({ ...HOME_BANDS.cta, y: HOME_BANDS.cta.y + CTA_LIP }, s), styles.ctaLip, { borderRadius: CTA_RADIUS * s }]}
+            testID="home-cta-lip"
+          />
           <Pressable
             accessibilityRole="button"
             testID="home-begin"
@@ -835,7 +865,7 @@ export default function HomeShrine() {
               styles.abs,
               bandRect(HOME_BANDS.cta, s),
               styles.cta,
-              { borderRadius: radius.pill * s },
+              ctaShape(s),
               pressed && styles.pressed,
             ]}
           >
@@ -843,6 +873,7 @@ export default function HomeShrine() {
               {t('home.begin')}
             </Text>
           </Pressable>
+          </>
         );
 
       // ── footer · the tab bar (SCRUM-164) ──────────────────────────────────
@@ -948,6 +979,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  /** `btn · Make an Offering (shadow)` — the solid darker lip, 4 board px below the button. */
+  ctaLip: { backgroundColor: brand.cinnabarDeep },
   ctaLabel: { color: onColorCream, fontWeight: '600' },
   clanEntry: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   /** `btn · settings` — paperDeep fill, ink stroke; radius + width are scaled inline. */
