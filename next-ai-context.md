@@ -2431,4 +2431,33 @@ it as "the push did nothing".
 ⚠️ **And `cashPrice` deliberately did NOT move** — the cash rail is a separate pairing and it was already right.
 
 **US$0.00.**
+## 📍 2026-11-09 (S80, cont.) — SCRUM-228 answered: **Door Gods are a PAIR, left and right, no top piece**
+
+⚠️ **Owner, verbatim: *"No door god is a left right only, no top"*** — the ticket's **option A**.
+
+⚠️ **This is a DELIBERATE REVERSAL, and the record says so.** The door gods' three slots were the **one inference**
+in `SET_SLOTS`: the owner's earlier *"The door Gods is also a trio one"* was the only evidence and no board draws them
+on an altar. ⚠️ The consequence on glass was already filed as a defect (SCRUM-226's render evidence): two **PORTRAIT**
+panels stretched into the **162 × 46** 横批 band read as a squashed card, with the pair's red block floating beside
+them. A 门神 flanks a doorway; no traditional 横批 carries them.
+
+**WHAT CHANGED**
+· `SET_SLOTS.door_gods` → **`['side_left', 'side_right']`** (was `top_middle` + both sides) — so door gods now draw
+exactly like the lanterns, and **`top_middle` is the couplets' 横批 alone**.
+· ⚠️ **THE CHIP COMES BACK.** Because door gods no longer run through the chip's band, `chipBandClear` shows the chip
+on a door-gods altar — before this, a set with no business in that band was **removing the only way in**.
+· ✅ `check:lib` **931 → 932**, and the assertion IS the record: a future reader who "restores" the trio is
+contradicted by the gate rather than silently obeyed. Fault-tested — re-adding `top_middle` turns **both** new checks
+red (the pair, and the chip staying visible).
+· `SCRUM-226` narrows from a **trio** to **two door-leaf drawings**; `SCRUM-227` (user-written couplet text) loses its
+"does a door god own this band?" pre-question.
+· ⚠️ `follow-up-items.md` **no longer claims the borrowed banner is approved** — it said the top-middle reuse was
+"approved as temporary", which is now simply wrong.
+
+⚠️ **`top_middle` STILL serves two categories** (a `top` slot, but the couplets are a `side` set) — that follow-up
+stands, only narrower: it is the last set in the wrong category for that band.
+
+**US$0.00.**
+
+
 

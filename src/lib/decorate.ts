@@ -367,7 +367,7 @@ export function artVariantFor(code: DecorationCode, slot: DecorationSlot): 'crow
  * | set | pieces | slots |
  * |---|---|---|
  * | Spring Couplets | **3** — 横批 + a scroll each side | `top_middle` · `side_left` · `side_right` |
- * | Door Gods | **3** | `top_middle` · `side_left` · `side_right` |
+ * | Door Gods | **2** — one door leaf each side, **NO top piece** | `side_left` · `side_right` |
  * | Lanterns | **2** — one each side (the upper corners) | `top_left` · `top_right` |
  * | Zhong Kui | 1 — the print behind the tablet | `background` |
  *
@@ -376,8 +376,14 @@ export function artVariantFor(code: DecorationCode, slot: DecorationSlot): 'crow
  * ⚠️ **`equip_decoration` stores ONE row per set** (S14k clears the other slot in the category), so this table is the
  * only place the pieces-per-set fact can live. ⚠️ Measured on glass 2026-11-09: with `lanterns` in `top_left` only one
  * corner lit — the defect that started this.
- * ⚠️ **Door Gods' trio shape is ASSUMED to match the couplets'** (same category, same three positions). No board
- * draws the door gods on an altar, so this is the one line here that is inference rather than measurement.
+ *
+ * ⚠️⚠️ **DOOR GODS WERE THE ONE INFERENCE HERE, AND THE OWNER HAS NOW SETTLED IT (SCRUM-228, 2026-11-09).**
+ * They were given the couplets' three slots *by inference* — no board draws them on an altar, and the owner's earlier
+ * *"The door Gods is also a trio one"* was the only evidence. Asked directly whether they own a top-middle band, the
+ * answer was: **"No door god is a left right only, no top"** — i.e. a **PAIR**, which is also what a 门神 actually is
+ * (they flank a doorway; no traditional 横批 carries them). ⚠️ So they now draw exactly like the lanterns and the
+ * `top_middle` band is the **couplets' 横批 alone**. ⚠️ The borrowed banner was visibly wrong on glass: two PORTRAIT
+ * panels stretched into a 162 × 46 band read as a squashed card (SCRUM-226's render evidence).
  */
 const SET_SLOTS: Record<DecorationCode, readonly DecorationSlot[]> = {
   /** a PAIR, one hanging each side — the upper corners (`1d` draws both) */
@@ -388,8 +394,14 @@ const SET_SLOTS: Record<DecorationCode, readonly DecorationSlot[]> = {
    * its own** yet (`1e` has it as raw shapes). Filed rather than faked with a second motif.
    */
   spring_couplets: ['top_middle', 'side_left', 'side_right'],
-  /** a TRIO, the couplets' shape — see the caveat above */
-  door_gods: ['top_middle', 'side_left', 'side_right'],
+  /**
+   * ⚠️⚠️ **A PAIR — left and right only, NO top piece** (owner, 2026-11-09, answering SCRUM-228: *"No door god is a
+   * left right only, no top"*). ⚠️ They briefly carried the couplets' `top_middle` **by inference** and drew two
+   * portrait panels stretched into a 162 × 46 band, which read as a squashed card rather than a pair of door leaves.
+   * ⚠️ This is the ticket's **option A** and it is a deliberate reversal of the earlier *"the door Gods is also a
+   * trio one"* — documented so it is not "corrected" back by a future reader. `check:lib` asserts the pair.
+   */
+  door_gods: ['side_left', 'side_right'],
   /** one print, behind the tablet */
   zhong_kui: ['background'],
   /**

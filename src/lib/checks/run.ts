@@ -4037,10 +4037,25 @@ function storeChecks(): void {
     coupletsOnly.length === 3
       && coupletsOnly.map((p) => p.slot).join(',') === 'top_middle,side_left,side_right',
     coupletsOnly.map((p) => p.slot).join(','));
+  /**
+   * ⚠️⚠️ **DOOR GODS ARE A PAIR — left and right, NO top piece** (owner, 2026-11-09, answering SCRUM-228:
+   * *"No door god is a left right only, no top"*). ⚠️ They had carried the couplets' `top_middle` **by inference** from
+   * an earlier *"the door Gods is also a trio one"*, and drew two PORTRAIT panels stretched into a 162 × 46 band.
+   * ⚠️ This is a deliberate reversal of that line, so the assertion is the record: a future reader who "restores" the
+   * trio is contradicted here rather than silently obeyed.
+   */
   const doorGodsOnly = drawPlan({ ...noDecor, side_left: 'door_gods' } as never);
-  check('⚠️ …and DOOR GODS are a trio too (assumed to share the couplets\' shape — see `SET_SLOTS`)',
-    doorGodsOnly.length === 3
-      && doorGodsOnly.map((p) => p.slot).join(',') === 'top_middle,side_left,side_right');
+  check('⚠️⚠️ DOOR GODS are a PAIR — a leaf each side and NO top-middle piece (SCRUM-228)',
+    doorGodsOnly.length === 2
+      && doorGodsOnly.map((p) => p.slot).join(',') === 'side_left,side_right',
+    doorGodsOnly.map((p) => p.slot).join(','));
+  /**
+   * ⚠️ **THE CONSEQUENCE THE RULING BUYS:** `top_middle` is now the **couplets' 横批 and nothing else**, so a
+   * door-gods altar leaves that band CLEAR and the chip still shows. ⚠️ Before the ruling the door gods hid the chip —
+   * a set with no business in that band was removing the only way in.
+   */
+  check("⚠️ …and they leave the 横批 band CLEAR, so the chip still shows — top-middle is the couplets' alone",
+    chipBandClear(doorGodsOnly, HOME_BANDS.templeChip));
   const backgroundOnly = drawPlan({ ...noDecor, background: 'zhong_kui' } as never);
   check('⚠️ the BACKGROUND print draws BEHIND the tablet — the z-order `1e` depends on',
     backgroundOnly.length === 1 && backgroundOnly[0].behind === true);
