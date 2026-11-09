@@ -25,7 +25,6 @@ import {
   SLOT_ART,
   SLOT_HIT,
   BACKGROUND_OVERSHOOT,
-  BACKGROUND_RAISE,
   BACKGROUND_TOP_OFFSET,
   artVariantFor,
   chipBandClear,
@@ -3395,9 +3394,7 @@ function storeChecks(): void {
    * slot behind a `=== 'background'` carve-out (the first cut) would have let any background change through unexamined.
    */
   const topAllowance: Partial<Record<DecorationSlot, number>> = {
-    // ⚠️ The alignment edge AND the lift, because the box is translated after it is aligned — an allowance that stopped at
-    // the offset would fail a print the owner had deliberately raised.
-    background: SLOT_HIT.background.h * BACKGROUND_TOP_OFFSET + SLOT_ART.background.h * BACKGROUND_RAISE,
+    background: SLOT_HIT.background.h * BACKGROUND_TOP_OFFSET,
   };
   const outsideZone = SLOTS.filter((s) => {
     const z = SLOT_HIT[s];
@@ -3419,17 +3416,17 @@ function storeChecks(): void {
   const bgW = SLOT_HIT.background.w * BACKGROUND_OVERSHOOT;
   const bgH = SLOT_HIT.background.h * BACKGROUND_OVERSHOOT;
   const bgX = SLOT_HIT.background.x + (SLOT_HIT.background.w - bgW) / 2;
-  const bgTop = SLOT_HIT.background.y - SLOT_HIT.background.h * BACKGROUND_TOP_OFFSET - bgH * BACKGROUND_RAISE;
+  const bgTop = SLOT_HIT.background.y - SLOT_HIT.background.h * BACKGROUND_TOP_OFFSET;
   // ⚠️ The constants lead the failure text on purpose: when only a knob moved, the rect follows it, so `want === got`
   // below would read like a pass. Measured by moving each knob — see the fault test.
-  check('⚠️⚠️ the background print is aligned top-centre at 81 % and the whole box LIFTED 15 % of itself',
-    BACKGROUND_OVERSHOOT === 0.8096 && BACKGROUND_TOP_OFFSET === 0.028 && BACKGROUND_RAISE === 0.15
+  check('⚠️⚠️ the background print is aligned top-centre at 68.8 %, with no lift above its edge',
+    BACKGROUND_OVERSHOOT === 0.68816 && BACKGROUND_TOP_OFFSET === 0.028
       && Math.abs(bgArt.w - bgW) < 1e-9 && Math.abs(bgArt.h - bgH) < 1e-9
       && Math.abs(bgArt.x - bgX) < 1e-9 && Math.abs(bgArt.y - bgTop) < 1e-9
       // ⚠️ Top-CENTRE, so the two side margins are equal — a left anchor would pass the width check and walk sideways.
       && Math.abs((bgArt.x - SLOT_HIT.background.x)
         - (SLOT_HIT.background.x + SLOT_HIT.background.w - (bgArt.x + bgArt.w))) < 1e-9,
-    `overshoot ${BACKGROUND_OVERSHOOT} · top ${BACKGROUND_TOP_OFFSET} · raise ${BACKGROUND_RAISE} · `
+    `overshoot ${BACKGROUND_OVERSHOOT} · top ${BACKGROUND_TOP_OFFSET} · `
       + `${bgArt.w.toFixed(1)}×${bgArt.h.toFixed(1)} at (${bgArt.x.toFixed(1)}, ${bgArt.y.toFixed(1)}) (want ${bgW.toFixed(1)}×${bgH.toFixed(1)} at (${bgX.toFixed(1)}, ${bgTop.toFixed(1)}))`);
   /**
    * ⚠️ **THE TABLET DRAWS AT 72 % OF ITS BAND** — 20 % then a further 10 % (owner). ⚠️ Bottom-anchored: it gives up the

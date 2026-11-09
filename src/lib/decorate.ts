@@ -80,13 +80,9 @@ export const SLOT_HIT: Record<DecorationSlot, Rect> = {
  * Removed rather than left at 0, so there is one way to position this print and not two that disagree.
  *
  * ⚠️ Provenance of the number, so the next cut has its history: `1.0` (the zone) → `1.1` (+10 %) → `0.88` (−20 %) →
- * `0.704` (another −20 %) → **`0.8096`** (+15 %, i.e. `0.704 × 1.15`).
- * ⚠️ **"Bring up X %" is read as SIZE here, not as a vertical raise** — the owner asked in the same breath to *"maintain
- * top center alignment"*, and a raise is the one thing that breaks it: 15 % of this print's height would lift its top
- * `33.8` board px, off the edge the anchor holds. Growing keeps the top and moves the bottom, which is the whole point of
- * `BACKGROUND_TOP_OFFSET`.
+ * `0.704` (another −20 %) → `0.8096` (+15 %) → **`0.68816`** (−15 %, i.e. `0.8096 × 0.85`).
  */
-export const BACKGROUND_OVERSHOOT = 0.8096;
+export const BACKGROUND_OVERSHOOT = 0.68816;
 
 /**
  * ⚠️ **WHERE THE BOX IS ALIGNED: its top edge, as a fraction of the ZONE's height above the zone's top** (`0.028` = `8.96`
@@ -95,21 +91,14 @@ export const BACKGROUND_OVERSHOOT = 0.8096;
  * ⚠️ Where `0.028` comes from, so it is a measurement and not a taste: an earlier *"bring it up another 10 %"* lifted the
  * 0.88 print by 10 % of its own height (`28.16`) from a centred position `35.2` below the zone's top, so `35.2 − 28.16 =
  * 8.96`, and `8.96 / 320 = 0.028` exactly.
+ * ⚠️⚠️ **THIS IS THE ONLY VERTICAL CONTROL THERE IS — the box sits ON this edge, with no lift on top of it** (owner,
+ * 2026-11-09: *"bring it down back 15% cos now its encroaching on the top banner"*). ⚠️ The `BACKGROUND_RAISE = 0.15` of the
+ * previous commit is **deleted, not zeroed** — the same rule `BACKGROUND_LIFT` got: one way to position this print, not two
+ * that disagree. What it did is recorded here instead: `38.86` board px up, putting the top at `240.2`, where the print
+ * reached into the chip band (`a fault test at 0.30 proved the collision`). ⚠️ **Reversing the lift is what fixes the banner
+ * overlap** — the −15 % size alone would have left the top `38.86` px too high.
  */
 export const BACKGROUND_TOP_OFFSET = 0.028;
-
-/**
- * ⚠️ **HOW FAR THE WHOLE BOX IS LIFTED, as a fraction of its OWN height** (owner, 2026-11-09: *"bring the whole background
- * decoration box up 15% so the art is still top center aligned"*).
- *
- * ⚠️⚠️ **A TRANSLATION, not a size and not an anchor.** The box moves up as one piece — top edge and bottom edge together —
- * so nothing inside it changes and the horizontal centring `hungFrom()` established is untouched. That is what *"so the art
- * is still top center aligned"* asks for, and it is why this is a separate step from `BACKGROUND_TOP_OFFSET`: the offset
- * says where the box is ALIGNED, this says how far it has been MOVED from there.
- * ⚠️ The unit is the print's own height, because that is how the owner asked (*"up 15%"* of the box). ⚠️ It therefore
- * SCALES with the print: a future size change moves the lift too, by design — say so rather than discovering it.
- */
-export const BACKGROUND_RAISE = 0.15;
 
 /**
  * A rect hung from the **TOP-CENTRE** of `zone`: horizontally centred, `factor` of the zone's size, its top edge
@@ -120,11 +109,6 @@ export function hungFrom(zone: Rect, factor: number, topOffset: number): Rect {
   const w = zone.w * factor;
   const h = zone.h * factor;
   return { x: zone.x + (zone.w - w) / 2, y: zone.y - zone.h * topOffset, w, h };
-}
-
-/** ⚠️ Move a rect UP by `factor` of its own height — a translation, so its size and its x are untouched. */
-export function raise(r: Rect, factor: number): Rect {
-  return { x: r.x, y: r.y - r.h * factor, w: r.w, h: r.h };
 }
 
 /**
@@ -140,12 +124,12 @@ export const SLOT_ART: Record<DecorationSlot, Rect> = {
   top_right: { x: 301, y: 210, w: 52, h: 66 },
   side_left: { x: 33, y: 300, w: 41, h: 160 },
   side_right: { x: 317, y: 300, w: 41, h: 160 },
-  /** `decor · 鍾馗像 (background)` — ⚠️ **ALIGNED to the zone's top-centre, then the whole box LIFTED** (owner, 2026-11-09:
-   * *"bring the whole background decoration box up 15% so the art is still top center aligned"*).
-   * ⚠️ Two steps, in this order, because they are two different facts: `hungFrom()` decides the alignment (centred, top at
-   * `BACKGROUND_TOP_OFFSET`), `raise()` then translates the whole box up `BACKGROUND_RAISE` of its own height — size and
-   * centring untouched, which is exactly *"the art is still top center aligned"*. */
-  background: raise(hungFrom(SLOT_HIT.background, BACKGROUND_OVERSHOOT, BACKGROUND_TOP_OFFSET), BACKGROUND_RAISE),
+  /** `decor · 鍾馗像 (background)` — ⚠️ **HUNG FROM THE ZONE'S TOP-CENTRE, and nothing else** (owner, 2026-11-09:
+   * *"further reduce the size of the zhong kui art by 15% and bring it down back 15%"*).
+   * ⚠️ One step again, after two commits of a second one: `hungFrom()` is the whole placement — `BACKGROUND_OVERSHOOT` for
+   * size, `BACKGROUND_TOP_OFFSET` for the edge it hangs from. A lift on top of an anchor was two controls for one edge, and
+   * the second is what walked the print into the chip band. */
+  background: hungFrom(SLOT_HIT.background, BACKGROUND_OVERSHOOT, BACKGROUND_TOP_OFFSET),
 };
 
 /** `slot · hint (how it works)` — 20,618 350×18, drawn only in customise mode. */
