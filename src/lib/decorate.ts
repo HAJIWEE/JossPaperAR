@@ -211,7 +211,7 @@ export interface DrawPlan {
    * ⚠️ **A SET'S PIECE IS NOT ALWAYS THE SET'S FACE.** The couplets are a trio and the top-middle one is the 横批 — a
    * banner, not a scroll — so the drawing is chosen by SLOT as well as by code. `undefined` = the code's own motif.
    */
-  readonly art?: 'crown' | 'single';
+  readonly art?: 'crown' | 'single' | 'scroll';
 }
 
 /**
@@ -221,9 +221,9 @@ export interface DrawPlan {
  * art of its own — the board never draws the door gods on an altar — so it borrows the side motif and that is
  * recorded as owed rather than invented.
  */
-export function artVariantFor(code: DecorationCode, slot: DecorationSlot): 'crown' | 'single' | undefined {
+export function artVariantFor(code: DecorationCode, slot: DecorationSlot): 'crown' | 'single' | 'scroll' | undefined {
   /** the couplets' 横批 banner, only in the top-middle */
-  if (code === 'spring_couplets' && slot === 'top_middle') return 'crown';
+  if (code === 'spring_couplets') return slot === 'top_middle' ? 'crown' : 'scroll';
   /** ⚠️ ONE lantern per corner: the pair motif belongs on a store card, not on the altar */
   if (code === 'lanterns') return 'single';
   return undefined;

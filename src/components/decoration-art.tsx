@@ -73,6 +73,28 @@ interface Motif {
 }
 
 /**
+ * ⚠️ **ONE COUPLET SCROLL — what a SIDE of the altar holds** (`EN · 1d` `decor · couplet (side-left)`, 41 × 160),
+ * ported 2026-11-09.
+ *
+ * ⚠️ **`COUPLET` is the whole TRIO** — a plaque with three gold panels over two vertical strips — i.e. the STORE CARD's
+ * illustration. Drawing it into a 41 × 160 side rect (the owner, spotting it on glass: *"the side banners still show
+ * all 3 banners in the couplets"*) put the plaque and BOTH strips down each side, so one side of the altar displayed a
+ * whole set. The altar shows one object per slot: a scroll here, the 横批 at the top-middle.
+ */
+const COUPLET_SCROLL: Motif = {
+  box: [41, 160],
+  inks: [
+    { x: 19.5, y: 2.1, w: 3.1, h: 10.3, fill: 'ink' },
+    { x: 4.1, y: 10.3, w: 32.8, h: 145.6, rx: 3, fill: 'cinnabar', stroke: 'ink', sw: 3 },
+    { x: 12.3, y: 22.6, w: 16.4, h: 20.5, fill: 'goldBright', stroke: 'ink', sw: 2 },
+    { x: 12.3, y: 53.3, w: 16.4, h: 20.5, fill: 'goldBright', stroke: 'ink', sw: 2 },
+    { x: 12.3, y: 84.1, w: 16.4, h: 20.5, fill: 'goldBright', stroke: 'ink', sw: 2 },
+    { x: 12.3, y: 114.9, w: 16.4, h: 20.5, fill: 'goldBright', stroke: 'ink', sw: 2 },
+  ],
+  trails: [],
+};
+
+/**
  * ⚠️ **THE COUPLETS' THIRD PIECE — the 横批 (horizontal banner)**, ported 2026-11-09 from `EN · 1e`'s
  * `decor · 横批 (top-middle) @125,213 141×40`. It is a SEPARATE drawing, not the pair of scrolls: the owner's
  * correction (*"the Spring Couplets consist of a trio of objects … one for the top middle … one for the left … one
@@ -293,7 +315,7 @@ const COMPOSED: Record<DecorationCode, readonly DecorationCode[] | undefined> = 
  * (2026-11-09). So a caller with a small square box asks here first rather than guessing from the code.
  */
 /** ⚠️ A second drawing for the same code, chosen by the SLOT (see `decorate.ts#artVariantFor`). */
-export type ArtVariant = 'crown' | 'single';
+export type ArtVariant = 'crown' | 'single' | 'scroll';
 
 export function isComposed(code: DecorationCode): boolean {
   return COMPOSED[code] !== undefined;
@@ -334,7 +356,11 @@ export function DecorationArt({
       </View>
     );
   }
-  const motif = art === 'crown' ? COUPLET_CROWN : art === 'single' ? LANTERN_SINGLE : MOTIFS[code];
+  const motif =
+    art === 'crown' ? COUPLET_CROWN
+      : art === 'single' ? LANTERN_SINGLE
+        : art === 'scroll' ? COUPLET_SCROLL
+          : MOTIFS[code];
   if (motif === null) {
     // ⚠️ A placeholder that LOOKS like a placeholder — never a stand-in motif.
     return (

@@ -3473,17 +3473,20 @@ function storeChecks(): void {
    * drawing is chosen by SLOT, and the banner has art of its own rather than the pair stretched into a wide box —
    * which is exactly how it looked on glass before this.
    */
-  check('⚠️⚠️ the COUPLETS\' top-middle piece uses the 横批 drawing, and only that slot does',
+  check('⚠️⚠️ the COUPLETS\' pieces each use their OWN drawing: 横批 on top, ONE scroll per side',
     artVariantFor('spring_couplets', 'top_middle') === 'crown'
-      && artVariantFor('spring_couplets', 'side_left') === undefined);
+      && artVariantFor('spring_couplets', 'side_left') === 'scroll'
+      && artVariantFor('spring_couplets', 'side_right') === 'scroll');
   check('⚠️⚠️ a LANTERN on the altar is ONE lantern — the pair motif is the store card\'s',
     artVariantFor('lanterns', 'top_left') === 'single' && artVariantFor('lanterns', 'top_right') === 'single');
   const ART_SRC_TXT = readFileSync(join(PROJECT_ROOT, 'src', 'components', 'decoration-art.tsx'), 'utf8');
-  check('⚠️ …and each second drawing is the board\'s own box, matching the rect it is drawn into',
+  check('⚠️ …and every second drawing is the board\'s own box, matching the rect it is drawn into',
     ART_SRC_TXT.includes('box: [141, 40]') && ART_SRC_TXT.includes('box: [52, 66]')
+      && ART_SRC_TXT.includes('box: [41, 160]')
       && SLOT_ART.top_middle.w === 141 && SLOT_ART.top_middle.h === 40
-      && SLOT_ART.top_left.w === 52 && SLOT_ART.top_left.h === 66,
-    `${SLOT_ART.top_middle.w}×${SLOT_ART.top_middle.h} · ${SLOT_ART.top_left.w}×${SLOT_ART.top_left.h}`);
+      && SLOT_ART.top_left.w === 52 && SLOT_ART.top_left.h === 66
+      && SLOT_ART.side_left.w === 41 && SLOT_ART.side_left.h === 160,
+    `${SLOT_ART.top_middle.w}×${SLOT_ART.top_middle.h} · ${SLOT_ART.top_left.w}×${SLOT_ART.top_left.h} · ${SLOT_ART.side_left.w}×${SLOT_ART.side_left.h}`);
   check('⚠️ …and the altar passes the variant through, so the banner is not silently replaced',
     readFileSync(join(PROJECT_ROOT, 'src', 'components', 'home', 'decor-layer.tsx'), 'utf8').includes('art={p.art}'));
   /**
