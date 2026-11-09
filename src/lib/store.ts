@@ -27,8 +27,13 @@ export const STORE = {
    * `switcher · Offerings` 23,115 171×33 and `… Decorations` 197,115 171×33, inside a
    * `switcher · category (bg)` at **20,112 350×38** — fill `paperDeep`, stroke ink 2.5, **r19**,
    * i.e. a PILL. ⚠️ Without the outer pill the two segments read as two loose buttons.
+   *
+   * ⚠️ The board's `switcher · active segment` is **r16.5** — read back off the Penpot file, not
+   * inferred: 33 tall, so its caps are half-circles and it is a pill too. (This line said `radius: 10`
+   * until 2026-11-09; that figure was never on the board.) ⚠️ It is the BOARD's number, not the number
+   * this app draws — see `STORE_SWITCHER` for the one that must align with the track.
    */
-  switcher: { y: 115, w: 171, h: 33, radius: 10, xs: [23, 197] as const },
+  switcher: { y: 115, w: 171, h: 33, radius: 16.5, xs: [23, 197] as const },
   switcherBg: { w: 350, h: 38, radius: 19, stroke: 2.5 },
   /** `tag · FEATURED (bg)` — 30,174 86×22, fill **gold**, stroke ink 2, r8. */
   tag: { y: 174, w: 86, h: 22, radius: 8, stroke: 2 },
@@ -39,9 +44,40 @@ export const STORE = {
    * prices float on the page with nothing holding them — the defect the owner caught on glass.
    */
   cardFrame: { w: 165, h: 150, radius: 14, stroke: 2.5 },
-  featuredFrame: { w: 354, h: 190, radius: 18, stroke: 3 },
-  /** `card · <name> points (bg)` — 68×24, fill **gold**, stroke ink 2, r12. */
-  pricePill: { w: 68, h: 24, radius: 12, stroke: 2 },
+  /**
+   * ⚠️ **`padBottom` is why this constant is an object and not three numbers** (owner on glass, 2026-11-09:
+   * *"the wealth Bundle's points value button is also too close to the bottom border"*).
+   *
+   * ⚠️ The card was rendered with `paddingHorizontal` and `paddingTop` only — so the price pill, the LAST
+   * child, sat flush on the card's own 3 px stroke. ⚠️ The board leaves a gap: `card · featured` spans
+   * **342 → 532** and its pill row ends at **518**, i.e. **14 px** below the pill, on BOTH `EN · 7 Store`
+   * and `EN · 7b`.
+   */
+  featuredFrame: { w: 354, h: 190, radius: 18, stroke: 3, padBottom: 14 },
+  /**
+   * `card · <name> cash (bg)` / `… points (bg)` — **68×24, fill gold, stroke ink 2, r12**, at **+12** and
+   * **+85** inside a 165-wide card, so the gap between them is **5**.
+   *
+   * ⚠️ **The three numbers are one budget** — but *not* the board's own sums, because **RN draws
+   * `borderWidth` INSIDE the box**. The board's `card · X (bg)` is 165 wide with a **centred** 2.5 stroke, so
+   * its pills sit 12 from the OUTER edge; in RN that is `12 − 2.5 = 9.5` of padding:
+   * `2.5 + 9.5 + 68 + 5 + 68 + 9.5 + 2.5 = 165` exactly. ⚠️ Taking `12` as the padding (which is what the
+   * board reads as) leaves 136 of content for 141 of pill and overflows by 5 — measured on glass before this
+   * was corrected: the right pill sat **18** device px from the border while its twin sat **27** from the left.
+   * ⚠️ That is the same mistake the switcher made with its 171s, and `check:lib` now asserts the border-box sum
+   * rather than the board's.
+   */
+  pricePill: { w: 68, h: 24, radius: 12, stroke: 2, gap: 5 },
+  /**
+   * `card · featured cash (bg)` **72×30 r15** at **+196** and `… points (bg)` **74×30 r15** at **+274**,
+   * inside `card · featured` — so a gap of **6**, right-aligned against the card's 6 px inset.
+   *
+   * ⚠️ **The featured pills are NOT the small cards' pills.** Before this the featured card borrowed
+   * `pricePill` (68×24), so the one card the board draws largest had the smallest price readout.
+   * ⚠️ The two widths differ (72 vs 74) because the board sizes each to its own text — `$2.99` is one
+   * character shorter than `2,000 pts`. Transcribed, not tidied.
+   */
+  featuredPill: { cashW: 72, pointsW: 74, h: 30, radius: 15, gap: 6 },
   /** `art · wealth bundle (ingots)` — 85,195 220×106. */
   featuredArt: { y: 195, w: 220, h: 106 },
   /** `card · featured name` 30,308 · `… value` 30,330. */
@@ -54,9 +90,77 @@ export const STORE = {
    * FRAME's top (396), not from the art: art at **+9** (`art · Cash Bundle` is at 405), name at
    * **+84** (480), meta at **+102** (498), the price row at **+122** (518).
    */
-  card: { w: 165, xs: [20, 197] as const, ys: [396, 558] as const, artH: 72, name: 84, meta: 102, price: 122, pad: 12 },
+  card: {
+    w: 165,
+    xs: [20, 197] as const,
+    ys: [396, 558] as const,
+    artH: 72,
+    name: 84,
+    meta: 102,
+    price: 122,
+    /** `art · …` and the text sit **12 px from the card's OUTER edge** on the board. */
+    pad: 12,
+    /**
+     * ⚠️ **the actual horizontal padding: `pad − stroke`.**
+     *
+     * RN draws the border INSIDE the box, so the board's 12-from-the-edge is **9.5** of padding once the 2.5
+     * stroke is accounted for — and the card's two price pills have no slack to absorb the difference:
+     * `2.5 + 9.5 + 68 + 5 + 68 + 9.5 + 2.5 = 165` exactly. ⚠️ Using `pad` here instead (which reads as the
+     * right number off the board) overflows the content box by 5 px, and the right-hand pill ends up visibly
+     * closer to the border than the left-hand one — measured on glass before this line existed.
+     */
+    padH: 9.5,
+  },
   /** `note · store` — 24,806 342×34. */
   note: { y: 806 },
+} as const;
+
+/**
+ * ── THE SWITCHER'S INNER GEOMETRY — DERIVED FROM ONE PADDING VALUE ───────────
+ *
+ * ⚠️⚠️ **A SEGMENT'S CORNER RADIUS IS NOT AN INDEPENDENT NUMBER.** `switcher · category (bg)` is **r19**
+ * with a **2.5 ink stroke**, and its segments sit an `inset` inside that edge. For the two curves to run
+ * PARALLEL — so each segment's cap nests inside the track's cap instead of pinching against it — the
+ * inner radius must be the outer radius MINUS that whole inset:
+ *
+ *     inset        = stroke + pad            (RN draws the border AND the padding inside the box)
+ *     segmentRadius = radius − inset
+ *
+ * ⚠️ **The defect this replaces, found on glass** (owner, 2026-11-09: *"the corner radius of the border
+ * and the buttons do not align well, please use the padding value to properly adjust the corner radius
+ * of the inner buttons"*). The screen hard-coded the segments at **r16.5** — i.e. `19 − stroke`, nested
+ * for a **2.5** inset — while the row carried its own `paddingHorizontal: 2.5`, so they were *drawn* at a
+ * **5** px inset and each cap left a crescent of track between itself and the stroke.
+ * ⚠️ **And it overflowed**: `171 + 171 = 342` in a **340** content box, so the right segment ran 2 px
+ * over the track's own stroke.
+ *
+ * ⚠️ **So every number below is COMPUTED.** Change `pad` and the segments resize and re-round together;
+ * `check:lib` §29 asserts the rule (`segmentRadius === radius − inset`) and that the two widths plus the
+ * gap fill the content box exactly — so neither defect can come back by a single edited literal.
+ */
+const SWITCHER_PAD = 2.5;
+/** ⚠️ OUTER edge → a segment's outer edge. Border and padding both live inside the box. */
+const SWITCHER_INSET = STORE.switcherBg.stroke + SWITCHER_PAD;
+/** ⚠️ The board's own gap: `… Decorations` starts 3 px after `… Offerings` ends (197 − (23 + 171)). */
+const SWITCHER_GAP = STORE.switcher.xs[1] - (STORE.switcher.xs[0] + STORE.switcher.w);
+
+export const STORE_SWITCHER = {
+  /** The track, at the board's 350×38. */
+  w: STORE.switcherBg.w,
+  h: STORE.switcherBg.h,
+  radius: STORE.switcherBg.radius,
+  stroke: STORE.switcherBg.stroke,
+  /** ⚠️ The ONLY value to tune: the breathing room between a segment and the track's stroke. */
+  pad: SWITCHER_PAD,
+  /** ⚠️ Border + padding — what the radius and the widths are measured against. */
+  inset: SWITCHER_INSET,
+  gap: SWITCHER_GAP,
+  /** ⚠️ `radius − inset`: the caps are then concentric, which is the whole point. */
+  segmentRadius: STORE.switcherBg.radius - SWITCHER_INSET,
+  /** ⚠️ The track's content box, top to bottom — a segment may not stand proud of it. */
+  segmentH: STORE.switcherBg.h - SWITCHER_INSET * 2,
+  /** ⚠️ Two of these plus `gap` fill the track's content box EXACTLY — the old 171s did not. */
+  segmentW: (STORE.switcherBg.w - SWITCHER_INSET * 2 - SWITCHER_GAP) / 2,
 } as const;
 
 /**
@@ -145,4 +249,18 @@ export function baseMetaValue(offering: Offering): number {
  */
 export function pointsPrice(offering: Offering): string | null {
   return Number.isFinite(offering.price) && offering.price > 0 ? `${offering.price}` : null;
+}
+
+/**
+ * The cash price as the two decimals the copy key wants (`$%{cash}`), or `null` where there is none.
+ *
+ * ⚠️ **`null` is the House, and it must stay a skip rather than an empty pill.** Its card is drawn in the
+ * board's OWNED state with no cash layer at all (see `catalogue.ts`), so the screen renders one pill, not a
+ * blank one — an empty `$` is the kind of plausible-looking placeholder this project treats as a lie.
+ * ⚠️ Cents are **integers** in the catalogue; a float here would be a catalogue bug, and returning `null`
+ * makes it visible as a missing pill rather than as `$0.9900000001` on a store card.
+ */
+export function cashText(cashPrice: number | null): string | null {
+  if (cashPrice === null || !Number.isInteger(cashPrice) || cashPrice < 0) return null;
+  return (cashPrice / 100).toFixed(2);
 }

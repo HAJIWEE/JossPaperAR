@@ -11,7 +11,7 @@
  * ⚠️ FAULT-TEST IT: change an expected string and confirm it goes RED.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -45,7 +45,7 @@ import {
   rectsOverlap,
   sheetLayout,
 } from '../decorate.ts';
-import { CASH_IS_READABLE, FEATURED_CODE, STORE_TABS, baseMetaValue, pointsPrice, storeList } from '../store.ts';
+import { CASH_IS_READABLE, FEATURED_CODE, STORE, STORE_SWITCHER, STORE_TABS, baseMetaValue, cashText, pointsPrice, storeList } from '../store.ts';
 import { ART_BOX, artCodes, artSize, fitArt } from '../offering-art.ts';
 import { pickerGrid } from '../picker.ts';
 import {
@@ -116,6 +116,7 @@ import {
   HUD,
   HUD_TONES,
   LOCALE_PILL,
+  HUD_BAND_HEIGHT,
   PROFILE_ROUTE,
   PROFILE_ROUTES,
   PROFILE_ROWS,
@@ -165,7 +166,7 @@ import {
   dotSitsOnTray,
 } from '../offerings-layout.ts';
 import { formatPoints, homePanels } from '../home-panels.ts';
-import { ALTAR_DISPLAY_SLOTS, altarCaption, altarView, pageStep } from '../altar.ts';
+import { altarCaption, altarView, pageStep } from '../altar.ts';
 import { BULK_PREFIX, createSplitStorage, bulkKey } from '../split-storage.ts';
 import {
   MAX_ATTEMPTS,
@@ -1584,13 +1585,18 @@ function shrineGeometryChecks(): void {
   check(`every altar band is inside the altar region (${altarTop}→${altarBottom})`,
     strayed.length === 0, `strayed: ${strayed.join(', ')}`);
 
-  // ── the altar holds FOUR, and that is not the clan cap ────────────────────
-  check('the altar displays 4 tablets before it pages', ALTAR_DISPLAY_SLOTS === 4,
-    `${ALTAR_DISPLAY_SLOTS}`);
-  check('⚠️ …and 4 is NOT the clan cap of 10 — the board pages, it does not refuse',
-    ALTAR_DISPLAY_SLOTS !== ANCESTOR_CAP);
-  check('…and 4 is the board frame that draws it (`EN · 1c Home / full (4 tablets)`)',
-    ALTAR_DISPLAY_SLOTS === 4 && ALTAR_DISPLAY_SLOTS < ANCESTOR_CAP);
+  // ── ⚠️ THE ALTAR SHOWS THREE AND PAGES BY ONE — there is no page size of four ──
+  // ⚠️ These three checks used to guard `ALTAR_DISPLAY_SLOTS === 4` — **a constant NO SCREEN IMPORTED**. The stage draws
+  // three (`carouselStage`) and a swipe moves ONE tablet (`pageStep`), so the checks asserted a number nothing rendered while
+  // the real behaviour went unasserted here. They now read the functions the screen actually calls.
+  // (owner, 2026-11-09: *"i believe its already correct at 3"* — the 4 came from a board's NAME, not a request.)
+  const stageThree = carouselStage(HOME_BANDS.addSlot, 1, 3);
+  check('the altar stage is THREE tablets — centre + left + right (`EN · 1b`), not a page of four',
+    [stageThree.centre, stageThree.left, stageThree.right].filter((b) => b !== null).length === 3);
+  check('…and a page moves ONE tablet, not a page of four',
+    pageStep(0, 10, 1) === 1 && pageStep(9, 10, 1) === 9);
+  check('⚠️ …and the cap of 10 is REACHABLE by paging — the carousel pages to the tenth, it never refuses it',
+    pageStep(8, ANCESTOR_CAP, 1) === ANCESTOR_CAP - 1 && pageStep(0, ANCESTOR_CAP, -1) === 0);
 
   // ── ⚠️ THE ARROWS ARE GONE (owner, 2026-11-09) — the carousel is a SWIPE ──
   // ⚠️ These four checks used to assert that `carouselPrev`/`carouselNext` flanked the tablet slot. They are replaced by
@@ -1808,6 +1814,75 @@ function localeChecks(): void {
   check('⚠️ guard: a HUD declared before the scroll view WOULD fail that check',
     '<ScreenHud x />\n<ScrollView></ScrollView>'.indexOf('<ScreenHud')
       < '<ScreenHud x />\n<ScrollView></ScrollView>'.lastIndexOf('</ScrollView>'));
+
+  /**
+   * ⚠️⚠️ **THE HUD OWNS AN OPAQUE BAND — the header must HIDE what scrolls under it.**
+   *
+   * Owner on glass, 2026-11-09: *"when i scroll up the Title bar is not opaque so the Store title overlaps with
+   * the content."* ⚠️ **It was never a Store bug.** The HUD has to paint ABOVE the scroll view (see the order
+   * rule above — that is what makes it tappable), and it had no ground of its own, so on **every** screen that
+   * scrolls the cards ran straight through the title and the back button.
+   *
+   * ⚠️ **So the rule is DERIVED from each screen's ROOT style, not from a list**: if the screen's own ground is
+   * `surface.paper`, it must pass `band`. A hand-maintained list is exactly what let the HUD order drift across
+   * five screens; this one covers the next screen automatically. ⚠️ It reads the ROOT (`screen:`/`root:`) and
+   * not any `surface.paper` in the file — `capture.tsx` has a paper `gate` panel inside a camera screen, and
+   * demanding a band there would paint a cream strip across the viewfinder.
+   * ⚠️ `preparing.tsx` is excluded by the same rule and deliberately: it is `surface.camera` with a LIGHT hud,
+   * which is why the band is opt-in and not derived from `tone`.
+   */
+  const hudTagOf = (src: string): string => /<ScreenHud\b[^>]*>/.exec(src)?.[0] ?? '';
+  /** ⚠️ Re-derived here, not shared: `PROJECT_ROOT` is scoped to this function, and so is this. */
+  const APP_DIR = join(PROJECT_ROOT, 'src', 'app');
+  /**
+   * ⚠️⚠️ **BRACE-BALANCED ON PURPOSE — the first version of this regex only matched MULTI-LINE style objects,
+   * and every paper ground here is written `screen: { flex: 1, backgroundColor: surface.paper },` on ONE line.**
+   * ⚠️ So it found no paper screens at all and the check below passed **vacuously** — the exact class this file
+   * keeps warning about. The positive control caught it; the `=== 7` denominator below is what keeps it caught.
+   */
+  const rootIsPaper = (src: string): boolean => {
+    const at = /(?:^|\n)\s*(?:screen|root): \{/.exec(src);
+    if (at === null) return false;
+    const start = at.index + at[0].length;
+    let depth = 1;
+    let i = start;
+    while (i < src.length && depth > 0) {
+      if (src[i] === '{') depth += 1;
+      else if (src[i] === '}') depth -= 1;
+      i += 1;
+    }
+    return src.slice(start, i).includes('backgroundColor: surface.paper');
+  };
+  const hudScreenFiles = readdirSync(APP_DIR)
+    .filter((f) => f.endsWith('.tsx'))
+    .map((f) => ({ rel: `src/app/${f}`, src: readFileSync(join(APP_DIR, f), 'utf8') }))
+    .filter((s) => s.src.includes('<ScreenHud'));
+  const paperHudScreens = hudScreenFiles.filter((s) => rootIsPaper(s.src));
+  const bandMissing = paperHudScreens.filter((s) => !/\bband\b/.test(hudTagOf(s.src)));
+  /**
+   * ⚠️ **THE `=== 7` IS THE POINT.** A detector that silently stops recognising paper grounds would make
+   * "no screen is missing a band" true for ever — so the count is asserted alongside the emptiness.
+   */
+  check(`⚠️⚠️ every paper-ground screen gives the HUD an opaque band (${paperHudScreens.length}/7 of ${hudScreenFiles.length} HUD screens)`,
+    paperHudScreens.length === 7 && bandMissing.length === 0,
+    `no band: ${bandMissing.map((s) => s.rel).join(', ') || 'none'}`);
+  // ⚠️ POSITIVE CONTROL — the SOURCE THAT SHIPPED must fail the predicate, or it cannot catch a regression.
+  check('⚠️ guard: a paper screen WITHOUT `band` WOULD fail that rule',
+    rootIsPaper('const styles = {\n  screen: { flex: 1, backgroundColor: surface.paper },\n};')
+      && !/\bband\b/.test(hudTagOf('<ScreenHud titleKey="x" backTestID="b" />')));
+  check('⚠️ …and the camera screen is still correctly EXEMPT — its root is not paper',
+    !rootIsPaper(readFileSync(join(APP_DIR, 'capture.tsx'), 'utf8')));
+
+  const HUD_SRC = readFileSync(join(PROJECT_ROOT, 'src', 'components', 'screen-hud.tsx'), 'utf8');
+  check('⚠️⚠️ the band is CONDITIONAL — a camera screen must not get a paper strip across the viewfinder',
+    /band \? \(/.test(HUD_SRC) && HUD_SRC.includes('testID="hud-band"'));
+  check('⚠️ …and it is declared BEFORE the back circle, so it paints UNDER it rather than over it',
+    HUD_SRC.indexOf('hud-band') < HUD_SRC.indexOf('accessibilityLabel'));
+  check('⚠️ …and it is exactly the strip the screens reserve, so it never clips the first line at rest',
+    HUD_BAND_HEIGHT === HUD.touch.y + HUD.touch.size + 15
+      && hudScreenFiles.filter((s) => rootIsPaper(s.src))
+        .every((s) => s.src.includes('paddingTop: HUD.touch.y + HUD.touch.size + 15')),
+    `${HUD_BAND_HEIGHT}px`);
 
   /**
    * ⚠️ **THE TWO TONES ARE NOT INTERCHANGEABLE.** A light HUD on the camera is an ink ring on a dark
@@ -3189,6 +3264,12 @@ function storeChecks(): void {
     DECOR_LIB.includes("rpc('equip_decoration', { p_slot: slot, p_item_code: code })")
       && /function public\.equip_decoration\(p_slot text, p_item_code text\)/.test(EQUIP_SQL));
   check('⚠️⚠️ …and does NOT re-implement the slot/category rule client-side — the server owns it',
+    /**
+     * ⚠️ This is about the RULE (`equip_decoration` refusing a category mismatch), not about the word "category".
+     * Since 2026-11-09 the read also carries each owned item's category **for DISPLAY grouping**, taken from the
+     * catalogue — the same mirror `decor-sheet` already groups by. That is not a second opinion about what may be
+     * equipped; the client still asks the server and reports its answer.
+     */
     !/slot_category/.test(stripComments(DECOR_LIB)));
   check('⚠️ reads are RLS reads of the caller’s own rows, not a privileged RPC',
     DECOR_LIB.includes("from('inventory')") && DECOR_LIB.includes("from('equipped_decorations')"));
@@ -3198,6 +3279,35 @@ function storeChecks(): void {
   check('⚠️⚠️ all FIVE decorations are priced server-side — without it nothing can be owned',
     ['festive_set', 'spring_couplets', 'zhong_kui', 'door_gods', 'lanterns']
       .every((c) => new RegExp(`code = '${c}'`).test(PRICE_SQL)));
+
+  /**
+   * ⚠️⚠️ **SCRUM-204's OWN ACCEPTANCE CRITERION: "a read of owned decorations returns quantity and category per
+   * item."** ⚠️ The quantity was **selected and then thrown away** — the old code mapped `item_code` alone — and
+   * the category was never carried at all. That is the half-done read that leaves a picker unable to tell a side
+   * piece from a background one, and ⚠️ **no static type can see it**: `owned: readonly DecorationCode[]`
+   * compiles perfectly while discarding what it just fetched.
+   *
+   * ⚠️ And the category must come from the CATALOGUE: `inventory` is `(user_id, item_code, qty)`, so selecting a
+   * `category` from it would fail at runtime on a column that does not exist.
+   */
+  const DECOR_LIB_CODE = stripComments(DECOR_LIB);
+  /** ⚠️ The shape, as one predicate, so the positive control below exercises the SAME test. */
+  const exposesQtyAndCategory = (src: string): boolean =>
+    /readonly items: readonly OwnedDecoration\[\]/.test(src)
+      && /readonly qty: number/.test(src)
+      && /readonly category: DecorationSlotCategory/.test(src);
+  check('⚠️⚠️ the owned read SELECTS qty — not just the code', DECOR_LIB_CODE.includes("select('item_code, qty')"));
+  check('⚠️⚠️ …and EXPOSES both per item — `code · qty · category` (SCRUM-204)', exposesQtyAndCategory(DECOR_LIB_CODE));
+  check('⚠️⚠️ …and the CATEGORY comes from the catalogue, never from a column that does not exist',
+    DECOR_LIB_CODE.includes('CATEGORY_BY_CODE')
+      && /DECORATIONS[\s\S]{0,80}composedOf === undefined/.test(DECOR_LIB_CODE)
+      /** ⚠️ The select must not ask `inventory` for a `category`. */
+      && !/select\('item_code[^']*category/.test(DECOR_LIB_CODE));
+  check('⚠️ …and a COMPOSED SKU never reads as an owned altarpiece (`festive_set` is a SKU, all four pieces are it)',
+    DECOR_LIB_CODE.includes('d.composedOf === undefined'));
+  // ⚠️ POSITIVE CONTROL — the interface that SHIPPED must fail the shape test, or it proves nothing.
+  check('⚠️ guard: a read exposing only codes WOULD fail the qty/category check',
+    !exposesQtyAndCategory('export interface MyDecorations { readonly owned: readonly DecorationCode[]; }'));
 
   const STORE_SCREEN_JS = stripComments(
     readFileSync(join(PROJECT_ROOT, 'src', 'app', 'store.tsx'), 'utf8'),
@@ -3267,6 +3377,36 @@ function storeChecks(): void {
   check('⚠️ guard: the catalogue still carries five decorations, so the registry cannot drift silently',
     DECORATIONS.length === 5);
 
+  /**
+   * ⚠️⚠️ **THE DOOR GODS ARE TWO LEAVES, NOT THREE** (owner, 2026-11-09: *"The door gods object has 3 objects it
+   * should only have 2, the 2 from the left. the 3rd should be removed."*).
+   *
+   * ⚠️ The motif carried a THIRD panel's robe (`x 70.5 w 14.6`) and gold torso (`x 67.7 w 12.3`) — at the trio's
+   * 32.5 pitch that is a third leaf, and its FRAME falls outside the 85.1 box, so it drew as a red-and-gold block
+   * **floating beside the pair**. It was the last ghost of the trio assumption SCRUM-228 reversed.
+   * ⚠️ **Asserted on the ART DATA, not on the comment**: every ink in `DOORGODS` must end inside the second leaf
+   * (which ends at 60.5). A shape creeping right is exactly the defect, and no type can see it.
+   */
+  const doorgodsBlock = /const DOORGODS[\s\S]*?\n\};/.exec(DECOR_CODE)?.[0] ?? '';
+  const inkRightEdges = [...doorgodsBlock.matchAll(/x: ([\d.]+), y: [\d.]+, w: ([\d.]+)/g)]
+    .map((m) => Number(m[1]) + Number(m[2]));
+  check('⚠️⚠️ the DOOR GODS motif is TWO leaves — nothing is drawn past the second panel (SCRUM-228)',
+    /** ⚠️ The length guard is what stops `Math.max([])` (−Infinity) from passing vacuously. */
+    inkRightEdges.length >= 8 && Math.max(...inkRightEdges) <= 60.6,
+    `${inkRightEdges.length} shapes · furthest right edge ${Math.max(...inkRightEdges).toFixed(1)} (second leaf ends 60.5)`);
+  // ⚠️ POSITIVE CONTROL — the shape that shipped must FAIL the bound, or the check proves nothing.
+  check('⚠️ guard: the third leaf that shipped (x 70.5 + w 14.6 = 85.1) WOULD fail that bound',
+    70.5 + 14.6 > 60.6 && inkRightEdges.every((e) => e <= 60.6));
+  /**
+   * ⚠️ **AND THE ALTAR'S ONE LEAF IS ONE LEAF** — `DOORGOD_LEAF` must carry the single leaf's own **22.4 × 56.3** box,
+   * not the pair's 85.1 × 72. ⚠️ A variant that quietly reused the pair's box would stretch the same defect back in.
+   */
+  check("⚠️⚠️ the side-slot door god is ONE leaf — its own 22.4 × 56.3 box, not the pair's 85.1 × 72",
+    /const DOORGOD_LEAF[\s\S]{0,160}?box: \[22\.4, 56\.3\]/.test(DECOR_CODE));
+  // ⚠️ POSITIVE CONTROL — the pair's box must not satisfy that pattern.
+  check('⚠️ guard: the pair motif\'s `box: [85.1, 72]` is NOT what the leaf check accepts',
+    !/const DOORGOD_LEAF[\s\S]{0,160}?box: \[85\.1, 72\]/.test(DECOR_CODE));
+
 
   // `offerings_catalog.composed_of` — the SQL twin of this code field — and grants one of each
   // component, never the bundle itself. The SERVER behaviour is asserted in
@@ -3309,7 +3449,7 @@ function storeChecks(): void {
   check('…and it is the 20% rule, not a hard-coded 480',
     OFFERINGS.every((o) => baseMetaValue(o) === Math.round(o.price * 1.2)));
   check('⚠️ a price renders with a unit, and an UNPRICED item renders null (never "0 pts")',
-    pointsPrice(getOffering('gold_bar')) === '600'
+    pointsPrice(getOffering('gold_bar')) === '800'
       && pointsPrice({ ...getOffering('gold_bar'), price: Number.NaN }) === null);
 
   /**
@@ -3324,6 +3464,195 @@ function storeChecks(): void {
    */
   check('⚠️⚠️ both store tabs are LIVE — Decorations is no longer dark',
     STORE_TABS.every((tab) => tab.enabled));
+
+  /**
+   * ⚠️⚠️ **THE SWITCHER'S CAPS NEST, AND THE ROW FITS** (owner on glass, 2026-11-09: *"the corner radius
+   * of the border and the buttons do not align well, please use the padding value to properly adjust the
+   * corner radius of the inner buttons"*).
+   *
+   * ⚠️ TWO defects in ONE geometry, and neither is visible to `tsc`:
+   * - the segments were hard-coded **r16.5** — `19 − the 2.5 stroke`, i.e. nested for a **2.5** inset —
+   *   while the row carried its own `paddingHorizontal: 2.5`, so RN drew them at a **5** px inset and each
+   *   cap left a crescent of track between itself and the stroke;
+   * - `171 + 171 = 342` in a **340** content box, so the right segment ran **2 px over the track's stroke**.
+   *
+   * ⚠️ **Asserted as the RULE, not as the numbers** (`segmentRadius === radius − inset`, and
+   * `inset === stroke + pad`), so re-tuning the padding re-rounds the segments and this still holds —
+   * a gate pinned to `14` would pass a screen that had hard-coded it back.
+   */
+  check('⚠️⚠️ the switcher segment radius is DERIVED — the outer radius minus the WHOLE inset',
+    STORE_SWITCHER.segmentRadius === STORE_SWITCHER.radius - STORE_SWITCHER.inset
+      && STORE_SWITCHER.inset === STORE_SWITCHER.stroke + STORE_SWITCHER.pad,
+    `r${STORE_SWITCHER.segmentRadius} = r${STORE_SWITCHER.radius} − ${STORE_SWITCHER.inset}`);
+  check("…and a segment is a PILL inside that inset — never taller than the track's content box",
+    STORE_SWITCHER.segmentH === STORE_SWITCHER.segmentRadius * 2
+      && STORE_SWITCHER.segmentH === STORE_SWITCHER.h - STORE_SWITCHER.inset * 2,
+    `h${STORE_SWITCHER.segmentH} · r${STORE_SWITCHER.segmentRadius}`);
+  check('⚠️ …and two segments PLUS the gap fill the content box EXACTLY — no float, no overflow',
+    Math.abs(STORE_SWITCHER.segmentW * 2 + STORE_SWITCHER.gap - (STORE_SWITCHER.w - STORE_SWITCHER.inset * 2)) < 1e-9,
+    `${STORE_SWITCHER.segmentW}×2 + ${STORE_SWITCHER.gap} vs ${STORE_SWITCHER.w - STORE_SWITCHER.inset * 2}`);
+  /**
+   * ⚠️ POSITIVE CONTROL — the geometry that actually shipped must FAIL these, or the three checks above
+   * are arithmetic about nothing. The pre-fix numbers are re-stated here (r16.5 · 171 · a 5 px inset) and
+   * asserted to break BOTH the nesting rule and the width budget.
+   */
+  check('⚠️ guard: the pre-fix geometry (r16.5 beside a 2.5 padding, 171×33) FAILS both rules',
+    Math.abs(16.5 - STORE_SWITCHER.segmentRadius) > 1e-9
+      && 171 * 2 > STORE_SWITCHER.w - STORE_SWITCHER.inset * 2);
+  /**
+   * ⚠️ **AND THE SCREEN MUST RENDER THE SPEC** — the numbers are only derived if `store.tsx` reads them.
+   * A literal `borderRadius: 16.5` typed back into the switcher would pass every check above.
+   */
+  check('⚠️⚠️ the screen renders the DERIVED spec — the segment radius is not typed back in',
+    /borderRadius: STORE_SWITCHER\.segmentRadius/.test(storeSrc)
+      && /padding: STORE_SWITCHER\.pad/.test(storeSrc)
+      && !/borderRadius: 16\.5/.test(storeSrc)
+      && !/paddingHorizontal: 2\.5 \* s/.test(storeSrc));
+
+  /**
+   * ⚠️⚠️ **THE LISTINGS' CASH RAIL** (owner on glass, 2026-11-09: *"In the offerings store, the Cash option is
+   * missing for the items on offer"*).
+   *
+   * ⚠️ It was absent because `catalogue.ts` said the cash prices *"are the next read"* — and an unread price
+   * looks exactly like an undecided one. `EN · 7 Store` and `ZH · 7 商店` both draw **two pills on every card**
+   * and **name the item in the layer** (`card · Gold Bar cash` = `$1.99`), which is the pairing that can be
+   * trusted. That is the decoration price transposition's lesson (Door Gods ↔ Lanterns, fixed under SCRUM-204),
+   * already paid for once: pair by LAYER NAME, never by grid position.
+   *
+   * ⚠️ **No two offerings may share a cash price** — with four distinct values a transposition changes which
+   * CODE carries which number; with a duplicate this table would stop discriminating and agree with itself.
+   */
+  const BOARD_OFFERING_CASH: Record<string, number | null> = {
+    joss_paper_stack: 99,
+    gold_bar: 199,
+    smartphone: 149,
+    wealth_bundle: 299,
+    /** ⚠️ DERIVED, not read — see the block below. */
+    house: 298,
+  };
+  check('⚠️⚠️ every offering carries the cash price `EN · 7 Store` draws — in cents (the House is the one DERIVED)',
+    OFFERINGS.every((o) => o.cashPrice === BOARD_OFFERING_CASH[o.code]),
+    OFFERINGS.map((o) => `${o.code}=${o.cashPrice}`).join(' '));
+  check('⚠️ …and NO two offerings share one — a transposition would otherwise be invisible',
+    (() => {
+      const priced = OFFERINGS.map((o) => o.cashPrice).filter((c): c is number => c !== null);
+      return priced.length === 5 && new Set(priced).size === 5;
+    })(),
+    OFFERINGS.map((o) => `${o.code}=${o.cashPrice}`).join(' '));
+  check('⚠️⚠️ …and exactly ONE cash price is `derived` — the House, and nothing else may claim that provenance',
+    OFFERINGS.filter((o) => o.cashSource === 'derived').map((o) => o.code).join(',') === 'house');
+  check('⚠️ …and every cash price is WHOLE cents — no float may ever reach money',
+    OFFERINGS.every((o) => o.cashPrice === null || (Number.isInteger(o.cashPrice) && o.cashPrice > 0)));
+  check('…and `cashText` gives the copy key two decimals, and refuses a null or a float rather than a `$`',
+    cashText(99) === '0.99' && cashText(149) === '1.49' && cashText(298) === '2.98'
+      && cashText(null) === null && cashText(99.5) === null);
+
+  /**
+   * ⚠️⚠️ **THE HOUSE'S $2.98 IS RECOMPUTED HERE, and it matters WHICH points you calibrate against.**
+   *
+   * Owner, 2026-11-09: *"Use the rest of the objects cash price vs their points and calculate an appropriate
+   * value."* The board draws the House's card in its OWNED state with no cash layer, so there was nothing to
+   * transcribe; the three **board-priced singles** are the calibration set and the **bundle is excluded**
+   * (668.9 pts/$ is its deliberate discount, and including it would drag the House down).
+   *
+   * ⚠️⚠️ **BUT THE SIBLINGS' POINTS ARE THEMSELVES IN DISPUTE (SCRUM-230).** Two rates exist:
+   *   · the BOARD's pairing — 800/`$1.99` · 600/`$1.49` · 400/`$0.99` → mean **402.9117 pts/$** → **298¢**
+   *   · the CATALOGUE's pairing WAS transposed — 600/`$1.99` · 800/`$1.49` · 400/`$0.99` → mean **414.1536
+   *     pts/$** → **290¢**, and that **8¢ gap was the transposition's signature**
+   * ⚠️ **298¢ shipped while the two disagreed, because it is the value that survives the swap.** ✅ **SCRUM-230
+   * landed 2026-11-09 and the two rates have CONVERGED on 298¢** — the assertion below flipped from "8¢ apart"
+   * to "identical", which is the whole point of recomputing both instead of restating the stored number.
+   */
+  const BOARD_OFFERING_POINTS: Record<string, number> = {
+    joss_paper_stack: 400,
+    gold_bar: 800,
+    smartphone: 600,
+    wealth_bundle: 2000,
+  };
+  /**
+   * ⚠️⚠️ **THE TRANSPOSITION IS CLOSED (SCRUM-230, 2026-11-09) — this now asserts ZERO drift.**
+   *
+   * ⚠️ While the defect was live this check accepted *"0 mismatches or exactly the gold_bar/smartphone pair"*,
+   * because a gate that is red on `main` gets disabled. ✅ **That tolerance is gone on purpose**: the two
+   * now match the board, so a re-transposition — or any third drift — fails here immediately.
+   * ⚠️ The HOUSE is not in the board table at all: its card is drawn OWNED, so the board states neither its
+   * cash nor its points; only its `priceSource: 'derived'` points are the catalogue's own.
+   */
+  const pointMismatches = OFFERINGS
+    .filter((o) => o.code in BOARD_OFFERING_POINTS && o.price !== BOARD_OFFERING_POINTS[o.code])
+    .map((o) => o.code)
+    .sort();
+  check("⚠️⚠️ every offering's POINTS match the board — the SCRUM-230 swap is closed, and no drift may return",
+    pointMismatches.length === 0,
+    pointMismatches.join(',') || 'none');
+
+  const boardSingles = ['joss_paper_stack', 'gold_bar', 'smartphone'];
+  const rateFrom = (points: (code: string) => number): number =>
+    boardSingles.reduce((sum, code) => sum + points(code) / ((getOffering(code as never).cashPrice as number) / 100), 0) / boardSingles.length;
+  const boardRate = rateFrom((code) => BOARD_OFFERING_POINTS[code]);
+  const catalogueRate = rateFrom((code) => getOffering(code as never).price);
+  const houseFromBoard = Math.round((getOffering('house').price / boardRate) * 100);
+  const houseFromCatalogue = Math.round((getOffering('house').price / catalogueRate) * 100);
+  check("⚠️⚠️ the House's cash price is the BOARD-priced siblings' rate, recomputed at check time",
+    getOffering('house').cashPrice === houseFromBoard,
+    `board ${boardRate.toFixed(4)} pts/$ → ${houseFromBoard}¢ vs stored ${getOffering('house').cashPrice}¢`);
+  check("⚠️⚠️ …and the catalogue's own rate now AGREES with the board's — the 8¢ SCRUM-230 gap is closed",
+    houseFromBoard === houseFromCatalogue && boardRate === catalogueRate,
+    `board ${houseFromBoard}¢ · catalogue ${houseFromCatalogue}¢ · delta ${houseFromBoard - houseFromCatalogue}¢`);
+  // ⚠️ POSITIVE CONTROL — a cent either way must FAIL, or the recomputation is decoration.
+  check("⚠️ guard: $2.97 and $2.99 are NOT what the siblings' rate gives",
+    houseFromBoard === 298 && Math.abs(Math.round((1200 / boardRate) * 100) - 299) === 1);
+
+  /**
+   * ⚠️⚠️ **THE PRICE-PILL BUDGET — the switcher's 171s in a different disguise.**
+   *
+   * `EN · 7b` and `EN · 7` put the two pills at **dx 12** and **dx 85** inside a 165-wide card, i.e.
+   * `12 + 68 + 5 + 68 + 12`. ⚠️ `styles.chips` carries `gap: 8` (sized for the two balance chips at the top of
+   * the page), so reusing that row here puts the pair **3 px over the card's content box** — which is why the
+   * pills got their own gap rather than being dropped into the existing row.
+   */
+  check("⚠️⚠️ two price pills fit a small card EXACTLY — the BORDER-BOX sum, 165, not the board's 12+68+5+68+12",
+    /** ⚠️ `2·stroke + 2·padH + 2·pill + gap`: RN draws the stroke INSIDE the 165, which the board's own sum ignores. */
+    2 * STORE.cardFrame.stroke + 2 * STORE.card.padH + 2 * STORE.pricePill.w + STORE.pricePill.gap === STORE.cardFrame.w
+      /** ⚠️ …and `padH` IS `pad − stroke`, so the two can never drift apart. */
+      && STORE.card.padH === STORE.card.pad - STORE.cardFrame.stroke,
+    `2×${STORE.cardFrame.stroke} + 2×${STORE.card.padH} + 2×${STORE.pricePill.w} + ${STORE.pricePill.gap} vs ${STORE.cardFrame.w}`);
+  check("⚠️ …and the featured pair fits its card, and is BIGGER than a small card's",
+    STORE.featuredPill.cashW + STORE.featuredPill.gap + STORE.featuredPill.pointsW <= STORE.featuredFrame.w - 2 * 12
+      && STORE.featuredPill.h > STORE.pricePill.h
+      && STORE.featuredPill.radius > STORE.pricePill.radius,
+    `featured ${STORE.featuredPill.cashW}+${STORE.featuredPill.gap}+${STORE.featuredPill.pointsW}×${STORE.featuredPill.h}`);
+
+  /**
+   * ⚠️⚠️ **BOTH FEATURED CARDS LEAVE ROOM UNDER THE PILL ROW** (owner: *"the wealth Bundle's points value
+   * button is also too close to the bottom border"*).
+   *
+   * ⚠️ The featured card is **content-sized** (no `height`), so the only thing between its last child and its
+   * own stroke is this padding — and it was simply **absent**, on both tabs. `card · featured` leaves 14 px
+   * under the pill row (row ends 518, card ends 532).
+   * ⚠️ Asserted on the SOURCE as well as the constant: `STORE.featuredFrame.padBottom` being 14 while no card
+   * passes it is exactly the state this check has to fail in.
+   */
+  const padBottomUses = (stripComments(storeSrc).match(/paddingBottom: STORE\.featuredFrame\.padBottom/g) ?? []).length;
+  check('⚠️⚠️ both featured cards pass a BOTTOM inset — the property that was missing entirely',
+    STORE.featuredFrame.padBottom > 0 && padBottomUses === 2,
+    `padBottom ${STORE.featuredFrame.padBottom} · ${padBottomUses} call sites`);
+
+  /**
+   * ⚠️ **AND THE PILLS ARE ACTUALLY DRAWN, FROM DATA.** All three defects behind this block are the same shape
+   * — *the price exists in the catalogue but not on the screen* — which no type and no unit check can see: a
+   * card compiles perfectly while printing a bare `<Text>` where a pill belongs.
+   */
+  const storeCode = stripComments(storeSrc);
+  check('⚠️⚠️ BOTH tabs draw a CASH pill AND a points pill on every card — bare price text is the defect',
+    (storeCode.match(/store-(?:item|decor)-\$\{item\.code\}-cash/g) ?? []).length === 2
+      && (storeCode.match(/store-(?:item|decor)-\$\{item\.code\}-points/g) ?? []).length === 2,
+    `cash ${(storeCode.match(/-\$\{item\.code\}-cash/g) ?? []).length} · points ${(storeCode.match(/-\$\{item\.code\}-points/g) ?? []).length}`);
+  check('⚠️ …and every pill goes through ONE component, so a card cannot lose its background again',
+    (storeCode.match(/<PricePill /g) ?? []).length >= 8,
+    `${(storeCode.match(/<PricePill /g) ?? []).length} pills`);
+  check('⚠️ …and NO cash figure is typed into the screen — it comes from the catalogue via `cashText`',
+    /cashText\(/.test(storeCode) && !/\$\d+\.\d\d/.test(storeCode));
   /**
    * ⚠️⚠️ **TRANSCRIBED FROM THE BOARD'S LAYER NAMES, NOT FROM THE CARD LAYOUT** — and the first version of
    * this table was wrong because it did the opposite. `EN · 7b` draws the four cards in a 2 × 2 grid, so the
@@ -3743,10 +4072,54 @@ function storeChecks(): void {
     coupletsOnly.length === 3
       && coupletsOnly.map((p) => p.slot).join(',') === 'top_middle,side_left,side_right',
     coupletsOnly.map((p) => p.slot).join(','));
+  /**
+   * ⚠️⚠️ **DOOR GODS ARE A PAIR — left and right, NO top piece** (owner, 2026-11-09, answering SCRUM-228:
+   * *"No door god is a left right only, no top"*). ⚠️ They had carried the couplets' `top_middle` **by inference** from
+   * an earlier *"the door Gods is also a trio one"*, and drew two PORTRAIT panels stretched into a 162 × 46 band.
+   * ⚠️ This is a deliberate reversal of that line, so the assertion is the record: a future reader who "restores" the
+   * trio is contradicted here rather than silently obeyed.
+   */
   const doorGodsOnly = drawPlan({ ...noDecor, side_left: 'door_gods' } as never);
-  check('⚠️ …and DOOR GODS are a trio too (assumed to share the couplets\' shape — see `SET_SLOTS`)',
-    doorGodsOnly.length === 3
-      && doorGodsOnly.map((p) => p.slot).join(',') === 'top_middle,side_left,side_right');
+  check('⚠️⚠️ DOOR GODS are a PAIR — a leaf each side and NO top-middle piece (SCRUM-228)',
+    doorGodsOnly.length === 2
+      && doorGodsOnly.map((p) => p.slot).join(',') === 'side_left,side_right',
+    doorGodsOnly.map((p) => p.slot).join(','));
+  /**
+   * ⚠️ **THE CONSEQUENCE THE RULING BUYS:** `top_middle` is now the **couplets' 横批 and nothing else**, so a
+   * door-gods altar leaves that band CLEAR and the chip still shows. ⚠️ Before the ruling the door gods hid the chip —
+   * a set with no business in that band was removing the only way in.
+   */
+  check("⚠️ …and they leave the 横批 band CLEAR, so the chip still shows — top-middle is the couplets' alone",
+    chipBandClear(doorGodsOnly, HOME_BANDS.templeChip));
+  /**
+   * ⚠️⚠️ **ONE DOOR LEAF PER SIDE — never the card's pair** (owner, 2026-11-09: *"door gods should be 1 per side not 2
+   * per side"*).
+   *
+   * ⚠️ A side slot's art rect is **41 × 160** and `DOORGODS` is **85.1 × 72 with TWO leaves**, so without a variant the
+   * altar stretched the pair into the strip and drew **FOUR door gods with their spears crossing** — caught on glass,
+   * not by a gate. The couplets and lanterns already had their per-slot split; door gods were the one set missing it.
+   */
+  check('⚠️⚠️ every DOOR GOD piece draws the ONE-LEAF variant, never the pair motif',
+    doorGodsOnly.length === 2 && doorGodsOnly.every((p) => p.art === 'leaf'),
+    doorGodsOnly.map((p) => `${p.slot}:${p.art ?? 'pair-motif'}`).join(' '));
+  /**
+   * ⚠️⚠️ **THE RIGHT ONE IS MIRRORED** (owner, 2026-11-09 — the two sides were drawn identically: *"The right one is
+   * mirrored"*). ⚠️ A 門神 pair is **matching but opposite**, so the same leaf twice is wrong even when each side holds
+   * one leaf. ⚠️ `side_right` is the only slot with a partner; the lanterns are symmetric and the corners do not flip.
+   */
+  check('⚠️⚠️ the RIGHT door god is MIRRORED and the left is not — a pair is matching but opposite',
+    doorGodsOnly.find((p) => p.slot === 'side_right')?.mirror === true
+      && doorGodsOnly.find((p) => p.slot === 'side_left')?.mirror === false,
+    doorGodsOnly.map((p) => `${p.slot}:mirror=${String(p.mirror)}`).join(' '));
+  // ⚠️ POSITIVE CONTROL — a symmetric pair must NOT flip, or "mirror everything" would pass this.
+  check('⚠️ guard: the lanterns are symmetric, so their corners are not mirrored',
+    lanternOnly.every((p) => p.mirror === false),
+    lanternOnly.map((p) => `${p.slot}:mirror=${String(p.mirror)}`).join(' '));
+  // ⚠️ POSITIVE CONTROL — the variant must be the reason, not a coincidence of some other field.
+  check('⚠️ guard: without the variant the pair motif is what a side would get — the defect that shipped',
+    artVariantFor('door_gods', 'side_left') === 'leaf'
+      && artVariantFor('lanterns', 'top_left') === 'single'
+      && artVariantFor('zhong_kui', 'background') === undefined);
   const backgroundOnly = drawPlan({ ...noDecor, background: 'zhong_kui' } as never);
   check('⚠️ the BACKGROUND print draws BEHIND the tablet — the z-order `1e` depends on',
     backgroundOnly.length === 1 && backgroundOnly[0].behind === true);

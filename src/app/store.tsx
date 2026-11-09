@@ -34,7 +34,7 @@ import { getOffering, type OfferingCode } from '@/domain/catalogue';
 import { collectedItemName } from '@/lib/collection';
 import { purchaseItem } from '@/lib/offerings-api';
 import { HUD } from '@/lib/profile';
-import { STORE, STORE_TABS, baseMetaValue, decorationList, pointsPrice, storeList, type StoreTabId } from '@/lib/store';
+import { STORE, STORE_SWITCHER, STORE_TABS, baseMetaValue, cashText, decorationList, pointsPrice, storeList, type StoreTabId } from '@/lib/store';
 import { DESIGN_REFERENCE_WIDTH, brand, fontSize, onColorCream, surface, text } from '@/theme/tokens';
 
 function scale(): number {
@@ -58,11 +58,54 @@ function scale(): number {
  * (SCRUM-212) and these cards are still a layout: tapping one does nothing rather than pretending to sell.
  * ⚠️ That is the owner's line, verbatim: *"build out all of it to the point of the actual payments portion."*
  */
+/**
+ * ONE PRICE PILL, for both rails and both card sizes.
+ *
+ * ⚠️⚠️ **WHY THIS EXISTS AT ALL** (owner on glass, 2026-11-09: *"In the decorations store, the options to buy
+ * buttons are missing their borders and backgrounds"*). The decorations' small cards drew `$0.99` and
+ * `800 pts` as **bare `<Text>`** while the offerings' cards drew them as gold pills — the same numbers, two
+ * different treatments, because each block had hand-rolled its own row. ⚠️ Repeating a pill four times is
+ * how one of them ends up without a background; there is now one component and no block owns a pill.
+ *
+ * ⚠️ `featured` switches BOTH the box and the type size: the board draws the featured pair at **72/74 × 30
+ * r15** and the small cards' at **68 × 24 r12** — the card the board draws largest must not carry the
+ * smallest readout (which is what happened when the featured card borrowed `pricePill`).
+ */
+function PricePill({
+  label,
+  w,
+  s,
+  featured = false,
+  testID,
+}: {
+  readonly label: string;
+  readonly w: number;
+  readonly s: number;
+  readonly featured?: boolean;
+  readonly testID?: string;
+}) {
+  const spec = featured ? STORE.featuredPill : STORE.pricePill;
+  return (
+    <View
+      style={[
+        styles.pricePill,
+        { width: w * s, height: spec.h * s, borderRadius: spec.radius * s, borderWidth: STORE.pricePill.stroke * s },
+      ]}
+      testID={testID}
+    >
+      <Text style={[styles.priceText, { fontSize: (featured ? 12 : 11) * s }]} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+
 function DecorationsBlock() {
   const { width } = useWindowDimensions();
   const s = width / DESIGN_REFERENCE_WIDTH;
   const { featured, more } = decorationList();
-  const cents = (c: number | null) => (c === null ? '' : (c / 100).toFixed(2));
+  const featuredCash = cashText(featured.cashPrice);
   return (
     <>
       <Text style={[styles.intro, { fontSize: 13 * s }]} testID="store-decor-intro">
@@ -76,7 +119,14 @@ function DecorationsBlock() {
         onPress={() => undefined}
         style={({ pressed }) => [
           styles.featured,
-          { borderRadius: STORE.featuredFrame.radius * s, borderWidth: STORE.featuredFrame.stroke * s, paddingHorizontal: 12 * s, paddingTop: 12 * s },
+          {
+            borderRadius: STORE.featuredFrame.radius * s,
+            borderWidth: STORE.featuredFrame.stroke * s,
+            paddingHorizontal: 12 * s,
+            paddingTop: 12 * s,
+            /** ⚠️ The pill row is the LAST child — see `featuredFrame.padBottom`. */
+            paddingBottom: STORE.featuredFrame.padBottom * s,
+          },
         ]}
       >
         <View style={[styles.tag, { width: STORE.tag.w * s, height: STORE.tag.h * s, borderRadius: STORE.tag.radius * s, borderWidth: STORE.tag.stroke * s }]}>
@@ -87,21 +137,21 @@ function DecorationsBlock() {
         </View>
         <Text style={[styles.featuredName, { fontSize: 16 * s }]} numberOfLines={1}>{localized(featured.name)}</Text>
         <Text style={[styles.featuredValue, { fontSize: 12 * s }]} numberOfLines={1}>{t('store.decorFeaturedValue')}</Text>
-        {/* ⚠️ BOTH rails, as the board draws them — cash first, then points. */}
-        <View style={[styles.chips, { marginTop: 6 * s }]}>
-          <View style={[styles.tag, { width: STORE.pricePill.w * s, height: STORE.pricePill.h * s, borderRadius: STORE.pricePill.radius * s, borderWidth: STORE.pricePill.stroke * s }]}>
-            <Text style={[styles.priceText, { fontSize: 11 * s }]} numberOfLines={1}>{t('store.cashPrice', { cash: cents(featured.cashPrice) })}</Text>
-          </View>
-          <View style={[styles.tag, { width: STORE.pricePill.w * s, height: STORE.pricePill.h * s, borderRadius: STORE.pricePill.radius * s, borderWidth: STORE.pricePill.stroke * s }]}>
-            <Text style={[styles.priceText, { fontSize: 11 * s }]} numberOfLines={1}>{t('store.price', { points: String(featured.price) })}</Text>
-          </View>
+        {/* ⚠️ BOTH rails, as the board draws them — cash first, then points, right-aligned at the board's gap. */}
+        <View style={[styles.pillRow, { marginTop: 6 * s, justifyContent: 'flex-end', gap: STORE.featuredPill.gap * s }]}>
+          {featuredCash === null ? null : (
+            <PricePill label={t('store.cashPrice', { cash: featuredCash })} w={STORE.featuredPill.cashW} s={s} featured testID="store-decor-featured-cash" />
+          )}
+          <PricePill label={t('store.price', { points: String(featured.price) })} w={STORE.featuredPill.pointsW} s={s} featured testID="store-decor-featured-points" />
         </View>
       </Pressable>
 
       {/* ── the rest ─────────────────────────────────────────────────────── */}
       <Text style={[styles.moreHead, { fontSize: 15 * s }]}>{t('store.moreDecorations')}</Text>
       <View style={[styles.grid, { gap: (STORE.card.xs[1] - STORE.card.xs[0] - STORE.card.w) * s }]}>
-        {more.map((item) => (
+        {more.map((item) => {
+          const cash = cashText(item.cashPrice);
+          return (
           <Pressable
             key={item.code}
             accessibilityRole="button"
@@ -114,8 +164,11 @@ function DecorationsBlock() {
                * missing their borders"*). `card · X (bg)` on `EN · 7b` is **165 × 150 with r14 and a 2.5 ink
                * stroke** — and this screen had dropped the stroke entirely, so the cards floated as bare paper
                * with nothing separating them from the page.
+               * ⚠️ **AND `paddingHorizontal` SINCE 2026-11-09** — the board sets the name and both pills at
+               * **dx 12** inside the 165-wide card, and without it the pills physically cannot fit:
+               * `12 + 68 + 5 + 68 + 12 = 165` exactly. The text was flush against the border before.
                */
-              { width: 165 * s, minHeight: 150 * s, borderRadius: 14 * s, borderWidth: 2.5 * s, borderColor: brand.ink },
+              { width: 165 * s, minHeight: 150 * s, borderRadius: 14 * s, borderWidth: 2.5 * s, borderColor: brand.ink, paddingHorizontal: STORE.card.padH * s },
             ]}
           >
             <View style={{ height: STORE.card.artH * s, alignItems: 'center', justifyContent: 'center' }}>
@@ -123,12 +176,16 @@ function DecorationsBlock() {
             </View>
             <Text style={[styles.name, { fontSize: 13 * s }]} numberOfLines={1}>{localized(item.name)}</Text>
             <Text style={[styles.meta, { fontSize: 10.5 * s }]} numberOfLines={1}>{t('store.decorPermanent')}</Text>
-            <View style={[styles.chips, { marginTop: 4 * s }]}>
-              <Text style={[styles.priceText, { fontSize: 10 * s }]} numberOfLines={1}>{t('store.cashPrice', { cash: cents(item.cashPrice) })}</Text>
-              <Text style={[styles.priceText, { fontSize: 10 * s }]} numberOfLines={1}>{t('store.price', { points: String(item.price) })}</Text>
+            {/* ⚠️ REAL PILLS — this row was bare `<Text>`, which is the defect the owner saw. */}
+            <View style={[styles.pillRow, { marginTop: 6 * s, gap: STORE.pricePill.gap * s }]}>
+              {cash === null ? null : (
+                <PricePill label={t('store.cashPrice', { cash })} w={STORE.pricePill.w} s={s} testID={`store-decor-${item.code}-cash`} />
+              )}
+              <PricePill label={t('store.price', { points: String(item.price) })} w={STORE.pricePill.w} s={s} testID={`store-decor-${item.code}-points`} />
             </View>
           </Pressable>
-        ))}
+          );
+        })}
       </View>
     </>
   );
@@ -255,15 +312,31 @@ export default function StoreScreen() {
             {/* The pill BACKGROUND first — `switcher · category (bg)`, r19, ink 2.5. */}
             <View
               /**
-               * ⚠️⚠️ **GEOMETRY FROM THE BOARD, NOT FROM MEMORY** (`switcher · category (bg)` on `EN · 7b`):
-               * 350 × 38, r19, ink stroke 2.5, and the two segments sit inside it at 171 × 33 with **NO border
-               * of their own**. ⚠️ The first version bordered every pill, which grew each one by 4 px and pushed
-               * the pair into the container's own stroke — the misalignment the owner saw.
+               * ⚠️⚠️ **THE RADIUS IS DERIVED FROM THE PADDING, NOT TYPED** (owner on glass, 2026-11-09:
+               * *"the corner radius of the border and the buttons do not align well, please use the padding
+               * value to properly adjust the corner radius of the inner buttons"*).
+               *
+               * ⚠️ The track is r19 with a 2.5 ink stroke, and RN draws that stroke INSIDE the box — so a
+               * segment inset by `stroke + pad` from the OUTER edge must be `19 − (stroke + pad)` to nest.
+               * ⚠️ The previous build hard-coded `r16.5` (nested for the stroke alone) beside a 2.5
+               * `paddingHorizontal`, so the caps were drawn at a 5 px inset and each one left a crescent of
+               * track — and `171 + 171` overflowed the 340 content box by 2 px into the stroke.
+               * ⚠️ `STORE_SWITCHER` computes the inset, the radius, both segment dimensions and the gap from
+               * that one padding; `check:lib` §29 holds the rule.
                */
-              style={[styles.switcherBg, { width: 350 * s, height: 38 * s, borderRadius: 19 * s, borderWidth: 2.5 * s, paddingHorizontal: 2.5 * s }]}
+              style={[
+                styles.switcherBg,
+                {
+                  width: STORE_SWITCHER.w * s,
+                  height: STORE_SWITCHER.h * s,
+                  borderRadius: STORE_SWITCHER.radius * s,
+                  borderWidth: STORE_SWITCHER.stroke * s,
+                  padding: STORE_SWITCHER.pad * s,
+                },
+              ]}
               testID="store-switcher"
             >
-            <View style={styles.switcher}>
+            <View style={[styles.switcher, { gap: STORE_SWITCHER.gap * s }]}>
               {STORE_TABS.map((tab) => (
                 <Pressable
                   key={tab.id}
@@ -275,10 +348,15 @@ export default function StoreScreen() {
                    * day Decorations was enabled, BOTH drew as the active cinnabar segment. ⚠️ Two identical red
                    * pills is not a switcher; the state has to be `tab.id === tabId`.
                    * ⚠️ And no per-pill border: the board's only stroke is the container's.
+                   * ⚠️ The radius/height/width come from `STORE_SWITCHER` — see the track above.
                    */
                   style={[
                     styles.tab,
-                    { width: 171 * s, height: 33 * s, borderRadius: 16.5 * s },
+                    {
+                      width: STORE_SWITCHER.segmentW * s,
+                      height: STORE_SWITCHER.segmentH * s,
+                      borderRadius: STORE_SWITCHER.segmentRadius * s,
+                    },
                     tabId === tab.id ? styles.tabOn : styles.tabOff,
                   ]}
                 >
@@ -314,7 +392,22 @@ export default function StoreScreen() {
                 setBuyIssue(null);
                 setBuying({ code: featured.code, price: featured.price });
               }}
-              style={[styles.featured, { borderRadius: STORE.featuredFrame.radius * s, borderWidth: STORE.featuredFrame.stroke * s, paddingHorizontal: 12 * s, paddingTop: 12 * s }]}
+              /**
+               * ⚠️ **`paddingBottom` IS THE FIX FOR THE PILL SITTING ON THE BORDER** (owner, 2026-11-09: *"the
+               * wealth Bundle's points value button is also too close to the bottom border"*). The card had
+               * horizontal and top padding only, so its last child was flush against the card's own 3 px
+               * stroke; `card · featured` on `EN · 7 Store` leaves **14 px** under the pill row.
+               */
+              style={[
+                styles.featured,
+                {
+                  borderRadius: STORE.featuredFrame.radius * s,
+                  borderWidth: STORE.featuredFrame.stroke * s,
+                  paddingHorizontal: 12 * s,
+                  paddingTop: 12 * s,
+                  paddingBottom: STORE.featuredFrame.padBottom * s,
+                },
+              ]}
               testID="store-featured"
             >
               <View style={[styles.tag, { width: STORE.tag.w * s, height: STORE.tag.h * s, borderRadius: STORE.tag.radius * s, borderWidth: STORE.tag.stroke * s }]}>
@@ -329,19 +422,27 @@ export default function StoreScreen() {
               <Text style={[styles.featuredValue, { fontSize: 12 * s }]} numberOfLines={1}>
                 {t('store.featuredValue', { value: String(baseMetaValue(featured)) })}
               </Text>
-              {pointsPrice(featured) === null ? null : (
-                <View style={[styles.pricePill, { width: STORE.pricePill.w * s, height: STORE.pricePill.h * s, borderRadius: STORE.pricePill.radius * s, borderWidth: STORE.pricePill.stroke * s }]}>
-                  <Text style={[styles.priceText, { fontSize: 11 * s }]} numberOfLines={1}>
-                    {t('store.price', { points: pointsPrice(featured) as string })}
-                  </Text>
-                </View>
-              )}
+              {/*
+                ⚠️⚠️ **BOTH RAILS, AND BOTH AT THE FEATURED SIZE.** `card · featured cash (bg)` is 72×30 r15
+                and `card · featured points (bg)` 74×30 r15, right-aligned at a 6 px gap — so the bundle now
+                shows **$2.99** beside its 2,000 pts, exactly as the board draws it. ⚠️ It used to render a
+                single 68×24 pill (the small cards' size) with no cash rail at all.
+              */}
+              <View style={[styles.pillRow, { marginTop: 6 * s, justifyContent: 'flex-end', gap: STORE.featuredPill.gap * s }]}>
+                {cashText(featured.cashPrice) === null ? null : (
+                  <PricePill label={t('store.cashPrice', { cash: cashText(featured.cashPrice) as string })} w={STORE.featuredPill.cashW} s={s} featured testID="store-featured-cash" />
+                )}
+                <PricePill label={t('store.price', { points: pointsPrice(featured) as string })} w={STORE.featuredPill.pointsW} s={s} featured testID="store-featured-points" />
+              </View>
             </Pressable>
 
             {/* ── More bundles ──────────────────────────────────────────────── */}
             <Text style={[styles.moreHead, { fontSize: 15 * s }]}>{t('store.more')}</Text>
             <View style={[styles.grid, { gap: (STORE.card.xs[1] - STORE.card.xs[0] - STORE.card.w) * s }]}>
-              {more.map((item) => (
+              {more.map((item) => {
+                const cash = cashText(item.cashPrice);
+                const points = pointsPrice(item);
+                return (
                 <Pressable
                   key={item.code}
                   accessibilityRole="button"
@@ -351,7 +452,7 @@ export default function StoreScreen() {
                     setBuyIssue(null);
                     setBuying({ code: item.code, price: item.price });
                   }}
-                  style={[styles.card, { width: STORE.cardFrame.w * s, height: STORE.cardFrame.h * s, borderRadius: STORE.cardFrame.radius * s, borderWidth: STORE.cardFrame.stroke * s, paddingHorizontal: STORE.card.pad * s }]}
+                  style={[styles.card, { width: STORE.cardFrame.w * s, height: STORE.cardFrame.h * s, borderRadius: STORE.cardFrame.radius * s, borderWidth: STORE.cardFrame.stroke * s, paddingHorizontal: STORE.card.padH * s }]}
                   testID={`store-item-${item.code}`}
                 >
                   <View style={{ height: STORE.card.artH * s, alignItems: 'center', justifyContent: 'center' }}>
@@ -363,15 +464,26 @@ export default function StoreScreen() {
                   <Text style={[styles.meta, { fontSize: 11 * s }]} numberOfLines={1}>
                     {t('store.base', { value: String(baseMetaValue(item)) })}
                   </Text>
-                  {pointsPrice(item) === null ? null : (
-                    <View style={[styles.pricePill, { width: STORE.pricePill.w * s, height: STORE.pricePill.h * s, borderRadius: STORE.pricePill.radius * s, borderWidth: STORE.pricePill.stroke * s }]}>
-                      <Text style={[styles.priceText, { fontSize: 11 * s }]} numberOfLines={1}>
-                        {t('store.price', { points: pointsPrice(item) as string })}
-                      </Text>
-                    </View>
-                  )}
+                  {/*
+                    ⚠️⚠️ **BOTH RAILS — THE CASH PILL WAS MISSING ENTIRELY.** `card · <name> cash (bg)` and
+                    `… points (bg)` are **68×24 r12** at **dx 12** and **dx 85**, so the pair plus the gaps
+                    fills the card's content box exactly (`12 + 68 + 5 + 68 + 12 = 165`). ⚠️ The offerings'
+                    cash prices had never been read off the board, so this row drew the points rail only —
+                    which is what the owner saw as *"the Cash option is missing"*.
+                    ⚠️ **The House renders ONE pill on purpose**: the board draws its card in the OWNED state
+                    with no cash layer, so `cashPrice` is `null` rather than a made-up number.
+                  */}
+                  <View style={[styles.pillRow, { marginTop: 6 * s, gap: STORE.pricePill.gap * s }]}>
+                    {cash === null ? null : (
+                      <PricePill label={t('store.cashPrice', { cash })} w={STORE.pricePill.w} s={s} testID={`store-item-${item.code}-cash`} />
+                    )}
+                    {points === null ? null : (
+                      <PricePill label={t('store.price', { points })} w={STORE.pricePill.w} s={s} testID={`store-item-${item.code}-points`} />
+                    )}
+                  </View>
                 </Pressable>
-              ))}
+                );
+              })}
             </View>
 
             <Text style={[styles.note, { fontSize: 11.5 * s }]} testID="store-note">
@@ -413,8 +525,9 @@ export default function StoreScreen() {
       {/** ⚠️ **THE STORE IS A TAB DESTINATION, so it carries the bar** (SCRUM-211). */}
       <TabBarBand />
 
-      {/** ⚠️ AFTER the ScrollView — see the Settings defect recorded in `history.tsx`. */}
-      <ScreenHud titleKey="store.title" backTestID="store-back" titleTestID="store-title" />
+      {/** ⚠️ AFTER the ScrollView — see the Settings defect recorded in `history.tsx`. `band` because this
+           screen is `surface.paper`: without it the cards scroll THROUGH the title (owner, 2026-11-09). */}
+      <ScreenHud titleKey="store.title" backTestID="store-back" titleTestID="store-title" band />
     </View>
   );
 }
@@ -501,13 +614,19 @@ const styles = StyleSheet.create({
   },
   name: { color: text.ink, fontWeight: '700' },
   meta: { color: text.inkSoft },
+  /**
+   * ⚠️ **No `marginTop` any more** — the ROW carries it (`pillRow`), because the same pill is now both a
+   * small card's last child and the featured card's last child, and those two need different margins. A
+   * margin baked in here was what made the featured row unable to clear its own border.
+   */
   pricePill: {
     backgroundColor: brand.gold,
     borderColor: brand.ink,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 6,
   },
+  /** ⚠️ The price-pill ROW — the pills are `pricePill`/`featuredPill`; this only lines them up. */
+  pillRow: { flexDirection: 'row', alignItems: 'center' },
   priceText: { color: text.ink, fontWeight: '700' },
   note: { color: text.inkSoft, marginTop: 16 },
   issue: { color: brand.cinnabar, fontWeight: '700', marginTop: 8 },

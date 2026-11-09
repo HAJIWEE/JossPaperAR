@@ -177,6 +177,13 @@ export const MESSAGES = {
     'settings.general': 'General',
     'settings.privacy': 'Privacy',
     'settings.language': 'Language',
+    /**
+     * ⚠️ NOT `settings.notBuilt` — this row is LIVE (proven on glass 2026-11-09: EN → 中文 switched
+     * every string, and a `force-stop` + relaunch came back Chinese at first paint). The shared
+     * `notBuilt` label told the user the opposite of the truth on a working control.
+     * Same convention as the delete row: the sub names the CONSEQUENCE.
+     */
+    'settings.languageSub': 'EN · 中文 — switches every screen and remembers the choice',
     'settings.notifications': 'Daily remembrance reminder',
     'settings.notificationsSub': 'One nudge each evening · 8:00 PM',
     'settings.retention': 'Original photos',
@@ -669,6 +676,7 @@ export const MESSAGES = {
     'settings.general': '通用',
     'settings.privacy': '隐私',
     'settings.language': '语言',
+    'settings.languageSub': 'EN · 中文 — 全应用立即切换，并记住你的选择',
     'settings.notifications': '每日追思提醒',
     'settings.notificationsSub': '每晚提醒一次 · 20:00',
     'settings.retention': '原始照片',

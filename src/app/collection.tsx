@@ -134,6 +134,7 @@ export default function CollectionScreen() {
         titleKey="collection.title"
         backTestID="collection-back"
         titleTestID="collection-title"
+        band
       />
     </View>
   );

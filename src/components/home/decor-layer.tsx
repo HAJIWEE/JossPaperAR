@@ -40,6 +40,7 @@ function Piece({
   rect,
   s,
   art,
+  mirror,
   onPress,
   testID,
 }: {
@@ -47,17 +48,26 @@ function Piece({
   rect: Rect;
   s: number;
   art?: ArtVariant;
+  /** ⚠️ Flip the ART horizontally — the right-hand member of a pair (`MIRRORED_SLOTS` in `decorate.ts`). */
+  mirror?: boolean;
   /** ⚠️ Given only when this piece IS the way into customising — see `DecorBack`/`DecorFront`. */
   onPress?: () => void;
   testID?: string;
 }) {
+  /**
+   * ⚠️ **THE FLIP GOES ON THE ART, NOT ON THE BOX.** Flipping the outer box would also flip the pressable's own
+   * geometry — harmless for a rectangle, but it makes the hit area and the drawing two things that can drift, and the
+   * rect is the board's own measurement of where the piece is.
+   */
   const inner = (
-    <DecorationArt
-      code={code}
-      size={Math.max(rect.w, rect.h) * s}
-      box={{ w: rect.w * s, h: rect.h * s }}
-      art={art}
-    />
+    <View style={[styles.fill, mirror === true && styles.mirrored]}>
+      <DecorationArt
+        code={code}
+        size={Math.max(rect.w, rect.h) * s}
+        box={{ w: rect.w * s, h: rect.h * s }}
+        art={art}
+      />
+    </View>
   );
   if (onPress === undefined) {
     return (
@@ -107,7 +117,7 @@ interface LayerProps {
 }
 
 function piecesIn(
-  plan: readonly { slot: DecorationSlot; code: DecorationCode; rect: Rect; art?: ArtVariant }[],
+  plan: readonly { slot: DecorationSlot; code: DecorationCode; rect: Rect; art?: ArtVariant; mirror?: boolean }[],
   { scale, onEnter }: LayerProps,
 ) {
   return plan.map((p) => (
@@ -117,6 +127,7 @@ function piecesIn(
       rect={p.rect}
       s={scale}
       art={p.art}
+      mirror={p.mirror}
       onPress={onEnter}
       testID={onEnter === undefined ? undefined : `decor-piece-${p.slot}`}
     />
@@ -199,6 +210,10 @@ export function DecorSlots({
 }
 
 const styles = StyleSheet.create({
+  /** ⚠️ The art fills the piece's rect — a wrapper so the flip has something to flip. */
+  fill: { width: '100%', height: '100%' },
+  /** ⚠️ The right-hand member of a pair. A horizontal flip, not a second drawing: same object, opposite hand. */
+  mirrored: { transform: [{ scaleX: -1 }] },
   /** `slot · …` — `#F0C75E` @ 0.12 fill, `#A8862A` 2 px DASHED stroke, r10. */
   slot: {
     backgroundColor: 'rgba(240, 199, 94, 0.12)',

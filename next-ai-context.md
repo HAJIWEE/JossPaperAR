@@ -128,7 +128,7 @@
     - **Then it was too high: −15 % and the lift reverted** (*"further reduce the size … by 15% and bring it down back 15% cos now its encroaching on the top banner"*). `BACKGROUND_OVERSHOOT` **0.68816**; **`BACKGROUND_RAISE` deleted** (reversing the lift), so `SLOT_ART.background` is a single `hungFrom()` again. ⚠️ **The revert is the fix, not the shrink:** the top returns to the alignment edge (`279.04`); −15 % size alone would have left it `38.86` board px high. ⚠️ **Diagnosis worth keeping: two vertical controls (an anchor AND a lift) fought over one edge, and the lift lost** — one control per edge is the rule. ✅ **On glass: top 443 → 515 px (−72, back on the edge), width 282 → 240 (×0.851), and the BOTTOM edge unmoved at `499.25` board px both ways** — the lift and the shrink are both 15 % of the same height, so the print shrank with its bottom pinned and the altar line stayed put.
     - ⚠️⚠️ **THE TRAP THAT MADE THIS EXPENSIVE: this worktree's Metro did NOT notice THIS turn's edit.** The device kept serving the previous bundle — the new screenshots were **byte-identical apart from the clock**, which `ImageChops.difference(...).getbbox()` proves in one line (`(110,35,598,58)` = the status bar and nothing else). ⚠️ **A "verified on glass" claim is only as good as the bundle**, and the tell is a diff, not a look. ✅ **The rule: after editing, restart Metro and prove the screenshot MOVED.** A `force-stop` + `am start` is not enough when the server predates the edit. ⚠️ **Grepping the bundle for an identifier is not a usable check** — dev bundles come back minified, so `BACKGROUND_OVERSHOOT` reads **0 hits while the code is present**; diff the *pixels*, not the JS. ⚠️ **And do not over-correct: the stale one was this turn's edit, not last turn's.** The pre-change shot measured the print at **209 board px = 1.1 × 190**, which is proof the earlier +10 % *had* reached the glass — the measurement is what distinguishes the two cases.
   - ✅ **TAP OUTSIDE TO LEAVE** (owner: *"Tapping outside of the customization options should return me to normal mode with the tablets and tablet controls"*). An **invisible full-board catcher** is painted FIRST inside the overlay, so the six zones sit above it — a slot tap opens its picker, never the exit — and the chip and the sheet paint after it, so both stay live. ⚠️ The catcher lives in the `altar` region, so the **CTA and tab bar paint above it**; that is why leaving the screen also resets the mode (on blur), otherwise navigating away and back would return to a screen still wearing zones. `check:lib` **885 → 887**, both assertions fault-tested red. Verified on glass: tapping the table area leaves customising and the ＋/tablet controls come back.
-- **Session S79k · 2026-11-09 — 🖼️ `SCRUM-204` · THE DECORATION PRICES WERE A TRANSPOSITION: DOOR GODS and LANTERNS were swapped, and THE GATE AGREED WITH THE DEFECT. ⚠️ US$0.00 — no AI call.**
+- **Session S79k · 2026-11-09 — 🖼️ under `SCRUM-204` (the customisation workstream; that ticket's own scope is the `equip_decoration` wiring) · THE DECORATION PRICES WERE A TRANSPOSITION: DOOR GODS and LANTERNS were swapped, and THE GATE AGREED WITH THE DEFECT. ⚠️ US$0.00 — no AI call.**
   - ⚠️ **`EN · 7b` was authoritative all along, and it states the pairing in its own layer NAMES:** `card · Door Gods cash = $1.49` / `points = 1,200 pts`, `card · Lanterns cash = $1.99` / `points = 1,600 pts`. `ZH · 7b` agrees (门神 $1.49 / 1,200 · 灯笼 $1.99 / 1,600). ⚠️ The first pass paired the four cards by their **POSITION** in the 2 × 2 grid and swapped the two that share a row — so the **lanterns charged 400 points too much** and the **door gods 400 too little**.
   - ⚠️⚠️ **`check:lib`'s `BOARD_DECOR_PRICES` was transcribed from the same wrong pass, so it PASSED over the defect** — *a table that restates its input cannot catch a transposition*. Corrected, plus **a new control: no two decorations may share a price pair**, so a swap necessarily changes which code carries which number. Fault-tested three ways — full transposition → **RED** · one row duplicated → **RED** (the price check **and** the new guard) · restored → **857 green**.
   - ✅ **Corrected in four places at once, because they are ONE decision:** `src/domain/catalogue.ts` · `supabase/seed.sql` · **new migration `20261109100000_decoration_price_swap`** (never an edit to the applied `20261108160000`) · the gate table.
@@ -765,14 +765,25 @@ settings gear, halo, offerings, the tablet, the tribute/streak panels and the ta
 ported from the boards and on glass — and the altar can finally **hold a tablet**.
 
 ```
-`SCRUM-146` ✅ Done   (+ 165 cap · 166 read · 167 display · 168 sheet)
+`SCRUM-146` ✅ Done   the tablet sheet (+ 165 cap · 168 sheet)  ⚠️ its own TITLE still says "4-then-overflow"
 `SCRUM-161` ✅ Done   tribute + streak panels live
-`SCRUM-162` ✅ Done   the Penpot port
-`SCRUM-164` 🔄 In Progress   tab bar built · **Book entry + way back still missing**
-`SCRUM-148` 🔄 In Progress   ⚠️ NOT done — 163 + 164 remain
-`SCRUM-163` ⏳ To Do        the geometry gate (360 dp assertions)
-`SCRUM-208` ⏳ To Do        ⚠️ yours: the board's active tab is 1.44:1
+`SCRUM-164` ✅ Done   Book + League entries, each with a way back
+`SCRUM-163` 🔄 In Review   the geometry gate (360 dp assertions) — on `cline/8d819`
+`SCRUM-162` 🔄 In Review   the Penpot port / altar art — ⚠️ NOT "4 tablet slots": the stage shows **three**
+`SCRUM-167` ⏳ To Do    ⚠️ **re-scope or close** — "4 visible + an honest overflow" is superseded by three-and-swipe
+`SCRUM-148` 🔄 In Progress   ⚠️ 162 + 163 are In Review; 167 wants re-scoping before this can close
+`SCRUM-208` ✅ Done   the Home board's active tab (decided)
+`SCRUM-151` ✅ Done   ⚠️ **step 6 is COMPLETE** — children **182** switcher · **183** delete · **184**
+                      /settings · **185** history · **186** gates all ✅ **Done** (2026-11-09), and the
+                      parent closed with them. ⚠️ All five had sat at `To Do` for shipped work whose
+                      briefs had gone stale (*"the route does not exist at all today"*, *"`delete_my_data()`
+                      has never had a caller"* — both false for weeks). The one branch item is a
+                      one-line label fix riding in PR #85.
 ```
+
+⚠️ **That block was four statuses out of date until 2026-11-09** (162 said ✅ Done when it was `In Progress`,
+164 and 208 said not-started when both were `Done`). ⚠️ **Read it from Jira, do not trust it** — it is a
+hand-kept snapshot and it drifts.
 
 **Pushed to glass:** EAS `preview` build **`de4c1df9`**, commit **`89d15cd`**, project
 `josspaperar/joss-paper-ar`. ⚠️ Verify the install off `dumpsys package app.josspaperar | grep
@@ -797,12 +808,16 @@ Every one was found by **looking at the phone**, with `tsc` and 515+ checks gree
   4.90:1, so neither "copy the board" nor "nudge it back" passes silently.
 
 ## Next, in order
-1. **`SCRUM-163`** — geometry gate, 360 dp. Cheap, and it guards the class above.
-2. **`SCRUM-164`** — the Book entry + a way back (the tab bar is not the whole ticket).
-3. **`SCRUM-151`** — Profile & Settings, **including the language switcher** the app still lacks.
-4. **`SCRUM-147`** onboarding → **`150`** store → **`149`** item burn → **`155`** seed → **`157`** demo run.
+1. **Merge `PR #85`** — `SCRUM-204` · `162` · `163` · `231` all wait on it, and none of it is on `main`.
+2. **`SCRUM-226`** — the door gods' generated art (two leaves drawn at **41 × 160**). ⚠️ If the two leaves turn
+   out to be **genuinely different drawings**, `side_right`'s `mirror` flag must be dropped **in the same
+   commit** — the gate asserts the flag, not the art under it.
+3. **`SCRUM-167`** — **re-scope or close**: its "4 visible + honest overflow" brief is superseded by what the
+   app now does (three on the stage, the swipe reaching all ten — `SCRUM-231`).
+4. **`SCRUM-151`** — Profile & Settings, **including the language switcher** the app still lacks.
+5. **`SCRUM-147`** onboarding → **`150`** store → **`149`** item burn → **`155`** seed → **`157`** demo run.
 
-⚠️ **`SCRUM-12`** is still blocked on the **`SCRUM-159`** decision, and **`SCRUM-208`** is yours.
+⚠️ **`SCRUM-12`** is still blocked on the **`SCRUM-159`** decision.
 
 ### 📲 The APK for the off-session review
 ⚠️ EAS `preview` builds sit in the queue for **30–40 min** (measured twice). The build was still
@@ -916,8 +931,12 @@ characters. No given name → 姓 + 氏…"* — the limit is stated for the fir
 
 **`check:lib` 559 → 581.** §18 asserts every band **fits the canvas** — ⚠️ **and a band dragged into
 the wrong place still fits.** So §25 asserts **PAIRS**: `a` is above `b`, or two regions do not
-overlap. New pure helpers: `bandAbove` · `bandsOverlap` · `HOME_REGION_TOPS` · `regionsStackDown` ·
-`ALTAR_DISPLAY_SLOTS`.
+overlap. New pure helpers: `bandAbove` · `bandsOverlap` · `HOME_REGION_TOPS` · `regionsStackDown`.
+⚠️ **`ALTAR_DISPLAY_SLOTS = 4` was listed here and has since been DELETED** — it was a constant **no
+screen imported**, guarded by three §25 checks, transcribed from a board's NAME (`EN · 1c Home / full
+(4 tablets)`) rather than requested (owner, 2026-11-09: *"i believe its already correct at 3"*). The
+altar stage draws **three** (`carouselStage`) and pages by **one** (`pageStep`); the clan cap is **10**.
+Those three checks now read the functions the screen calls.
 
 ⚠️ **`bandsOverlap` is deliberately NOT applied inside the altar** — `halo` (160→580) and
 `offerings` (434→604) overlap because the offerings are painted IN FRONT of the halo. A gate
@@ -2237,4 +2256,315 @@ message **through the app's own instance** and fails on a surviving brace or `[m
 4. **`7d` item detail and `7e`'s own buy sheet** — the cash rail is native (Play Billing · EAS · Play
    Console). `SCRUM-212`.
 5. ⚠️ **Correct the stale "no policy" sentence** in `history.tsx` and `my_offerings.sql` (§3.1).
+
+## 📍 2026-11-09 — the store switcher's caps now NEST (the radius is derived from the padding)
+
+⚠️ **Owner on glass: *"the corner radius of the border and the buttons do not align well, please use the padding
+value to properly adjust the corner radius of the inner buttons."*** Two defects in one geometry, and **both were
+invisible to every gate** — `tsc` does not know what a rounded corner looks like.
+
+- **The radius was nested for the wrong inset.** The track (`switcher · category (bg)`) is **r19** with a **2.5 ink
+  stroke**, and the segments were hard-coded at **r16.5** — i.e. `19 − stroke`. ⚠️ But the row also carried
+  `paddingHorizontal: 2.5`, so RN *drew* them at a **5** px inset: each cap sat too round for its gap and left a
+  crescent of `paperDeep` between itself and the stroke.
+- **The row OVERFLOWED.** `171 + 171 = 342` inside a **340** content box (350 − 2×2.5 border − 2×2.5 padding), so the
+  right segment ran **2 px over the track's own stroke**.
+- ⚠️ **And `STORE.switcher.radius` said `10`** — a number that is **not on the board**. Read back off Penpot, the
+  board's `switcher · active segment` is **171×33 r16.5** (a full pill).
+
+**Fixed by deriving, not typing.** `STORE_SWITCHER` (in `src/lib/store.ts`, mirroring the existing `LOCALE_PILL`
+convention: `inset` + `segmentRadius`) computes **every** number from one padding:
+`inset = stroke + pad` → `segmentRadius = radius − inset` → **r14**, `segmentH = h − 2·inset` → **28** (so it is a
+pill again, `14 = 28/2`), and `segmentW = (350 − 2·inset − gap)/2` → **168.5**, which with the board's own 3 px gap
+fills the content box **exactly**. Both caps are then concentric.
+
+✅ **Proved on the floor device**, not by arithmetic alone: `uiautomator dump` reads the track at `[40,341][686,411]`
+and the active segment at `[49,350][360,402]` — an inset of **9 device px on ALL FOUR sides** (5 board px × 1.846),
+which is exactly the concentric condition; the Decorations side measures `[366,350][677,402]`, inset 9 on its right.
+⚠️ **Before the fix that inset was 9 horizontally and 5 vertically.**
+
+✅ `check:lib` §29 gained **5 checks** (905 total, all green): the nesting rule, the pill rule, the exact width
+budget, a **positive control** that the shipped r16.5/171 geometry FAILS both, and one that `store.tsx` really
+renders `STORE_SWITCHER` (a literal typed back in would otherwise pass). **Fault-tested three ways, all red** —
+hard-coding `segmentRadius: 16.5` (4 red) · `segmentW: 171` (width budget red) · `borderRadius: 16.5 * s` in the
+screen (spec check red). `npm run check` green across all suites. **US$0.00.**
+
+
+
+
+## 📍 2026-11-09 (later) — the store's cards: the cash rail, the pill on the border, and bare text where a pill belonged
+
+⚠️ **Three owner findings on ONE screen, all the same shape: the price existed in the catalogue and not on the
+glass.** `tsc` cannot see a missing pill; every gate was green through all three.
+
+- **The offerings had no cash rail at all.** `catalogue.ts` said the cash prices *"are the next read"* — and an
+  unread price looks exactly like an undecided one. ⚠️ **`EN · 7 Store` and `ZH · 7 商店` both draw TWO pills on
+  every card and NAME the item in the layer** (`card · Gold Bar cash` = `$1.99`). Read: **$0.99 · $1.99 · $1.49
+  · featured $2.99**, in cents. ⚠️ **The House is the one price on this rail that is DERIVED, not read** — its card
+  is drawn OWNED (`card · House owned`) on both boards, so there was nothing to transcribe. **The owner answered
+  `SCRUM-229` the same day** (*"Use the rest of the objects cash price vs their points and calculate an
+  appropriate value"*): the three singles sit at **404.04 · 402.68 · 402.01 pts/$** → mean **402.9117** →
+  `1,200 ÷ 402.9117 = $2.9783` → **`$2.98`**, carrying `cashSource: 'derived'` so it never passes for a
+  transcription. ⚠️⚠️ **AND THE DERIVATION EXPOSED THE DEPENDENCE ON `SCRUM-230`:** calibrated on the
+  CATALOGUE's *transposed* points the same sum gives **414.1536 pts/$ → $2.90**, so the two pairings differ by
+  exactly **8¢**. `$2.98` ships (every other cash price on the rail is the board's, and it is the value that
+  survives the swap); `check:lib` recomputes BOTH and asserts the 8¢ delta, so fixing `SCRUM-230` makes them
+  converge instead of silently changing the House's price.
+- **The featured card's last child sat on its own stroke.** It had `paddingHorizontal` + `paddingTop` and no
+  bottom inset. `card · featured` leaves **14 px** under the pill row (row ends 518, card ends 532) — on BOTH
+  store boards, and both tabs had the defect.
+- **The decorations drew their "buy" figures as bare `<Text>`** while the offerings drew gold pills. Same
+  numbers, two treatments, because each block hand-rolled its own row. There is now **one `PricePill`** used 8
+  times, at the board's two sizes: small **68×24 r12** gap 5, featured **72/74×30 r15** gap 6 right-aligned.
+
+⚠️⚠️ **AND ONE DEFECT WAS MINE, CAUGHT ONLY BY MEASURING.** The first pass at the pills **overflowed the card**
+and the screenshot looked fine. ⚠️ **My own budget gate was arithmetically TRUE and modelled the WRONG BOX** —
+it asserted the board's `12 + 68 + 5 + 68 + 12 = 165`, but **RN draws `borderWidth` INSIDE the width**, so the
+content box is `165 − 2×2.5 = 160` for 141 of pill. Measured: the right pill sat **18** device px from the border
+while its twin sat **27**. Fixed with `card.padH = pad − stroke = 9.5` and the gate now asserts the **border-box**
+sum (`2·stroke + 2·padH + 2·pill + gap`). ⚠️ **Eighth sighting of the recurring class**: a check that cannot fail
+the right way because it trusts a model instead of the rendering model.
+
+✅ **Measured on `HN615L005386`** (`uiautomator dump`, after a fresh Metro bundle — ⚠️ CI-mode Metro served a
+STALE bundle first and the numbers did not move; `--clear` + a restart is what made the fix observable): small
+card **left 22 / right 23**, gap 9; featured **32 device px** under the pill row (14 board px + 3 stroke).
+
+✅ `check:lib` **905 → 916**, **fault-tested four ways, all red** (cash `199→189` · a featured card losing
+`paddingBottom` · `gap 5→8` · `padH 9.5→12`). `npm run check` green, `tsc` clean.
+
+⚠️⚠️ **FOUND AND DELIBERATELY NOT FIXED: the offerings' POINTS pairing is transposed vs both boards.** The
+boards say **Gold Bar 800 pts (base 960)** and **Phone 600 pts (base 720)**; this catalogue has `gold_bar` 600 and
+`smartphone` 800 — so the app charges **600 for a gold bar and 800 for a phone**. Same class as the decoration price transposition (Door Gods ↔ Lanterns, fixed under `SCRUM-204`), same
+cause: a `priceSource: 'derived'` pairing assigned by list position. ⚠️ It is what `purchase_item` charges, so it
+needs the catalogue + `seed.sql` + the `offerings_catalog` mirror + a NEW migration + a re-push, plus a product
+call — **not a ride along a layout change.** Recorded in `catalogue.ts`; raised as **SCRUM-230**.
+
+**US$0.00** — boards read through the Penpot MCP, device verified over the local Metro loop.
+
+
+## 📍 2026-11-09 (S80) — the header was see-through, and it was never a Store bug
+
+⚠️ **Owner on glass: *"when i scroll up the Title bar is not opaque so the Store title overlaps with the content."***
+He was right about the symptom and the cause was structural, not local.
+
+**Why it happened.** `ScreenHud` is absolutely positioned **above** the `ScrollView` — and it has to be, or it never
+receives a tap (the `2026-11-01` defect: a perfect-looking back button that did nothing). ⚠️ It had **no ground of its
+own**, so every screen that scrolls let its cards run straight through the title and the back circle. ⚠️ **Nine
+screens, not one** — the owner noticed it where he was scrolling.
+
+**The fix** — the owner's second option (keep the title, hide what goes under it), because the first (scroll the header
+away) would take the back button with it:
+- `ScreenHud` gained an **opt-in `band`**: a full-width, **opaque** strip at `surface.paper`, declared **before** the
+  circle and title so it paints under them and over the scroll view. ⚠️ **No `elevation`**: a raised strip would cast a
+  shadow line the board does not draw.
+- `HUD_BAND_HEIGHT = touch.y + touch.size + 15` — **not a taste call.** Every screen already reserves exactly that at
+  the top of its content, so the band's lower edge is where the content begins: it hides everything that scrolls up
+  and **never clips the first line at rest** (verified: at scroll 0 the Store's intro sits immediately below it).
+- ⚠️ **Opt-in, NOT derived from `tone`**: `preparing.tsx` is a dark `surface.camera` screen that deliberately draws the
+  LIGHT hud (*"a paper disc reads on this screen's `surface.camera` background"*), so `light` does not imply paper.
+  `capture.tsx` likewise — and it carries a paper `gate` PANEL, so "the file mentions `surface.paper`" is not the test.
+
+✅ **`check:lib` §26 makes the rule DERIVED, not a list**: it reads every screen that renders `<ScreenHud` and requires
+`band` on any whose ROOT style (`screen:` / `root:`) is `surface.paper` — **7/7**. A hand-maintained list is what let
+the HUD order drift across five screens; this covers the next screen automatically.
+
+⚠️⚠️ **AND MY FIRST DETECTOR PASSED VACUOUSLY.** The `rootIsPaper` regex only matched **multi-line** style objects, and
+every paper ground here is written `screen: { flex: 1, backgroundColor: surface.paper },` on **one line** — so it found
+**no** paper screens and "no screen is missing a band" was true for the wrong reason. ⚠️ **The positive control caught
+it** (ninth sighting of the class); the detector is now brace-balanced AND the check asserts the **denominator**
+(`=== 7`), so a detector that stops recognising paper grounds goes red instead of silent.
+
+✅ **Measured on `HN615L005386`**: `hud-band` = `[0,0][720,200]` — 200 px = 100 dp × density 2, exactly the content's
+`paddingTop`; the title (`[132,102][214,148]`) and back circle sit inside it. Scrolled, the featured card crops cleanly
+at the band edge with no bleed-through; at rest nothing is clipped. Profile and History carry the band and show **no**
+visible bar — it is the page's own colour.
+
+✅ `check:lib` **920 → 926**, **fault-tested three ways, all red**: Store losing `band` · the band made unconditional
+(a cream strip would land on the viewfinder) · the height off by one. `npm run check` green, `tsc` clean, CI green.
+
+**US$0.00.**
+
+
+## 📍 2026-11-09 (S80, cont.) — SCRUM-204's last criterion, and a citation that pointed at the wrong ticket
+
+**SCRUM-204 is the `equip_decoration` WIRING ticket, not the price transposition.** ⚠️ Seven places in the repo said
+"SCRUM-204" while meaning the Door Gods ↔ Lanterns swap — `catalogue.ts` ×2, `checks/run.ts`, two doc lines and the
+cost row. ⚠️ **The citation was not invented**: that swap really was fixed *inside 204's comment trail*, which is how
+`project-costs.md` attributed it — but read cold, it says the wiring ticket *is* the price ticket, which it is not.
+Reworded to *"the decoration price transposition (…, fixed under SCRUM-204)"* everywhere, and the two citations that
+**are** correct (`decorations.ts`'s header, the shrine-customisation gate) were left alone. ⚠️ There is still **no
+ticket of its own** for that swap — a JQL search for Door Gods / Lanterns / decoration price / transposition returns
+only SCRUM-228 and SCRUM-226.
+
+**204's one open acceptance criterion is now met:** *"a read of owned decorations returns quantity and category per
+item."* ⚠️ `qty` **was selected and then thrown away** (the old map took `item_code` alone) and the category was never
+carried — ⚠️ **and no static type can see either**, because `owned: readonly DecorationCode[]` compiles perfectly while
+discarding what it just fetched. `MyDecorations` now carries `items: OwnedDecoration[]` = **`code · qty · category`**,
+with `owned` **derived from it** so the two cannot disagree.
+
+⚠️ Two traps built in: the category comes from the **catalogue** (`CATEGORY_BY_CODE`), never from `inventory`, which is
+`(user_id, item_code, qty)` — selecting a `category` there would fail at runtime on a column that does not exist; and
+**composed SKUs are excluded**, so `festive_set` (a bundle, `purchase_item` never writes a row for it) can never read
+as an altarpiece you own.
+
+✅ `check:lib` **926 → 931**, fault-tested three ways, all red: the select dropping `qty` again · asking `inventory`
+for a `category` · removing the composed-SKU guard. Verified on glass that Home still loads and the shrine's read
+returns. **US$0.00.**
+
+
+
+## 📍 2026-11-09 (S80, cont.) — SCRUM-230: the Gold Bar / Phone point prices were transposed, and now they are not
+
+⚠️ **Owner: *"yes you should do 230 and fix that as well"*** — so the fourth price defect of the week is closed.
+
+**THE DEFECT.** `catalogue.ts` paired `gold_bar` with **600** (base 720) and `smartphone` with **800** (base 960).
+Both boards say the opposite, in EN and ZH, **in layer names that state their own item**:
+`card · Gold Bar points` = **800** · `card · Phone points` = **600** (`ZH · 7 商店`: 金条 800 / 手机 600).
+⚠️ So a player paid **600 for the more valuable item and 800 for the less** — 200 points each way, in the wrong
+direction — and it survived because the pairing was assigned by **list position** under a `priceSource: 'derived'`
+that said it *"still needs a PM confirmation"* and never got one.
+
+**FOUR PLACES HAD TO MOVE TOGETHER** — points are what `purchase_item` charges, and a client/server disagreement
+would mean the card says 800 while the server bills 600:
+1. `src/domain/catalogue.ts` — the swap (+ the PROVENANCE block, which asked the question the board has now answered).
+2. `supabase/seed.sql` — the mirror rows **and its own `base_value` self-check** (720/960 → 960/720), which would
+   otherwise have failed the next `db reset`.
+3. **A NEW migration** `20261109163000_offering_price_swap.sql` — an applied one is never edited — then
+   `npx supabase db push --yes`. ⚠️ **A fresh worktree has no `supabase/.temp`, so every remote command dies with
+   *"Cannot find project ref"*;** copied from the vault first, then `migration list` **read before pushing** (it was
+   aligned — the new file was the ONLY pending one).
+4. The Store's gates — `BOARD_OFFERING_POINTS` already held the board's pairing, and ⚠️ **the tolerance that let it
+   pass while the defect was live is now GONE**: it asserts **zero drift**, so a re-transposition fails immediately.
+
+✅ **The House's $2.98 needed no change** — and that is the gate doing its job: it recomputes the price from BOTH
+pairings, so the **8¢ gap it asserted yesterday flipped to "identical"** on its own. `boardRate === catalogueRate`
+is now an assertion, not a hope.
+
+✅ **VERIFIED IN THREE PLACES, not one.** `check:lib` **931 green** (the `pointsPrice(gold_bar) === '800'` assertion
+moved with it); **hosted rows read back** with a read-only SQL query — `gold_bar 800/base 960 · smartphone
+600/base 720`, `base_value` following because it is a GENERATED column; **on glass** (`HN615L005386`) the cards now
+read **Gold Bar `base 960 · $1.99 · 800 pts`** and **Smartphone `base 720 · $1.49 · 600 pts`**.
+⚠️ An **anon PostgREST** read of `offerings_catalog` answers `[]` — that is RLS, **not** an empty table; do not read
+it as "the push did nothing".
+
+⚠️ **And `cashPrice` deliberately did NOT move** — the cash rail is a separate pairing and it was already right.
+
+**US$0.00.**
+## 📍 2026-11-09 (S80, cont.) — the right-hand door god is MIRRORED
+
+⚠️ **Owner: *"The right one is mirrored"*** — a request, and I checked first: **nothing in the code mirrored anything**
+(`scaleX`/`transform` appeared nowhere in the decor path), and a pixel comparison of the two sides from the shrine
+screenshot showed them **identical**. So both sides were drawing the *same* leaf, which is wrong for a 門神 pair —
+they are **matching but opposite** (weapon on opposite sides, matched faces).
+
+**WHAT SHIPPED**
+· `MIRRORED_SLOTS` in `decorate.ts` — **data, not a `slot === 'side_right'` test buried in the renderer**, so a gate can
+assert it. `side_right` is the only slot with a partner; ⚠️ the top corners hold the same **symmetric** lantern, so they
+must NOT flip.
+· `drawPlan` marks each piece `mirror: true|false`.
+· `decor-layer.tsx` flips the **art** (`scaleX: -1` on an inner wrapper), ⚠️ **not the box**: flipping the pressable's
+own rect would make the hit area and the drawing two things that can drift, and the rect is the board's measurement.
+
+✅ `check:lib` **938 → 940**, fault-tested **both ways**: nothing mirroring reports
+*"side_left:mirror=false side_right:mirror=false"* and a blanket flip reports *"side_left:mirror=true"* **plus** the
+lantern guard — each red, then green on restore.
+
+⚠️ **Verified on glass**, not by assertion: the crop of both sides now shows the spear running the other way on the
+right. ⚠️ The preview used to see it was again a **temporary client override** (no rows written to the account) and is
+**reverted** — `git status` shows only the three real files.
+
+✅ **ACCEPTED AS TEMPORARY — owner, 2026-11-09: *"For now this is fine. but mark it down."*** It is marked in
+**`follow-up-items.md`** under `SCRUM-226` as three bullets: the pair has no top piece · the card motif's third leaf is
+deleted (and its right leaf is now plainer, because that drifted body *was* its robe) · the altar draws one ported,
+**stretched**, mirrored leaf per side. ⚠️ **The trap that mark records:** the mirror is a **flip**, so if two genuinely
+different drawings are ever generated, `side_right`'s `mirror` flag must be turned off **in the same commit** — the gate
+asserts the flag, not the art underneath it.
+
+**US$0.00.**
+
+
+## 📍 2026-11-09 (S80, cont.) — door gods render ONE leaf per side on the shrine
+
+⚠️ **Owner, after eyeballing the shrine: *"door gods should be 1 per side not 2 per side"*** — and the render he was
+looking at showed **four** door gods with their spears crossing.
+
+**WHY IT HAPPENED.** `MOTIFS.door_gods` is the **store card's illustration** — `DOORGODS`, **85.1 × 72, two leaves side
+by side**. A side slot's art rect is **41 × 160**, and `artVariantFor` gave the couplets a `'scroll'`, the lanterns a
+`'single'`… and **door gods nothing**, so each side stretched the PAIR into the strip. ⚠️ **Same defect the couplets had
+before `COUPLEt_SCROLL`** — the lesson is already in this file: *a slot needs its own object drawing, chosen by SLOT*.
+
+**THE FIX.** `DOORGOD_LEAF` — the **left leaf of `DOORGODS`**, re-based to its own **22.4 × 56.3** frame box, carrying
+its own spear. **Ported, not redrawn**, so the altar and the card cannot disagree about the figure. `artVariantFor` now
+returns `'leaf'` for `door_gods`, and `ArtVariant` gained the member.
+
+⚠️ **I rendered the leaf on its own before wiring it** (throwaway SVG from its own numbers → ImageMagick), then rendered
+the **shrine** through the real path. Both looked right; the shrine now shows exactly two door gods, one a side.
+
+⚠️ Still **stretched** into the slot's 41 × 160 — that rect is the design's own shape. A leaf **drawn at** 41 × 160, and
+whether the right side should be a **mirror**, is SCRUM-226's generated art.
+
+✅ `check:lib` **934 → 938**, fault-tested: deleting the variant reports
+*"side_left:pair-motif side_right:pair-motif"* and turns **two** checks red (the plan, and the guard).
+
+⚠️ **The preview was a temporary client override** — `readMyDecorations` pretended the door gods were owned and equipped
+rather than writing rows to the owner's account (they own none; 1,200 pts). **Reverted and verified** (`git status` shows
+only the three real files). **US$0.00.**
+
+
+## 📍 2026-11-09 (S80, cont.) — the door gods motif's THIRD leaf deleted
+
+⚠️ **Owner: *"The door gods object has 3 objects it should only have 2, the 2 from the left. the 3rd should be
+removed."*** — the drawing, not the slot map (that was the previous fix).
+
+**WHAT IT WAS.** `DOORGODS` carried a **third panel's** robe (`x 70.5 w 14.6`) and gold torso (`x 67.7 w 12.3`).
+At the trio's **32.5 pitch** that is a third leaf, and its FRAME falls outside the **85.1** box — so it was clipped
+mid-shape and drew as a **red-and-gold block floating beside the pair**. ⚠️ The last ghost of the trio assumption
+`SCRUM-228` reversed an hour earlier.
+
+⚠️ **I rendered the motif before cutting, and that is what identified the shapes** — a throwaway SVG built from the
+motif's own numbers, rasterised with ImageMagick (`convert`/`magick` are on this box; there is **no** cairosvg, and
+`sprite-render.ts` is about the burnt offering, not motifs). ⚠️ **Without a picture this would have been guesswork**:
+ten of the twelve shapes are inside the two leaves, and the two that are not are exactly the stray object.
+
+**THE TRADE-OFF, stated plainly:** the removed block WAS the right leaf's robe, so that leaf now keeps its frame,
+cinnabar border, head and face disc but no robe — **the pair is asymmetric** (visible at card size on
+`HN615L005386`). ⚠️ Symmetric art is `SCRUM-226`'s generated pair; a one-edit stopgap would be to mirror the left
+leaf's robe/gold into the right instead of deleting them. Recorded, not assumed.
+
+✅ `check:lib` **932 → 934**, and the assertion reads the **art data**, not the comment: nothing in `DOORGODS` may end
+past the second leaf (`x + w ≤ 60.6`, with a length guard so `Math.max([])` cannot pass vacuously). Fault-tested —
+restoring the two shapes reports *"12 shapes · furthest right edge 85.1"* and goes **red**.
+
+**US$0.00.**
+
+## 📍 2026-11-09 (S80, cont.) — SCRUM-228 answered: **Door Gods are a PAIR, left and right, no top piece**
+## 📍 2026-11-09 (S80, cont.) — SCRUM-228 answered: **Door Gods are a PAIR, left and right, no top piece**
+
+⚠️ **Owner, verbatim: *"No door god is a left right only, no top"*** — the ticket's **option A**.
+
+⚠️ **This is a DELIBERATE REVERSAL, and the record says so.** The door gods' three slots were the **one inference**
+in `SET_SLOTS`: the owner's earlier *"The door Gods is also a trio one"* was the only evidence and no board draws them
+on an altar. ⚠️ The consequence on glass was already filed as a defect (SCRUM-226's render evidence): two **PORTRAIT**
+panels stretched into the **162 × 46** 横批 band read as a squashed card, with the pair's red block floating beside
+them. A 门神 flanks a doorway; no traditional 横批 carries them.
+
+**WHAT CHANGED**
+· `SET_SLOTS.door_gods` → **`['side_left', 'side_right']`** (was `top_middle` + both sides) — so door gods now draw
+exactly like the lanterns, and **`top_middle` is the couplets' 横批 alone**.
+· ⚠️ **THE CHIP COMES BACK.** Because door gods no longer run through the chip's band, `chipBandClear` shows the chip
+on a door-gods altar — before this, a set with no business in that band was **removing the only way in**.
+· ✅ `check:lib` **931 → 932**, and the assertion IS the record: a future reader who "restores" the trio is
+contradicted by the gate rather than silently obeyed. Fault-tested — re-adding `top_middle` turns **both** new checks
+red (the pair, and the chip staying visible).
+· `SCRUM-226` narrows from a **trio** to **two door-leaf drawings**; `SCRUM-227` (user-written couplet text) loses its
+"does a door god own this band?" pre-question.
+· ⚠️ `follow-up-items.md` **no longer claims the borrowed banner is approved** — it said the top-middle reuse was
+"approved as temporary", which is now simply wrong.
+
+⚠️ **`top_middle` STILL serves two categories** (a `top` slot, but the couplets are a `side` set) — that follow-up
+stands, only narrower: it is the last set in the wrong category for that band.
+
+**US$0.00.**
+
+
 
