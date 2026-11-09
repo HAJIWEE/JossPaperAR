@@ -33,6 +33,9 @@
  * read, while the behaviour that *is* real (three on the stage, one page per swipe) was covered by the stage geometry instead.
  * That is the vacuous-gate class: **a gate is only worth its line if the thing it reads is the thing that renders.**
  * ⚠️ Deleting the constant is what makes "how many are on screen" and "how many a clan may hold" impossible to conflate again.
+ * ⚠️ **The board was RENAMED to `EN · 1c Home / full (3 tablets)` on 2026-11-09** — but measured by layer name, **its art still
+ * draws TWO** (`tablet · left` + `tablet · centre`, no `tablet · right`, where `EN · 1b` has one at x=400). **A board is fixed
+ * when its layers say so, not when its name does.**
  */
 
 /**
