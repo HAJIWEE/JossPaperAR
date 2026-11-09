@@ -89,14 +89,27 @@ export const SLOT_HIT: Record<DecorationSlot, Rect> = {
 export const BACKGROUND_OVERSHOOT = 0.8096;
 
 /**
- * ⚠️⚠️ **THE PRINT'S TOP EDGE, held as a fraction of the ZONE'S height above the zone's top** (`0.028` = `8.96` board px).
- * ⚠️ **A fraction of the ZONE, never of the print** — a fraction of the print moves the top every time the size changes,
- * which is the drift *"maintain top center alignment"* exists to stop. That is the whole lesson of this constant.
- * ⚠️ Where `0.028` comes from, so it is a measurement and not a taste: the owner's earlier *"bring it up another 10 %"*
- * lifted the 0.88 print by 10 % of its own height (`28.16`) from a centred position `35.2` below the zone's top, so
- * `35.2 − 28.16 = 8.96`, and `8.96 / 320 = 0.028` exactly. **The top edge the owner is looking at is the one this holds.**
+ * ⚠️ **WHERE THE BOX IS ALIGNED: its top edge, as a fraction of the ZONE's height above the zone's top** (`0.028` = `8.96`
+ * board px). ⚠️ **A fraction of the ZONE, never of the print** — a fraction of the print moves the alignment edge every time
+ * the size changes, which is the drift *"maintain top center alignment"* exists to stop.
+ * ⚠️ Where `0.028` comes from, so it is a measurement and not a taste: an earlier *"bring it up another 10 %"* lifted the
+ * 0.88 print by 10 % of its own height (`28.16`) from a centred position `35.2` below the zone's top, so `35.2 − 28.16 =
+ * 8.96`, and `8.96 / 320 = 0.028` exactly.
  */
 export const BACKGROUND_TOP_OFFSET = 0.028;
+
+/**
+ * ⚠️ **HOW FAR THE WHOLE BOX IS LIFTED, as a fraction of its OWN height** (owner, 2026-11-09: *"bring the whole background
+ * decoration box up 15% so the art is still top center aligned"*).
+ *
+ * ⚠️⚠️ **A TRANSLATION, not a size and not an anchor.** The box moves up as one piece — top edge and bottom edge together —
+ * so nothing inside it changes and the horizontal centring `hungFrom()` established is untouched. That is what *"so the art
+ * is still top center aligned"* asks for, and it is why this is a separate step from `BACKGROUND_TOP_OFFSET`: the offset
+ * says where the box is ALIGNED, this says how far it has been MOVED from there.
+ * ⚠️ The unit is the print's own height, because that is how the owner asked (*"up 15%"* of the box). ⚠️ It therefore
+ * SCALES with the print: a future size change moves the lift too, by design — say so rather than discovering it.
+ */
+export const BACKGROUND_RAISE = 0.15;
 
 /**
  * A rect hung from the **TOP-CENTRE** of `zone`: horizontally centred, `factor` of the zone's size, its top edge
@@ -107,6 +120,11 @@ export function hungFrom(zone: Rect, factor: number, topOffset: number): Rect {
   const w = zone.w * factor;
   const h = zone.h * factor;
   return { x: zone.x + (zone.w - w) / 2, y: zone.y - zone.h * topOffset, w, h };
+}
+
+/** ⚠️ Move a rect UP by `factor` of its own height — a translation, so its size and its x are untouched. */
+export function raise(r: Rect, factor: number): Rect {
+  return { x: r.x, y: r.y - r.h * factor, w: r.w, h: r.h };
 }
 
 /**
@@ -122,11 +140,12 @@ export const SLOT_ART: Record<DecorationSlot, Rect> = {
   top_right: { x: 301, y: 210, w: 52, h: 66 },
   side_left: { x: 33, y: 300, w: 41, h: 160 },
   side_right: { x: 317, y: 300, w: 41, h: 160 },
-  /** `decor · 鍾馗像 (background)` — ⚠️ **HUNG FROM THE ZONE'S TOP-CENTRE at `BACKGROUND_OVERSHOOT`** (owner, 2026-11-09:
-   * *"maintain top center alignment but reduce the background decoration another 20%"*). ⚠️ Anchor first, size second: the
-   * top edge (`BACKGROUND_TOP_OFFSET`) and the horizontal centre are HELD, so this — and every future — size change moves
-   * only the width and the bottom edge. */
-  background: hungFrom(SLOT_HIT.background, BACKGROUND_OVERSHOOT, BACKGROUND_TOP_OFFSET),
+  /** `decor · 鍾馗像 (background)` — ⚠️ **ALIGNED to the zone's top-centre, then the whole box LIFTED** (owner, 2026-11-09:
+   * *"bring the whole background decoration box up 15% so the art is still top center aligned"*).
+   * ⚠️ Two steps, in this order, because they are two different facts: `hungFrom()` decides the alignment (centred, top at
+   * `BACKGROUND_TOP_OFFSET`), `raise()` then translates the whole box up `BACKGROUND_RAISE` of its own height — size and
+   * centring untouched, which is exactly *"the art is still top center aligned"*. */
+  background: raise(hungFrom(SLOT_HIT.background, BACKGROUND_OVERSHOOT, BACKGROUND_TOP_OFFSET), BACKGROUND_RAISE),
 };
 
 /** `slot · hint (how it works)` — 20,618 350×18, drawn only in customise mode. */
