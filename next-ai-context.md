@@ -2431,6 +2431,34 @@ it as "the push did nothing".
 ⚠️ **And `cashPrice` deliberately did NOT move** — the cash rail is a separate pairing and it was already right.
 
 **US$0.00.**
+## 📍 2026-11-09 (S80, cont.) — door gods render ONE leaf per side on the shrine
+
+⚠️ **Owner, after eyeballing the shrine: *"door gods should be 1 per side not 2 per side"*** — and the render he was
+looking at showed **four** door gods with their spears crossing.
+
+**WHY IT HAPPENED.** `MOTIFS.door_gods` is the **store card's illustration** — `DOORGODS`, **85.1 × 72, two leaves side
+by side**. A side slot's art rect is **41 × 160**, and `artVariantFor` gave the couplets a `'scroll'`, the lanterns a
+`'single'`… and **door gods nothing**, so each side stretched the PAIR into the strip. ⚠️ **Same defect the couplets had
+before `COUPLEt_SCROLL`** — the lesson is already in this file: *a slot needs its own object drawing, chosen by SLOT*.
+
+**THE FIX.** `DOORGOD_LEAF` — the **left leaf of `DOORGODS`**, re-based to its own **22.4 × 56.3** frame box, carrying
+its own spear. **Ported, not redrawn**, so the altar and the card cannot disagree about the figure. `artVariantFor` now
+returns `'leaf'` for `door_gods`, and `ArtVariant` gained the member.
+
+⚠️ **I rendered the leaf on its own before wiring it** (throwaway SVG from its own numbers → ImageMagick), then rendered
+the **shrine** through the real path. Both looked right; the shrine now shows exactly two door gods, one a side.
+
+⚠️ Still **stretched** into the slot's 41 × 160 — that rect is the design's own shape. A leaf **drawn at** 41 × 160, and
+whether the right side should be a **mirror**, is SCRUM-226's generated art.
+
+✅ `check:lib` **934 → 938**, fault-tested: deleting the variant reports
+*"side_left:pair-motif side_right:pair-motif"* and turns **two** checks red (the plan, and the guard).
+
+⚠️ **The preview was a temporary client override** — `readMyDecorations` pretended the door gods were owned and equipped
+rather than writing rows to the owner's account (they own none; 1,200 pts). **Reverted and verified** (`git status` shows
+only the three real files). **US$0.00.**
+
+
 ## 📍 2026-11-09 (S80, cont.) — the door gods motif's THIRD leaf deleted
 
 ⚠️ **Owner: *"The door gods object has 3 objects it should only have 2, the 2 from the left. the 3rd should be

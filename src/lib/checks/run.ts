@@ -3392,6 +3392,15 @@ function storeChecks(): void {
   // ⚠️ POSITIVE CONTROL — the shape that shipped must FAIL the bound, or the check proves nothing.
   check('⚠️ guard: the third leaf that shipped (x 70.5 + w 14.6 = 85.1) WOULD fail that bound',
     70.5 + 14.6 > 60.6 && inkRightEdges.every((e) => e <= 60.6));
+  /**
+   * ⚠️ **AND THE ALTAR'S ONE LEAF IS ONE LEAF** — `DOORGOD_LEAF` must carry the single leaf's own **22.4 × 56.3** box,
+   * not the pair's 85.1 × 72. ⚠️ A variant that quietly reused the pair's box would stretch the same defect back in.
+   */
+  check("⚠️⚠️ the side-slot door god is ONE leaf — its own 22.4 × 56.3 box, not the pair's 85.1 × 72",
+    /const DOORGOD_LEAF[\s\S]{0,160}?box: \[22\.4, 56\.3\]/.test(DECOR_CODE));
+  // ⚠️ POSITIVE CONTROL — the pair's box must not satisfy that pattern.
+  check('⚠️ guard: the pair motif\'s `box: [85.1, 72]` is NOT what the leaf check accepts',
+    !/const DOORGOD_LEAF[\s\S]{0,160}?box: \[85\.1, 72\]/.test(DECOR_CODE));
 
 
   // `offerings_catalog.composed_of` — the SQL twin of this code field — and grants one of each
@@ -4077,6 +4086,22 @@ function storeChecks(): void {
    */
   check("⚠️ …and they leave the 横批 band CLEAR, so the chip still shows — top-middle is the couplets' alone",
     chipBandClear(doorGodsOnly, HOME_BANDS.templeChip));
+  /**
+   * ⚠️⚠️ **ONE DOOR LEAF PER SIDE — never the card's pair** (owner, 2026-11-09: *"door gods should be 1 per side not 2
+   * per side"*).
+   *
+   * ⚠️ A side slot's art rect is **41 × 160** and `DOORGODS` is **85.1 × 72 with TWO leaves**, so without a variant the
+   * altar stretched the pair into the strip and drew **FOUR door gods with their spears crossing** — caught on glass,
+   * not by a gate. The couplets and lanterns already had their per-slot split; door gods were the one set missing it.
+   */
+  check('⚠️⚠️ every DOOR GOD piece draws the ONE-LEAF variant, never the pair motif',
+    doorGodsOnly.length === 2 && doorGodsOnly.every((p) => p.art === 'leaf'),
+    doorGodsOnly.map((p) => `${p.slot}:${p.art ?? 'pair-motif'}`).join(' '));
+  // ⚠️ POSITIVE CONTROL — the variant must be the reason, not a coincidence of some other field.
+  check('⚠️ guard: without the variant the pair motif is what a side would get — the defect that shipped',
+    artVariantFor('door_gods', 'side_left') === 'leaf'
+      && artVariantFor('lanterns', 'top_left') === 'single'
+      && artVariantFor('zhong_kui', 'background') === undefined);
   const backgroundOnly = drawPlan({ ...noDecor, background: 'zhong_kui' } as never);
   check('⚠️ the BACKGROUND print draws BEHIND the tablet — the z-order `1e` depends on',
     backgroundOnly.length === 1 && backgroundOnly[0].behind === true);

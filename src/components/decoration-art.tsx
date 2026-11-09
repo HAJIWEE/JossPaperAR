@@ -268,6 +268,35 @@ const DOORGODS: { box: readonly [number, number]; inks: readonly Ink[]; trails: 
   ],
 };
 
+/**
+ * `decor · door god (side)` — **ONE leaf**, for the SIDE slots (owner, 2026-11-09: *"door gods should be 1 per side not 2
+ * per side"*).
+ *
+ * ⚠️⚠️ **THE PAIR MOTIF IS THE STORE CARD'S ILLUSTRATION AND MUST NEVER BE STRETCHED INTO A SLOT.** A side slot is
+ * **41 × 160** and `DOORGODS` is 85.1 × 72 with TWO leaves, so the altar drew **four door gods** with their spears
+ * crossing — the defect the owner caught on glass. It is the same split the couplets and lanterns already have
+ * (`COUPLET_SCROLL`, `LANTERN_SINGLE`): ⚠️ **a slot needs its own object drawing, chosen by SLOT**, and door gods were
+ * the one set without one.
+ * ⚠️ It is the **LEFT leaf of `DOORGODS`**, re-based to its own frame box (**22.4 × 56.3**) and carrying its own spear —
+ * **ported, not redrawn**, so the altar and the card cannot disagree about the figure.
+ * ⚠️ It is still stretched into the slot's 41 × 160, because that rect is the design's own shape; a leaf **drawn at**
+ * 41 × 160 is SCRUM-226's generated art.
+ */
+const DOORGOD_LEAF: Motif = {
+  box: [22.4, 56.3],
+  inks: [
+    { x: 0, y: 0, w: 22.4, h: 56.3, rx: 2, fill: 'paper', stroke: 'ink', sw: 3 },
+    { x: 1.7, y: 1.9, w: 19, h: 52.4, rx: 2, fill: 'paper', stroke: 'cinnabar', sw: 2 },
+    { x: 4.5, y: 28.8, w: 14.6, h: 17, rx: 2, fill: 'cinnabar', stroke: 'ink', sw: 2.5 },
+    { x: 5, y: 14.4, w: 12.3, h: 14.4, rx: 2, fill: 'goldDeep', stroke: 'ink', sw: 2 },
+    { x: 9, y: 7.8, w: 3.9, h: 6.5, rx: 2, fill: 'cinnabar', stroke: 'ink', sw: 2 },
+    { x: 7.8, y: 18.9, w: 6.7, h: 7.9, rx: 3.35, fill: 'paper', stroke: 'ink', sw: 2 },
+  ],
+  trails: [
+    { d: 'M4069.677734375,790.2000122070312L4080.875,773.1818237304688L4082.5546875,775.1454467773438L4071.357177734375,792.1636352539062Z', dx: -4065.2, dy: -754.9, fill: 'goldDeep', stroke: 'ink', sw: 1.5 },
+  ],
+};
+
 const MOTIFS: Record<DecorationCode, Motif | null> = {
   lanterns: LANTERN,
   spring_couplets: COUPLET,
@@ -329,7 +358,7 @@ const COMPOSED: Record<DecorationCode, readonly DecorationCode[] | undefined> = 
  * (2026-11-09). So a caller with a small square box asks here first rather than guessing from the code.
  */
 /** ⚠️ A second drawing for the same code, chosen by the SLOT (see `decorate.ts#artVariantFor`). */
-export type ArtVariant = 'crown' | 'single' | 'scroll';
+export type ArtVariant = 'crown' | 'single' | 'scroll' | 'leaf';
 
 export function isComposed(code: DecorationCode): boolean {
   return COMPOSED[code] !== undefined;
@@ -374,7 +403,9 @@ export function DecorationArt({
     art === 'crown' ? COUPLET_CROWN
       : art === 'single' ? LANTERN_SINGLE
         : art === 'scroll' ? COUPLET_SCROLL
-          : MOTIFS[code];
+          // ⚠️ ONE door leaf for a side slot — never the card's pair (owner, 2026-11-09).
+          : art === 'leaf' ? DOORGOD_LEAF
+            : MOTIFS[code];
   if (motif === null) {
     // ⚠️ A placeholder that LOOKS like a placeholder — never a stand-in motif.
     return (
