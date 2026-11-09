@@ -92,29 +92,6 @@ export function peerSlot(
   return { x: midX + (side === 'left' ? -offset : offset) - w / 2, y: band.y + c.y + c.h - h, w, h };
 }
 
-/**
- * Where the **＋ add-tablet** control sits (owner, 2026-11-09: *"move the Add Ancestor + to where the 3rd tablet would've
- * been"*): in the third tablet's slot, standing on its floor — but centred in the part of the slot that is **VISIBLE**.
- * ⚠️ A peer is drawn BEHIND the centre, so the slot's overlap with the centre tablet never shows; the ＋ is drawn ON TOP, so
- * centring it in the raw slot put its left edge 4 board px into the current tablet's border (measured on glass). ⚠️ So the
- * exposed strip — from the centre's edge to the slot's outer edge — is what it is centred in, and if that strip is narrower
- * than the control it falls back to the slot's own centre rather than drifting outside.
- */
-export function addTabletSlot(
-  band: { readonly x: number; readonly y: number; readonly w: number; readonly h: number },
-  side: 'left' | 'right' = 'right',
-  plusSide = 48,
-): Box {
-  const c = tabletBox(band);
-  const centreRight = band.x + c.x + c.w;
-  const slot = peerSlot(band, side);
-  const lo = side === 'right' ? centreRight : slot.x;
-  const hi = side === 'right' ? slot.x + slot.w : band.x + c.x;
-  const strip = hi - lo;
-  const x = strip >= plusSide ? lo + (strip - plusSide) / 2 : slot.x + (slot.w - plusSide) / 2;
-  return { x, y: slot.y + slot.h - plusSide, w: plusSide, h: plusSide };
-}
-
 /** The three-tablet stage: the current tablet, plus whichever neighbours exist. Rects are BOARD-absolute. */
 export interface Stage {
   readonly centre: Box;

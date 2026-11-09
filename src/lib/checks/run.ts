@@ -18,7 +18,6 @@ import { fileURLToPath } from 'node:url';
 import { isValidClanName } from '../clan-rules.ts';
 import {
   TABLET_SCALE,
-  addTabletSlot,
   NEIGHBOUR_SCALE,
   NEIGHBOUR_OFFSET,
   carouselStage,
@@ -3442,60 +3441,56 @@ function storeChecks(): void {
     shrunk.length === 0, shrunk.join(', '));
 
   /**
-   * ⚠️⚠️ **THE ＋ SITS IN THE THIRD TABLET'S SLOT** (owner, 2026-11-09: *"move the Add Ancestor + to where the 3rd tablet
-   * would've been"*). ⚠️ Asserted against `peerSlot()` — the SAME function the peers are drawn from — so the control cannot
-   * drift from the place the next tablet will appear: inside the slot, horizontally centred, and standing on the slot's floor.
-   * ⚠️⚠️ **Clearance is asserted against the decoration ART rects, and NOT the print's tap zone** — this check used to include
-   * the zone, and moving the ＋ into the third slot makes it overlap that zone (`101..291 × 288..608`). That overlap is
-   * harmless and the comparison would have been wrong: a zone is a **customise-mode** target, and this control is rendered
-   * only when NOT customising (`!customize`, asserted above), while the decoration ART rects are the Pressables that exist in
-   * normal mode — the ones that could actually swallow the tap. ⚠️ Relaxed deliberately and narrowly, not to make it pass.
+   * ⚠️⚠️ **THE ＋ IS NOW A GHOST TABLET — THE CONTROL IS THE THIRD SLOT ITSELF** (owner, 2026-11-09: *"redesign the '+' for
+   * adding new ancestor so that its following the tablet shape"*). ⚠️ Asserted against `peerSlot()` — the SAME function the
+   * peers are drawn from — so the thing that advertises the next tablet occupies exactly the next tablet's footprint.
+   * ⚠️⚠️ **The old "clear of every decoration ART rect" clause is GONE, deliberately:** a slot-sized control necessarily
+   * overlaps the print's art, and clearance is the wrong rule for it. What keeps it usable is the **paint order** (it renders
+   * after `DecorFront`, asserted above) — a decoration can no longer swallow the tap. ⚠️ And the ＋ MARK must not be hidden
+   * behind the current tablet, which is asserted as the slot's centre sitting beyond the centre tablet's right edge.
    */
   const plusSlot = peerSlot(HOME_BANDS.addSlot, 'right');
-  const plusRect = addTabletSlot(HOME_BANDS.addSlot, 'right');
   const stageForPlus = carouselStage(HOME_BANDS.addSlot, 1, 3);
   /** ⚠️ Its OWN read of the screen, not the `homeSrc` further down: that one is declared after this check, and using it here
    * threw `Cannot access 'homeSrc' before initialization` — a crash, not a red, which is the worst shape of failure. */
   const plusSrc = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'app', 'index.tsx'), 'utf8'));
-  const plusCoveredBy = SLOTS.filter((s) => rectsOverlap(plusRect, SLOT_ART[s]));
-  check('⚠️⚠️ the ＋ sits in the THIRD tablet slot, on its floor, and clear of the current tablet and every decoration',
+  check('⚠️⚠️ the ＋ is a ghost tablet occupying the THIRD slot exactly, its mark clear of the current tablet',
     /**
-     * ⚠️⚠️ **The source must ASK for the right-hand slot.** The geometry below is derived from the same call, so on its own it
-     * is self-consistent and would stay green with the ＋ on the LEFT — measured. This clause makes the side testable.
+     * ⚠️ **The source must ask for the right-hand slot AND draw the ghost** — the geometry below is derived from the same call,
+     * so on its own it is self-consistent and would stay green with the ＋ on the LEFT (measured).
      */
-    plusSrc.includes("addTabletSlot(slot, 'right')")
-      && plusRect.x >= plusSlot.x && plusRect.x + plusRect.w <= plusSlot.x + plusSlot.w
-      /** Standing on the slot's floor, exactly like the peer tablet it advertises. */
-      && Math.abs(plusRect.y + plusRect.h - (plusSlot.y + plusSlot.h)) < 1e-9
+    plusSrc.includes("peerSlot(slot, 'right')")
+      && plusSrc.includes('<TabletGhost')
       /**
-       * ⚠️ **AND OFF THE CURRENT TABLET.** A peer hides behind the centre, so the slot's overlap never shows; the ＋ is painted
-       * on top, and centring it in the raw slot put its edge into the current tablet's border on glass. This is the assertion
-       * that keeps it in the VISIBLE part of the slot (`addTabletSlot`).
+       * ⚠️ **AND IT MUST BE PAINTED BETWEEN THE PRINT AND THE CURRENT TABLET.** `DecorBack` (the print) before it, so the print
+       * cannot steal a tap on the ghost's left third; the centre tablet after it, so the slot's 13.7 px overlap with the current
+       * tablet is COVERED instead of crossing its face — which is what a peer looks like, and what the first cut got wrong.
        */
-      && !rectsOverlap(plusRect, stageForPlus.centre)
-      && plusCoveredBy.length === 0
-      && !rectsOverlap(plusRect, HOME_BANDS.carouselNextTouch)
-      && plusRect.x >= 0 && plusRect.x + plusRect.w <= DECOR_BOARD.w
+      && plusSrc.indexOf('<DecorBack') < plusSrc.indexOf('testID="home-add-tablet"')
+      && plusSrc.indexOf('testID="home-add-tablet"') < plusSrc.indexOf('testID="home-tablet"')
+      && Math.abs(plusSlot.x - peerSlot(HOME_BANDS.addSlot, 'right').x) < 1e-9
+      /** The mark is drawn at the plaque's centre, which is the slot's centre — it must clear the current tablet. */
+      && plusSlot.x + plusSlot.w / 2 > stageForPlus.centre.x + stageForPlus.centre.w
+      && Math.abs((plusSlot.y + plusSlot.h) - (stageForPlus.centre.y + stageForPlus.centre.h)) < 1e-9
+      && plusSlot.x >= 0 && plusSlot.x + plusSlot.w <= DECOR_BOARD.w
       /** 44 dp minimum at 360 dp on a 390 board: 44 / (360/390) = 47.7 board px. */
-      && plusRect.w >= (44 * DECOR_BOARD.w) / 360,
-    plusCoveredBy.join(', ') || `${plusRect.w}×${plusRect.h} at ${plusRect.x.toFixed(1)},${plusRect.y.toFixed(1)} in slot ${plusSlot.x.toFixed(1)}..${(plusSlot.x + plusSlot.w).toFixed(1)}, centre ends ${(stageForPlus.centre.x + stageForPlus.centre.w).toFixed(1)}`);
+      && plusSlot.w >= (44 * DECOR_BOARD.w) / 360 && plusSlot.h >= (44 * DECOR_BOARD.w) / 360,
+    `${plusSlot.w.toFixed(1)}×${plusSlot.h.toFixed(1)} at ${plusSlot.x.toFixed(1)},${plusSlot.y.toFixed(1)} · slot centre ${(plusSlot.x + plusSlot.w / 2).toFixed(1)} · tablet ends ${(stageForPlus.centre.x + stageForPlus.centre.w).toFixed(1)}`);
 
   /**
-   * ⚠️⚠️ **THE ＋ MUST BE DRAWN, NOT TYPED** (owner, 2026-11-09: *"The center alignment of the + is off"*).
-   * ⚠️ A `Text` glyph is centred by its FONT metrics, which a fullwidth `＋` plus Android's font padding do not agree on —
-   * the mark sat up and left however the box was aligned. Two bars positioned from `(side − stroke) / 2` have no font in the
-   * arithmetic. ⚠️ Asserted as: no `fontSize` inside the add-tablet control, and the inset formula present. Turning it back
-   * into a glyph fails here rather than on the owner's screen.
+   * ⚠️⚠️ **THE ＋ IS DRAWN, NOT TYPED** (owner, 2026-11-09: *"The center alignment of the + is off"*). ⚠️ A `Text` glyph is
+   * centred by its FONT metrics, and a fullwidth `＋` plus Android's font padding disagree — the mark sat up and left however the
+   * box was aligned. ⚠️ It moved into `TabletGhost` when the control became tablet-shaped, so the assertion follows it: inside
+   * that component there must be **no `fontSize`** and the mark must be `Path` strokes. Turning it back into a glyph fails here
+   * rather than on the owner's screen.
    */
-  const addSrc = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'app', 'index.tsx'), 'utf8'))
+  const ghostSrc = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'components', 'home', 'tablet.tsx'), 'utf8'))
     .replace(/\s+/g, ' ');
-  const addStart = addSrc.indexOf("!customize && view.kind === 'tablet' && !view.hasNext");
-  /** ⚠️ To the CLOSING tag, not to the testID: the testID is written before the children, so ending there would slice the
-   * mark off and the check would pass on an empty tail. */
-  const addBlock = addStart < 0 ? '' : addSrc.slice(addStart, addSrc.indexOf('</Pressable>', addStart));
-  check('⚠️⚠️ the ＋ is DRAWN from two centred bars — no font metrics, so it cannot sit off-centre',
-    addBlock.length > 0 && !addBlock.includes('fontSize') && addBlock.includes('(side - stroke) / 2'),
-    addBlock.length === 0 ? 'control not found' : `${addBlock.length} chars`);
+  const ghostAt = ghostSrc.indexOf('export function TabletGhost');
+  const ghostBlock = ghostAt < 0 ? '' : ghostSrc.slice(ghostAt, ghostSrc.indexOf('export function Tablet(', ghostAt));
+  check('⚠️⚠️ the ＋ inside the ghost tablet is DRAWN from two stroked paths — no font metrics to mis-centre it',
+    ghostBlock.length > 0 && !ghostBlock.includes('fontSize') && ghostBlock.includes('strokeLinecap'),
+    ghostBlock.length === 0 ? 'TabletGhost not found' : `${ghostBlock.length} chars`);
 
   /**
    * ⚠️⚠️ **THE CAROUSEL IS `EN · 1b`'s, NOT AN ARROW GLYPH WITH A HIT BOX** (owner: *"Refer to EN -1b on penpot… there should

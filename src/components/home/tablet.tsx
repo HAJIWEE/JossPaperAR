@@ -85,6 +85,57 @@ export function TabletPlate() {
  * ⚠️ `width`/`height` come from the BAND (`bandRect` already applied the canvas scale), never
  * from a number in here — that is the same rule every art component in this folder follows.
  */
+/**
+ * **THE GHOST TABLET — the add-ancestor control, in the ancestors' own shape** (owner, 2026-11-09: *"redesign the '+' for
+ * adding new ancestor so that its following the tablet shape"*).
+ *
+ * ⚠️ **It is the SAME outline path as `TabletPlate`**, not a lookalike: the crown, shoulders, body and plinth are the board's
+ * own coordinates, so the control that promises a tablet is drawn as a tablet. ⚠️ Only the paint changes — a translucent paper
+ * fill and a dashed ink stroke, so it reads as a slot rather than a tablet already standing there.
+ * ⚠️ The `＋` is TWO BARS, not a glyph: a `Text` plus is centred by its font metrics and sat off-centre in the pill this
+ * replaces (measured 2026-11-09). Nothing here depends on a font.
+ */
+export function TabletGhost({ width, height, testID }: { width: number; height: number; testID?: string }) {
+  /**
+   * ⚠️⚠️ **The mark is in VIEWBOX units, not pixels** — the first cut multiplied its arms by `width / VB.w` *inside a viewBox-
+   * scaled `<Svg>`, so a 123 px ghost got a ~5 px plus and it was invisible on glass (measured 2026-11-09). The `<Svg>` already
+   * scales the units; sizing anything here by the device ratio scales it twice.
+   */
+  const cx = TABLET_TEXT_BOX.x + TABLET_TEXT_BOX.w / 2;
+  const cy = TABLET_TEXT_BOX.y + TABLET_TEXT_BOX.h / 2;
+  const arm = 13;
+  const barW = 2.6;
+  return (
+    <View style={{ width, height }} testID={testID}>
+      <Svg width="100%" height="100%" viewBox={`0 0 ${VB.w} ${VB.h}`}>
+        <Path
+          d="M0,307.211L0,285.778L10.717,285.778L10.717,42.866L25.006,0.0002L103.594,0.0002L117.883,42.866L117.883,285.778L128.6,285.778L128.6,307.211L0,307.211Z"
+          fill="rgba(250, 248, 244, 0.55)"
+          stroke={brand.ink}
+          strokeOpacity={0.45}
+          strokeWidth={1.6}
+          strokeDasharray="6 4"
+          strokeLinejoin="round"
+        />
+        <Rect
+          x={TABLET_TEXT_BOX.x}
+          y={TABLET_TEXT_BOX.y}
+          width={TABLET_TEXT_BOX.w}
+          height={TABLET_TEXT_BOX.h}
+          fill="none"
+          stroke={brand.gold}
+          strokeOpacity={0.5}
+          strokeWidth={1}
+          strokeDasharray="4 4"
+        />
+        {/* ⚠️ Two bars, positioned from their own arm length — no font, so it cannot sit off-centre. */}
+        <Path d={`M${cx - arm},${cy} L${cx + arm},${cy}`} stroke={brand.gold} strokeWidth={barW} strokeLinecap="round" />
+        <Path d={`M${cx},${cy - arm} L${cx},${cy + arm}`} stroke={brand.gold} strokeWidth={barW} strokeLinecap="round" />
+      </Svg>
+    </View>
+  );
+}
+
 export function Tablet({
   name,
   width,

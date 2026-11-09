@@ -13,8 +13,8 @@ import { StreakPanel, TributePanel } from '@/components/home/panels';
 import { ShrineBase } from '@/components/home/shrine-base';
 import { ShrineCanvas } from '@/components/home/shrine-canvas';
 import { TabBarBand } from '@/components/home/tab-bar-band';
-import { Tablet } from '@/components/home/tablet';
-import { addTabletSlot, altarCaption, altarView, carouselStage, pageStep, peerSlot, tabletBox } from '@/lib/altar';
+import { Tablet, TabletGhost } from '@/components/home/tablet';
+import { altarCaption, altarView, carouselStage, pageStep, peerSlot, tabletBox } from '@/lib/altar';
 import {
   ANCESTOR_CAP,
   GIVEN_NAME_MAX,
@@ -455,7 +455,12 @@ export default function HomeShrine() {
          * ⚠️ 48 board px ≈ 44.3 dp at the 360 dp reference — the whole slot is 66.9 × 159.2, so a slot-sized target would be
          * enormous; the pill is the control and the slot is only its address.
          */
-        const plusRect = addTabletSlot(slot, 'right');
+        /**
+         * ⚠️ **THE CONTROL IS THE SLOT ITSELF** — a ghost tablet in the third position, drawn in the ancestors' own silhouette
+         * (owner, 2026-11-09: *"redesign the '+' … so that its following the tablet shape"*). It is slot-sized, so the thing
+         * that advertises the next tablet IS the next tablet's footprint; `peerSlot()` owns that geometry for both.
+         */
+        const plusRect = peerSlot(slot, 'right');
         const addAt = {
           position: 'absolute' as const,
           left: plusRect.x * s,
@@ -572,6 +577,27 @@ export default function HomeShrine() {
                 })}
               </View>
             )}
+            {/* ⚠️⚠️ **THE ONLY WAY TO ADD A TABLET ONCE ONE EXISTS** (owner, 2026-11-09: *"GO WITH 1"* — a ＋ beside the
+                carousel arrows). ⚠️ The empty altar's ＋ is `home-add-slot`, rendered ONLY for `view.kind === 'empty'`, so from
+                the first enshrined ancestor onward there was **no add control at all** while `ancestor_cap` is 10.
+                ⚠️ Shown on the LAST tablet (where "next" has run out and the eye is looking for what comes after), never while
+                customising, and not once the cap is reached (`capReached`, the same helper the server enforces).
+                ⚠️⚠️ **RENDERED AFTER `DecorFront`, and that placement is the point:** the arrows above are painted BEFORE the
+                decorations and are consequently covered by a side banner — measured 2026-11-09, a tap on *next* opens the
+                customiser. A new control must not inherit that defect, so it paints on top *and* sits clear of every
+                decoration rect (asserted in `check:lib`, not just intended). */}
+            {!customize && view.kind === 'tablet' && !view.hasNext && mayEdit && !capReached(view.count) ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('ancestor.titleAdd')}
+                onPress={() => openSheet(null)}
+                style={({ pressed }) => [addAt, pressed && styles.pressed]}
+                testID="home-add-tablet"
+              >
+                <TabletGhost width={plusRect.w * s} height={plusRect.h * s} />
+              </Pressable>
+            ) : null}
+
             {view.kind === 'empty' ? (
               customize ? null : (
                 <Pressable
@@ -675,65 +701,6 @@ export default function HomeShrine() {
                 testID="home-tablet-next"
               >
                 <Text style={[styles.carouselGlyph, { fontSize: 28 * s }]}>{'\u203A'}</Text>
-              </Pressable>
-            ) : null}
-
-            {/* ⚠️⚠️ **THE ONLY WAY TO ADD A TABLET ONCE ONE EXISTS** (owner, 2026-11-09: *"GO WITH 1"* — a ＋ beside the
-                carousel arrows). ⚠️ The empty altar's ＋ is `home-add-slot`, rendered ONLY for `view.kind === 'empty'`, so from
-                the first enshrined ancestor onward there was **no add control at all** while `ancestor_cap` is 10.
-                ⚠️ Shown on the LAST tablet (where "next" has run out and the eye is looking for what comes after), never while
-                customising, and not once the cap is reached (`capReached`, the same helper the server enforces).
-                ⚠️⚠️ **RENDERED AFTER `DecorFront`, and that placement is the point:** the arrows above are painted BEFORE the
-                decorations and are consequently covered by a side banner — measured 2026-11-09, a tap on *next* opens the
-                customiser. A new control must not inherit that defect, so it paints on top *and* sits clear of every
-                decoration rect (asserted in `check:lib`, not just intended). */}
-            {!customize && view.kind === 'tablet' && !view.hasNext && mayEdit && !capReached(view.count) ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('ancestor.titleAdd')}
-                onPress={() => openSheet(null)}
-                style={({ pressed }) => [addAt, styles.addTablet, pressed && styles.pressed]}
-                testID="home-add-tablet"
-              >
-                {/**
-                 * ⚠️⚠️ **THE ＋ IS DRAWN, NOT TYPED** (owner, 2026-11-09: *"The center alignment of the + is off"*).
-                 * ⚠️ A `Text` glyph cannot be centred reliably: the fullwidth `＋` carries side bearings and Android adds
-                 * font padding, so the mark sits up and left inside its own box no matter what `alignItems`/`justifyContent`
-                 * say. ⚠️ The empty altar's ＋ works around the same metrics with a measured `paddingTop` — a hack that has
-                 * to be re-measured per size. Two bars are centred **by construction**: both are positioned from `(side -
-                 * stroke) / 2`, so there is no font in the arithmetic at all.
-                 */}
-                {(() => {
-                  const side = 20 * s;
-                  const stroke = 2.2 * s;
-                  const inset = (side - stroke) / 2;
-                  return (
-                    <View style={{ width: side, height: side }}>
-                      <View
-                        style={{
-                          position: 'absolute',
-                          left: 0,
-                          top: inset,
-                          width: side,
-                          height: stroke,
-                          borderRadius: stroke / 2,
-                          backgroundColor: text.gold,
-                        }}
-                      />
-                      <View
-                        style={{
-                          position: 'absolute',
-                          left: inset,
-                          top: 0,
-                          width: stroke,
-                          height: side,
-                          borderRadius: stroke / 2,
-                          backgroundColor: text.gold,
-                        }}
-                      />
-                    </View>
-                  );
-                })()}
               </Pressable>
             ) : null}
 
@@ -942,15 +909,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   carouselGlyph: { color: text.inkSoft, fontWeight: '700' },
-  /** `nav · ＋ add a tablet` — a small round pill, so it reads as a CONTROL beside the arrows rather than altar art. */
-  addTablet: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: surface.paperDeep,
-    borderWidth: 1.5,
-    borderColor: brand.ink,
-    borderRadius: 999,
-  },
   /** `btn · settings` — paperDeep fill, ink stroke; radius + width are scaled inline. */
   settingsBtn: {
     backgroundColor: surface.paperDeep,
