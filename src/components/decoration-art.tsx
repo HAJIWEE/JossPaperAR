@@ -222,7 +222,23 @@ const COMPOSED: Record<DecorationCode, readonly DecorationCode[] | undefined> = 
   door_gods: undefined,
 };
 
-export function DecorationArt({ code, size }: { code: DecorationCode; size: number }) {
+export function DecorationArt({
+  code,
+  size,
+  box,
+}: {
+  code: DecorationCode;
+  size: number;
+  /**
+   * ⚠️ **A RECT TO FILL, when the caller has one — used by the altar, which draws each piece at the board's own
+   * measured rect** (`decor · couplet (side-left)` is 41 × 160, not a square). ⚠️ That STRETCHES the art on
+   * purpose (`preserveAspectRatio="none"`): every motif's source box is 85.1 × 72 while the board draws couplets
+   * 41 × 160, so the board stretched them too — the rect is the design's answer to "what shape is this HERE".
+   * ⚠️ Without `box` the art is contained in a square of `size` and keeps its aspect, which is what the store
+   * cards and the picker rows want.
+   */
+  box?: { readonly w: number; readonly h: number };
+}) {
   const parts = COMPOSED[code];
   if (parts !== undefined) {
     // The four motifs in a row, scaled to the caller's box - the caller owns the size, the set owns the layout.
@@ -238,15 +254,22 @@ export function DecorationArt({ code, size }: { code: DecorationCode; size: numb
   if (motif === null) {
     // ⚠️ A placeholder that LOOKS like a placeholder — never a stand-in motif.
     return (
-      <Svg width={size} height={size} viewBox="0 0 40 40">
+      <Svg width={box?.w ?? size} height={box?.h ?? size} viewBox="0 0 40 40">
         <Rect x={2} y={2} width={36} height={36} rx={6} fill="none" stroke={brand.ink} strokeWidth={2} />
       </Svg>
     );
   }
   const [bw, bh] = motif.box;
-  const scale = Math.min(size / bw, size / bh);
+  /** ⚠️ `box` wins over `size`: the caller measured this piece's rect off the board. */
+  const w = box?.w ?? bw * Math.min(size / bw, size / bh);
+  const h = box?.h ?? bh * Math.min(size / bw, size / bh);
   return (
-    <Svg width={bw * scale} height={bh * scale} viewBox={`0 0 ${bw} ${bh}`}>
+    <Svg
+      width={w}
+      height={h}
+      viewBox={`0 0 ${bw} ${bh}`}
+      preserveAspectRatio={box === undefined ? undefined : 'none'}
+    >
       {motif.inks.map((r, i) => (
         <Rect
           key={i}

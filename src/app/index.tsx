@@ -5,6 +5,8 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { ClanPill } from '@/components/clan-pill';
 import { AncestorSheet, type SheetMode } from '@/components/home/ancestor-sheet';
 import { AltarHalo } from '@/components/home/altar-halo';
+import { DecorBack, DecorFront, DecorSlots } from '@/components/home/decor-layer';
+import { DecorSheet } from '@/components/home/decor-sheet';
 import { AppMark, SettingsGear } from '@/components/home/header-art';
 import { Offerings } from '@/components/home/offerings';
 import { StreakPanel, TributePanel } from '@/components/home/panels';
@@ -33,6 +35,8 @@ import {
   type Ancestor,
 } from '@/lib/clan-api';
 import { PILL_X_ON_REFERENCE, type PillClan } from '@/lib/clan-pill';
+import { equipDecoration, readMyDecorations, type MyDecorations } from '@/lib/decorations';
+import type { DecorationCode, DecorationSlot } from '@/domain/catalogue';
 import { readFirstRun } from '@/lib/first-run';
 import { fetchHomeSummary } from '@/lib/home-api';
 import { homePanels, type SummaryResult } from '@/lib/home-panels';
@@ -126,6 +130,20 @@ export default function HomeShrine() {
   } | null>(null);
   const [sheetBusy, setSheetBusy] = useState(false);
   const [sheetIssue, setSheetIssue] = useState<string | null>(null);
+
+  /**
+   * ── THE ALTAR'S DECORATIONS (SCRUM-156 · SCRUM-205) ────────────────────────
+   * ⚠️ `null` = not read yet, and NOTHING is drawn for it — an unattended altar, not an error. A failed read
+   * also leaves it `null`; the picker reports the failure when it is opened, rather than the shrine claiming
+   * the user owns nothing (which is a different, and false, statement).
+   */
+  const [decor, setDecor] = useState<MyDecorations | null>(null);
+  /** Whether the six dashed zones are showing — `EN · 1f`. */
+  const [customize, setCustomize] = useState(false);
+  /** Which slot's picker is open, or `null`. One sheet, not one per slot. */
+  const [decorSlot, setDecorSlot] = useState<DecorationSlot | null>(null);
+  const [equipBusy, setEquipBusy] = useState(false);
+  const [decorIssue, setDecorIssue] = useState<string | null>(null);
 
   /** Turn a `SheetProblem` into the copy the user reads. ⚠️ `null` = there is no problem. */
   const problemText = useCallback((p: SheetProblem): string | null => {
@@ -266,6 +284,12 @@ export default function HomeShrine() {
         // the shrine comes back from `/reward` showing stale numbers without this.
         const totals = await fetchHomeSummary();
         if (!cancelled) setSummary(totals);
+        /**
+         * ⚠️ The decorations too — the store SELLS them and this screen PAINTS them, so a purchase made in
+         * another tab has to appear on return. Same reason as the tribute panel, same re-read-on-focus rule.
+         */
+        const myDecor = await readMyDecorations();
+        if (!cancelled) setDecor(myDecor.ok ? myDecor.data : null);
       })();
       return () => {
         cancelled = true;
@@ -283,6 +307,48 @@ export default function HomeShrine() {
       router.push({ pathname: '/capture', params });
     })();
   };
+
+  /**
+   * Equip a decoration into the slot whose picker is open.
+   *
+   * ⚠️ **The server decides, and the screen then RE-READS** — it never patches its own state optimistically.
+   * `equip_decoration` checks ownership, the slot/category match and the one-set-per-category rule (S14k); a
+   * `42501`/`P0001` arrives as `result.reason` and is shown as-is, because "not owned" and "wrong slot" are
+   * different facts and the user can act on both.
+   * ⚠️ The picker closes only on SUCCESS, so a refusal leaves the choice in front of them to change.
+   */
+  const pickSlot = useCallback((next: DecorationSlot) => {
+    setDecorIssue(null);
+    // ⚠️ The tablet sheet and the picker never share the screen — one scrim, one panel.
+    setSheet(null);
+    setDecorSlot(next);
+  }, []);
+
+  const equip = useCallback(
+    (code: DecorationCode) => {
+      const slot = decorSlot;
+      if (slot === null) return;
+      void (async () => {
+        setEquipBusy(true);
+        setDecorIssue(null);
+        const result = await equipDecoration(slot, code);
+        if (!result.ok) {
+          setEquipBusy(false);
+          setDecorIssue(result.reason);
+          return;
+        }
+        const mine = await readMyDecorations();
+        setEquipBusy(false);
+        if (!mine.ok) {
+          setDecorIssue(mine.reason);
+          return;
+        }
+        setDecor(mine.data);
+        setDecorSlot(null);
+      })();
+    },
+    [decorSlot],
+  );
 
   const region = (name: HomeRegion) => {
     switch (name) {
@@ -363,6 +429,8 @@ export default function HomeShrine() {
             <View style={[styles.abs, bandRect(HOME_BANDS.shrineBase, s)]} testID="home-shrine-base">
               <ShrineBase />
             </View>
+            {/* ⚠️ BEFORE the tablet: `EN · 1e` paints `decor · 鍾馗像 (background)` behind it. */}
+            {decor === null ? null : <DecorBack scale={s} equipped={decor.equipped} />}
             {/* ⚠️ The ALTAR-STATE CAPTION — `caption · altar state`. `altarCaption()` chooses the
                 EMPTY line, the board's FILLED line, or the singular; ⚠️ the screen used to render
                 the empty line unconditionally, so a shrine holding three tablets still read
@@ -390,14 +458,30 @@ export default function HomeShrine() {
             {/* ⚠️ `zone · customizable temple (label)` — the chip that tells the owner the altar is
                 theirs. ⚠️ Only the LABEL is drawn: the chip's own background fill could not be read
                 from the plugin yet, and a guessed chip is worse than a bare line. */}
-            <View
-              style={[styles.abs, bandRect(HOME_BANDS.templeChip, s), styles.chip]}
+            {/* ⚠️⚠️ **THE ENTRY TO CUSTOMISING, AND IT IS THE CHIP THAT ALREADY SAID SO.**
+                `zone · customizable temple (label)` reads *"Everything here is customizable"* — a label that
+                promised a control the app did not have. ⚠️ **No board draws an entry** (the `1f` family has no
+                route in, and its interactions point nowhere), so the least invented option is to make the
+                promise itself the control: tapping it toggles the six zones from `1f`. ⚠️ That adds NOTHING to a
+                signed-off Home — no new band, no moved layer — which is the constraint S36 measured the header
+                row to satisfy. ⚠️ Filed as the PM decision **`SCRUM-225`** rather than assumed settled. */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('home.templeChip')}
+              accessibilityState={{ selected: customize }}
+              onPress={() => setCustomize((on) => !on)}
+              style={({ pressed }) => [
+                styles.abs,
+                bandRect(HOME_BANDS.templeChip, s),
+                styles.chip,
+                pressed && styles.pressed,
+              ]}
               testID="home-temple-chip"
             >
               <Text numberOfLines={1} style={{ color: text.gold, fontSize: 10.5 * s }}>
                 {t('home.templeChip')}
               </Text>
-            </View>
+            </Pressable>
 
             {/* ⚠️ EMPTY → the ＋ slot. The `＋` is the add affordance the board draws
                 (`slot · ＋ add a tablet`), and since the sheet now lives on THIS screen it has a
@@ -470,6 +554,17 @@ export default function HomeShrine() {
               >
                 <Text style={[styles.carouselGlyph, { fontSize: 28 * s }]}>{'\u203A'}</Text>
               </Pressable>
+            ) : null}
+
+            {/* ⚠️ AFTER the art: `1d` draws the lanterns and couplets in FRONT of the table. */}
+            {decor === null ? null : <DecorFront scale={s} equipped={decor.equipped} />}
+            {/* ⚠️ `1f` — the six dashed zones, only while customising. */}
+            {customize ? (
+              <DecorSlots
+                scale={s}
+                ownedCount={decor === null ? 0 : decor.owned.length}
+                onPick={pickSlot}
+              />
             ) : null}
           </>
         );
@@ -573,6 +668,27 @@ export default function HomeShrine() {
           onClose={closeSheet}
         />
       ) : null}
+
+      {/**
+       * ⚠️ THE DECORATION PICKER — painted after the tablet sheet, for the same reason: it covers the tab bar,
+       * as `1f2`/`1f3`/`1f4` draw it (the panel runs to the board's bottom edge, 844, and the bar sits at 764).
+       */}
+      {decorSlot === null ? null : (
+        <DecorSheet
+          scale={s}
+          bleed={shrineBleedDp(screen.height, s)}
+          slot={decorSlot}
+          owned={decor === null ? [] : decor.owned}
+          equipped={decor === null ? null : decor.equipped[decorSlot]}
+          busy={equipBusy}
+          problem={decorIssue}
+          onEquip={equip}
+          onClose={() => {
+            setDecorSlot(null);
+            setDecorIssue(null);
+          }}
+        />
+      )}
     </ShrineCanvas>
   );
 }

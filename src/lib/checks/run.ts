@@ -19,6 +19,14 @@ import { isValidClanName } from '../clan-rules.ts';
 import { PREPARING_PHASES, pipelineFailed } from '../../domain/slice.ts';
 import { NAV_TABS, activeTabKey, isSamePath, tabPressIsNoop } from '../nav.ts';
 import { COLLECTION, COLLECTION_SLOTS, collectionGrid, collectionOverflows, collectedItemName, displayBurnCount } from '../collection.ts';
+import {
+  DECOR_BOARD,
+  SLOT_ART,
+  SLOT_HIT,
+  drawPlan,
+  optionsForSlot,
+  sheetLayout,
+} from '../decorate.ts';
 import { CASH_IS_READABLE, FEATURED_CODE, STORE_TABS, baseMetaValue, pointsPrice, storeList } from '../store.ts';
 import { ART_BOX, artCodes, artSize, fitArt } from '../offering-art.ts';
 import { pickerGrid } from '../picker.ts';
@@ -154,7 +162,7 @@ import {
 import { QUOTA_SPENT_COPY } from '../../domain/quota.ts';
 import { AIM_BANDS } from '../../domain/aim.ts';
 import { LEAGUE_TIERS } from '../../domain/league.ts';
-import { DECORATIONS, OFFERINGS } from '../../domain/catalogue.ts';
+import { DECORATIONS, OFFERINGS, SLOT_CATEGORY } from '../../domain/catalogue.ts';
 import { INITIAL_OFFERING, applyAll, isWaiting, nextAction } from '../../domain/slice.ts';
 import { eventsFromResponse } from '../ritual-map.ts';
 import {
@@ -3348,6 +3356,117 @@ function storeChecks(): void {
     pairs.join(' '));
   check('⚠️⚠️ the CASH rail is now DRAWN — the old "omit the chip" rule is retired',
     readFileSync(join(PROJECT_ROOT, 'src', 'app', 'store.tsx'), 'utf8').includes('store-cash-chip'));
+
+  /**
+   * ⚠️⚠️ **THE ALTAR'S DECORATIONS — SCRUM-205's acceptance, as arithmetic.**
+   *
+   * None of this is visible to `tsc`: a slot rect that runs off the board, an art rect bigger than the zone that
+   * holds it, a picker that offers the wrong category, or a sheet height that matches one board and not the other.
+   * ⚠️ Every number was measured off `EN · 1f`/`1d`/`1e` on 2026-11-09 (the table is in `lib/decorate.ts`), so this
+   * block is what keeps the code and the board agreeing after the next edit.
+   */
+  const SLOTS = Object.keys(SLOT_HIT) as (keyof typeof SLOT_HIT)[];
+  check('⚠️⚠️ every one of the SIX slots has a tap zone AND an art rect',
+    SLOTS.length === 6 && SLOTS.every((s) => SLOT_ART[s] !== undefined));
+  check('⚠️ …and both fit INSIDE the 390 × 844 board — a rect that runs off it is a piece you cannot see',
+    SLOTS.every((s) => {
+      const inside = (r: { x: number; y: number; w: number; h: number }) =>
+        r.x >= 0 && r.y >= 0 && r.x + r.w <= DECOR_BOARD.w && r.y + r.h <= DECOR_BOARD.h;
+      return inside(SLOT_HIT[s]) && inside(SLOT_ART[s]);
+    }));
+  /**
+   * ⚠️⚠️ **THE ZONE MUST CONTAIN THE ART.** `1f` draws the tap targets larger than the pieces; the day one is
+   * smaller, the piece is drawn outside the thing that selects it — the defect class the owner's eye keeps finding
+   * first. ⚠️ Asserted per slot, so re-measuring one cannot quietly break another.
+   */
+  const outsideZone = SLOTS.filter((s) => {
+    const z = SLOT_HIT[s];
+    const a = SLOT_ART[s];
+    return !(a.x >= z.x && a.y >= z.y && a.x + a.w <= z.x + z.w && a.y + a.h <= z.y + z.h);
+  });
+  check('⚠️⚠️ each ART rect sits INSIDE its own tap zone — a piece outside its zone cannot be tapped',
+    outsideZone.length === 0, outsideZone.join(' '));
+
+  /**
+   * ⚠️⚠️ **ONLY THE SLOT'S OWN CATEGORY IS OFFERED** — the acceptance line SCRUM-205 exists for. ⚠️ Asserted by
+   * CATEGORY, not by a list of codes, so a new decoration cannot silently escape it: a new BACKGROUND print still
+   * may not appear in a side slot.
+   */
+  const everyCode = DECORATIONS.map((d) => d.code);
+  check('⚠️⚠️ a slot offers ONLY its own category — a side slot never offers the background print',
+    SLOTS.every((s) => {
+      const opts = optionsForSlot(s, everyCode, null);
+      return opts.length > 0 && opts.every((o) => o.decoration.category === SLOT_CATEGORY[s]);
+    }));
+  // ⚠️ POSITIVE CONTROL — the filter is not empty-by-accident: the SIDE slots really do offer three (S14).
+  check('⚠️ guard: the side slots offer three sets (couplets · door gods · festive set), not zero',
+    optionsForSlot('side_left', everyCode, null).length === 3
+      && optionsForSlot('background', everyCode, null).every((o) => o.code === 'zhong_kui'));
+  check('⚠️ an UNOWNED item is listed but NOT selectable, and an equipped one is not re-equipable',
+    (() => {
+      const o = optionsForSlot('side_left', ['spring_couplets'], 'spring_couplets');
+      const equipped = o.find((x) => x.code === 'spring_couplets');
+      const unowned = o.find((x) => x.code === 'door_gods');
+      return equipped !== undefined && equipped.state === 'equipped' && !equipped.selectable
+        && unowned !== undefined && unowned.state === 'unowned' && !unowned.selectable;
+    })());
+
+  /**
+   * ⚠️⚠️ **THE SHEET HAS TWO HEIGHTS BECAUSE TWO BOARDS DRAW IT.** `1f2` (two options) is panel 520 with rows
+   * 598/682; `1f3`/`1f4` (three) are panel 440 with rows 518/602/686. A frozen height is wrong on the other, and a
+   * panel that stops short of 844 leaves a strip of shrine showing under the sheet.
+   */
+  const twoOpts = sheetLayout(2);
+  const threeOpts = sheetLayout(3);
+  check('⚠️⚠️ the picker sheet reproduces BOTH boards: 2 options → 520, 3 options → 440',
+    twoOpts.panel.y === 520 && threeOpts.panel.y === 440
+      && twoOpts.rows.map((r) => r.y).join(',') === '598,682'
+      && threeOpts.rows.map((r) => r.y).join(',') === '518,602,686');
+  check('⚠️ …and the panel always reaches the board bottom, with the button at the board\'s 774…826',
+    twoOpts.panel.y + twoOpts.panel.h === DECOR_BOARD.h
+      && threeOpts.panel.y + threeOpts.panel.h === DECOR_BOARD.h
+      && threeOpts.button.y === 774 && threeOpts.button.y + threeOpts.button.h === 826);
+
+  /**
+   * ⚠️⚠️ **THE DRAW PLAN** — what the shrine paints, from what the server said is equipped. ⚠️ The Festive Set is an
+   * AMALGAMATION (`EN · 1e` draws all four pieces), so equipping it must light five slots rather than squeeze four
+   * motifs into one — and an explicitly equipped piece must keep its own slot.
+   */
+  const noDecor: Record<string, null> = {
+    top_left: null, top_middle: null, top_right: null, side_left: null, side_right: null, background: null,
+  };
+  check('⚠️ nothing equipped draws NOTHING — the shrine is not decorated by default',
+    drawPlan(noDecor as never).length === 0);
+  const lanternOnly = drawPlan({ ...noDecor, top_left: 'lanterns' } as never);
+  check('⚠️ a TOP piece draws in front, in its own slot, and nowhere else',
+    lanternOnly.length === 1 && lanternOnly[0].slot === 'top_left' && lanternOnly[0].behind === false);
+  const backgroundOnly = drawPlan({ ...noDecor, background: 'zhong_kui' } as never);
+  check('⚠️ the BACKGROUND print draws BEHIND the tablet — the z-order `1e` depends on',
+    backgroundOnly.length === 1 && backgroundOnly[0].behind === true);
+  const setPlan = drawPlan({ ...noDecor, side_left: 'festive_set' } as never);
+  check('⚠️⚠️ the FESTIVE SET lights the five slots its components live in, not one',
+    setPlan.length === 5
+      && setPlan.map((p) => p.slot).join(',') === 'top_left,top_right,side_left,side_right,background');
+  const setPlusLantern = drawPlan({ ...noDecor, side_left: 'festive_set', top_left: 'lanterns' } as never);
+  check('⚠️ …and an explicitly equipped piece KEEPS its slot — a set never overwrites a choice',
+    setPlusLantern.filter((p) => p.slot === 'top_left').length === 1
+      && setPlusLantern.find((p) => p.slot === 'top_left')?.code === 'lanterns');
+
+  /**
+   * ⚠️⚠️ **THE SLOT→CATEGORY RULE IS NOT COPIED.** `domain/catalogue.ts` owns `SLOT_CATEGORY` (S14j/S14k) and
+   * `equip_decoration` enforces it; a second table here or in `decorate.ts` would be the "two implementations of one
+   * rule" this project keeps deleting — and the day they disagree, a slot offers what the server will refuse.
+   */
+  const DECORATE_SRC = readFileSync(join(PROJECT_ROOT, 'src', 'lib', 'decorate.ts'), 'utf8');
+  check('⚠️⚠️ `decorate.ts` IMPORTS SLOT_CATEGORY — it does not restate the slot→category map',
+    /import\s*\{[\s\S]*?SLOT_CATEGORY[\s\S]*?\}\s*from\s*'\.\.\/domain\/catalogue\.ts'/.test(DECORATE_SRC)
+      && !/SLOT_CATEGORY\s*[:=]/.test(stripComments(DECORATE_SRC)));
+  check('⚠️ …and the altar hands the art a RECT, so a piece fills its measured box',
+    readFileSync(join(PROJECT_ROOT, 'src', 'components', 'home', 'decor-layer.tsx'), 'utf8').includes('box={{')
+      && readFileSync(join(PROJECT_ROOT, 'src', 'components', 'decoration-art.tsx'), 'utf8')
+        .includes("preserveAspectRatio={box === undefined ? undefined : 'none'}"));
+
+
 
   /**
    * ⚠️⚠️ **THE SIZES MUST MATCH THE FILES ON DISK.** Since 2026-11-01 the art is five raster
