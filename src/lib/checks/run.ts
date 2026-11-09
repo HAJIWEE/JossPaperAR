@@ -24,10 +24,12 @@ import {
   DECOR_BOARD,
   SLOT_ART,
   SLOT_HIT,
+  BACKGROUND_OVERSHOOT,
   artVariantFor,
   chipBandClear,
   drawPlan,
   optionsForSlot,
+  overshoot,
   rectsOverlap,
   sheetLayout,
 } from '../decorate.ts';
@@ -3383,7 +3385,14 @@ function storeChecks(): void {
    * smaller, the piece is drawn outside the thing that selects it — the defect class the owner's eye keeps finding
    * first. ⚠️ Asserted per slot, so re-measuring one cannot quietly break another.
    */
+  /**
+   * ⚠️⚠️ **THE ZONE MUST CONTAIN THE ART — EXCEPT THE BACKGROUND, WHICH OVERHANGS ON PURPOSE.** `1f` draws the tap targets
+   * larger than the pieces; the day one is smaller, the piece is drawn outside the thing that selects it. ⚠️ The
+   * background is the deliberate exception (owner, 2026-11-09): the print runs 5 % past its zone on every side so it reads
+   * as a backdrop, and its zone is still the tap target underneath it.
+   */
   const outsideZone = SLOTS.filter((s) => {
+    if (s === 'background') return false;
     const z = SLOT_HIT[s];
     const a = SLOT_ART[s];
     return !(a.x >= z.x && a.y >= z.y && a.x + a.w <= z.x + z.w && a.y + a.h <= z.y + z.h);
@@ -3391,30 +3400,35 @@ function storeChecks(): void {
   check('⚠️⚠️ each ART rect sits INSIDE its own tap zone — a piece outside its zone cannot be tapped',
     outsideZone.length === 0, outsideZone.join(' '));
   /**
-   * ⚠️⚠️ **THE BACKGROUND PRINT FILLS ITS MARKED SPACE** (owner, 2026-11-09: *"enlarge the background decoration to occupy
-   * the entirety of the marked background decoration space"*). ⚠️ The board's own group is `101,367 190×161` — a print that
-   * sat entirely inside a tablet's footprint, so a decorated altar showed two dark slivers instead of a backdrop. ⚠️ Equality
-   * is asserted, not containment: the point is that the art and the zone are the SAME rect, so a future re-measure of one
-   * cannot leave the other behind.
+   * ⚠️⚠️ **THE BACKGROUND PRINT IS THE ZONE PLUS 10 %** (owner, 2026-11-09): *"enlarge the background decoration to occupy
+   * the entirety of the marked background decoration space"*, then *"bring up the background decoration by 10%"*. ⚠️ The
+   * board's own group is `101,367 190×161` — a print that sat inside a tablet's footprint; filling the zone made it a
+   * backdrop and the overhang keeps it off the outline. ⚠️ Asserted as the RELATIONSHIP (`overshoot(zone, OVER)`) plus the
+   * constant, not as four numbers, so a re-measure of the zone carries the print with it.
    */
-  check('⚠️⚠️ the background print is the WHOLE marked zone, not a picture inside it',
-    SLOT_ART.background.x === SLOT_HIT.background.x
-      && SLOT_ART.background.y === SLOT_HIT.background.y
-      && SLOT_ART.background.w === SLOT_HIT.background.w
-      && SLOT_ART.background.h === SLOT_HIT.background.h,
-    `${SLOT_ART.background.w}×${SLOT_ART.background.h} vs ${SLOT_HIT.background.w}×${SLOT_HIT.background.h}`);
+  const wantBg = overshoot(SLOT_HIT.background, BACKGROUND_OVERSHOOT);
+  const overLeft = SLOT_HIT.background.x - SLOT_ART.background.x;
+  const overRight = SLOT_ART.background.x + SLOT_ART.background.w - (SLOT_HIT.background.x + SLOT_HIT.background.w);
+  check('⚠️⚠️ the background print is its zone PLUS 10 %, evenly overhanging on every side',
+    BACKGROUND_OVERSHOOT === 1.1
+      && Math.abs(SLOT_ART.background.x - wantBg.x) < 1e-9
+      && Math.abs(SLOT_ART.background.y - wantBg.y) < 1e-9
+      && Math.abs(SLOT_ART.background.w - wantBg.w) < 1e-9
+      && Math.abs(SLOT_ART.background.h - wantBg.h) < 1e-9
+      && Math.abs(overLeft - overRight) < 1e-9,
+    `${SLOT_ART.background.w.toFixed(1)}×${SLOT_ART.background.h.toFixed(1)} vs zone ${SLOT_HIT.background.w}×${SLOT_HIT.background.h} · overhang ${overLeft.toFixed(1)}/${overRight.toFixed(1)}`);
   /**
-   * ⚠️ **THE TABLET DRAWS AT 80 % OF ITS BAND** (owner, 2026-11-09: *"reduce the tablet size by 20%"*), and it gives up
-   * that size from the TOP — its plinth has to stay on the table. ⚠️ The band itself must NOT shrink: it is also the ＋
-   * slot's tap target and the carousel's anchor.
+   * ⚠️ **THE TABLET DRAWS AT 72 % OF ITS BAND** — 20 % then a further 10 % (owner). ⚠️ Bottom-anchored: it gives up the
+   * height from the TOP so its plinth stays on the table. ⚠️ The band itself must NOT shrink — it is also the ＋ slot's
+   * tap target and the carousel's anchor.
    */
   const tab = tabletBox(HOME_BANDS.addSlot);
-  check('⚠️⚠️ the tablet is 80 % of its band, centred, and still resting on the band floor',
-    Math.abs(tab.w - HOME_BANDS.addSlot.w * 0.8) < 1e-9
-      && Math.abs(tab.h - HOME_BANDS.addSlot.h * 0.8) < 1e-9
+  check('⚠️⚠️ the tablet is 72 % of its band, centred, and still resting on the band floor',
+    Math.abs(tab.w - HOME_BANDS.addSlot.w * TABLET_SCALE) < 1e-9
+      && Math.abs(tab.h - HOME_BANDS.addSlot.h * TABLET_SCALE) < 1e-9
       && Math.abs(tab.x * 2 + tab.w - HOME_BANDS.addSlot.w) < 1e-9
       && Math.abs(tab.y + tab.h - HOME_BANDS.addSlot.h) < 1e-9
-      && TABLET_SCALE === 0.8,
+      && TABLET_SCALE === 0.72,
     `${tab.w.toFixed(1)}×${tab.h.toFixed(1)} in ${HOME_BANDS.addSlot.w}×${HOME_BANDS.addSlot.h}`);
 
   /**

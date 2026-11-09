@@ -33,7 +33,7 @@
 export const ALTAR_DISPLAY_SLOTS = 4;
 
 /**
- * ⚠️ **THE TABLET DRAWS AT 80 % OF ITS BAND** (owner, 2026-11-09: *"the tablet is also too big now… reduce the tablet
+ * ⚠️ **THE TABLET DRAWS AT 72 % OF ITS BAND** (owner, 2026-11-09: *"the tablet is also too big now… reduce the tablet
  * size by 20%"*).
  *
  * ⚠️ The BAND (`slot · ＋ add a tablet` / the centre tablet, `131,285 129×307`) is **not** the drawing: it is also the ＋
@@ -41,7 +41,7 @@ export const ALTAR_DISPLAY_SLOTS = 4;
  * ⚠️ Bottom-aligned, not centred: the tablet's plinth must stay resting on the table (`y 588`), so it loses its height
  * from the TOP. Centring it would float the plaque off the burner.
  */
-export const TABLET_SCALE = 0.8;
+export const TABLET_SCALE = 0.72;
 
 export interface Box {
   readonly x: number;

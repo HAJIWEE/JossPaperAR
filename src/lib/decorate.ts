@@ -68,6 +68,20 @@ export const SLOT_HIT: Record<DecorationSlot, Rect> = {
 };
 
 /**
+ * ⚠️ **THE BACKGROUND PRINT OVERHANGS ITS ZONE BY 10 %** (owner, 2026-11-09: *"bring up the background decoration by
+ * 10%"*). ⚠️ It is 10 % of the PRINT, not a nudge of the whole shrine: the zone is the marked space, and the print runs
+ * 5 % past it on every side so it reads as a backdrop rather than a picture pinned to an outline.
+ */
+export const BACKGROUND_OVERSHOOT = 1.1;
+
+/** A rect grown by `factor` about its own centre — both overhangs equal, so the composition stays symmetrical. */
+export function overshoot(r: Rect, factor: number): Rect {
+  const w = r.w * factor;
+  const h = r.h * factor;
+  return { x: r.x - (w - r.w) / 2, y: r.y - (h - r.h) / 2, w, h };
+}
+
+/**
  * The six **art rects** — `1d` / `1e`'s `decor · …` groups, board-relative.
  *
  * ⚠️ `top_middle`'s 141 × 40 was measured on a `横批` — a wide scroll this catalogue does not sell yet. It is
@@ -80,10 +94,12 @@ export const SLOT_ART: Record<DecorationSlot, Rect> = {
   top_right: { x: 301, y: 210, w: 52, h: 66 },
   side_left: { x: 33, y: 300, w: 41, h: 160 },
   side_right: { x: 317, y: 300, w: 41, h: 160 },
-  /** `decor · 鍾馗像 (background)` — ⚠️ **NOW THE WHOLE ZONE** (owner, 2026-11-09: *"enlarge the background decoration to
-   * occupy the entirety of the marked background decoration space"*). The board's own group is `101,367 190×161`, which
-   * left the print buried behind a tablet with only slivers showing; filling the marked space makes it a backdrop. */
-  background: { x: 101, y: 288, w: 190, h: 320 },
+  /** `decor · 鍾馗像 (background)` — ⚠️ **THE WHOLE ZONE, PLUS 10 %** (owner, 2026-11-09): *"enlarge the background
+   * decoration to occupy the entirety of the marked background decoration space"*, then *"bring up the background
+   * decoration by 10%"*. The board's own group is `101,367 190×161`, which left the print buried behind a tablet; filling
+   * the zone made it a backdrop, and the 10 % overhang lets it read as one instead of stopping exactly on the outline.
+   * ⚠️ Scaled about the ZONE'S CENTRE, so both overhangs are 5 % and the composition stays symmetrical. */
+  background: overshoot(SLOT_HIT.background, BACKGROUND_OVERSHOOT),
 };
 
 /** `slot · hint (how it works)` — 20,618 350×18, drawn only in customise mode. */

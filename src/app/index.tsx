@@ -447,16 +447,25 @@ export default function HomeShrine() {
             <View style={[styles.abs, bandRect(HOME_BANDS.halo, s)]} testID="home-halo-band">
               <AltarHalo />
             </View>
+            {/**
+             * ⚠️⚠️ **THE PRINT GOES BEHIND THE ALTAR, ABOVE THE HALO** (owner, 2026-11-09: *"the background decoration Z
+             * layer needs to be pushed back as well as currently its in front of the altar"*).
+             *
+             * ⚠️ It used to mount after `home-shrine-base`, so an enlarged print painted OVER the table — a poster pasted
+             * on the altar instead of a backdrop behind it. ⚠️ Note the board's own order (`1e`) puts the print AFTER the
+             * table, which was harmless while the group was `190×161` and stopped at `y 528`, well above the table at 588;
+             * filling the zone (`288..608`) made it overlap, and a 10 % overshoot overlaps more. So the owner's order
+             * wins over the board's, and the reason is the size change, not a disagreement with the drawing.
+             */}
+            {decor === null ? null : (
+              <DecorBack scale={s} equipped={decor.equipped} onEnter={customize ? undefined : enterCustomize} />
+            )}
             <View style={[styles.abs, bandRect(HOME_BANDS.offerings, s)]} testID="home-offerings-band">
               <Offerings />
             </View>
             <View style={[styles.abs, bandRect(HOME_BANDS.shrineBase, s)]} testID="home-shrine-base">
               <ShrineBase />
             </View>
-            {/* ⚠️ BEFORE the tablet: `EN · 1e` paints `decor · 鍾馗像 (background)` behind it. */}
-            {decor === null ? null : (
-              <DecorBack scale={s} equipped={decor.equipped} onEnter={customize ? undefined : enterCustomize} />
-            )}
             {/* ⚠️ The ALTAR-STATE CAPTION — `caption · altar state`. `altarCaption()` chooses the
                 EMPTY line, the board's FILLED line, or the singular; ⚠️ the screen used to render
                 the empty line unconditionally, so a shrine holding three tablets still read
