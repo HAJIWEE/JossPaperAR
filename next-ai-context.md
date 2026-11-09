@@ -2454,6 +2454,13 @@ lantern guard — each red, then green on restore.
 right. ⚠️ The preview used to see it was again a **temporary client override** (no rows written to the account) and is
 **reverted** — `git status` shows only the three real files.
 
+✅ **ACCEPTED AS TEMPORARY — owner, 2026-11-09: *"For now this is fine. but mark it down."*** It is marked in
+**`follow-up-items.md`** under `SCRUM-226` as three bullets: the pair has no top piece · the card motif's third leaf is
+deleted (and its right leaf is now plainer, because that drifted body *was* its robe) · the altar draws one ported,
+**stretched**, mirrored leaf per side. ⚠️ **The trap that mark records:** the mirror is a **flip**, so if two genuinely
+different drawings are ever generated, `side_right`'s `mirror` flag must be turned off **in the same commit** — the gate
+asserts the flag, not the art underneath it.
+
 **US$0.00.**
 
 
