@@ -2038,6 +2038,67 @@ The icon is built from the board so it is right; ⚠️ **the in-app mark is sti
 red on: adaptive colour → `#E6F4FE` (1 of 814), splash plugin deleted (1). **US$0.00.**
 
 
+## 2026-11-08 (S79j) — the in-app mark was a BLACK SLAB; the strokes were never scaled
+
+⚠️ Building the launcher icon at 1024 exposed it: `AppMark` rendered a black slab, `assets/app-mark.svg` (from the
+170 board) a clean gold tablet.
+
+**Cause:** the header export is the 170 board in **53.012**. x/y/width/height were divided correctly, but the tablet
+and ring **stroke widths `8 · 9`** and their **`rx 8 · 3`** were copied **verbatim** → the tablet's border was
+**22.9 %** of its own edge instead of **9.0 %**.
+
+⚠️ **Nothing could see it:** the numbers WERE the board's, and a stroke has no invariant except relative to its own
+shape. **Measured by rendering** all three at 512 px: old **61 px (22.9 %)** · new **24 px (9.0 %)** · board **24 px
+(9.0 %)**.
+
+**Fix:** `MARK_SCALE = 53.012 / 170`, every size-derived value expressed through it.
+
+⚠️⚠️ **The first gate was WRONG** — it evaluated the `const` declarations, so replacing `strokeWidth={TABLET_STROKE}`
+with a literal `8` left it green while the app drew a slab. It now parses the **rendered elements** and compares
+stroke ÷ its own edge against the ratio parsed from the board SVG. Fault-tested red: `pair0 (8): 29.0 % vs 9.0 %`.
+
+**Gates 821** (+4) · `tsc` 0 · 20/20. **US$0.00.**
+
+
+## 2026-11-08 (S79k) — the profile name defaults from the email; changeable once a week (SCRUM-223)
+
+⚠️⚠️ **THE PATH THAT MATTERS IS THE UPDATE, NOT THE INSERT.** Anonymous-first (ADR-004) means `handle_new_user`
+sees `email = NULL`; the address arrives later as an **UPDATE** on `auth.users`. A default written only into the
+insert trigger would look implemented and never fire for a real user. Two triggers: insert + `on_auth_user_email_set`.
+
+**Derivation lives in SQL ONLY** (`simplified_name_from_email`) — the client displays the stored value. `hajiwee94.11@`
+→ `Hajiwee94` · `gwee+work@` → `Gwee` · `张.伟@` → `张伟` · nothing → NULL.
+
+**The limit** raises `name_change_too_soon` inside 7 days AND owns `name_changed_at` (RLS is column-agnostic — a
+client could otherwise reset its own cooldown). **A default starts no clock** (INSERT, and the `joss.name_defaulted`
+flag) or the upgrade would spend the user's first change.
+
+⚠️ **Backfill MUST precede the trigger** or every existing account is locked out over a name it never chose — gated.
+
+⚠️ **The SQL test found two real bugs**: a reversed-split that derived the DOMAIN (`Example`), and a CJK branch that
+kept the dot (`张.伟`). `supabase/tests/profile_name.sql` S1–S7; fault-tested by deleting the flag branch → S5 red.
+**Hosted after push: 20 profiles · 3 named · 0 clocks started.**
+
+**Gates 831** (+10) · `tsc` 0 · 20/20. **US$0.00.**
+
+
+## 2026-11-08 (S79l) — the limit warning rendered as `{days}`, and i18n-js wants `%{days}`
+
+⚠️⚠️ **Owner: "i dont see one when i go to change the name."** He was right, and the cause was not layout — it was a
+placeholder **the library never substitutes**. The app uses **`i18n-js`**, syntax **`%{name}`**; I wrote `{days}`,
+so the sheet printed *"once every {days} days"*. ⚠️ **Nothing could see it**: `tsc` fine, key in both locales, string
+rendered. `check:lib` only compared key SETS.
+
+**Fixed:** the limit is its **own bordered notice** above the field (not a clause in the hint paragraph), and there is
+now a gate on the **CLASS** — no bare `{placeholder}` in either locale — plus a sweep that RENDERS every `%{…}`
+message **through the app's own instance** and fails on a surviving brace or `[missing]`.
+
+⚠️ **My first sweep was a FALSE GREEN**: the probe built `new I18n(...)` WITHOUT `defaultSeparator`, printed
+`[missing … translation]`, and a brace-only detector passed it. Render through the real instance or don't claim it.
+
+**Gates 838** (+7) · fault-tested red 3 of 838. **US$0.00.**
+
+
 ## Next, in order
 
 1. **`SCRUM-215`'s remaining half** — the SMTP provider + the two templates carrying `{{ .Token }}`, then

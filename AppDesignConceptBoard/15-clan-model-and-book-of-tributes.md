@@ -199,6 +199,52 @@ One active `code` per clan (Head can re-roll it): **link · QR · copyable code*
 
 **Terminology (ZH lock — confirm against the design row):** 宗族 clan · 族长 head · 长老 elder · 副族长 co-head · 成员 member · 供奉簿 Book of Tributes · 邀请码 invite code. *(供奉 already means "offering" in the shipped copy — [[10-economy-spec]] §4.)*
 
+### 8.1 · The three account-flow strings — ✅ RESOLVED 2026-11-08 (`SCRUM-217`)
+
+These blocked `SCRUM-215`: the copy lived only in a comment, and none of it was in this table. All three are
+now decided, so this section is the authority — ⚠️ **do not re-draft them.**
+
+| # | String | Decision | Final copy |
+|---|--------|----------|------------|
+| 217.1 | **The clan-fork gate note** (`EN · 0e13` / `ZH · 0e13`, which now *state* the requirement instead of offering it) | ✅ **approved as drafted** | EN `An account and a clan are required to tend this altar together.` · ZH `需要账号与宗族，才能共同打理这座祭坛。` |
+| 217.2 | **The ZH privacy note** on the sign-up board | ✅ **generalised to 信息** | ZH `邮箱仅用于登录验证，不会用于广告或信息推送。` (EN unchanged: *Your email is only used to sign you in — never for ads or messages.*) |
+| 217.3 | **The ZH Google label** (phase 2) | ✅ **use Google's own multilingual button — never hand-word it** | ZH `使用 Google 账号登录` · EN `Sign in with Google` — **from Google's pre-approved assets**, see below |
+
+⚠️ **217.1 replaces a signed-off string**, `A clan is required — every altar belongs to a family.` — so this is
+a change to an approved board, not a new string on a blank one. It is **board copy only**: the fork note is not
+in `src/` yet, so a search for it finding nothing is expected, not a bug.
+
+⚠️⚠️ **217.2 changed a PRIVACY CLAIM, and that is why it was not a wording nit.** The signed-off phone board said
+`手机号仅用于登录验证，不会用于广告或短信推送。` — *SMS* push. Carried to email it became `邮件推送` (*email* push),
+which **narrowed the promise**: only email pushes were excluded, so an SMS, a notification, or any future channel
+sat outside what the person was told. The EN sentence says **"ads or messages"** on purpose. `信息推送` is the ZH
+that means the same thing. ⚠️ `check:lib` §32 now asserts both locales say it — a promise getting weaker in one
+language is the kind of thing only a test notices.
+
+#### 217.3 — the Google button: use Google's assets, not our translation
+
+**Decision:** the Google control is a **standard, Google-supplied button** with its own localisation, not a
+hand-drawn button with a hand-written ZH label. Google's [branding guidelines](https://developers.google.com/identity/branding-guidelines)
+offer three sanctioned routes, in its own order of preference:
+
+1. the **Google Identity Services SDK-rendered** button (always current — recommended);
+2. **downloadable pre-approved assets** — PNG and SVG, light/neutral/dark, rectangular/pill;
+3. a custom button, whose **text may be localised** (Google: *"允许并鼓励您对该文本进行本地化"*) —
+   `Sign in with Google` / `使用 Google 账号登录`, or the encouraged CTAs `Sign up with Google` / `Continue with Google`.
+
+⚠️ **Required for app verification**, so this is a Store blocker, not a style preference. And four things are
+non-negotiable regardless of route:
+
+- The **"G" keeps its standard colour on a white background** — never monochrome, never recoloured.
+- **No "Google" alone** as the button text (it must carry the sign-in action).
+- **The button must be at least as prominent as any other third-party sign-in option** — same size, similar weight.
+- Don't invent an icon; start from Google's own asset if a size is needed.
+
+⚠️ **So there is deliberately no `account.google*` key in `src/lib/i18n.ts`** — a hand-written label there is the
+thing this decision forbids. When phase 2 lands, the label comes from the asset or the SDK, and this table's ZH
+column is a **reference for the board**, not a string to paste into the app.
+
+
 > ✅ **RESOLVED 2026-10-10 (`SCRUM-95`) — SIMPLIFIED, and this table is now what the app ships.** PM: *"Simplified Chinese. Has a significant larger market."* The whole `zh` table in `src/lib/i18n.ts` moved at once (character conversion driven by **OpenCC's** traditional→simplified mapping, not a hand-typed list — the hand-typed first pass silently missed `來·碼·設·誠·邊·輸·線·內`), plus **two word-level fixes this table itself caught**: `連結` → **`链接`** (C2/C10) and `身分` → **`身份`**, because a character pass yields `连结`/`身分` — both wrong for a simplified reader. `check:lib` **section 15** now asserts that no shipping ZH string carries a traditional character, so the drift cannot return. ⚠️ **And a correction to my own `SCRUM-95` comment: I said the boards were simplified — they are *mostly*, and 7 strings are still traditional (`虔誠 · 擦邊 · 對準 · 鍾馗像`, with the simplified forms on *other* boards).** Filed as **`SCRUM-96`**; the Penpot plugin tab was unreachable, so that sweep is **incomplete** and says so. ⚠️ **Original note, kept for the record:** **CHARACTER-SET MISMATCH — measured 2026-10-08, and not silently resolved.** This table is typed in **SIMPLIFIED** (C2's *家人发来了链接？输入邀请码。*), but the shipped `src/lib/i18n.ts` is **TRADITIONAL** (*家人發來了連結？輸入邀請碼。*) — and the code is what the signed-off `ZH · 0e 宗族` boards were built from. The new SCRUM-46 copy was therefore written **traditional**, to match the app rather than this table. **Which character set the Singapore-diaspora audience should read is a product question for the PM** (Singapore is officially simplified, but its traditional-using families are a real segment) — a definitive answer means either a sweep of the i18n table or a correction here. Recorded so a future session does not copy this table into the app and silently half-translate it.
 
 ---

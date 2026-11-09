@@ -288,6 +288,9 @@ otp_expiry = 3600
 # sender_name = "Admin"
 
 # ═══ Email templates (SCRUM-215) ═══════════════════════════════════════════
+# ⚠️ THE SUBJECTS CARRY A `[JossPaperAR]` PREFIX BECAUSE THE HOSTED PROJECT DOES — verified against the live
+# config on 2026-11-08 (mailer_subjects_magic_link / _email_change). ⚠️ Before that the local copy said the bare
+# subject, so a local run and a real email disagreed about what the mail is called.
 # ⚠️ **THESE CARRY `{{ .Token }}`, AND THAT IS THE POINT.** GoTrue's SHIPPED templates render
 # a LINK (`{{ .ConfirmationURL }}`) — but the account screen is a SIX-BOX CODE ENTRY, so a
 # template with no `{{ .Token }}` sends an email that `verifyOtp(...)` can never match.
@@ -297,11 +300,11 @@ otp_expiry = 3600
 # HTML must be pasted into Dashboard → Authentication → Email Templates or the code never
 # reaches a real inbox (SCRUM-215).
 [auth.email.template.email_change]
-subject = "Confirm your Joss Paper AR email"
+subject = "[JossPaperAR] Confirm your Joss Paper AR email"
 content_path = "./supabase/templates/email_change.html"
 
 [auth.email.template.magic_link]
-subject = "Your Joss Paper AR sign-in code"
+subject = "[JossPaperAR] Your Joss Paper AR sign-in code"
 content_path = "./supabase/templates/magic_link.html"
 
 # Uncomment to customize email template

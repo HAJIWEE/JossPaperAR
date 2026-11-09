@@ -226,11 +226,23 @@ export const MESSAGES = {
     'store.title': 'Store',
     'store.intro': 'Standard offerings.',
     'store.pointsChip': 'Store Points %{points}',
+    // ⚠️ The CASH rail's copy (owner, 2026-11-08: build the layout, not the payment). ⚠️ `%{cash}` is
+    // formatted in cents->dollars at the call site, so no float ever reaches the string.
+    'store.cashChip': 'Cash $%{cash}',
+    'store.cashPrice': '$%{cash}',
+    'store.buyCash': 'Buy for cash',
+    // ⚠️ A control that exists must SAY what it does — this is not a greyed-out promise, it is the truth.
+    'store.cashNotOpen': 'Cash purchases open when Google Play billing goes live — use Store Points for now.',
     'store.tabOfferings': 'Offerings',
     'store.tabDecorations': 'Decorations',
     'store.featured': 'FEATURED',
     'store.featuredValue': 'base value %{value}',
     'store.more': 'More bundles',
+    // ── DECORATIONS (`EN · 7b Store · Decorations`) — the board's own copy, not a paraphrase. ────
+    'store.decorIntro': 'Decorations stay on your altar. Pay with cash or Store Points.',
+    'store.decorFeaturedValue': 'four pieces · permanent',
+    'store.decorPermanent': 'Decoration · permanent',
+    'store.moreDecorations': 'More decorations',
     'store.base': 'base %{value}',
     'store.price': '%{points} pts',
     'store.note': 'Pay with Store Points — every burn earns Points at 20% of its tribute.',
@@ -267,12 +279,21 @@ export const MESSAGES = {
     'profile.nameRow': 'Your name',
     'profile.nameNotSet': 'Not set yet',
     'profile.nameHint': "Your own name, for your profile. Your clan's name lives on the Clan page.",
+    // ⚠️ THE LIMIT IS ITS OWN LINE, NOT A CLAUSE INSIDE THE HINT (owner, 2026-11-08: *"i dont see one when i go
+    // to change the name"*). Buried at the end of a paragraph it read as boilerplate. It now has one job and its
+    // own styled row in the sheet, because it is a COST the user is about to pay.
+    'profile.nameLimitNote': 'You can change your name once every %{days} days.',
     'profile.namePlaceholder': 'e.g. Ah Gwee',
     'profile.nameSave': 'Save name',
     'profile.nameSaving': 'Saving…',
     'profile.nameEmpty': 'Enter a name first.',
     'profile.nameTooLong': 'That name is too long.',
     'profile.nameFailed': 'The name was not saved — try again.',
+    // ⚠️ The once-a-week limit (SCRUM-223). ⚠️ `{days}` is the DATABASE's interval and `{remaining}` is this
+    // user's wait — two different numbers. Reusing one placeholder for both would print "once every 2 days" to
+    // someone with 2 days left.
+    'profile.nameLockedSub': 'Change again in %{remaining} days',
+    'profile.nameTooSoon': 'A name can be changed once every %{days} days. Try again in %{remaining} days.',
     // ⚠️ The tablet sheet (SCRUM-146 · SCRUM-168). Every limit named here is the DB's own.
     // ⚠️ The sheet's copy is `EN · 1s Ancestor sheet` / `EN · 1s2 … / edit mode`, read off
     // Penpot 2026-11-01 — NOT written here. The title says *ancestor* (the person), not
@@ -427,6 +448,11 @@ export const MESSAGES = {
     'account.emailLabel': 'EMAIL',
     'account.emailPlaceholder': 'you@example.com',
     'account.languageCaption': 'LANGUAGE',
+    // ⚠️ THE PROMISE IS "ads or messages", NOT "ads or email" (owner, 2026-11-08 · SCRUM-217.2: *"we can
+    // generalize the ZH to 信息 instead"*). ⚠️ The ZH draft said 邮件推送 — which quietly promised something
+    // narrower than the EN sentence: only EMAIL pushes would be excluded, so an SMS, a notification or any
+    // future channel fell outside the promise the user was shown. 信息推送 keeps the two languages saying the
+    // same thing. `check:lib` holds this line, because a narrowing here is a privacy claim getting weaker.
     'account.privacy': 'Your email is only used to sign you in — never for ads or messages.',
     'account.create': 'Create account',
     'account.sendCode': 'Send code',
@@ -650,11 +676,20 @@ export const MESSAGES = {
     'store.title': '商店',
     'store.intro': '标准供品。',
     'store.pointsChip': '功德点 %{points}',
+    'store.cashChip': '现金 $%{cash}',
+    'store.cashPrice': '$%{cash}',
+    'store.buyCash': '现金购买',
+    'store.cashNotOpen': '现金购买将于 Google Play 结算上线后开放 — 目前请使用功德点。',
     'store.tabOfferings': '供品',
     'store.tabDecorations': '装饰',
     'store.featured': '精选',
     'store.featuredValue': '基础 %{value}',
     'store.more': '更多套装',
+    'store.decorIntro': '装饰会留在你的神台上，可用现金或功德点购买。',
+    'store.decorFeaturedValue': '四件 · 永久',
+    'store.decorPermanent': '装饰 · 永久',
+    'store.moreDecorations': '更多装饰',
+
     'store.base': '基础 %{value}',
     'store.price': '%{points} 点',
     'store.note': '使用功德点购买 — 每次焚烧可获得其功德 20% 的点数。',
@@ -687,12 +722,17 @@ export const MESSAGES = {
     'profile.nameRow': '你的名字',
     'profile.nameNotSet': '尚未设置',
     'profile.nameHint': '这仅是你的个人档案名字，宗族名称请到宗族页面查看。',
+    'profile.nameLimitNote': '名字每 %{days} 天只能修改一次。',
     'profile.namePlaceholder': '例如：阿贵',
     'profile.nameSave': '保存名字',
     'profile.nameSaving': '保存中…',
     'profile.nameEmpty': '请先输入名字。',
     'profile.nameTooLong': '名字太长了。',
     'profile.nameFailed': '名字未能保存 — 请重试。',
+    // ⚠️ 每 7 天只能修改一次（SCRUM-223）。`{days}` 是数据库的间隔，`{remaining}` 是这位用户还需等待的天数 —
+    // 两个不同的数字，混用会让只剩 2 天的人看到「每 2 天可修改一次」。
+    'profile.nameLockedSub': '%{remaining} 天后可再次修改',
+    'profile.nameTooSoon': '名字每 %{days} 天只能修改一次，请 %{remaining} 天后再试。',
     // ⚠️ 牌位弹层 — 文案取自 `ZH · 1s 安奉牌位` / `ZH · 1s2 … / 编辑`（Penpot，2026-11-01）。
     'ancestor.titleAdd': '添加祖先',
     'ancestor.titleEdit': '编辑祖先',
@@ -821,7 +861,7 @@ export const MESSAGES = {
     'account.emailLabel': '邮箱',
     'account.emailPlaceholder': '请输入邮箱',
     'account.languageCaption': '语言',
-    'account.privacy': '邮箱仅用于登录验证，不会用于广告或邮件推送。',
+    'account.privacy': '邮箱仅用于登录验证，不会用于广告或信息推送。',
     'account.create': '创建账号',
     'account.sendCode': '发送验证码',
     'account.verifyTitle': '输入验证码',

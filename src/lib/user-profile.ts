@@ -14,7 +14,7 @@
 
 import type { ApiResult } from './clan-api.ts';
 import { supabase } from './supabase.ts';
-import { chosenNameProblem, normaliseChosenName } from './user-name.ts';
+import { chosenNameProblem, normaliseChosenName, nameChangeCooldown, type NameCooldown } from './user-name.ts';
 
 /** What the screen needs about the caller. */
 export interface MyName {
@@ -24,12 +24,24 @@ export interface MyName {
   readonly pseudonym: string | null;
   /** ⚠️ The signed-in address — a USER profile should answer *"which account am I?"*. */
   readonly email: string | null;
+  /**
+   * ⚠️ When the user last changed the name, straight from the database (SCRUM-223). `null` means never — which
+   * includes a name the SERVER derived from the email, because a default is not a choice.
+   */
+  readonly nameChangedAt: string | null;
+  /**
+   * ⚠️ The display half of the once-a-week limit, computed from `nameChangedAt` against the clock NOW. ⚠️ It is
+   * here so the row can be disabled *before* an edit is attempted: offering a control that the database then
+   * refuses is the dead-looking control this project keeps removing.
+   */
+  readonly cooldown: NameCooldown;
 }
+
 
 export async function readMyName(): Promise<ApiResult<MyName>> {
   const { data, error } = await supabase()
     .from('profiles')
-    .select('chosen_name, display_label')
+    .select('chosen_name, display_label, name_changed_at')
     .maybeSingle();
   if (error) return { ok: false, reason: reasonOf(error) };
 
@@ -51,15 +63,28 @@ export async function readMyName(): Promise<ApiResult<MyName>> {
     email = null;
   }
 
+  const nameChangedAt = text(row.name_changed_at);
+
   return {
     ok: true,
-    data: { chosenName: text(row.chosen_name), pseudonym: text(row.display_label), email },
+    data: {
+      chosenName: text(row.chosen_name),
+      pseudonym: text(row.display_label),
+      email,
+      nameChangedAt,
+      /** ⚠️ `Date.now()` at READ time — the screen re-reads on focus, so the wait is never stale by more than a visit. */
+      cooldown: nameChangeCooldown(nameChangedAt, Date.now()),
+    },
   };
 }
 
 /**
  * Set the caller's own name. ⚠️ Validated here AND by the column's CHECK, because a round trip is not a
  * validation strategy.
+ *
+ * ⚠️⚠️ **AND THE ONCE-A-WEEK LIMIT IS THE DATABASE'S, NOT THIS FUNCTION'S.** `enforce_name_change_limit` raises
+ * `name_change_too_soon` on an early write; this only TRANSLATES that refusal into a key the screen can render.
+ * ⚠️ A client-side check alone would be advice — `profiles_update_own` reaches the row from anywhere.
  */
 export async function setChosenName(raw: string): Promise<ApiResult<string>> {
   const name = normaliseChosenName(raw);
@@ -79,7 +104,15 @@ export async function setChosenName(raw: string): Promise<ApiResult<string>> {
 function reasonOf(error: unknown): string {
   if (typeof error === 'object' && error !== null) {
     const message = (error as { message?: unknown }).message;
-    if (typeof message === 'string' && message.length > 0) return message;
+    if (typeof message === 'string' && message.length > 0) {
+      /**
+       * ⚠️ The trigger's message IS a key (`name_change_too_soon`), so it is translated literally rather than
+       * passed through: a screen comparing against a raw database sentence is a screen that breaks the day
+       * someone rewords the trigger.
+       */
+      if (message.includes('name_change_too_soon')) return 'too_soon';
+      return message;
+    }
   }
   return 'request_failed';
 }

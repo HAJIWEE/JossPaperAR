@@ -21,24 +21,114 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { ConfirmCard } from '@/components/confirm-card';
 import { OfferingArt } from '@/components/offering-art';
 import { TabBarBand } from '@/components/home/tab-bar-band';
 import { ScreenHud } from '@/components/screen-hud';
-import { t } from '@/lib/i18n';
+import { localized, t } from '@/lib/i18n';
+import { DecorationArt } from '@/components/decoration-art';
 import { fetchHomeSummary } from '@/lib/home-api';
 import { getOffering, type OfferingCode } from '@/domain/catalogue';
 import { collectedItemName } from '@/lib/collection';
 import { purchaseItem } from '@/lib/offerings-api';
 import { HUD } from '@/lib/profile';
-import { STORE, STORE_TABS, baseMetaValue, pointsPrice, storeList } from '@/lib/store';
-import { DESIGN_REFERENCE_WIDTH, brand, fontSize, surface, text } from '@/theme/tokens';
+import { STORE, STORE_TABS, baseMetaValue, decorationList, pointsPrice, storeList, type StoreTabId } from '@/lib/store';
+import { DESIGN_REFERENCE_WIDTH, brand, fontSize, onColorCream, surface, text } from '@/theme/tokens';
 
 function scale(): number {
   return Dimensions.get('screen').width / DESIGN_REFERENCE_WIDTH;
 }
+
+/**
+ * THE DECORATIONS HALF OF THE STORE — `EN · 7b Store · Decorations`.
+ *
+ * ⚠️ **Every price here is the board's own** (`EN · 7b`): Festive Set $3.99/3,000 · Couplets $0.99/800 ·
+ * Zhong Kui Print $1.29/1,000 · Door Gods $1.99/1,600 · Lanterns $1.49/1,200. They live in `domain/catalogue.ts`
+ * and are formatted here, never hand-typed into copy.
+ *
+ * ⚠️⚠️ **BOTH RAILS ARE DRAWN AND NEITHER PURCHASE IS WIRED.** ⚠️ Decorations were `price: null` until today, so
+ * no server-side purchase can honour these yet — `decorations_catalog.price` is still NULL. So the cards are
+ * honest about being a layout: they show the design, and tapping one says so rather than pretending to sell.
+ * ⚠️ That is the owner's line, verbatim: *"build out all of it to the point of the actual payments portion."*
+ */
+function DecorationsBlock() {
+  const { width } = useWindowDimensions();
+  const s = width / DESIGN_REFERENCE_WIDTH;
+  const { featured, more } = decorationList();
+  const cents = (c: number | null) => (c === null ? '' : (c / 100).toFixed(2));
+  return (
+    <>
+      <Text style={[styles.intro, { fontSize: 13 * s }]} testID="store-decor-intro">
+        {t('store.decorIntro')}
+      </Text>
+
+      {/* ── the FEATURED decoration ─────────────────────────────────────── */}
+      <Pressable
+        accessibilityRole="button"
+        testID="store-decor-featured"
+        onPress={() => undefined}
+        style={({ pressed }) => [
+          styles.featured,
+          { borderRadius: STORE.featuredFrame.radius * s, borderWidth: STORE.featuredFrame.stroke * s, paddingHorizontal: 12 * s, paddingTop: 12 * s },
+        ]}
+      >
+        <View style={[styles.tag, { width: STORE.tag.w * s, height: STORE.tag.h * s, borderRadius: STORE.tag.radius * s, borderWidth: STORE.tag.stroke * s }]}>
+          <Text style={[styles.tagText, { fontSize: 10 * s }]}>{t('store.featured')}</Text>
+        </View>
+        <View style={{ height: STORE.featuredArt.h * s, alignItems: 'center', justifyContent: 'center' }}>
+          <DecorationArt code={featured.code} size={STORE.featuredArt.h * s} />
+        </View>
+        <Text style={[styles.featuredName, { fontSize: 16 * s }]} numberOfLines={1}>{localized(featured.name)}</Text>
+        <Text style={[styles.featuredValue, { fontSize: 12 * s }]} numberOfLines={1}>{t('store.decorFeaturedValue')}</Text>
+        {/* ⚠️ BOTH rails, as the board draws them — cash first, then points. */}
+        <View style={[styles.chips, { marginTop: 6 * s }]}>
+          <View style={[styles.tag, { width: STORE.pricePill.w * s, height: STORE.pricePill.h * s, borderRadius: STORE.pricePill.radius * s, borderWidth: STORE.pricePill.stroke * s }]}>
+            <Text style={[styles.priceText, { fontSize: 11 * s }]} numberOfLines={1}>{t('store.cashPrice', { cash: cents(featured.cashPrice) })}</Text>
+          </View>
+          <View style={[styles.tag, { width: STORE.pricePill.w * s, height: STORE.pricePill.h * s, borderRadius: STORE.pricePill.radius * s, borderWidth: STORE.pricePill.stroke * s }]}>
+            <Text style={[styles.priceText, { fontSize: 11 * s }]} numberOfLines={1}>{t('store.price', { points: String(featured.price) })}</Text>
+          </View>
+        </View>
+      </Pressable>
+
+      {/* ── the rest ─────────────────────────────────────────────────────── */}
+      <Text style={[styles.moreHead, { fontSize: 15 * s }]}>{t('store.moreDecorations')}</Text>
+      <View style={[styles.grid, { gap: (STORE.card.xs[1] - STORE.card.xs[0] - STORE.card.w) * s }]}>
+        {more.map((item) => (
+          <Pressable
+            key={item.code}
+            accessibilityRole="button"
+            testID={`store-decor-${item.code}`}
+            onPress={() => undefined}
+            style={({ pressed }) => [
+              styles.card,
+              /**
+               * ⚠️⚠️ **BORDER FROM THE BOARD** (owner, 2026-11-08: *"the decorations page individual items is also
+               * missing their borders"*). `card · X (bg)` on `EN · 7b` is **165 × 150 with r14 and a 2.5 ink
+               * stroke** — and this screen had dropped the stroke entirely, so the cards floated as bare paper
+               * with nothing separating them from the page.
+               */
+              { width: 165 * s, minHeight: 150 * s, borderRadius: 14 * s, borderWidth: 2.5 * s, borderColor: brand.ink },
+            ]}
+          >
+            <View style={{ height: STORE.card.artH * s, alignItems: 'center', justifyContent: 'center' }}>
+              <DecorationArt code={item.code} size={STORE.card.artH * s} />
+            </View>
+            <Text style={[styles.name, { fontSize: 13 * s }]} numberOfLines={1}>{localized(item.name)}</Text>
+            <Text style={[styles.meta, { fontSize: 10.5 * s }]} numberOfLines={1}>{t('store.decorPermanent')}</Text>
+            <View style={[styles.chips, { marginTop: 4 * s }]}>
+              <Text style={[styles.priceText, { fontSize: 10 * s }]} numberOfLines={1}>{t('store.cashPrice', { cash: cents(item.cashPrice) })}</Text>
+              <Text style={[styles.priceText, { fontSize: 10 * s }]} numberOfLines={1}>{t('store.price', { points: String(item.price) })}</Text>
+            </View>
+          </Pressable>
+        ))}
+      </View>
+    </>
+  );
+}
+
 
 export default function StoreScreen() {
   const s = scale();
@@ -46,6 +136,8 @@ export default function StoreScreen() {
   const [failed, setFailed] = useState(false);
   /** ⚠️ The code awaiting confirmation, or `null`. One card, not one per item. */
   const [buying, setBuying] = useState<{ readonly code: OfferingCode; readonly price: number } | null>(null);
+  /** ⚠️ Which half of the store is showing. The switcher is the board's, and both tabs are live. */
+  const [tabId, setTabId] = useState<StoreTabId>('offerings');
   const [buyIssue, setBuyIssue] = useState<string | null>(null);
   /**
    * ⚠️ **ONE KEY PER CONFIRM, not per attempt.** It is minted when the card OPENS and reused until
@@ -94,12 +186,22 @@ export default function StoreScreen() {
    * lines, because the extractor that hunts untranslated copy cannot follow one.
    */
   const buyingOffering = buying === null ? null : getOffering(buying.code);
+  /**
+   * ⚠️ **NO CASH AMOUNT YET, DELIBERATELY.** The offering cash prices are drawn on `EN · 7` and I have not read
+   * them — a made-up `$0.00` beside a real item would be an invented price, which is worse than an absent one.
+   * ⚠️ The DECORATIONS board (`EN · 7b`) gave its five prices and those ARE in `catalogue.ts`; the offerings'
+   * cash prices are the next read.
+   */
+  const buyCashLabel = t('store.buyCash');
+
   const buyBody =
     buying === null ? '' : (buyingOffering?.composedOf?.length ?? 0) > 0
       ? t('store.buyBodyBundle', { name: String(collectedItemName(buying.code)), points: String(buying.price) })
       : t('store.buyBody', { name: String(collectedItemName(buying.code)), points: String(buying.price) });
 
   const { featured, more } = storeList();
+  /** ⚠️ The decorations now have PRICES (from `EN · 7b`) and PORTED ART, so the tab is live rather than dark. */
+  const decor = decorationList();
 
   return (
     <View style={styles.screen}>
@@ -116,46 +218,72 @@ export default function StoreScreen() {
           <>
             <Text style={[styles.intro, { fontSize: 13 * s }]}>{t('store.intro')}</Text>
 
-            {/* ── the points chip ⚠️ and NO cash chip — see the header ─────── */}
-            <View
-              style={[styles.chip, { height: STORE.chip.h * s, borderRadius: STORE.chip.radius * s }]}
-              testID="store-points-chip"
-            >
-              <Text style={[styles.chipText, { fontSize: 12 * s }]} numberOfLines={1}>
-                {t('store.pointsChip', { points: String(points) })}
-              </Text>
+            {/* ── the two balance chips: CASH and POINTS ─────────────────────
+                ⚠️⚠️ **THE CASH CHIP IS RENDERED AND THE PAYMENT IS NOT WIRED** (owner, 2026-11-08:
+                *"i still don't see the Cash portions of the store ... build out all of it to the point of the
+                actual payments portion"*). ⚠️ So this is LAYOUT: the chip is drawn to the board's geometry
+                (`EN · 7b` / `EN · 7`) and shows the balance the RPC surface can actually give us — which is
+                ⚠️ **nothing**: there is no cash-balance read anywhere in the RPC surface, so it renders `$0.00`
+                rather than the board's sample `$12.50`. ⚠️ Printing a sample balance would be the one lie this
+                screen could tell that a user would believe.
+            */}
+            <View style={styles.chips}>
+              <View
+                style={[styles.chip, { height: STORE.chip.h * s, borderRadius: STORE.chip.radius * s }]}
+                testID="store-cash-chip"
+              >
+                <Text style={[styles.chipText, { fontSize: 12 * s }]} numberOfLines={1}>
+                  {t('store.cashChip', { cash: (0).toFixed(2) })}
+                </Text>
+              </View>
+              <View
+                style={[styles.chip, { height: STORE.chip.h * s, borderRadius: STORE.chip.radius * s }]}
+                testID="store-points-chip"
+              >
+                <Text style={[styles.chipText, { fontSize: 12 * s }]} numberOfLines={1}>
+                  {t('store.pointsChip', { points: String(points) })}
+                </Text>
+              </View>
             </View>
 
             {/* ── the switcher ⚠️ Decorations is disabled, not dead ────────── */}
             {/* The pill BACKGROUND first — `switcher · category (bg)`, r19, ink 2.5. */}
             <View
-              style={[styles.switcherBg, { height: STORE.switcherBg.h * s, borderRadius: STORE.switcherBg.radius * s, borderWidth: STORE.switcherBg.stroke * s, paddingHorizontal: 3 * s }]}
+              /**
+               * ⚠️⚠️ **GEOMETRY FROM THE BOARD, NOT FROM MEMORY** (`switcher · category (bg)` on `EN · 7b`):
+               * 350 × 38, r19, ink stroke 2.5, and the two segments sit inside it at 171 × 33 with **NO border
+               * of their own**. ⚠️ The first version bordered every pill, which grew each one by 4 px and pushed
+               * the pair into the container's own stroke — the misalignment the owner saw.
+               */
+              style={[styles.switcherBg, { width: 350 * s, height: 38 * s, borderRadius: 19 * s, borderWidth: 2.5 * s, paddingHorizontal: 2.5 * s }]}
               testID="store-switcher"
             >
-            <View style={[styles.switcher, { gap: (STORE.switcher.xs[1] - STORE.switcher.xs[0] - STORE.switcher.w) * s }]}>
+            <View style={styles.switcher}>
               {STORE_TABS.map((tab) => (
-                <View
+                <Pressable
                   key={tab.id}
+                  onPress={() => setTabId(tab.id)}
                   testID={`store-tab-${tab.id}`}
                   accessibilityState={{ disabled: !tab.enabled }}
+                  /**
+                   * ⚠️⚠️ **SELECTION, NOT ENABLEDNESS.** The pills used to be styled by `tab.enabled` — so the
+                   * day Decorations was enabled, BOTH drew as the active cinnabar segment. ⚠️ Two identical red
+                   * pills is not a switcher; the state has to be `tab.id === tabId`.
+                   * ⚠️ And no per-pill border: the board's only stroke is the container's.
+                   */
                   style={[
                     styles.tab,
-                    {
-                      width: STORE.switcher.w * s,
-                      height: STORE.switcher.h * s,
-                      borderRadius: STORE.switcher.radius * s,
-                    },
-                    tab.enabled && styles.tabOn,
-                    !tab.enabled && styles.tabOff,
+                    { width: 171 * s, height: 33 * s, borderRadius: 16.5 * s },
+                    tabId === tab.id ? styles.tabOn : styles.tabOff,
                   ]}
                 >
                   <Text
-                    style={[styles.tabText, { fontSize: 13.5 * s }, tab.enabled && styles.tabTextOn]}
+                    style={[styles.tabText, { fontSize: 13.5 * s }, tabId === tab.id ? styles.tabTextOn : styles.tabTextOff]}
                     numberOfLines={1}
                   >
                     {t(tab.labelKey)}
                   </Text>
-                </View>
+                </Pressable>
               ))}
             </View>
             </View>
@@ -172,6 +300,7 @@ export default function StoreScreen() {
                  name + a value and NO pill, but a card you can buy must show what it costs.
                  ⚠️ No CASH price is drawn: there is no cash rail and **no read for a cash balance**
                  (`CASH_IS_READABLE`), and inventing a price is a product decision. */}
+            {tabId === 'offerings' ? (<>
             <Pressable
               accessibilityRole="button"
               onPress={() => {
@@ -243,6 +372,9 @@ export default function StoreScreen() {
             <Text style={[styles.note, { fontSize: 11.5 * s }]} testID="store-note">
               {t('store.note')}
             </Text>
+            </>) : (
+              <DecorationsBlock />
+            )}
 
             {/** ⚠️ The SERVER's own refusal, shown as it came — not reworded into copy. */}
             {buyIssue === null ? null : (
@@ -250,7 +382,6 @@ export default function StoreScreen() {
                 {buyIssue}
               </Text>
             )}
-
             <ConfirmCard
               visible={buying !== null}
               title={t('store.buyTitle')}
@@ -259,6 +390,16 @@ export default function StoreScreen() {
               cancelLabel={t('common.cancel')}
               onConfirm={() => void confirmBuy()}
               onCancel={() => setBuying(null)}
+              /**
+               * ⚠️⚠️ **THE CASH RAIL, INSIDE THE MODAL** (owner, 2026-11-08). It was first rendered on the page
+               * BEHIND this modal, which made it invisible on glass — a gate that greps for the testID passes on a
+               * control nobody can see. `ConfirmCard` now takes a second action, so the layout is honest AND reachable.
+               * ⚠️ It stays enabled and answers the truth on press: Play Billing is not in this build.
+               */
+              secondaryLabel={buyCashLabel}
+              secondaryTestID="store-buy-cash"
+              onSecondary={() => setBuyIssue(t('store.cashNotOpen'))}
+              secondaryNote={t('store.cashNotOpen')}
             />
           </>
         )}
@@ -279,6 +420,31 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, paddingBottom: 40 },
   problem: { color: text.inkSoft, fontSize: fontSize.body.at390 },
   intro: { color: text.inkSoft },
+  /** ⚠️ The cash button beside the points confirm — outlined, not filled: it is the secondary rail. */
+  cashBtn: {
+    marginTop: 10,
+    minHeight: 46,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: brand.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  cashBtnLabel: { color: brand.ink, fontSize: 14, fontWeight: '700' },
+  /** ⚠️ The two-chip row (cash + points) — the board draws them side by side, not stacked. */
+  /**
+   * ⚠️⚠️ **THE BALANCE ROW IS RIGHT-ALIGNED** (owner, 2026-11-08: *"the UI Layout for the cash and points display is
+   * not right aligned like the penpot design"*).
+   *
+   * ⚠️ The board settles it: `chip · points balance (bg)` on `EN · 7b` sits at **x 250 of 390** — **18 dp from the
+   * right edge** — at 122 × 28. It answers "how much do I have?", so the group hugs that edge while the reading
+   * column above it stays left-flush.
+   * ⚠️ `alignSelf: stretch` is what makes `flex-end` mean anything: without it the row shrink-wraps its content and
+   * both alignments look identical.
+   */
+  chips: { flexDirection: 'row', gap: 8, marginBottom: 8, alignSelf: 'stretch', justifyContent: 'flex-end' },
+
   chip: {
     alignSelf: 'flex-end',
     paddingHorizontal: 12,
@@ -297,11 +463,15 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   switcher: { flexDirection: 'row' },
-  tab: { alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: brand.ink },
+  /** ⚠️ NO border, NO opacity — the board's segment is a flat fill and the container carries the only stroke. */
+  tab: { alignItems: 'center', justifyContent: 'center' },
   tabOn: { backgroundColor: brand.cinnabar },
-  tabOff: { backgroundColor: 'transparent', opacity: 0.45 },
+  // ⚠️ Unselected is the CONTAINER's own ground showing through, so it reads as a well, not a dimmed button.
+  tabOff: { backgroundColor: 'transparent' },
   tabText: { color: text.ink, fontWeight: '700' },
-  tabTextOn: { color: surface.paper },
+  /** ⚠️ Both colours are the board's: `#fff8e8` on the active segment, `#4a463f` off it. */
+  tabTextOn: { color: onColorCream },
+  tabTextOff: { color: text.inkSoft },
   featured: {
     marginTop: 16,
     backgroundColor: surface.row,

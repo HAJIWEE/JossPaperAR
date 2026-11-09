@@ -33,6 +33,20 @@ export interface ConfirmCardProps {
   readonly cancelLabel: string;
   readonly onConfirm: () => void;
   readonly onCancel: () => void;
+  /**
+   * ⚠️ **AN OPTIONAL SECOND ACTION** (SCRUM-212 · the store's cash rail).
+   *
+   * ⚠️ It lives INSIDE the modal because the modal is what the user is looking at — a control rendered on the
+   * page behind the scrim cannot be seen or tapped, and that is exactly the defect this prop fixes: the store's
+   * `Buy for cash` was drawn on the screen underneath and was invisible on glass.
+   * ⚠️ Both are absent by default, so every existing caller is unchanged and there is no second button anywhere
+   * it is not wanted.
+   */
+  readonly secondaryLabel?: string;
+  readonly secondaryTestID?: string;
+  readonly onSecondary?: () => void;
+  /** ⚠️ Shown under the secondary action — used for "this is not wired yet" rather than a disabled control. */
+  readonly secondaryNote?: string;
 }
 
 export function ConfirmCard({
@@ -43,6 +57,10 @@ export function ConfirmCard({
   cancelLabel,
   onConfirm,
   onCancel,
+  secondaryLabel,
+  secondaryTestID,
+  onSecondary,
+  secondaryNote,
 }: ConfirmCardProps) {
   return (
     <Modal
@@ -66,6 +84,23 @@ export function ConfirmCard({
             <Text style={styles.primaryLabel}>{confirmLabel}</Text>
           </Pressable>
 
+          {/* ⚠️ The second action, INSIDE the modal — see the prop's note for why it cannot live on the page. */}
+          {secondaryLabel === undefined || onSecondary === undefined ? null : (
+            <>
+              <Pressable
+                style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}
+                onPress={onSecondary}
+                accessibilityRole="button"
+                testID={secondaryTestID ?? 'confirm-card-secondary'}
+              >
+                <Text style={styles.secondaryLabel}>{secondaryLabel}</Text>
+              </Pressable>
+              {secondaryNote === undefined ? null : (
+                <Text style={styles.secondaryNote}>{secondaryNote}</Text>
+              )}
+            </>
+          )}
+
           {/*
             ⚠️ The VISIBLE label is 20 px; the TOUCH target is 44 (this project's floor
             for the 40–50s audience). The board draws the label, not the target — the
@@ -86,6 +121,19 @@ export function ConfirmCard({
 }
 
 const styles = StyleSheet.create({
+  /** ⚠️ The secondary action: outlined, not filled — it must read as the alternative, never as the main act. */
+  secondary: {
+    marginTop: 10,
+    minHeight: 46,
+    borderRadius: CONFIRM_SPEC.card.radius / 2,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  secondaryLabel: { fontSize: 16, fontWeight: '700' },
+  /** ⚠️ The honest note under it — "not yet" said in words beats a control that lies. */
+  secondaryNote: { marginTop: 8, fontSize: 12, lineHeight: 16, textAlign: 'center' },
   scrim: {
     flex: 1,
     backgroundColor: scrimRgba(),

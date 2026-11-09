@@ -533,6 +533,125 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **SCRUM-59 was the one that changed the code**, and it was kept out of PR-3 on purpose — it edits `request_cartoonize`, which was already applied, so it belongs in its own migration + PR with its own tests. **It is built: see §12.5.**
 
+### 12.56 · S79m — SCRUM-217's three strings decided, and one of them was a PRIVACY claim getting weaker (2026-11-08)
+
+> **Owner:** *"For 217.1 it should be ok. For 217.2 we can generalize the ZH to 信息 instead. 3. we should be able to
+> find generic google components already designed and being used commonly in some design packages ... there should
+> already be multilingual options."*
+>
+> **217.1 — the clan-fork gate note: approved as drafted** (`An account and a clan are required to tend this altar
+> together.` / `需要账号与宗族，才能共同打理这座祭坛。`). ⚠️ It **replaces a signed-off string**, so it is a change to an
+> approved board. **Board copy only** — it is not in `src/`, and a search finding nothing there is expected.
+>
+> ⚠️⚠️ **217.2 — this one was not a wording nit.** The signed-off PHONE board promised 短信推送 (*SMS* push). Carried
+> to email it became **邮件推送** (*email* push) — which **narrowed the promise**: only email pushes were excluded, so
+> an SMS, a notification, or any future channel fell outside what the user was told. ⚠️ **The EN sentence says
+> "ads or messages" on purpose.** Generalised to **信息推送** so both languages promise the same thing, and
+> `check:lib` §32 now asserts it — ⚠️ a privacy claim getting weaker in one language is exactly what only a test
+> notices. Fault-tested red by restoring 邮件推送.
+>
+> **217.3 — the Google label: use Google's own button.** The owner's instinct is backed by Google's own spec.
+> ⚠️ [The branding guidelines](https://developers.google.com/identity/branding-guidelines) state that following them
+> is **required for app verification** — a Store blocker, not a style choice — and offer the SDK-rendered button,
+> **pre-approved PNG/SVG assets**, or a custom button whose text may be **localised** (*"允许并鼓励您对该文本进行本地化"*).
+> The official ZH string is **`使用 Google 账号登录`**. So there is deliberately **no `account.google*` key** in the
+> i18n table: a hand-written label is the thing the decision forbids. Four constraints are recorded in doc 15 §8.1 —
+> the "G" keeps its colour on white, never "Google" alone, prominence at least equal to other options, never an
+> invented icon.
+>
+> **All three live in doc 15 §8.1** — the copy authority — so a future session cannot re-draft them.
+> **Gates: 840** (from 838) · `tsc` **0** · 20/20 · **SCRUM-217 closed Done**. **US$0.00.**
+
+
+### 12.55 · S79k — the name arrives BY DEFAULT, and can be changed once a week (SCRUM-223)
+
+> **Owner, 2026-11-08:** *"I want the profile name to be defaulted to a simplified of the email address used to
+> sign up with the optional for the user to change it once every week."*
+>
+> ⚠️⚠️ **THE SIGN-UP PATH HERE IS NOT THE USUAL ONE, AND THAT IS THE WHOLE RISK.** This app is **anonymous-first**
+> (ADR-004): `handle_new_user` creates the profile from an **insert** on `auth.users` where `email` is **NULL**,
+> and the address arrives later — as an **UPDATE**, which that trigger never sees. ⚠️ A default written only into
+> `handle_new_user` would therefore look implemented and never once fire on the journey every real user takes.
+> So there are **two** paths: the insert (§5) and `on_auth_user_email_set` (§6).
+>
+> **The derivation** (`simplified_name_from_email`) lives in **SQL only** — the client displays the stored value
+> instead of re-deriving it, so there is no second implementation to drift. `hajiwee94.11@…` → `Hajiwee94`;
+> `gwee+work@…` → `Gwee`; `张.伟@…` → `张伟`; nothing derivable → `NULL`, and the screen keeps its call to action.
+>
+> **The limit** is a BEFORE trigger that (a) raises `name_change_too_soon` inside 7 days, and (b) ⚠️ **owns
+> `name_changed_at`** — because `profiles_update_own` is *column-agnostic*, so without that a client could PATCH
+> its own row and reset its own cooldown. ⚠️ And a **default is not a choice**: an INSERT and the
+> `joss.name_defaulted` flag both start no clock, or the anonymous→email upgrade would spend the user's first change
+> before they opened the screen.
+>
+> ⚠️ **THE BACKFILL MUST RUN BEFORE THE TRIGGER IS CREATED** — after it, every existing account would be locked
+> out for a week over a name nobody chose. There is a gate on that ordering, and it was fault-tested by moving the
+> backfill after the trigger went live (red).
+>
+> **Verified against real Postgres**, `supabase/tests/profile_name.sql` (S1–S7): the derivation cases, the sign-up
+> default, the refusal, the client-cannot-reset-its-clock case, the **anonymity upgrade**, never overwriting a
+> chosen name, and the anonymous-stays-nameless case. ⚠️ **The test found two real bugs in the migration**: a
+> reversed-split trick that derived the DOMAIN (`Example` instead of `Hajiwee94`) and a CJK branch that kept the
+> dot (`张.伟`). Both are now unrepresentable. Fault-tested by deleting the `joss.name_defaulted` branch → **S5 red**.
+>
+> **Hosted, after `db push`:** 20 profiles · **3 named** · **0 clocks started** — the backfill named the nameless
+> accounts and started nobody's week.
+>
+> **Gates: 831** (from 821) · `tsc` **0** · 20/20. Two fault-tested red (rounding the wait down; moving the
+> backfill after the trigger). **US$0.00.**
+>
+> ── ⚠️⚠️ FOLLOW-UP THE SAME DAY: THE WARNING WAS THERE AND RENDERED AS `{days}` ──────────────────
+> **Owner:** *"Can you make sure that there is a warning about the weekly once limit for name change in the UI
+> currently i dont see one when i go to change the name."* ⚠️ **He was right, and the cause was not layout — it was
+> a placeholder the library never substitutes.**
+>
+> The app uses **`i18n-js`**, whose interpolation syntax is **`%{name}`** (see `home.streakLabel`). ⚠️ **I wrote
+> `{days}`**, so the sheet rendered the literal words *"once every {days} days"* — and ⚠️ **nothing could see it**:
+> `tsc` was happy, the key existed in both locales, and the string *was* rendered. `check:lib` compared key SETS.
+>
+> **Two fixes.** (1) The limit is now its **own bordered notice** above the field, not a clause at the end of the
+> hint paragraph — it was fine print about the one thing that costs the user something. (2) ⚠️ **A gate on the CLASS,
+> not the instance**: no message in EITHER locale may contain a bare `{placeholder}`, plus a sweep that renders every
+> `%{…}` message **through the app's own instance** (the one lesson `defaultSeparator` exists for) and fails on a
+> surviving brace or a `[missing]` key. ⚠️ The first version of that sweep was a **false green** — my probe built a
+> plain `new I18n(...)` without the separator, printed `[missing … translation]`, and my brace-only detector passed it.
+>
+> **Gates: 838** (from 831) · `tsc` **0** · 20/20. Fault-tested red on the shipped mistake: 3 of 838.
+> ⚠️ **The lesson:** "the key exists in both locales" is not "the user can read it".
+
+
+### 12.54 · S79j — the in-app mark was a BLACK SLAB: strokes (and two radii) were never scaled (2026-11-08)
+
+> ⚠️⚠️ **The launcher icon and the in-app header mark were drawing the same design at different weights**, and the
+> icon build is what exposed it: rendering `AppMark` at 1024 produced a black slab, while `assets/app-mark.svg`
+> (from the 170 board) produced a clean gold tablet.
+>
+> **The cause, value by value.** The board draws in **170 units**; the header export is that board in **53.012**. The
+> port divided x/y/width/height correctly — frame bars `8.5 × 33.15 → 2.651 × 10.337`, `rx 4.25 → 1.325` — but the
+> tablet and ring **stroke widths `8 · 9`** and their **`rx 8 · 3`** were copied **verbatim**. So at any shared
+> rendered size the tablet's border was **22.9 %** of its own edge instead of **9.0 %**, and the gold vanished.
+>
+> ⚠️ **Nothing could see it**: the numbers were the board's own, the file "looked" like a faithful port, and a
+> stroke has no numeric invariant except *relative to its own shape*. **Measured by rendering** all three at 512 px
+> and scanning the tablet's border at its vertical centre: **old 61 px (22.9 %) · new 24 px (9.0 %) · board 24 px
+> (9.0 %)** — the fix restores the board exactly.
+>
+> **The fix is structural, not numeric:** `MARK_SCALE = 53.012 / 170` and every size-derived value is expressed
+> through it (`8 * MARK_SCALE`), so it cannot drift again.
+>
+> **Gates: 821** (from 817) · `tsc` **0** · 20/20. ⚠️ The gate compares **stroke ÷ its own shape's edge** against
+> the **same ratio parsed out of `assets/app-mark.svg`** — a proportional invariant, not a magic number.
+> ⚠️⚠️ **And the first version of that gate was WRONG:** it evaluated the `const` declarations, so a fault test
+> that replaced `strokeWidth={TABLET_STROKE}` with a literal `8` left the constants pristine and the gate **green**
+> while the app drew a slab. It now parses the **rendered elements**. Fault-tested red — `pair0 (8): 29.0 % of its
+> edge vs board 9.0 %` (1 of 821).
+>
+> ✅ **CONFIRMED ON GLASS, 2026-11-08** (Expo Go + Metro over `adb reverse`, so the ACTUAL working tree): the
+> sign-in wall's header now draws the gold tablet with a thin ink border, the cinnabar ring and a gold diamond —
+> matching the launcher icon. ⚠️ **Before the fix the same screen was the black slab** whose render is in §12.53's
+> commit; the two now agree because they share a ratio, not because someone eyed them.
+
+
 ### 12.53 · S79i — THE ICON AND THE SPLASH: the boards were there, the APK shipped Expo's defaults (2026-11-08)
 
 > ⚠️⚠️ **The owner spotted it on the installed APK: a generic icon.** `app.json` pointed at Expo's template assets and
@@ -562,6 +681,8 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 > library in CI) and the wiring: 1024² + colour type 2 for the icon, colour type 6 for the adaptive layers, and the
 > two colour assertions that catch a revert — **paper, not `#E6F4FE`**, and **`#1b1613` at 190 px**. Fault-tested
 > red: the adaptive colour reverted to Expo blue (1 of 814); the splash plugin deleted (1).
+>
+> ✅ **CONFIRMED ON GLASS, 2026-11-08** (Galaxy A-series, APK from build `7d6118d2`, installed 13:29:26): Android's own **App info** screen shows the gold tablet on the **cream `#F5F0E8`** adaptive ground — the corner brackets clip to nubs at 12/3/6/9 under the circular mask, the three small diamonds show at the top — and a cold start shows the **dark `#1b1613`** splash with the paper-coloured mark at 190 px. ⚠️ Read from the **device's** rendering, not from the source, because "the config names the file" was exactly what was true when it shipped Expo's default.
 
 
 ### 12.5 · SCRUM-59 — the AI-budget stop-rule, built (migration `0011`)

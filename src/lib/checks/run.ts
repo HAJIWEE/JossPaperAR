@@ -39,7 +39,7 @@ import {
   routeAfterAccount,
 } from '../account-flow.ts';
 import { planBootstrap } from '../session-map.ts';
-import { chosenNameProblem, normaliseChosenName } from '../user-name.ts';
+import { chosenNameProblem, normaliseChosenName, nameChangeCooldown, DAY_MS, NAME_CHANGE_INTERVAL_DAYS, NAME_CHANGE_INTERVAL_MS } from '../user-name.ts';
 import { readBurnParams, readItemBurnParams, readItemRewardParams, readRewardParams } from '../route-params.ts';
 import { getOffering } from '../../domain/catalogue.ts';
 import { bookView, showsBookSectionTitle } from '../clan-roles.ts';
@@ -76,7 +76,7 @@ import {
   scanDecision,
   shouldHoldInvite,
 } from '../invite-flow.ts';
-import { LOCALES, MESSAGES, detectLocale, localized, messageKeys, setLocale, t } from '../i18n.ts';
+import { LOCALES, MESSAGES, activeLocale, detectLocale, localized, messageKeys, setLocale, t } from '../i18n.ts';
 import {
   LOCALE_KEY,
   LOCALE_LABELS,
@@ -154,7 +154,7 @@ import {
 import { QUOTA_SPENT_COPY } from '../../domain/quota.ts';
 import { AIM_BANDS } from '../../domain/aim.ts';
 import { LEAGUE_TIERS } from '../../domain/league.ts';
-import { OFFERINGS } from '../../domain/catalogue.ts';
+import { DECORATIONS, OFFERINGS } from '../../domain/catalogue.ts';
 import { INITIAL_OFFERING, applyAll, isWaiting, nextAction } from '../../domain/slice.ts';
 import { eventsFromResponse } from '../ritual-map.ts';
 import {
@@ -2394,6 +2394,26 @@ function accountChecks(): void {
   // ⚠️ THE WALL RULE (ADR-004 · SCRUM-147 · its Amendment 1): never before the first burn, offered after.
   check('⚠️ the account is NEVER reachable before the first burn — and IS offered after it',
     ACCOUNT_GATE.reachableBeforeFirstBurn === false && ACCOUNT_GATE.offeredAfterFirstBurn === true);
+
+  /**
+   * ⚠️⚠️ **THE PRIVACY PROMISE MUST SAY THE SAME THING IN BOTH LANGUAGES** (owner, 2026-11-08 · SCRUM-217.2:
+   * *"we can generalize the ZH to 信息 instead"*).
+   *
+   * The signed-off phone copy was 短信推送 (SMS push). Carried to email it became 邮件推送 — ⚠️ which
+   * **narrowed the promise**: only *email* pushes were excluded, so an SMS, a notification, or any future
+   * channel fell outside what the user was told. The EN sentence says *"ads or messages"*, deliberately broad.
+   * 信息推送 is the ZH that means the same thing.
+   * ⚠️ A privacy claim getting **weaker in one language** is not a copy nit — it is the promise the product
+   * makes, so it is asserted, on the RENDERED string.
+   */
+  const privacy = (loc: 'en' | 'zh') => MESSAGES[loc]['account.privacy'] ?? '';
+  check('⚠️⚠️ the ZH privacy promise is GENERAL (信息), not narrowed to email — it matches the EN sentence',
+    privacy('zh').includes('信息推送') && !privacy('zh').includes('邮件推送')
+      && privacy('en').includes('ads or messages'),
+    `zh="${privacy('zh')}" en="${privacy('en')}"`);
+  // ⚠️ POSITIVE CONTROL — the wording that shipped before the decision must FAIL that check.
+  check('⚠️ guard: the narrowed 邮件推送 string WOULD fail the general-promise check',
+    !'邮箱仅用于登录验证，不会用于广告或邮件推送。'.includes('信息推送'));
   // ⚠️ And the one case the upgrade cannot do: an email that is already an account means SIGN IN, never
   // the documented data-reassignment workaround — that would be the second user ADR-004 forbids.
   check('⚠️ an email that already has an account means SIGN IN, never a data reassignment',
@@ -2781,6 +2801,109 @@ function accountChecks(): void {
   check('⚠️ guard: padding does not push a legal name over the limit',
     chosenNameProblem(`  ${'A'.repeat(24)}  `) === null && normaliseChosenName('  Gwee  ') === 'Gwee');
 
+  /**
+   * ⚠️⚠️ **THE ONCE-A-WEEK LIMIT — THE DISPLAY HALF** (owner, 2026-11-08 · SCRUM-223).
+   *
+   * ⚠️ The DATABASE is the authority (`enforce_name_change_limit`); this rule only decides whether the row
+   * reads as editable, so the screen never offers a control the database will refuse. ⚠️ The cases that matter
+   * are the BOUNDARIES, and the one that would strand somebody: a malformed timestamp must FAIL OPEN, because
+   * a display bug must never lock a person out.
+   */
+  const DAY = DAY_MS;
+  const T0 = Date.parse('2026-11-08T00:00:00.000Z');
+  const iso = (ms: number) => new Date(ms).toISOString();
+  check('⚠️ a name never changed is editable, and a fresh change is not',
+    nameChangeCooldown(null, T0).allowed
+      && nameChangeCooldown(iso(T0), T0).allowed === false);
+  check('⚠️ the window is 7 days — allowed one millisecond after it, refused one millisecond before',
+    nameChangeCooldown(iso(T0), T0 + 7 * DAY - 1).allowed === false
+      && nameChangeCooldown(iso(T0), T0 + 7 * DAY).allowed === true
+      && nameChangeCooldown(iso(T0), T0 + 7 * DAY + 1).allowed === true);
+  // ⚠️ Rounded UP: "in 0 days" would read as allowed, which is exactly wrong at 6 days 1 hour.
+  check('⚠️ the wait is reported in whole days, ROUNDED UP (never "0 days" while still locked)',
+    nameChangeCooldown(iso(T0), T0 + 6 * DAY + 23 * 60 * 60 * 1000).daysRemaining === 1
+      && nameChangeCooldown(iso(T0), T0 + 1 * DAY).daysRemaining === 6
+      && nameChangeCooldown(iso(T0), T0 + 7 * DAY).daysRemaining === 0);
+  check('⚠️⚠️ a malformed timestamp FAILS OPEN — a display bug must not lock anyone out',
+    nameChangeCooldown('not-a-date', T0).allowed && nameChangeCooldown('', T0).allowed);
+  // ⚠️ POSITIVE CONTROL — the boundary check above is only meaningful if the window is not trivially large/small.
+  check('⚠️ guard: the interval is exactly 7 days, not a week-ish guess',
+    NAME_CHANGE_INTERVAL_DAYS === 7 && NAME_CHANGE_INTERVAL_MS === 7 * DAY_MS);
+
+  /**
+   * ⚠️⚠️ **A BARE `{placeholder}` RENDERS LITERALLY, AND THE OWNER FOUND IT** (2026-11-08: *"i dont see one when
+   * i go to change the name"* — the sheet read *"once every {days} days"*).
+   *
+   * The app uses **`i18n-js`**, whose interpolation syntax is `%{name}` — so my `{days}` was never substituted.
+   * ⚠️ **Nothing could see it**: `tsc` is happy, the key existed in both locales, and the string WAS rendered —
+   * it just read as braces. ⚠️ So this asserts the syntax across EVERY message in BOTH locales, not just the ones
+   * in this feature, because the next author will make the same mistake.
+   */
+  const barePlaceholders = (locale: Record<string, string>, name: string): string[] =>
+    Object.entries(locale)
+      .filter(([, v]) => typeof v === 'string' && /(?<!%)\{[A-Za-z_]/.test(v))
+      .map(([k]) => `${name}:${k}`);
+  const bare = [...barePlaceholders(MESSAGES.en, 'en'), ...barePlaceholders(MESSAGES.zh, 'zh')];
+  check('⚠️⚠️ no message uses a bare `{placeholder}` — i18n-js only substitutes `%{name}`',
+    bare.length === 0, bare.join(', '));
+  // ⚠️ POSITIVE CONTROL — the detector must fire on the exact mistake that shipped, or "none found" is vacuous.
+  check('⚠️ guard: the placeholder detector WOULD catch the `{days}` that shipped',
+    barePlaceholders({ probe: 'once every {days} days' }, 'probe').length === 1
+      && barePlaceholders({ probe: 'once every %{days} days' }, 'probe').length === 0);
+
+  /**
+   * ⚠️⚠️ **AND THE SYNTAX IS NOT THE BEHAVIOUR — THIS RENDERS EVERY `%{…}` MESSAGE THROUGH THE APP'S OWN
+   * INSTANCE.** ⚠️ The syntax check above would pass on a table that the instance cannot resolve, and a dotted key
+   * used to do exactly that (`[missing "en.ritual.cannotPrepare" translation]`, SCRUM-53/64 — the reason
+   * `defaultSeparator` is `\u0000`). ⚠️ So this asks the library, not the source: substitute every declared
+   * placeholder with a number and fail if any `{…}` survives or a key does not resolve.
+   */
+  const localeBefore = activeLocale();
+  const unresolved: string[] = [];
+  for (const loc of ['en', 'zh'] as const) {
+    setLocale(loc);
+    for (const [key, value] of Object.entries(MESSAGES[loc])) {
+      if (typeof value !== 'string' || !value.includes('%{')) continue;
+      const vars: Record<string, string> = {};
+      for (const m of value.matchAll(/%\{([A-Za-z_]\w*)\}/g)) vars[m[1]] = '7';
+      const rendered = t(key, vars);
+      if (rendered.includes('[missing') || /\{[A-Za-z_]/.test(rendered)) unresolved.push(`${loc}:${key}`);
+    }
+  }
+  setLocale(localeBefore);
+  check('⚠️⚠️ every `%{…}` message really interpolates through the app instance — no raw braces, no missing key',
+    unresolved.length === 0, unresolved.join(', '));
+  // ⚠️ POSITIVE CONTROL — the sweep must be able to fail; `7` days is the copy under test.
+  check('⚠️ guard: the interpolation sweep finds the limit copy and it reads as a sentence',
+    (() => {
+      const before = activeLocale();
+      setLocale('en');
+      const out = t('profile.nameLimitNote', { days: '7' });
+      setLocale(before);
+      return out === 'You can change your name once every 7 days.';
+    })());
+
+  /**
+   * ⚠️ **AND THE LIMIT MUST BE VISIBLE IN THE SHEET, NOT JUST TRANSLATED.** ⚠️ The first version put the notice
+   * inside the hint paragraph, where it read as boilerplate. This reads the RENDERED element (the same lesson as
+   * `AppMark`: assert on what draws, not on what is declared).
+   */
+  const PROFILE_SCREEN_SRC = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'app', 'profile.tsx'),
+    'utf8',
+  );
+  check('⚠️⚠️ the weekly limit is RENDERED as its own notice in the name sheet',
+    PROFILE_SCREEN_SRC.includes('testID="profile-name-limit"')
+      && /t\('profile\.nameLimitNote',\s*\{\s*days:/.test(PROFILE_SCREEN_SRC));
+  check('⚠️ …and both locales carry it with the `%{days}` placeholder',
+    MESSAGES.en['profile.nameLimitNote']?.includes('%{days}') === true
+      && MESSAGES.zh['profile.nameLimitNote']?.includes('%{days}') === true);
+  // ⚠️ POSITIVE CONTROL — a hardcoded sentence would pass a "does it exist" check but drift from the constant.
+  check('⚠️ guard: the notice takes the interval as a PARAMETER, so the copy cannot disagree with the rule',
+    !/'profile\.nameLimitNote': '[^']*\b7\b/.test(readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '..', 'i18n.ts'), 'utf8')));
+
+
   const NAME_MIGRATION = readFileSync(
     join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'supabase', 'migrations', '20261108120000_profile_chosen_name.sql'),
     'utf8');
@@ -2788,6 +2911,43 @@ function accountChecks(): void {
     /chosen_name\s+text/i.test(NAME_MIGRATION) && /between 1 and 24/i.test(NAME_MIGRATION));
   check('⚠️⚠️ …and it is NOT unique — duplicate account names are allowed (identity is user_id)',
     !/unique/i.test(NAME_MIGRATION.replace(/--.*$/gm, '')));
+
+  /**
+   * ⚠️⚠️ **THE MIGRATION THAT MAKES THE NAME AUTOMATIC** (SCRUM-223). Three things in it are load-bearing and
+   * invisible at runtime when wrong, so each gets its own assertion:
+   *   1. the derivation function exists and clamps to the SAME 24 the column checks;
+   *   2. ⚠️ the backfill runs BEFORE the limit trigger is created — after it, every existing account would be
+   *      locked out of changing a name it never chose;
+   *   3. ⚠️ there is a trigger on **auth.users UPDATE**, not just the insert path: this app signs people in
+   *      anonymously and attaches the email LATER, so `handle_new_user` never sees it (ADR-004).
+   */
+  const LIMIT_MIGRATION = readFileSync(
+    join(
+      dirname(fileURLToPath(import.meta.url)),
+      '..', '..', '..',
+      'supabase', 'migrations', '20261108130000_profile_name_default_and_weekly_limit.sql',
+    ),
+    'utf8',
+  );
+  const SQL_ONLY = LIMIT_MIGRATION.replace(/--.*$/gm, '');
+  check('⚠️ the derivation exists and clamps to the same 24 the column enforces',
+    /create or replace function public\.simplified_name_from_email/i.test(SQL_ONLY)
+      && /left\(candidate, 24\)/i.test(SQL_ONLY));
+  check('⚠️⚠️ the BACKFILL runs before the limit trigger — else a name nobody chose costs a week',
+    SQL_ONLY.indexOf('update public.profiles p') < SQL_ONLY.indexOf('create trigger enforce_name_change_limit')
+      && SQL_ONLY.indexOf('update public.profiles p') > -1);
+  check('⚠️⚠️ the limit refuses an early change and OWNS the timestamp (a client PATCH cannot reset it)',
+    /raise exception 'name_change_too_soon'/i.test(SQL_ONLY)
+      && /new\.name_changed_at := old\.name_changed_at/i.test(SQL_ONLY)
+      && /interval '7 days'/i.test(SQL_ONLY));
+  check('⚠️⚠️ the default is applied when the EMAIL ARRIVES, not only at sign-up (the anonymous upgrade)',
+    /after update of email on auth\.users/i.test(SQL_ONLY)
+      && /joss\.name_defaulted/i.test(SQL_ONLY)
+      && /and chosen_name is null/i.test(SQL_ONLY));
+  // ⚠️ POSITIVE CONTROL — a derived name is not a choice, so the default must not start the 7-day clock.
+  check('⚠️ guard: a SERVER-SET default is excluded from the cooldown, an INSERT starts no clock',
+    /if tg_op = 'INSERT' then\s*\n\s*new\.name_changed_at := null/i.test(SQL_ONLY)
+      && /coalesce\(current_setting\('joss\.name_defaulted', true\), 'off'\) = 'on'/i.test(SQL_ONLY));
   /**
    * ⚠️ **THE PRIVACY LINE.** `display_label` is auto-generated by `pseudonym_for()` on sign-in and its own table
    * comment says *"NEVER the ancestor name"* (doc 13 §4). ⚠️ So no client file may write it — a single
@@ -2859,6 +3019,108 @@ function accountChecks(): void {
   // ⚠️ The source art is kept in the repo, so a future size can be regenerated instead of re-traced.
   check('⚠️ the mark is kept as SVG — the icon was generated from it, not hand-drawn',
     ['app-mark.svg', 'app-mark-on-dark.svg'].every((f) => existsSync(join(ASSETS, f))));
+
+  /**
+   * ⚠️⚠️ **THE IN-APP MARK MUST KEEP THE BOARD'S STROKE-TO-EDGE RATIO — the ratio is the invariant, the
+   * raw numbers are not.** Measured 2026-11-08: `AppMark` in `header-art.tsx` used the board's
+   * `strokeWidth` **8 · 9 · 5** verbatim inside a **53.012** box, while the board draws them in **170** —
+   * so at any shared rendered size the tablet's border was **22.9%** of its own edge instead of **9.0%**.
+   * ⚠️ It rendered as a **black slab** (the gold was swallowed), and it survived because nothing compared
+   * the two coordinate systems: the x/y/width/height had been scaled correctly, so the file *looked* right.
+   *
+   * ✅ So this evaluates the **expressions** `AppMark` actually renders (not the comment prose) and compares
+   * each stroke to its own shape's edge, then to the board's ratio. ⚠️ Reverting to a literal `8` fails here
+   * even though it is numerically the board's own number — that is the whole point.
+   */
+  const BOARD_MARK_SVG = readFileSync(join(ASSETS, 'app-mark.svg'), 'utf8');
+  // ⚠️ Resolved the same way `ASSETS` is, never through a path constant that only some functions scope.
+  const HEADER_ART_TSX = readFileSync(
+    join(ASSETS, '..', 'src', 'components', 'home', 'header-art.tsx'),
+    'utf8',
+  );
+  // The board's three stroked shapes, as [shape edge, stroke width] — the diamond's edge from its own path.
+  const boardPairs = [
+    (() => {
+      const m = /<rect x="40\.8"[^>]*width="([\d.]+)"[^>]*stroke-width="([\d.]+)"/.exec(BOARD_MARK_SVG);
+      return m ? [Number(m[1]), Number(m[2])] : null;
+    })(),
+    (() => {
+      const m = /<rect x="62\.9"[^>]*width="([\d.]+)"[^>]*stroke-width="([\d.]+)"/.exec(BOARD_MARK_SVG);
+      return m ? [Number(m[1]), Number(m[2])] : null;
+    })(),
+    (() => {
+      const m = /d="M73\.1,85L85,73\.1L([\d.]+),85[^"]*" fill="#f0c75e" stroke="#1a1a1a" stroke-width="([\d.]+)"/.exec(
+        BOARD_MARK_SVG,
+      );
+      // the diamond's edge = its x span: 73.1 -> the captured far corner (96.9) = 23.8
+      return m ? [Number(m[1]) - 73.1, Number(m[2])] : null;
+    })(),
+  ];
+  check('⚠️ the board mark parses into 3 stroked shapes — the ratio comparison has a real reference',
+    boardPairs.every((p) => p !== null && p[0] > 0 && p[1] > 0), JSON.stringify(boardPairs));
+
+  // ⚠️ Evaluate what the component RENDERS: the `strokeWidth={…}` on each element, plus the constants it
+  // may reference. ⚠️ Reading only the `const` declarations was the first attempt and it was **wrong** —
+  // a fault test that replaced `strokeWidth={TABLET_STROKE}` with the literal `8` left the constants
+  // pristine and the gate green while the app drew a slab. Assert on the element, never on the declaration.
+  const MARK_ENV = [...HEADER_ART_TSX.matchAll(/const ([A-Z][A-Z_]+) = ([^;]+);/g)]
+    .map(([, name, expr]) => `const ${name} = ${expr};`)
+    .join('\n')
+    // MARK_SCALE references both of its operands as bare numbers already, so the definitions evaluate in order.
+    .replace(/const MARK_SCALE = ([\d.]+) \/ ([\d.]+);/, (_m, a, b) => `const MARK_SCALE = ${Number(a) / Number(b)};`);
+  const evalInEnv = (expr: string): number => {
+    try {
+      return Number(new Function(`${MARK_ENV}; return (${expr});`)());
+    } catch {
+      return NaN;
+    }
+  };
+  const SCALE = evalInEnv('MARK_SCALE');
+  // Split `AppMark`'s body into its rendered elements, then pair each stroke with its own shape's edge.
+  const appMarkBody = /export function AppMark\(\)[\s\S]*?\n\}/.exec(HEADER_ART_TSX)?.[0] ?? '';
+  const rendered = appMarkBody
+    .split(/<(?:Rect|Path)/)
+    .slice(1)
+    .map((el) => {
+      const sw = /strokeWidth=\{([^}]+)\}/.exec(el)?.[1];
+      if (!sw) return null;
+      const w = /width=\{([\d.]+)\}/.exec(el)?.[1];
+      let edge = w ? Number(w) : NaN;
+      if (!w) {
+        // the diamond: its edge is the x span of its own path
+        const xs = [...(/d="([^"]+)"/.exec(el)?.[1] ?? '').matchAll(/([\d.]+),([\d.]+)/g)].map((m) => Number(m[1]));
+        if (xs.length) edge = Math.max(...xs) - Math.min(...xs);
+      }
+      return { sw: sw.trim(), stroke: evalInEnv(sw), edge };
+    })
+    .filter((e): e is { sw: string; stroke: number; edge: number } => e !== null);
+
+  check('⚠️ `AppMark` renders 3 stroked shapes — the check reads the ELEMENTS, not the constants',
+    rendered.length === 3 && rendered.every((r) => Number.isFinite(r.stroke) && r.edge > 0),
+    JSON.stringify(rendered));
+
+  const mismatch = rendered
+    .map((r, i) => {
+      const board = boardPairs[i];
+      if (!board) return `pair${i}:nopair`;
+      const want = board[1] / board[0];
+      const got = r.stroke / r.edge;
+      return Math.abs(want - got) / want > 0.01
+        ? `pair${i} (${r.sw}): ${(got * 100).toFixed(1)}% of its edge vs board ${(want * 100).toFixed(1)}%`
+        : null;
+    })
+    .filter(Boolean);
+  check('⚠️⚠️ the in-app mark keeps the BOARD\'s stroke-to-edge ratio — a black slab is a ratio bug',
+    mismatch.length === 0, mismatch.join(' · '));
+
+  // ⚠️ POSITIVE CONTROL — the numbers that actually shipped must FAIL the comparison, or it proves nothing.
+  const slabStrokes = [8, 9, 5]; // the unscaled literals, in the 53.012 box
+  const slabViolations = slabStrokes.filter((s, i) => {
+    const board = boardPairs[i];
+    return board ? Math.abs(board[1] / board[0] - s / rendered[i].edge) / (board[1] / board[0]) > 0.01 : false;
+  });
+  check('⚠️ guard: the pre-fix slab (8 · 9 · 5 unscaled) WOULD fail the ratio check',
+    slabViolations.length === 3, `violations=${slabViolations.length}/3`);
 }
 
 function storeChecks(): void {
@@ -2873,8 +3135,122 @@ function storeChecks(): void {
   // ⚠️ POSITIVE CONTROL — the two lists must not both be the whole catalogue.
   check('⚠️ guard: the featured item is NOT also in the list beneath it',
     !more.some((o) => o.code === FEATURED_CODE));
+  /**
+   * ⚠️⚠️ **THE CASH RAIL IS NOW *RENDERED* — and the payment is still not wired** (owner, 2026-11-08).
+   *
+   * ⚠️ **THIS CHECK IS DELIBERATELY THE OPPOSITE OF WHAT IT SAID THIS MORNING, and the reversal is the owner's.**
+   * I first read *"disable the cash portions for now"* as *render nothing*, and enforced it. The owner then said:
+   * *"i still don't see the Cash portions of the store. Please build out all of it to the point of the actual
+   * payments portion for now. At least so i can see the UI layout is fine."*
+   *
+   * ⚠️ So the rule is a LINE, not an absence: **the layout is drawn to the pixel; the payment is not called.**
+   * - ✅ REQUIRED: the cash balance chip, the cash price beside the points price, and `Buy for cash`.
+   * - ⛔ STILL FORBIDDEN: any Play Billing call, and any claim that a purchase completed.
+   *
+   * ⚠️ The SCRUM-145 rule still applies and is why the button must be honest: it may exist, but tapping it must
+   * say cash is not open yet — never pretend to charge.
+   *
+   * ⚠️ **ASSERTED ON THE CODE, NOT THE COMMENT** — `store.tsx`'s header discusses the rail at length, and this
+   * project has twice shipped a gate that read prose. Comments are stripped first.
+   */
+  const stripComments = (src: string): string =>
+    src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  /**
+   * ⚠️️ **SHRINE CUSTOMISATION — THE HALF `tsc` CANNOT SEE** (SCRUM-204).
+   *
+   * ⚠️ The client has NO generated DB types, so nothing static checks that an RPC's ARGUMENT NAMES match the
+   * database: `rpc('equip_decoration', { p_slot, p_item_code })` would compile and then fail only on a device if
+   * either name drifted. The migration is the authority, so the two are asserted together here.
+   *
+   * ⚠⚠ And the rule is asserted to live SERVER-SIDE ONLY — the client must not re-implement the
+   * slot-category check, or the day they disagree the screen refuses what the server allows.
+   */
+  const DECOR_LIB = readFileSync(join(PROJECT_ROOT, 'src', 'lib', 'decorations.ts'), 'utf8');
+  const EQUIP_SQL = readFileSync(
+    join(PROJECT_ROOT, 'supabase', 'migrations', '20261004091500_rpc_app_surface.sql'), 'utf8');
+  check('⚠️️ the client calls `equip_decoration` with the argument names the SQL declares',
+    DECOR_LIB.includes("rpc('equip_decoration', { p_slot: slot, p_item_code: code })")
+      && /function public\.equip_decoration\(p_slot text, p_item_code text\)/.test(EQUIP_SQL));
+  check('⚠️⚠️ …and does NOT re-implement the slot/category rule client-side — the server owns it',
+    !/slot_category/.test(stripComments(DECOR_LIB)));
+  check('⚠️ reads are RLS reads of the caller’s own rows, not a privileged RPC',
+    DECOR_LIB.includes("from('inventory')") && DECOR_LIB.includes("from('equipped_decorations')"));
+  // ⚠️ POSITIVE CONTROL — the prices that unblock the whole flow are really in the DB migration.
+  const PRICE_SQL = readFileSync(
+    join(PROJECT_ROOT, 'supabase', 'migrations', '20261108160000_decoration_prices.sql'), 'utf8');
+  check('⚠️⚠️ all FIVE decorations are priced server-side — without it nothing can be owned',
+    ['festive_set', 'spring_couplets', 'zhong_kui', 'door_gods', 'lanterns']
+      .every((c) => new RegExp(`code = '${c}'`).test(PRICE_SQL)));
+
+  const STORE_SCREEN_JS = stripComments(
+    readFileSync(join(PROJECT_ROOT, 'src', 'app', 'store.tsx'), 'utf8'),
+  );
+  check('~ the cash LAYOUT is rendered — chip, price and Buy for cash (the owner reversed my first reading)',
+    STORE_SCREEN_JS.includes('store-cash-chip')
+      && STORE_SCREEN_JS.includes('store-buy-cash')
+      && /\$\s?\d|\.toFixed\(2\)/.test(STORE_SCREEN_JS),
+    'cash chip / buy-for-cash / a dollar amount must all be in the rendered JSX');
+  check('⚠️⚠️ …but NO payment is wired — no Play Billing, and nothing claims a cash purchase succeeded',
+    !/react-native-iap|play.?billing|initConnection|requestPurchase/i.test(STORE_SCREEN_JS)
+      && !/purchase_item[\s\S]{0,80}cash/i.test(STORE_SCREEN_JS));
+  // ⚠️ POSITIVE CONTROL — the stripper must keep executable JSX, or "nothing found" is vacuous.
+  check('⚠️ guard: the comment-stripper keeps executable JSX, so the checks above can bite',
+    stripComments('/* cash $1 */ <Btn label="Buy for cash" />').includes('Buy for cash')
+      && !stripComments('/* cash $1 */ <Btn />').includes('cash'));
+
 
   // ⚠️ THE BUNDLE IS A BUNDLE, NOT AN ITEM (device report, 2026-11-07). `purchase_item` now reads
+  /**
+   * ⚠️⚠️ **THE DECORATION ART IS PORTED FROM PENPOT, AND ONLY WHERE A DRAWING EXISTS** (SCRUM-212, owner
+   * 2026-11-08: *"I meant DIFFERENT art — the Decorations … leave the five offering items as rasters."*).
+   *
+   * ⚠️ **READ AS TEXT, NOT IMPORTED** — `decoration-art.tsx` imports `react-native-svg`, and a `.tsx` that
+   * reaches `react-native` crashes `check:lib` under plain Node (the `ERR_MODULE_NOT_FOUND` lesson). So the
+   * invariants are asserted on the source, and the arithmetic ones live in the file's own data.
+   *
+   * ⚠️⚠️ **TWO OF THE FIVE ARE DELIBERATELY UNPORTED**, and that is the honest state, not an omission: the board's
+   * `option · couplets (icon)` and `option · zhongkui (icon)` are **byte-identical to `option · lanterns (icon)`**
+   * (copy-paste placeholders), and `festive_set` has no drawing at all. ⚠️ A gate that demanded five ported motifs
+   * would push the next session into inventing three.
+   */
+  const DECOR_SRC = readFileSync(
+    join(PROJECT_ROOT, 'src', 'components', 'decoration-art.tsx'),
+    'utf8',
+  );
+  const DECOR_CODE = stripComments(DECOR_SRC);
+  check('⚠️ the decoration art exists as SVG and uses TOKEN KEYS, never hex',
+    DECOR_CODE.includes("from 'react-native-svg'")
+      && !/#[0-9a-fA-F]{6}/.test(DECOR_CODE));
+  check('⚠️ every motif is transcribed with the board\'s own box — a viewBox per motif, not one shared',
+    (DECOR_CODE.match(/box: \[85\.1, 72\]/g) ?? []).length >= 2);
+  check('⚠️⚠️ an UNPORTED decoration renders a placeholder, never a stand-in motif',
+    /if \(motif === null\)/.test(DECOR_CODE) && DECOR_CODE.includes('viewBox="0 0 40 40"'));
+  // ⚠️ The honest count: exactly two of five ported, and the registry names all five.
+  const registered = ['lanterns', 'spring_couplets', 'zhong_kui', 'door_gods', 'festive_set'];
+  check('⚠️ …and the registry covers all FIVE catalogue codes, with three still null',
+    registered.every((c) => new RegExp(`\\b${c}:`).test(DECOR_CODE))
+      && (DECOR_CODE.match(/:\s*null,/g) ?? []).length === 1);
+  /**
+   * ⚠️️ **THE FESTIVE SET RENDERS THE FOUR IT CONTAINS** (owner, 2026-11-08: *"just put all the other
+   * decorations's art together"*). ⚠️ It is `null` in MOTIFS on purpose — the composition branch returns
+   * BEFORE the motif lookup — so the null-count check above is not describing a gap.
+   * ⚠️ And the list is asserted to be EXACTLY the other four catalogue codes: a set that silently stopped
+   * containing one of its pieces would still look finished.
+   */
+  const composedLine = /festive_set: \[([^\]]*)\]/.exec(DECOR_CODE)?.[1] ?? '';
+  const composedCodes = composedLine.split(',').map((c) => c.trim().replace(/'/g, '')).filter(Boolean);
+  check('⚠️️ the FESTIVE SET is composed of the other FOUR decorations, not a placeholder',
+    composedCodes.length === 4
+      && ['lanterns', 'spring_couplets', 'zhong_kui', 'door_gods'].every((c) => composedCodes.includes(c)),
+    composedCodes.join(' '));
+  // ⚠️ POSITIVE CONTROL — the four parts must each have real art, or the set composes placeholders.
+  check('⚠️ guard: every part of the set has a ported motif',
+    ['lanterns:', 'spring_couplets:', 'zhong_kui:', 'door_gods:'].every((k) => DECOR_CODE.includes(k)));
+  // ⚠️ POSITIVE CONTROL — the DECORATIONS list this registry must mirror really is five long.
+  check('⚠️ guard: the catalogue still carries five decorations, so the registry cannot drift silently',
+    DECORATIONS.length === 5);
+
+
   // `offerings_catalog.composed_of` — the SQL twin of this code field — and grants one of each
   // component, never the bundle itself. The SERVER behaviour is asserted in
   // `supabase/tests/purchase_bundle.sql`; THIS holds the code mirror the server was copied from, so a
@@ -2919,11 +3295,34 @@ function storeChecks(): void {
     pointsPrice(getOffering('gold_bar')) === '600'
       && pointsPrice({ ...getOffering('gold_bar'), price: Number.NaN }) === null);
 
-  check('⚠️ Decorations is DISABLED — its prices are NULL until the economy pass',
-    STORE_TABS.some((tab) => tab.id === 'decorations' && !tab.enabled)
-      && STORE_TABS.some((tab) => tab.id === 'offerings' && tab.enabled));
-  check('⚠️ there is NO cash chip — no rail and no read, so it is omitted rather than faked',
-    CASH_IS_READABLE === false);
+  /**
+   * ⚠️⚠️ **BOTH TABS ARE LIVE NOW, AND THIS CHECK IS THE OPPOSITE OF WHAT IT SAID THIS MORNING.**
+   *
+   * It used to assert *"Decorations is DISABLED — its prices are NULL until the economy pass"*. ⚠️ That was wrong
+   * twice over: the board `EN · 7b` had **all five prices designed** (owner: *"there is already pricing for the
+   * decorations in En-7b"*) and I had never read it, so the app hid a finished design behind a TODO of mine.
+   *
+   * ⚠️ **Every price is asserted against the board here**, because these numbers came off a drawing rather than
+   * out of code and a typo in one of them would be invisible until someone was charged.
+   */
+  check('⚠️⚠️ both store tabs are LIVE — Decorations is no longer dark',
+    STORE_TABS.every((tab) => tab.enabled));
+  const BOARD_DECOR_PRICES: Record<string, readonly [number, number]> = {
+    festive_set: [3000, 399], spring_couplets: [800, 99], zhong_kui: [1000, 129],
+    door_gods: [1600, 199], lanterns: [1200, 149],
+  };
+  check('⚠️⚠️ every decoration is priced EXACTLY as `EN · 7b` draws it — points AND cash, in cents',
+    DECORATIONS.length === 5
+      && DECORATIONS.every((d) => {
+        const want = BOARD_DECOR_PRICES[d.code];
+        return want !== undefined && d.price === want[0] && d.cashPrice === want[1];
+      }),
+    DECORATIONS.map((d) => `${d.code}=${d.price}/${d.cashPrice}`).join(' '));
+  // ⚠️ POSITIVE CONTROL — cash is INTEGER CENTS, so no float can ever reach a price.
+  check('⚠️ guard: cash prices are whole cents, never a decimal',
+    DECORATIONS.every((d) => Number.isInteger(d.cashPrice)));
+  check('⚠️⚠️ the CASH rail is now DRAWN — the old "omit the chip" rule is retired',
+    readFileSync(join(PROJECT_ROOT, 'src', 'app', 'store.tsx'), 'utf8').includes('store-cash-chip'));
 
   /**
    * ⚠️⚠️ **THE SIZES MUST MATCH THE FILES ON DISK.** Since 2026-11-01 the art is five raster

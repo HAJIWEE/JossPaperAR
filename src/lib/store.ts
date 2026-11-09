@@ -6,7 +6,7 @@
  * price renders as are facts about a MAPPING.
  */
 
-import { OFFERINGS, type Offering, type OfferingCode } from '../domain/catalogue.ts';
+import { DECORATIONS, OFFERINGS, type Offering, type OfferingCode } from '../domain/catalogue.ts';
 
 /**
  * Geometry, in **board px** (`EN · 7 Store`, 390×844).
@@ -96,8 +96,24 @@ export const FEATURED_CODE: OfferingCode = 'wealth_bundle';
  */
 export const STORE_TABS = [
   { id: 'offerings', labelKey: 'store.tabOfferings', enabled: true },
-  { id: 'decorations', labelKey: 'store.tabDecorations', enabled: false },
+  // ✅ ENABLED 2026-11-08 — the tab was dark only because `decorations_catalog.price` was NULL. The board
+  // `EN · 7b` HAD the prices all along (owner: *"there is already pricing for the decorations in En-7b"*), so
+  // they are in `catalogue.ts` now and the tab has something honest to draw.
+  { id: 'decorations', labelKey: 'store.tabDecorations', enabled: true },
 ] as const;
+
+/** ⚠️ The board's `FEATURED` card on `EN · 7b` is the **Festive Set** ("four pieces · permanent"). */
+export const FEATURED_DECORATION = 'festive_set' as const;
+
+/** The decorations, featured first then the rest — the same split the offerings use. */
+export function decorationList(): {
+  readonly featured: (typeof DECORATIONS)[number];
+  readonly more: readonly (typeof DECORATIONS)[number][];
+} {
+  const featured = DECORATIONS.find((d) => d.code === FEATURED_DECORATION);
+  if (featured === undefined) throw new RangeError(`featured decoration is not in the catalogue: ${FEATURED_DECORATION}`);
+  return { featured, more: DECORATIONS.filter((d) => d.code !== FEATURED_DECORATION) };
+}
 
 export type StoreTabId = (typeof STORE_TABS)[number]['id'];
 

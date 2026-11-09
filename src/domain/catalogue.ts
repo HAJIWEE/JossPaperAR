@@ -107,9 +107,15 @@ export function redemptionBaseValue(code: OfferingCode): number {
 // Permanent, NEVER burn → they are a points SINK, so they carry no baseValue.
 // Names are locked (S14); the SIX slots and THREE categories are locked (S14j).
 //
-// TODO(economy): decoration PRICES are not in any doc I can cite — they need the
-// economy/design pass before this becomes purchasable. Left `null` deliberately:
-// inventing a store price is a product decision, not a build decision.
+// ✅ PRICED 2026-11-08 — **the board already had them and I was wrong to say it didn't.** The owner: *"I
+// checked the penpot and there is already pricing for the decorations in En-7b"*. Read off
+// `EN · 7b Store · Decorations`, which draws BOTH rails for all four items and the featured set.
+//
+// ⚠️ So the old note ("inventing a store price is a product decision") was right in principle and wrong in
+// fact: the prices were designed and I never read the board. ⚠️ Every number below is the board's own:
+//   Festive Set $3.99 / 3,000 pts   Spring Couplets $0.99 / 800   Zhong Kui Print $1.29 / 1,000
+//   Door Gods $1.99 / 1,600         Lanterns $1.49 / 1,200
+// ⚠️ `cashPrice` is in CENTS, an integer, so no float ever touches money.
 
 export type DecorationSlotCategory = 'top' | 'side' | 'background';
 
@@ -146,14 +152,16 @@ export interface Decoration {
   readonly code: DecorationCode;
   readonly name: { readonly en: string; readonly zh: string };
   readonly category: DecorationSlotCategory;
-  /** `null` = not yet priced (see TODO above). Never burn. */
+  /** Store Points. ⚠️ Never burn — a decoration is a sink. */
   readonly price: number | null;
+  /** ⚠️ CASH, in CENTS (the board's `$3.99` = 399). Integer, so no float touches money. */
+  readonly cashPrice: number | null;
 }
 
 export const DECORATIONS: readonly Decoration[] = [
-  { code: 'spring_couplets', name: { en: 'Spring Couplets', zh: '春联' }, category: 'side', price: null },
-  { code: 'zhong_kui', name: { en: 'Zhong Kui Print', zh: '钟馗像' }, category: 'background', price: null },
-  { code: 'door_gods', name: { en: 'Door Gods', zh: '门神' }, category: 'side', price: null },
-  { code: 'lanterns', name: { en: 'Lanterns', zh: '灯笼' }, category: 'top', price: null },
-  { code: 'festive_set', name: { en: 'Festive Set', zh: '新春套装' }, category: 'side', price: null },
+  { code: 'spring_couplets', name: { en: 'Spring Couplets', zh: '春联' }, category: 'side', price: 800, cashPrice: 99 },
+  { code: 'zhong_kui', name: { en: 'Zhong Kui Print', zh: '钟馗像' }, category: 'background', price: 1000, cashPrice: 129 },
+  { code: 'door_gods', name: { en: 'Door Gods', zh: '门神' }, category: 'side', price: 1600, cashPrice: 199 },
+  { code: 'lanterns', name: { en: 'Lanterns', zh: '灯笼' }, category: 'top', price: 1200, cashPrice: 149 },
+  { code: 'festive_set', name: { en: 'Festive Set', zh: '新春套装' }, category: 'side', price: 3000, cashPrice: 399 },
 ] as const;
