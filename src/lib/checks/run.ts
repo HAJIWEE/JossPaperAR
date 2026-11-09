@@ -3495,7 +3495,22 @@ function storeChecks(): void {
       const src = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'app', 'index.tsx'), 'utf8'));
       return src.includes('chipBandClear(plan, HOME_BANDS.templeChip)')
         && /showChip \? \(/.test(src)
-        && src.includes('onEnter={enterCustomize}');
+        && src.includes('onEnter={customize ? undefined : enterCustomize}');
+    })());
+  /**
+   * ⚠️⚠️ **EVERY decoration is the way in, not only the one under the chip** (owner, 2026-11-09: *"the mode change needs
+   * to work on all components of decorations"*). ⚠️ The first cut made only the piece overlapping the chip's band
+   * tappable, so the LEFT lantern opened customising and the RIGHT one (301,210 — outside the band at 28–252) did nothing.
+   * ⚠️ Asserted on the layer's SOURCE: `piecesIn` must hand `onEnter` to every piece and must not test the band, and the
+   * testID must be unconditional — a band filter creeping back in would make this fail rather than quietly return.
+   */
+  check('⚠️⚠️ every drawn piece is pressable — the layer does not filter by the chip\'s band',
+    (() => {
+      const src = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'components', 'home', 'decor-layer.tsx'), 'utf8'));
+      return !src.includes('rectsOverlap')
+        && !src.includes('inBand')
+        && src.includes('onPress={onEnter}')
+        && src.includes('testID={onEnter === undefined ? undefined : `decor-piece-${p.slot}`}');
     })());
 
   /**

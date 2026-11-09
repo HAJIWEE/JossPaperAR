@@ -23,7 +23,6 @@ import {
   SLOT_HIT,
   categoryOf,
   drawPlan,
-  rectsOverlap,
   type Rect,
 } from '@/lib/decorate';
 import { t } from '@/lib/i18n';
@@ -90,32 +89,38 @@ function Piece({
 /**
  * Everything the shrine should draw, from what the server said is equipped.
  *
- * ⚠️ `band` + `onEnter` exist for ONE reason: a piece that runs through the temple chip's band becomes the way in
- * (`chipBandClear` decides whether the chip is shown at all). Without them the art is inert, which is what every other
- * piece wants to be — a decoration must not steal a tap from the altar behind it.
+ * ⚠️⚠️ **EVERY PIECE IS THE WAY IN** (owner, 2026-11-09: *"the mode change needs to work on all components of
+ * decorations"*). ⚠️ The first cut made only the piece that runs through the CHIP'S BAND tappable — so the left lantern
+ * opened customising and the right one (301,210, outside the band at 28–252) did nothing. That is the defect this
+ * comment replaces.
+ *
+ * ⚠️ `onEnter` is therefore given to EVERY piece when the shrine is in normal mode. It is not given while customising:
+ * there the six zones are the controls and a piece underneath them must not answer first.
+ * ⚠️ A decoration still cannot steal a tap that belongs to another control: the tablet is mounted AFTER `DecorBack` and
+ * therefore wins inside its own bounds, and nothing a decoration draws overlaps the CTA or the tab bar.
  */
 interface LayerProps {
   scale: number;
   equipped: EquippedMap;
-  band?: Rect;
+  /** ⚠️ `undefined` = inert art (customising, or nothing to enter). */
   onEnter?: () => void;
 }
 
-function piecesIn(plan: readonly { slot: DecorationSlot; code: DecorationCode; rect: Rect; art?: ArtVariant }[], { scale, band, onEnter }: LayerProps) {
-  return plan.map((p) => {
-    const inBand = band !== undefined && onEnter !== undefined && rectsOverlap(p.rect, band);
-    return (
-      <Piece
-        key={`${p.slot}:${p.code}`}
-        code={p.code}
-        rect={p.rect}
-        s={scale}
-        art={p.art}
-        onPress={inBand ? onEnter : undefined}
-        testID={inBand ? `decor-piece-${p.slot}` : undefined}
-      />
-    );
-  });
+function piecesIn(
+  plan: readonly { slot: DecorationSlot; code: DecorationCode; rect: Rect; art?: ArtVariant }[],
+  { scale, onEnter }: LayerProps,
+) {
+  return plan.map((p) => (
+    <Piece
+      key={`${p.slot}:${p.code}`}
+      code={p.code}
+      rect={p.rect}
+      s={scale}
+      art={p.art}
+      onPress={onEnter}
+      testID={onEnter === undefined ? undefined : `decor-piece-${p.slot}`}
+    />
+  ));
 }
 
 /** The prints that sit BEHIND the tablet — mounted before the altar art. */

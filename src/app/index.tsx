@@ -453,7 +453,7 @@ export default function HomeShrine() {
             </View>
             {/* ⚠️ BEFORE the tablet: `EN · 1e` paints `decor · 鍾馗像 (background)` behind it. */}
             {decor === null ? null : (
-              <DecorBack scale={s} equipped={decor.equipped} band={HOME_BANDS.templeChip} onEnter={enterCustomize} />
+              <DecorBack scale={s} equipped={decor.equipped} onEnter={customize ? undefined : enterCustomize} />
             )}
             {/* ⚠️ The ALTAR-STATE CAPTION — `caption · altar state`. `altarCaption()` chooses the
                 EMPTY line, the board's FILLED line, or the singular; ⚠️ the screen used to render
@@ -571,7 +571,7 @@ export default function HomeShrine() {
 
             {/* ⚠️ AFTER the art: `1d` draws the lanterns and couplets in FRONT of the table. */}
             {decor === null ? null : (
-              <DecorFront scale={s} equipped={decor.equipped} band={HOME_BANDS.templeChip} onEnter={enterCustomize} />
+              <DecorFront scale={s} equipped={decor.equipped} onEnter={customize ? undefined : enterCustomize} />
             )}
             {/* ⚠️ `1f` — the six dashed zones, only while customising. */}
             {customize ? (
