@@ -111,6 +111,8 @@ begin
                     'idempotency_key_reuse', 'idempotency_key_payload_mismatch');
   -- …and the auth row itself
   delete from auth.users        where id      in (v_u1, v_u2);
+  -- ⚠️ the deliberately unpriced catalogue row the "no price yet" assertion needs
+  delete from public.decorations_catalog where code = 'pr3_unpriced';
 end;
 $$;
 
@@ -140,12 +142,20 @@ begin
      'pr3-b@example.invalid', '', now(),
      '{"provider":"anonymous","providers":["anonymous"]}', '{}', now(), now());
 
-  -- two decorations owned, for the equip test (a PURCHASE cannot mint them:
-  -- their catalogue price is NULL until the economy pass prices them — a
-  -- documented finding, not an accident)
+  -- two decorations owned, for the equip test. ⚠️ A PURCHASE could not mint them
+  -- while their catalogue price was NULL; decorations are PRICED since 2026-11-08
+  -- (corrected 2026-11-09), so `purchase_item` mints them like any other item and
+  -- these two stay a plain fixture — the equip rule is what is under test here.
   insert into public.inventory (user_id, item_code, qty, acquired_via) values
     (v_u1, 'spring_couplets', 1, 'grant'),
     (v_u1, 'door_gods',       1, 'grant');
+
+  -- ⚠️ ONE DELIBERATELY UNPRICED decoration, and the only reason it exists is the
+  -- "no price yet" guard below. ⚠️ Every REAL decoration is priced now, so the
+  -- assertion needs an item that is not — it is deleted by the teardown.
+  insert into public.decorations_catalog (code, slot_category, name_en, name_zh, price)
+  values ('pr3_unpriced', 'top', 'PR3 Unpriced', 'PR3 未定价', null)
+  on conflict (code) do update set price = null;
 
   raise notice 'setup: two anonymous users (the profile bootstrap should fire)';
 end
@@ -543,11 +553,34 @@ begin
     (select qty from public.inventory where user_id = v_u1 and item_code = 'gold_bar') = 1,
     'the replay did not mint a second item');
 
+  -- ── a DECORATION is purchasable, at the catalogue's own price ─────────
+  /**
+   * ⚠️⚠️ **THIS BLOCK USED TO ASSERT THE OPPOSITE** — that buying a decoration fails
+   * with *"has no price yet"*. ⚠️ It passed only because the SEED inserted every
+   * decoration price as NULL *after* the migrations that priced them, so the local
+   * database could never buy a decoration while the hosted one could. Both are fixed:
+   * the seed carries the board's prices, so this asserts the real purchase instead,
+   * and the NULL guard keeps a fixture row of its own (`pr3_unpriced`).
+   */
+  v_r := public.purchase_item('lanterns', 'pr3-purchase-key-0002');
+  perform pg_temp.assert_true(v_r->>'kind' = 'decoration',
+    'a decoration purchase takes the decorations_catalog branch');
+  perform pg_temp.assert_true(
+    (v_r->>'price')::int = (select price from public.decorations_catalog where code = 'lanterns'),
+    'the decoration price is RE-READ server-side — a client cannot set its own');
+  perform pg_temp.assert_true((v_r->>'price')::int = 1600,
+    'Lanterns charge the board''s 1,600 pts (EN-7b) — not the 1,200 the transposition had');
+  perform pg_temp.assert_true((v_r->>'balance')::bigint = 47300,
+    'the tribute balance fell by exactly that price (48,900 → 47,300)');
+  perform pg_temp.assert_true(
+    (select qty from public.inventory where user_id = v_u1 and item_code = 'lanterns') = 1,
+    'the decoration landed in inventory — which is what `equip_decoration` requires');
+
   v_err := pg_temp.expect_error(
-    $q$select public.purchase_item('lanterns', 'pr3-purchase-key-0002')$q$,
+    $q$select public.purchase_item('pr3_unpriced', 'pr3-purchase-key-0003')$q$,
     'buying an unpriced decoration');
   perform pg_temp.assert_true(v_err like '%no price yet%',
-    'an unpriced decoration fails LOUDLY rather than inventing a price (a PR finding)');
+    'an unpriced decoration fails LOUDLY rather than inventing a price');
 
   -- ── equip_decoration: S14k, enforced twice ────────────────────────────
   v_r := public.equip_decoration('side_left', 'spring_couplets');

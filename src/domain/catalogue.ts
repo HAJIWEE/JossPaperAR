@@ -114,8 +114,19 @@ export function redemptionBaseValue(code: OfferingCode): number {
 // ⚠️ So the old note ("inventing a store price is a product decision") was right in principle and wrong in
 // fact: the prices were designed and I never read the board. ⚠️ Every number below is the board's own:
 //   Festive Set $3.99 / 3,000 pts   Spring Couplets $0.99 / 800   Zhong Kui Print $1.29 / 1,000
-//   Door Gods $1.99 / 1,600         Lanterns $1.49 / 1,200
+//   Door Gods $1.49 / 1,200         Lanterns $1.99 / 1,600
 // ⚠️ `cashPrice` is in CENTS, an integer, so no float ever touches money.
+//
+// ⚠️⚠️ **DOOR GODS AND LANTERNS WERE THE OTHER WAY ROUND UNTIL 2026-11-09** — the first pass paired them
+// by their POSITION on the board instead of by its layer NAMES. `EN · 7b` says it outright:
+//   `card · Door Gods cash  = $1.49`   `card · Door Gods points  = 1,200 pts`
+//   `card · Lanterns cash   = $1.99`   `card · Lanterns points   = 1,600 pts`
+// and `ZH · 7b` agrees (门神 $1.49 / 1,200 · 灯笼 $1.99 / 1,600). ⚠️ **Both are SIDE-vs-TOP so nothing
+// structural distinguished them** — the swap charged 400 points too much for the lanterns and 400 too
+// little for the door gods, and it is invisible to a reader who does not have the board open.
+// ⚠️ **The gate in `lib/checks/run.ts` was transcribed from the same wrong pass, so it AGREED with the
+// defect** — a table that restates its own input cannot catch a transposition. It is corrected there too,
+// and the DB follows in migration `20261109100000_decoration_price_swap`.
 
 export type DecorationSlotCategory = 'top' | 'side' | 'background';
 
@@ -156,12 +167,25 @@ export interface Decoration {
   readonly price: number | null;
   /** ⚠️ CASH, in CENTS (the board's `$3.99` = 399). Integer, so no float touches money. */
   readonly cashPrice: number | null;
+  /**
+   * ⚠️⚠️ **A SET, NOT A PIECE** (owner, 2026-11-09): *"Festive Set is just the rest of the decorations being sold
+   * together as a set, it should not be a selectable item for the decorations. when a user buys the Festive set he is
+   * getting all the other decorations in one shot."*
+   *
+   * ⚠️ So a composed decoration is **never offered in a slot picker and never drawn on the altar** — it is a SKU. Its
+   * mirror is `decorations_catalog.composed_of`, and `purchase_item` grants one of each component and **never a row
+   * for the set itself**, exactly as `wealth_bundle` does on the offerings side.
+   */
+  readonly composedOf?: readonly DecorationCode[];
 }
 
 export const DECORATIONS: readonly Decoration[] = [
   { code: 'spring_couplets', name: { en: 'Spring Couplets', zh: '春联' }, category: 'side', price: 800, cashPrice: 99 },
   { code: 'zhong_kui', name: { en: 'Zhong Kui Print', zh: '钟馗像' }, category: 'background', price: 1000, cashPrice: 129 },
-  { code: 'door_gods', name: { en: 'Door Gods', zh: '门神' }, category: 'side', price: 1600, cashPrice: 199 },
-  { code: 'lanterns', name: { en: 'Lanterns', zh: '灯笼' }, category: 'top', price: 1200, cashPrice: 149 },
-  { code: 'festive_set', name: { en: 'Festive Set', zh: '新春套装' }, category: 'side', price: 3000, cashPrice: 399 },
+  { code: 'door_gods', name: { en: 'Door Gods', zh: '门神' }, category: 'side', price: 1200, cashPrice: 149 },
+  { code: 'lanterns', name: { en: 'Lanterns', zh: '灯笼' }, category: 'top', price: 1600, cashPrice: 199 },
+  { code: 'festive_set', name: { en: 'Festive Set', zh: '新春套装' }, category: 'side', price: 3000, cashPrice: 399,
+    // ⚠️ A BUNDLE, not an altarpiece (owner, 2026-11-09) — buying it grants these four, and it is never offered in a
+    // slot picker nor drawn on the shrine. `decorations_catalog.composed_of` is the SQL mirror.
+    composedOf: ['lanterns', 'spring_couplets', 'zhong_kui', 'door_gods'] },
 ] as const;

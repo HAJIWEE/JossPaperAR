@@ -6,6 +6,18 @@
 
 ## 🎯 Immediate Actions (Next 1–2 Weeks)
 
+### 🟡 Altar customisation — deferred fine-tuning
+
+> **Owner, 2026-11-09: *"by eye ball this is good for now. we will fine tune this later and add more features."*** The surface is built and verified on glass (`SCRUM-205` In Review, `SCRUM-206` Done); these are the things knowingly left.
+
+- **🎨 `SCRUM-226` — The door gods have NO altar art — and the owner has said it will be GENERATED (2026-11-09: *"Door gods' art we will have to generate as well. but for now for the door gods lets use the current art."*).** So the reused pair motif (sides) and couplet banner (top-middle) are **approved as temporary** — do not "fix" them by borrowing another motif; the real drawings are a generation job.
+- **✍️ `SCRUM-227` — The couplets will be USER-WRITTEN — later** (owner, 2026-11-09: *"For the Couplets we will allow Users to self quote what will be displayed. but this will be later on."*). ⚠️ That is a text-rendering problem, not a decoration one: the scroll and 横批 are currently painted shapes, so free text needs a text layer inside the banner/scroll art, both scripts and line-breaking in a 41 px-wide scroll, and probably a content check (it is a public shrine). Nothing is built.
+- **🚪 `SCRUM-225` — ANSWERED (owner, 2026-11-09): *"If that position is empty then show the Chip, else clicking on the decoration enters the customizing workflow too."*** ✅ **Built:** `chipBandClear(plan, band)` decides from what the shrine is about to draw, so the chip renders only when nothing runs through its band (and always while customising, because it is the exit); a piece that DOES run through the band is wrapped in a `Pressable` and becomes the way in. ⚠️ Verified on glass: with a lantern equipped the chip is gone, tapping the lantern opens the six zones, and the hint switches to `1f`'s *"Tap a slot to place a decoration"*. `check:lib` **879 → 883**, fault-tested red.
+- **⚠️ `top_middle` serves TWO categories.** It is a **top** slot (so `1f3` offers lanterns there), yet the only set that draws in it is the couplets' 横批 — a **side** set. Tapping the middle and equipping lanterns lands them in the corners. Either the slot's offering rule changes, or the sheet says where a set will land.
+- **🔢 Prices print without a thousands separator** — `1200 pts`, where the board draws `1,200 pts`. Affects the sheet **and** the store (both use `String(points)`).
+- **📐 The three altar drawings are ports of the board's groups** (`COUPLET_SCROLL` 41×160 · `COUPLET_CROWN` 141×40 · `LANTERN_SINGLE` 52×66), measured from group bounds and token-mapped. Fine-tune against `1d`/`1e` at final size once the art is reviewed.
+- **⚠️ The equip ROUND-TRIP is verified on the LOCAL stack only.** A fresh hosted account owns nothing and cannot buy at 0 tribute, so `equip` → `re-read` has not run against hosted. Close it once the points rail is live end-to-end.
+
 ### 🔴 On the critical path
 
 - 🏮 **S71 (2026-10-31) — STEP 1 IS BUILT: the shrine, the altar, the tablet sheet and the tab bar are on glass. ⚠️ US$0.00 AI spend; one EAS `preview` build (`de4c1df9`).**

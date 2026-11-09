@@ -1,18 +1,46 @@
-import { Fragment, useCallback, useState } from 'react';
-import { Alert, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+/**
+ * Swipe thresholds, in dp. ⚠️ CLAIM is small enough to feel instant and large enough that a tap's own wobble never becomes a
+ * gesture; COMMIT is 3x larger, so a page turns only when the finger meant it.
+ */
+const SWIPE_CLAIM = 12;
+const SWIPE_COMMIT = 40;
+
+/**
+ * ⚠️⚠️ **THE CTA'S SHAPE, READ OFF `EN · 1b`** (owner, 2026-11-09: *"the "Begin an offering" button style doesn't match the penpot
+ * design. the corner radius and the border"*).
+ *
+ * ⚠️ The board's `btn · Make an Offering · 献供` is `20,676 350×66`: **radius 18**, fill `#c23b22`, **stroke `#1a1a1a` at 2.5, INNER**
+ * — and a separate `btn · Make an Offering (shadow)` at `20,680` filled `#9a2b18`, i.e. a **solid darker lip 4 board px lower**, not a
+ * blurred shadow. ⚠️ The app had been drawing `radius.pill` (999) with **no border at all**, which is exactly the two things that
+ * looked wrong; the colours were already the tokens' (`cinnabar` `#C23B22`, `cinnabarDeep` `#9A2B18`, `ink` `#1A1A1A`).
+ * ⚠️ RN's `borderWidth` is painted INSIDE the box, which is the board's `strokeAlignment: inner` — so the button keeps its 350×66.
+ * ⚠️ The board's drop-shadow effect (`0 12 26` @ 20 %) is NOT reproduced: RN has no cross-platform blur without a library, and the
+ * design already draws the visible edge as that solid lip.
+ */
+const CTA_RADIUS = radius.xl;
+const CTA_STROKE = 2.5;
+const CTA_LIP = 4;
+function ctaShape(s: number) {
+  return { borderRadius: CTA_RADIUS * s, borderWidth: CTA_STROKE * s, borderColor: brand.ink };
+}
+
+import { Fragment, useCallback, useMemo, useState } from 'react';
+import { Alert, Dimensions, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { ClanPill } from '@/components/clan-pill';
 import { AncestorSheet, type SheetMode } from '@/components/home/ancestor-sheet';
 import { AltarHalo } from '@/components/home/altar-halo';
+import { DecorBack, DecorFront, DecorSlots } from '@/components/home/decor-layer';
+import { DecorSheet } from '@/components/home/decor-sheet';
 import { AppMark, SettingsGear } from '@/components/home/header-art';
 import { Offerings } from '@/components/home/offerings';
 import { StreakPanel, TributePanel } from '@/components/home/panels';
 import { ShrineBase } from '@/components/home/shrine-base';
 import { ShrineCanvas } from '@/components/home/shrine-canvas';
 import { TabBarBand } from '@/components/home/tab-bar-band';
-import { Tablet } from '@/components/home/tablet';
-import { altarCaption, altarView, pageStep } from '@/lib/altar';
+import { Tablet, TabletGhost } from '@/components/home/tablet';
+import { altarCaption, altarView, carouselStage, pageAfterSwipe, peerSlot, stageBounds, tabletBox } from '@/lib/altar';
 import {
   ANCESTOR_CAP,
   GIVEN_NAME_MAX,
@@ -33,6 +61,9 @@ import {
   type Ancestor,
 } from '@/lib/clan-api';
 import { PILL_X_ON_REFERENCE, type PillClan } from '@/lib/clan-pill';
+import { chipBandClear, drawPlan } from '@/lib/decorate';
+import { equipDecoration, readMyDecorations, type MyDecorations } from '@/lib/decorations';
+import type { DecorationCode, DecorationSlot } from '@/domain/catalogue';
 import { readFirstRun } from '@/lib/first-run';
 import { fetchHomeSummary } from '@/lib/home-api';
 import { homePanels, type SummaryResult } from '@/lib/home-panels';
@@ -40,6 +71,8 @@ import { tabletName } from '@/lib/tablet-name';
 import {
   HOME_BANDS,
   HOME_REGION_ORDER,
+  REFERENCE_HEIGHT,
+  REFERENCE_WIDTH,
   bandRect,
   homeFitScale,
   shrineBleedDp,
@@ -101,6 +134,49 @@ export default function HomeShrine() {
    * the pill shows, so the shrine and the sheet can never disagree about which clan is open.
    */
   const [activeClanId, setActiveClanId] = useState<string | null>(null);
+  /**
+   * ⚠️⚠️ **SWIPE BROWSES THE TABLETS — THE ARROWS ARE GONE** (owner, 2026-11-09: *"remove the < and > buttons and instead design a
+   * swiping motion to scroll thru the tablets. Note to make a hint to user on this mechanism"*).
+   *
+   * ⚠️ **An ANCESTOR of the tablets, never an overlay.** The responder is attached to a view that CONTAINS the centre tablet, the
+   * peers and the ＋, and it claims only once the finger has MOVED — which is what lets a tap still open the tablet's sheet and a
+   * tap still reach the ＋. An overlay on top would have had to fight both.
+   * ⚠️ Claiming needs a horizontal threshold AND dominance over the vertical axis, or a diagonal drag on a screen that also
+   * scrolls would turn a page.
+   * ⚠️ Committed on RELEASE at a larger threshold than the claim: a 12 dp wobble starts the gesture, 40 dp turns the page.
+   * ⚠️ `pageStep` CLAMPS, so a swipe past either end is a no-op rather than a wrap — the rule the arrows had.
+   */
+  /** ⚠️ ONE predicate for both phases: horizontal, past the claim threshold, and dominant over the vertical axis. */
+  const shouldSwipe = (_e: unknown, g: { dx: number; dy: number }) =>
+    ancestors.length > 1 && Math.abs(g.dx) > SWIPE_CLAIM && Math.abs(g.dx) > Math.abs(g.dy) * 1.4;
+
+  const swipe = useMemo(
+    () =>
+      PanResponder.create({
+        /**
+         * ⚠️⚠️ **CAPTURE, NOT JUST BUBBLE — measured on glass.** With only `onMoveShouldSetPanResponder`, the FIRST swipe after the
+         * screen loads was lost: the touch starts on the tablet's own `Pressable`, which becomes the responder on touch-DOWN, and
+         * the parent's bubble-phase claim is not reliably granted against it. Subsequent swipes worked, so the first-gesture
+         * failure is the kind that feels like "sometimes it doesn't respond". ⚠️ Capture is asked during the MOVE phase only, so a
+         * tap (no movement) never triggers it and the tablet/＋ still receive their taps.
+         */
+        onMoveShouldSetPanResponderCapture: shouldSwipe,
+        onMoveShouldSetPanResponder: shouldSwipe,
+        onPanResponderRelease: (_e, g) => {
+          /**
+           * ⚠️⚠️ **THE DIRECTION IS DECIDED NOW, NOT INSIDE A STATE UPDATER — the fix for "toggling thru the same 2 sets"**
+           * (owner, 2026-11-09). `setPage(fn)` runs `fn` LATER, and RN reuses and RESETS one `gestureState` per gesture, so
+           * reading `g.dx` in there read **0** every time: the direction was always −1, forward swipes clamped at the first
+           * tablet, and the carousel looked like it only ever swapped between two. Logged proof: `page 0 -> 0 of 6 dx=0`.
+           * ⚠️ `swipeStep`/`pageAfterSwipe` are pure and gate-tested, so the rule is testable instead of inferred from behaviour;
+           * this line only hands them a number that is still true at the moment of release.
+           */
+          const next = pageAfterSwipe(page, ancestors.length, g.dx, SWIPE_COMMIT);
+          if (next !== page) setPage(next);
+        },
+      }),
+    [ancestors.length, page],
+  );
   /** ⚠️ The ONLY place the panel state is decided — `ready` · `loading` · `failed`. */
   const panels = homePanels(summary);
 
@@ -126,6 +202,20 @@ export default function HomeShrine() {
   } | null>(null);
   const [sheetBusy, setSheetBusy] = useState(false);
   const [sheetIssue, setSheetIssue] = useState<string | null>(null);
+
+  /**
+   * ── THE ALTAR'S DECORATIONS (SCRUM-156 · SCRUM-205) ────────────────────────
+   * ⚠️ `null` = not read yet, and NOTHING is drawn for it — an unattended altar, not an error. A failed read
+   * also leaves it `null`; the picker reports the failure when it is opened, rather than the shrine claiming
+   * the user owns nothing (which is a different, and false, statement).
+   */
+  const [decor, setDecor] = useState<MyDecorations | null>(null);
+  /** Whether the six dashed zones are showing — `EN · 1f`. */
+  const [customize, setCustomize] = useState(false);
+  /** Which slot's picker is open, or `null`. One sheet, not one per slot. */
+  const [decorSlot, setDecorSlot] = useState<DecorationSlot | null>(null);
+  const [equipBusy, setEquipBusy] = useState(false);
+  const [decorIssue, setDecorIssue] = useState<string | null>(null);
 
   /** Turn a `SheetProblem` into the copy the user reads. ⚠️ `null` = there is no problem. */
   const problemText = useCallback((p: SheetProblem): string | null => {
@@ -266,9 +356,22 @@ export default function HomeShrine() {
         // the shrine comes back from `/reward` showing stale numbers without this.
         const totals = await fetchHomeSummary();
         if (!cancelled) setSummary(totals);
+        /**
+         * ⚠️ The decorations too — the store SELLS them and this screen PAINTS them, so a purchase made in
+         * another tab has to appear on return. Same reason as the tribute panel, same re-read-on-focus rule.
+         */
+        const myDecor = await readMyDecorations();
+        if (!cancelled) setDecor(myDecor.ok ? myDecor.data : null);
       })();
       return () => {
         cancelled = true;
+        /**
+         * ⚠️ **LEAVING THE SCREEN LEAVES CUSTOMISING.** ⚠️ The full-board tap catcher sits inside the `altar` region, so
+         * the CTA and the tab bar paint ABOVE it — a tap there navigates rather than exiting, and coming back would show
+         * the zones again over a screen the user had left. Resetting on blur makes "away and back" mean normal mode,
+         * which is what the owner's rule implies (*"return me to normal mode with the tablets and tablet controls"*).
+         */
+        setCustomize(false);
       };
     }, []),
   );
@@ -283,6 +386,48 @@ export default function HomeShrine() {
       router.push({ pathname: '/capture', params });
     })();
   };
+
+  /**
+   * Equip a decoration into the slot whose picker is open.
+   *
+   * ⚠️ **The server decides, and the screen then RE-READS** — it never patches its own state optimistically.
+   * `equip_decoration` checks ownership, the slot/category match and the one-set-per-category rule (S14k); a
+   * `42501`/`P0001` arrives as `result.reason` and is shown as-is, because "not owned" and "wrong slot" are
+   * different facts and the user can act on both.
+   * ⚠️ The picker closes only on SUCCESS, so a refusal leaves the choice in front of them to change.
+   */
+  const pickSlot = useCallback((next: DecorationSlot) => {
+    setDecorIssue(null);
+    // ⚠️ The tablet sheet and the picker never share the screen — one scrim, one panel.
+    setSheet(null);
+    setDecorSlot(next);
+  }, []);
+
+  const equip = useCallback(
+    (code: DecorationCode) => {
+      const slot = decorSlot;
+      if (slot === null) return;
+      void (async () => {
+        setEquipBusy(true);
+        setDecorIssue(null);
+        const result = await equipDecoration(slot, code);
+        if (!result.ok) {
+          setEquipBusy(false);
+          setDecorIssue(result.reason);
+          return;
+        }
+        const mine = await readMyDecorations();
+        setEquipBusy(false);
+        if (!mine.ok) {
+          setDecorIssue(mine.reason);
+          return;
+        }
+        setDecor(mine.data);
+        setDecorSlot(null);
+      })();
+    },
+    [decorSlot],
+  );
 
   const region = (name: HomeRegion) => {
     switch (name) {
@@ -346,9 +491,74 @@ export default function HomeShrine() {
       // ── altar · the halo, the offerings, the shrine base and the tablet ───
       case 'altar': {
         const view = altarView(ancestors.length, page);
+        /**
+         * ⚠️⚠️ **`SCRUM-225` IS ANSWERED** (owner, 2026-11-09): *"If that position is empty then show the Chip, else
+         * clicking on the decoration enters the customizing workflow too."*
+         *
+         * ⚠️ The chip's band (`28,214 224×22`) sits INSIDE the top decoration band — the lantern draws 37,210 52×66 and
+         * the couplets' 横批 125,213 141×40 — so the two cannot both own that space. The rule is therefore:
+         *   · nothing drawn through the band → the CHIP is the way in;
+         *   · something drawn there → it is hidden and **that piece** is the way in.
+         * ⚠️ While CUSTOMISING the chip is always shown, because it is also the way OUT and the decorations sit under
+         * the zones there (a hidden chip would strand the user in the mode).
+         */
+        const plan = decor === null ? [] : drawPlan(decor.equipped);
+        const showChip = customize || chipBandClear(plan, HOME_BANDS.templeChip);
+        const enterCustomize = () => setCustomize(true);
         // ⚠️ The board draws the ＋ slot and the CENTRE TABLET on the SAME band
         // (131,285 129×307) — see `altar.ts`. They swap in place; nothing below moves.
         const slot = HOME_BANDS.addSlot;
+        /** ⚠️ The tablet draws at `TABLET_SCALE` (72 %) of its band, bottom-anchored - see `tabletBox`. */
+        /**
+         * ⚠️⚠️ **THE STAGE IS THREE TABLETS, `EN · 1b`** (owner: *"Refer to En-1b i should see 3 tablets"*). `carouselStage()`
+         * returns the centre plus whichever neighbours exist, all BOARD-absolute; the centre is then made band-relative again
+         * for the Pressable that already lives on the band (`tab`), so one function still owns the geometry of all three.
+         */
+        const stage = carouselStage(
+          slot,
+          view.kind === 'tablet' ? view.index : 0,
+          view.kind === 'tablet' ? view.count : 0,
+        );
+        /**
+         * ⚠️⚠️ **THE ＋ SITS IN THE THIRD TABLET'S SLOT** (owner, 2026-11-09: *"move the Add Ancestor + to where the 3rd
+         * tablet would've been"*). `peerSlot()` is the same geometry the peers use, so the control is exactly where the next
+         * tablet will appear — bottom-aligned on the table like one, and horizontally centred in the slot.
+         * ⚠️ 48 board px ≈ 44.3 dp at the 360 dp reference — the whole slot is 66.9 × 159.2, so a slot-sized target would be
+         * enormous; the pill is the control and the slot is only its address.
+         */
+        /**
+         * ⚠️ **THE CONTROL IS THE SLOT ITSELF** — a ghost tablet in the third position, drawn in the ancestors' own silhouette
+         * (owner, 2026-11-09: *"redesign the '+' … so that its following the tablet shape"*). It is slot-sized, so the thing
+         * that advertises the next tablet IS the next tablet's footprint; `peerSlot()` owns that geometry for both.
+         */
+        /**
+         * ⚠️⚠️ **A GHOST IN EVERY EMPTY SLOT, NOT JUST THE RIGHT ONE** (owner, 2026-11-09: *"if i swipe to the left there is no \+
+         * Ancestor UI on the left"*). ⚠️ The first cut put the control only in the third slot, so at the FIRST tablet — the state
+         * you reach by swiping right — the left slot sat empty with nothing in it. ⚠️ The rule is now per SIDE: an empty side gets
+         * the ghost, a side with a neighbour does not. ⚠️ With a single tablet BOTH sides are empty, and two identical controls
+         * would be a puzzle rather than a choice — the right one is kept, and the left one is gated on `count > 1`.
+         */
+        const slotFor = (side: 'left' | 'right') => {
+          const r = peerSlot(slot, side);
+          return {
+            rect: r,
+            style: {
+              position: 'absolute' as const,
+              left: r.x * s,
+              top: r.y * s,
+              width: r.w * s,
+              height: r.h * s,
+            },
+          };
+        };
+        const addLeft = slotFor('left');
+        const addRight = slotFor('right');
+        const tab = {
+          x: stage.centre.x - slot.x,
+          y: stage.centre.y - slot.y,
+          w: stage.centre.w,
+          h: stage.centre.h,
+        };
         const current = view.kind === 'tablet' ? ancestors[view.index] : null;
         /** ⚠️ The caption is the altar's OWN state, so it is chosen from the count — see `altar.ts`. */
         const caption = altarCaption(ancestors.length);
@@ -357,6 +567,21 @@ export default function HomeShrine() {
             <View style={[styles.abs, bandRect(HOME_BANDS.halo, s)]} testID="home-halo-band">
               <AltarHalo />
             </View>
+            {/**
+             * ⚠️⚠️ **THE PRINT GOES BEHIND THE ALTAR, ABOVE THE HALO** (owner, 2026-11-09: *"the background decoration Z
+             * layer needs to be pushed back as well as currently its in front of the altar"*).
+             *
+             * ⚠️ It used to mount after `home-shrine-base`, so a print that filled its zone painted OVER the table — a
+             * poster pasted on the altar instead of a backdrop behind it. ⚠️ Note the board's own order (`1e`) puts the
+             * print AFTER the table; harmless while the group was `190×161` and stopped at `y 528`, wrong once it filled
+             * the zone.
+             * ⚠️ **The overlap is gone at 70.4 %** (the print now ends at `y 513`, above the table at 588), so this is no
+             * longer a size fix — the order is kept on purpose: a backdrop belongs behind, the board (`1e`) puts the print
+             * behind the TABLET, and a future enlargement must not paste it on top of the altar again.
+             */}
+            {decor === null ? null : (
+              <DecorBack scale={s} equipped={decor.equipped} onEnter={customize ? undefined : enterCustomize} />
+            )}
             <View style={[styles.abs, bandRect(HOME_BANDS.offerings, s)]} testID="home-offerings-band">
               <Offerings />
             </View>
@@ -383,57 +608,145 @@ export default function HomeShrine() {
             {/* ⚠️ `hint · cta` — the line the board sets above the offer button. */}
             <View style={[styles.abs, bandRect(HOME_BANDS.hintCta, s)]} testID="home-hint-band">
               <Text numberOfLines={1} style={{ color: text.inkSoft, fontSize: 12 * s }}>
-                {t('home.ctaHint')}
+                {/*
+                 * ⚠️⚠️ **`hint · cta` TELLS THE USER ABOUT THE SWIPE** (owner: *"make a hint to user on this mechanism"*). The copy
+                 * is the BOARD's own: `EN · 1b` sets this line to *"Swipe to bring a tablet forward"* exactly where `1a` sets
+                 * *"Offer something meaningful, once a day"* — so the two states are the board's, not a string I invented.
+                 * ⚠️ It shows only when there is something to swipe through: with one tablet a swipe instruction would be a lie.
+                 */}
+                {t(view.kind === 'tablet' && view.count > 1 ? 'home.swipeHint' : 'home.ctaHint')}
               </Text>
             </View>
 
             {/* ⚠️ `zone · customizable temple (label)` — the chip that tells the owner the altar is
                 theirs. ⚠️ Only the LABEL is drawn: the chip's own background fill could not be read
-                from the plugin yet, and a guessed chip is worse than a bare line. */}
-            <View
-              style={[styles.abs, bandRect(HOME_BANDS.templeChip, s), styles.chip]}
-              testID="home-temple-chip"
-            >
-              <Text numberOfLines={1} style={{ color: text.gold, fontSize: 10.5 * s }}>
-                {t('home.templeChip')}
-              </Text>
-            </View>
+                from the plugin yet, and a guessed chip is worse than a bare line. ⚠️ It is an entry AND the
+                way back out of customising, so it is rendered LAST in this region (after the zones) to stay on
+                top and tappable — see the block at the foot of `altar`. */}
 
-            {/* ⚠️ EMPTY → the ＋ slot. The `＋` is the add affordance the board draws
-                (`slot · ＋ add a tablet`), and since the sheet now lives on THIS screen it has a
-                destination — so it is a real control, not the reserved band it used to be. */}
+            {/* ⚠️⚠️ **THE TWO MODES, AND THEY CANNOT SHARE THIS RECTANGLE** (owner, 2026-11-09): *"the shrine
+                customization for the Background and the Add new tablet UI now overlaps and this is an issue… in
+                customization mode, the add tablet interface should be hidden from sight, and the shrine customization
+                should be shown, while in normal mode the customization options should be hidden."*
+
+                ⚠️ The numbers are the reason: the background zone is `101,288 190×320` and the ＋ slot is
+                `131,285 129×307` — the SAME space. `1f` draws both because it is the EMPTY-altar board, but a ＋ floating
+                inside a "place a decoration here" outline asks the user to choose between two things one tap apart.
+                So while customising the altar's OWN controls are hidden and the six zones own the scene:
+                  · the ＋ (add tablet) is not rendered at all;
+                  · the tablet stays VISIBLE — it is the art the background is drawn behind, and hiding it would empty
+                    the shrine — but it is INERT, so it cannot open the ancestor sheet underneath a zone;
+                  · the carousel arrows go too (they sit inside the background zone as well). */}
+            {/**
+              * ⚠️⚠️ **THE PEERS — `EN · 1b` DRAWS THREE TABLETS, NOT ONE** (owner: *"Refer to En-1b i should see 3 tablets"*).
+              * The current tablet sits centre-on-top; each existing neighbour peeks from behind at `NEIGHBOUR_SCALE` of its
+              * size, bottom-aligned so all three stand on the same table line (the board's own ratios, see `altar.ts`).
+              * ⚠️ Painted BEFORE the centre Pressable so the current tablet is never obscured by its neighbours, and with
+              * `pointerEvents="none"`: the board gives ONLY the centre a `touch · tablet` layer, so a peer is art, not a
+              * control — tapping one must not open a sheet for an ancestor you can barely see.
+              * ⚠️ A peer exists only where the board shows one: no left on the first tablet, no right on the last.
+              */}
+            {/* ⚠️⚠️ **THE SWIPE SURFACE** — an ANCESTOR of the tablets, so a tap still reaches the tablet's sheet and the ＋,
+                and only a MOVED finger turns the page. It spans the whole canvas because every child inside is positioned in
+                board coordinates; a zero-size wrapper would never receive a touch at all. */}
+            <View
+              style={{ position: 'absolute', left: 0, top: 0, width: REFERENCE_WIDTH * s, height: REFERENCE_HEIGHT * s }}
+              {...swipe.panHandlers}
+              testID="home-tablet-stage"
+            >
+            {stage.left === null && stage.right === null ? null : (
+              <View style={styles.abs} pointerEvents="none" testID="home-tablet-peers">
+                {([['left', stage.left, view.kind === 'tablet' ? view.index - 1 : -1],
+                   ['right', stage.right, view.kind === 'tablet' ? view.index + 1 : -1]] as const).map(([side, r, at]) => {
+                  const peer = at >= 0 ? ancestors[at] : undefined;
+                  if (r === null || peer === undefined) return null;
+                  return (
+                    <View
+                      key={side}
+                      testID={`home-tablet-peer-${side}`}
+                      style={{ position: 'absolute', left: r.x * s, top: r.y * s, width: r.w * s, height: r.h * s }}
+                    >
+                      <Tablet
+                        name={tabletName(peer.surname, peer.givenName)}
+                        width={r.w * s}
+                        height={r.h * s}
+                      />
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+            {/* ⚠️⚠️ **THE ONLY WAY TO ADD A TABLET ONCE ONE EXISTS** (owner, 2026-11-09: *"GO WITH 1"* — a ＋ beside the
+                carousel arrows). ⚠️ The empty altar's ＋ is `home-add-slot`, rendered ONLY for `view.kind === 'empty'`, so from
+                the first enshrined ancestor onward there was **no add control at all** while `ancestor_cap` is 10.
+                ⚠️ Shown on the LAST tablet (where "next" has run out and the eye is looking for what comes after), never while
+                customising, and not once the cap is reached (`capReached`, the same helper the server enforces).
+                ⚠️⚠️ **RENDERED AFTER `DecorFront`, and that placement is the point:** the arrows above are painted BEFORE the
+                decorations and are consequently covered by a side banner — measured 2026-11-09, a tap on *next* opens the
+                customiser. A new control must not inherit that defect, so it paints on top *and* sits clear of every
+                decoration rect (asserted in `check:lib`, not just intended). */}
+            {!customize && view.kind === 'tablet' && mayEdit && !capReached(view.count) ? (
+              <>
+                {!view.hasPrev && view.count > 1 ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('ancestor.titleAdd')}
+                    onPress={() => openSheet(null)}
+                    style={({ pressed }) => [addLeft.style, pressed && styles.pressed]}
+                    testID="home-add-tablet-left"
+                  >
+                    <TabletGhost width={addLeft.rect.w * s} height={addLeft.rect.h * s} />
+                  </Pressable>
+                ) : null}
+                {!view.hasNext ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('ancestor.titleAdd')}
+                    onPress={() => openSheet(null)}
+                    style={({ pressed }) => [addRight.style, pressed && styles.pressed]}
+                    testID="home-add-tablet"
+                  >
+                    <TabletGhost width={addRight.rect.w * s} height={addRight.rect.h * s} />
+                  </Pressable>
+                ) : null}
+              </>
+            ) : null}
+
             {view.kind === 'empty' ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('ancestor.titleAdd')}
-                accessibilityState={{ disabled: !mayEdit }}
-                disabled={!mayEdit}
-                onPress={() => openSheet(null)}
-                style={[
-                  styles.abs,
-                  bandRect(slot, s),
-                  styles.reserved,
-                  styles.slotCentre,
-                  // ⚠️ 40 board px down, NOT centred: the slot band's lower half is where the
-                  // burner and its smoke sit, so a centred ＋ reads as a cross floating in the
-                  // smoke. Measured on glass 2026-10-31.
-                  { paddingTop: 40 * s },
-                ]}
-                testID="home-add-slot"
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={{ color: text.gold, fontSize: 44 * s, fontWeight: '300' }}
+              customize ? null : (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('ancestor.titleAdd')}
+                  accessibilityState={{ disabled: !mayEdit }}
+                  disabled={!mayEdit}
+                  onPress={() => openSheet(null)}
+                  style={[
+                    styles.abs,
+                    bandRect(slot, s),
+                    styles.reserved,
+                    styles.slotCentre,
+                    // ⚠️ 40 board px down, NOT centred: the slot band's lower half is where the
+                    // burner and its smoke sit, so a centred ＋ reads as a cross floating in the
+                    // smoke. Measured on glass 2026-10-31.
+                    { paddingTop: 40 * s },
+                  ]}
+                  testID="home-add-slot"
                 >
-                  ＋
-                </Text>
-              </Pressable>
+                  <Text
+                    allowFontScaling={false}
+                    style={{ color: text.gold, fontSize: 44 * s, fontWeight: '300' }}
+                  >
+                    ＋
+                  </Text>
+                </Pressable>
+              )
             ) : (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t('ancestor.titleEdit')}
-                accessibilityState={{ disabled: !mayEdit }}
-                disabled={!mayEdit}
+                accessibilityState={{ disabled: !mayEdit || customize }}
+                /** ⚠️ INERT while customising — the background zone is over it, and the tablet must not open a sheet. */
+                disabled={!mayEdit || customize}
                 onPress={() => openSheet(current ? current.id : null)}
                 style={[styles.abs, bandRect(slot, s)]}
                 testID="home-tablet"
@@ -441,35 +754,67 @@ export default function HomeShrine() {
                 {/* ⚠️ `tabletName()`, NOT `surname + givenName`. The board paints 陈氏 for a
                     tablet with no given name, and the sheet's preview uses the SAME function —
                     two call sites building the string is how a preview and its result drift. */}
-                <Tablet
-                  name={current ? tabletName(current.surname, current.givenName) : ''}
-                  width={slot.w * s}
-                  height={slot.h * s}
-                />
+                <View
+                  style={{
+                    position: 'absolute',
+                    left: tab.x * s,
+                    top: tab.y * s,
+                    width: tab.w * s,
+                    height: tab.h * s,
+                  }}
+                >
+                  <Tablet
+                    name={current ? tabletName(current.surname, current.givenName) : ''}
+                    width={tab.w * s}
+                    height={tab.h * s}
+                  />
+                </View>
               </Pressable>
             )}
 
-            {/* ⚠️ A carousel, never a "+N more": at the cap of 10 every tablet must be reachable
-                (the board draws prev/next at 26,412 and 340,412). The ends are ends — no wrap. */}
-            {view.kind === 'tablet' && view.hasPrev ? (
-              <Pressable
-                accessibilityRole="button"
-                testID="home-tablet-prev"
-                onPress={() => setPage(pageStep(view.index, view.count, -1))}
-                style={[styles.abs, bandRect(HOME_BANDS.carouselPrev, s), styles.carousel]}
-              >
-                <Text style={[styles.carouselGlyph, { fontSize: 28 * s }]}>{'\u2039'}</Text>
-              </Pressable>
+            </View>
+
+            {/* ⚠️ AFTER the art: `1d` draws the lanterns and couplets in FRONT of the table. */}
+            {decor === null ? null : (
+              <DecorFront scale={s} equipped={decor.equipped} onEnter={customize ? undefined : enterCustomize} />
+            )}
+            {customize ? (
+              <DecorSlots
+                scale={s}
+                ownedCount={decor === null ? 0 : decor.owned.length}
+                onPick={pickSlot}
+                onExit={() => setCustomize(false)}
+              />
             ) : null}
-            {view.kind === 'tablet' && view.hasNext ? (
-              <Pressable
-                accessibilityRole="button"
-                testID="home-tablet-next"
-                onPress={() => setPage(pageStep(view.index, view.count, 1))}
-                style={[styles.abs, bandRect(HOME_BANDS.carouselNext, s), styles.carousel]}
-              >
-                <Text style={[styles.carouselGlyph, { fontSize: 28 * s }]}>{'\u203A'}</Text>
-              </Pressable>
+
+            {/* ⚠️⚠️ **THE ENTRY TO CUSTOMISING — AND WHO WEARS IT IS `SCRUM-225`'s ANSWER** (owner, 2026-11-09):
+                *"If that position is empty then show the Chip, else clicking on the decoration enters the customizing
+                workflow too."* ⚠️ So the chip renders ONLY when nothing is drawn through its band (`chipBandClear`),
+                and while customising (it is also the way out). Its band (`28,214 224×22`) sits inside the top
+                decoration band — that collision is the whole reason the decision existed.
+
+                ⚠️⚠️ **RENDERED LAST, AND THAT IS ON GLASS.** Painting it before the zones put its text UNDERNEATH the
+                dashed border (measured 2026-11-09), and it must stay TAPPABLE. So it paints on top, with a solid
+                `paperDeep` fill while the zones are up so the label is legible over them. */}
+            {showChip ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('home.templeChip')}
+              accessibilityState={{ selected: customize }}
+              onPress={() => setCustomize((on) => !on)}
+              style={({ pressed }) => [
+                styles.abs,
+                bandRect(HOME_BANDS.templeChip, s),
+                styles.chip,
+                customize && { backgroundColor: surface.paperDeep },
+                pressed && styles.pressed,
+              ]}
+              testID="home-temple-chip"
+            >
+              <Text numberOfLines={1} style={{ color: text.gold, fontSize: 10.5 * s }}>
+                {t('home.templeChip')}
+              </Text>
+            </Pressable>
             ) : null}
           </>
         );
@@ -483,6 +828,11 @@ export default function HomeShrine() {
         // offering the burn first would be the wrong primary action — and replacing
         // it *in place* means nothing on the shrine moves.
         return clans.length === 0 ? (
+          <>
+          <View
+            style={[styles.abs, bandRect({ ...HOME_BANDS.cta, y: HOME_BANDS.cta.y + CTA_LIP }, s), styles.ctaLip, { borderRadius: CTA_RADIUS * s }]}
+            testID="home-cta-lip"
+          />
           <Pressable
             accessibilityRole="button"
             testID="home-clan-entry"
@@ -492,7 +842,7 @@ export default function HomeShrine() {
               bandRect(HOME_BANDS.cta, s),
               styles.cta,
               styles.clanEntry,
-              { borderRadius: radius.pill * s },
+              ctaShape(s),
               pressed && styles.pressed,
             ]}
           >
@@ -500,7 +850,13 @@ export default function HomeShrine() {
               {t('home.clanEntry')}
             </Text>
           </Pressable>
+          </>
         ) : (
+          <>
+          <View
+            style={[styles.abs, bandRect({ ...HOME_BANDS.cta, y: HOME_BANDS.cta.y + CTA_LIP }, s), styles.ctaLip, { borderRadius: CTA_RADIUS * s }]}
+            testID="home-cta-lip"
+          />
           <Pressable
             accessibilityRole="button"
             testID="home-begin"
@@ -509,7 +865,7 @@ export default function HomeShrine() {
               styles.abs,
               bandRect(HOME_BANDS.cta, s),
               styles.cta,
-              { borderRadius: radius.pill * s },
+              ctaShape(s),
               pressed && styles.pressed,
             ]}
           >
@@ -517,6 +873,7 @@ export default function HomeShrine() {
               {t('home.begin')}
             </Text>
           </Pressable>
+          </>
         );
 
       // ── footer · the tab bar (SCRUM-164) ──────────────────────────────────
@@ -573,6 +930,27 @@ export default function HomeShrine() {
           onClose={closeSheet}
         />
       ) : null}
+
+      {/**
+       * ⚠️ THE DECORATION PICKER — painted after the tablet sheet, for the same reason: it covers the tab bar,
+       * as `1f2`/`1f3`/`1f4` draw it (the panel runs to the board's bottom edge, 844, and the bar sits at 764).
+       */}
+      {decorSlot === null ? null : (
+        <DecorSheet
+          scale={s}
+          bleed={shrineBleedDp(screen.height, s)}
+          slot={decorSlot}
+          owned={decor === null ? [] : decor.owned}
+          equipped={decor === null ? null : decor.equipped[decorSlot]}
+          busy={equipBusy}
+          problem={decorIssue}
+          onEquip={equip}
+          onClose={() => {
+            setDecorSlot(null);
+            setDecorIssue(null);
+          }}
+        />
+      )}
     </ShrineCanvas>
   );
 }
@@ -601,10 +979,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  /** `btn · Make an Offering (shadow)` — the solid darker lip, 4 board px below the button. */
+  ctaLip: { backgroundColor: brand.cinnabarDeep },
   ctaLabel: { color: onColorCream, fontWeight: '600' },
   clanEntry: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  carousel: { alignItems: 'center', justifyContent: 'center' },
-  carouselGlyph: { color: text.inkSoft, fontWeight: '700' },
   /** `btn · settings` — paperDeep fill, ink stroke; radius + width are scaled inline. */
   settingsBtn: {
     backgroundColor: surface.paperDeep,

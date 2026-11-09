@@ -139,7 +139,31 @@ export const MESSAGES = {
     // were MISSING from the build until the owner diffed it against the board.
     'home.altarEmpty': 'Your altar is empty — tap ＋ to add a tablet.',
     'home.ctaHint': 'Offer something meaningful, once a day',
+    /** `EN · 1b`'s `hint · cta` — the line that teaches the carousel's gesture. ⚠️ Only when there is more than one tablet. */
+    'home.swipeHint': 'Swipe to bring a tablet forward',
     'home.templeChip': 'Everything here is customizable',
+    // ── the decoration picker — `EN · 1f` / `1f2` / `1f3` / `1f4` / `1f5`, copy taken from the boards
+    //    (SCRUM-205). ⚠️ Item NAMES are not here: they are `DECORATIONS[].name`, read through `localized()`. ──
+    'decor.slotTop': 'top',
+    'decor.slotSide': 'side',
+    'decor.slotBackground': 'background',
+    'decor.slotHint': 'Tap a slot to place a decoration',
+    'decor.emptyHint': 'No decorations yet — every slot is empty.',
+    'decor.sheetTitleSide': 'Side decorations',
+    // ⚠️ `decor.sheetSubSide` is NOT the board's `1f2` line. That one reads *"Both sets are yours — the altar shows
+    // one set per category."* — true when `1f2` was drawn (two side items) and FALSE now the catalogue holds three
+    // (couplets · door gods · festive set): the sheet renders three rows under it. ⚠️ NEW COPY, flagged for review —
+    // count-neutral, so adding a fourth side item cannot make it lie again.
+    'decor.sheetSubSide': 'Each category shows one set at a time.',
+    'decor.sheetTitleTop': 'Top decorations',
+    'decor.sheetSubTop': 'Lanterns and the wide centre slot — one set per slot.',
+    'decor.sheetTitleBackground': 'Background',
+    'decor.sheetSubBackground': 'Drawn behind the tablet — one at a time.',
+    'decor.stateEquipped': 'Equipped',
+    'decor.stateOwned': 'Owned',
+    'decor.stateNotOwned': 'Not owned · $%{cash} / %{points} pts',
+    'decor.equipSet': 'Equip this set',
+    'decor.equipOne': 'Equip this',
     // ⚠️ The tab bar's four labels — `nav · tab * label`, EN board.
     'nav.shrine': 'Shrine',
     'nav.league': 'League',
@@ -329,6 +353,9 @@ export const MESSAGES = {
     // singular is OURS: the board only draws the 3-tablet case, and "1 ancestors" is not copy.
     'home.altarFilledOne': 'One ancestor enshrined — swipe or tap a tablet to edit.',
     'home.altarFilled': '%{count} ancestors enshrined — swipe or tap a tablet to edit.',
+    /** ⚠️ Spoken names for the carousel arrows (`EN · 1b`): they are the only way to reach a tablet that is off-screen. */
+    'home.prevTablet': 'Previous tablet',
+    'home.nextTablet': 'Next tablet',
 
     // ── the throw (doc 05 §2 — the four bands) ────────────────────────────
     'band_bullseye': 'Bullseye',
@@ -613,7 +640,25 @@ export const MESSAGES = {
     // ⚠️ Board copy — `ZH · 1 Home / 首页` (Penpot, 2026-10-31).
     'home.altarEmpty': '尚未安奉牌位 — 轻点 ＋ 安放',
     'home.ctaHint': '每日供奉一件有意义之物',
+    'home.swipeHint': '左右滑动切换牌位',
     'home.templeChip': '此处一切皆可自定义',
+    // ── 装饰选择器 — `ZH · 1f` / `1f2` / `1f3` / `1f4` / `1f5`（SCRUM-205）。⚠️ 图片名称不在此处。 ──
+    'decor.slotTop': '顶部',
+    'decor.slotSide': '侧边',
+    'decor.slotBackground': '背景',
+    'decor.slotHint': '轻点格子，安放装饰',
+    'decor.emptyHint': '还没有装饰——每个格子都是空的。',
+    'decor.sheetTitleSide': '侧边装饰',
+    'decor.sheetSubSide': '每类每次仅展示一套。',
+    'decor.sheetTitleTop': '顶部装饰',
+    'decor.sheetSubTop': '灯笼与横批——每格一套。',
+    'decor.sheetTitleBackground': '背景',
+    'decor.sheetSubBackground': '绘于牌位之后——一次只展一幅。',
+    'decor.stateEquipped': '展示中',
+    'decor.stateOwned': '已拥有',
+    'decor.stateNotOwned': '未拥有 · $%{cash} / %{points} 点',
+    'decor.equipSet': '展示此套',
+    'decor.equipOne': '展示此件',
     'nav.shrine': '神龛',
     'nav.league': '联赛',
     'nav.store': '商店',
@@ -757,6 +802,8 @@ export const MESSAGES = {
     'ancestor.archiveConfirm': '归档后牌位将离开神龛，无法撤销。',
     'home.altarFilledOne': '已安奉 1 位祖先 — 滑动查看，轻点编辑',
     'home.altarFilled': '已安奉 %{count} 位祖先 — 滑动查看，轻点编辑',
+    'home.prevTablet': '上一个牌位',
+    'home.nextTablet': '下一个牌位',
 
     'band_bullseye': '正中',
     'band_devout': '虔诚',

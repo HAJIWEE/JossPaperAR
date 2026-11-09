@@ -16,8 +16,8 @@
  * (SCRUM-150 AC 1). ⚠️ The chip is re-read after every successful buy (`load()` in `confirmBuy`) —
  * the server is the authority, and a client-side subtraction would drift the moment a price changed.
  *
- * ⚠️ **Decorations is disabled**, and honestly so: `decorations_catalog.price` is **NULL until the
- * economy pass prices them** (*"inventing a store price is a product decision, not a build one"*).
+ * ⚠️ **Both store tabs are live** since 2026-11-08: `decorations_catalog.price` carries the prices the boards
+ * `EN · 7b` / `ZH · 7b` already drew (the tab was dark only because I had never read them).
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -45,12 +45,17 @@ function scale(): number {
  * THE DECORATIONS HALF OF THE STORE — `EN · 7b Store · Decorations`.
  *
  * ⚠️ **Every price here is the board's own** (`EN · 7b`): Festive Set $3.99/3,000 · Couplets $0.99/800 ·
- * Zhong Kui Print $1.29/1,000 · Door Gods $1.99/1,600 · Lanterns $1.49/1,200. They live in `domain/catalogue.ts`
+ * Zhong Kui Print $1.29/1,000 · Door Gods $1.49/1,200 · Lanterns $1.99/1,600. They live in `domain/catalogue.ts`
  * and are formatted here, never hand-typed into copy.
  *
- * ⚠️⚠️ **BOTH RAILS ARE DRAWN AND NEITHER PURCHASE IS WIRED.** ⚠️ Decorations were `price: null` until today, so
- * no server-side purchase can honour these yet — `decorations_catalog.price` is still NULL. So the cards are
- * honest about being a layout: they show the design, and tapping one says so rather than pretending to sell.
+ * ⚠️⚠️ **DOOR GODS AND LANTERNS WERE TRANSPOSED UNTIL 2026-11-09** — the first read of the board paired the
+ * four cards by their POSITION in the 2 × 2 grid instead of by their layer names, so the lanterns read
+ * 1,200/$1.49 and the door gods 1,600/$1.99. ⚠️ The board states the pairing outright (`card · Door Gods cash`,
+ * `card · Lanterns points`), in EN and ZH, and the cards on this screen now follow it.
+ *
+ * ⚠️⚠️ **BOTH RAILS ARE DRAWN AND NEITHER PURCHASE IS WIRED.** The prices are real — the points price is
+ * `decorations_catalog.price`, which `purchase_item` charges — but the CASH rail needs Google Play Billing
+ * (SCRUM-212) and these cards are still a layout: tapping one does nothing rather than pretending to sell.
  * ⚠️ That is the owner's line, verbatim: *"build out all of it to the point of the actual payments portion."*
  */
 function DecorationsBlock() {

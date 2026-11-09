@@ -16,9 +16,35 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { isValidClanName } from '../clan-rules.ts';
+import {
+  TABLET_SCALE,
+  NEIGHBOUR_SCALE,
+  NEIGHBOUR_OFFSET,
+  carouselStage,
+  peerSlot,
+  stageBounds,
+  tabletBox,
+  swipeStep,
+  pageAfterSwipe,} from '../altar.ts';
 import { PREPARING_PHASES, pipelineFailed } from '../../domain/slice.ts';
 import { NAV_TABS, activeTabKey, isSamePath, tabPressIsNoop } from '../nav.ts';
 import { COLLECTION, COLLECTION_SLOTS, collectionGrid, collectionOverflows, collectedItemName, displayBurnCount } from '../collection.ts';
+import {
+  DECOR_BOARD,
+  SLOT_ART,
+  SLOT_HIT,
+  BANNER_GROWTH,
+  BOARD_ART,
+  BOARD_HIT,
+  BACKGROUND_OVERSHOOT,
+  BACKGROUND_TOP_OFFSET,
+  artVariantFor,
+  chipBandClear,
+  drawPlan,
+  optionsForSlot,
+  rectsOverlap,
+  sheetLayout,
+} from '../decorate.ts';
 import { CASH_IS_READABLE, FEATURED_CODE, STORE_TABS, baseMetaValue, pointsPrice, storeList } from '../store.ts';
 import { ART_BOX, artCodes, artSize, fitArt } from '../offering-art.ts';
 import { pickerGrid } from '../picker.ts';
@@ -154,7 +180,7 @@ import {
 import { QUOTA_SPENT_COPY } from '../../domain/quota.ts';
 import { AIM_BANDS } from '../../domain/aim.ts';
 import { LEAGUE_TIERS } from '../../domain/league.ts';
-import { DECORATIONS, OFFERINGS } from '../../domain/catalogue.ts';
+import { DECORATIONS, OFFERINGS, SLOT_CATEGORY } from '../../domain/catalogue.ts';
 import { INITIAL_OFFERING, applyAll, isWaiting, nextAction } from '../../domain/slice.ts';
 import { eventsFromResponse } from '../ritual-map.ts';
 import {
@@ -1509,7 +1535,7 @@ function shrineGeometryChecks(): void {
   // loosening it. Assert the names exist BEFORE asserting anything about their values.
   const REQUIRED_BANDS = [
     'headerMark', 'settings', 'tribute', 'streak', 'caption', 'hintCta', 'halo', 'addSlot',
-    'carouselPrev', 'carouselNext', 'templeChip', 'offerings', 'shrineBase', 'cta', 'tabbar',
+    'templeChip', 'offerings', 'shrineBase', 'cta', 'tabbar',
     'sheetPanel', 'sheetPreview',
   ] as const;
   const missingBands = REQUIRED_BANDS.filter((name) => !(name in HOME_BANDS));
@@ -1550,10 +1576,7 @@ function shrineGeometryChecks(): void {
   // ── every altar band lives INSIDE the altar region ────────────────────────
   const altarTop = HOME_BANDS.caption.y;
   const altarBottom = HOME_BANDS.shrineBase.y + HOME_BANDS.shrineBase.h;
-  const ALTAR_BANDS = [
-    'caption', 'hintCta', 'halo', 'templeChip', 'addSlot', 'carouselPrev', 'carouselNext',
-    'offerings', 'shrineBase',
-  ] as const;
+  const ALTAR_BANDS = ['caption', 'hintCta', 'halo', 'templeChip', 'addSlot', 'offerings', 'shrineBase'] as const;
   const strayed = ALTAR_BANDS.filter((name) => {
     const band = HOME_BANDS[name];
     return band.y < altarTop || band.y + band.h > altarBottom;
@@ -1569,18 +1592,12 @@ function shrineGeometryChecks(): void {
   check('…and 4 is the board frame that draws it (`EN · 1c Home / full (4 tablets)`)',
     ALTAR_DISPLAY_SLOTS === 4 && ALTAR_DISPLAY_SLOTS < ANCESTOR_CAP);
 
-  // ── the carousel arrows FLANK the slot, and stay on the board ─────────────
-  const slot = HOME_BANDS.addSlot;
-  check('the prev arrow sits LEFT of the tablet slot',
-    HOME_BANDS.carouselPrev.x + HOME_BANDS.carouselPrev.w <= slot.x,
-    `prev ends ${HOME_BANDS.carouselPrev.x + HOME_BANDS.carouselPrev.w}, slot starts ${slot.x}`);
-  check('the next arrow sits RIGHT of the tablet slot',
-    HOME_BANDS.carouselNext.x >= slot.x + slot.w,
-    `next starts ${HOME_BANDS.carouselNext.x}, slot ends ${slot.x + slot.w}`);
-  check('…and neither arrow runs off the 390 board',
-    HOME_BANDS.carouselNext.x + HOME_BANDS.carouselNext.w <= REFERENCE_WIDTH);
-  check('the two arrows share one y (a pair, not two decisions)',
-    HOME_BANDS.carouselPrev.y === HOME_BANDS.carouselNext.y);
+  // ── ⚠️ THE ARROWS ARE GONE (owner, 2026-11-09) — the carousel is a SWIPE ──
+  // ⚠️ These four checks used to assert that `carouselPrev`/`carouselNext` flanked the tablet slot. They are replaced by
+  // the swipe's own guarantees (a real, three-slot-wide surface — see the carousel section), because a band that no longer
+  // exists cannot be flanking anything, and keeping the assertions would have been keeping the bands alive by accident.
+  check('⚠️ …and the arrow bands are GONE — the carousel is a swipe, not two buttons',
+    !('carouselPrev' in HOME_BANDS) && !('carouselNext' in HOME_BANDS));
 
   // ── ⚠️ POSITIVE CONTROLS — the predicates must FIRE on the defect they exist for ──
   // ⚠️ THIS IS THE SHIPPED CLASS, REPRODUCED: the CTA dragged up into the header band.
@@ -3307,9 +3324,23 @@ function storeChecks(): void {
    */
   check('⚠️⚠️ both store tabs are LIVE — Decorations is no longer dark',
     STORE_TABS.every((tab) => tab.enabled));
+  /**
+   * ⚠️⚠️ **TRANSCRIBED FROM THE BOARD'S LAYER NAMES, NOT FROM THE CARD LAYOUT** — and the first version of
+   * this table was wrong because it did the opposite. `EN · 7b` draws the four cards in a 2 × 2 grid, so the
+   * two that sit on the LEFT (`Spring Couplets`, `Door Gods`) and the two on the RIGHT (`Zhong Kui Print`,
+   * `Lanterns`) are trivially easy to pair by position — and Door Gods / Lanterns got swapped. ⚠️ **Because
+   * this table was written from the same wrong pass as the catalogue, it PASSED**: it asserted the defect
+   * back to itself. The authority is the layer NAME, which states its own item:
+   *   `card · Door Gods cash = $1.49` · `card · Door Gods points = 1,200 pts`
+   *   `card · Lanterns cash  = $1.99` · `card · Lanterns points  = 1,600 pts`
+   * and `ZH · 7b` carries the same pairing (门神 $1.49 / 1,200 · 灯笼 $1.99 / 1,600).
+   *
+   * ⚠️ The real tripwire is that **no two decorations may share a price pair** — a transposition is then a
+   * change of which CODE carries which number, and this table is the only thing that notices.
+   */
   const BOARD_DECOR_PRICES: Record<string, readonly [number, number]> = {
     festive_set: [3000, 399], spring_couplets: [800, 99], zhong_kui: [1000, 129],
-    door_gods: [1600, 199], lanterns: [1200, 149],
+    door_gods: [1200, 149], lanterns: [1600, 199],
   };
   check('⚠️⚠️ every decoration is priced EXACTLY as `EN · 7b` draws it — points AND cash, in cents',
     DECORATIONS.length === 5
@@ -3321,8 +3352,545 @@ function storeChecks(): void {
   // ⚠️ POSITIVE CONTROL — cash is INTEGER CENTS, so no float can ever reach a price.
   check('⚠️ guard: cash prices are whole cents, never a decimal',
     DECORATIONS.every((d) => Number.isInteger(d.cashPrice)));
+  /**
+   * ⚠️⚠️ **NO TWO DECORATIONS MAY SHARE A PRICE PAIR — this is the check that would have caught the
+   * Door Gods / Lanterns transposition.** With five distinct pairs, a swapped row changes which CODE
+   * carries which number; with a duplicated pair the swap would be a no-op and the table above could
+   * silently stop discriminating. ⚠️ Asserted as a CONTROL on the table, not on the catalogue, so a
+   * typo in `BOARD_DECOR_PRICES` cannot make it vacuous.
+   */
+  const pairs = Object.values(BOARD_DECOR_PRICES).map((p) => `${p[0]}/${p[1]}`);
+  check('⚠️ guard: every board price PAIR is unique, so a transposition cannot hide',
+    new Set(pairs).size === pairs.length && pairs.length === 5,
+    pairs.join(' '));
   check('⚠️⚠️ the CASH rail is now DRAWN — the old "omit the chip" rule is retired',
     readFileSync(join(PROJECT_ROOT, 'src', 'app', 'store.tsx'), 'utf8').includes('store-cash-chip'));
+
+  /**
+   * ⚠️⚠️ **THE ALTAR'S DECORATIONS — SCRUM-205's acceptance, as arithmetic.**
+   *
+   * None of this is visible to `tsc`: a slot rect that runs off the board, an art rect bigger than the zone that
+   * holds it, a picker that offers the wrong category, or a sheet height that matches one board and not the other.
+   * ⚠️ Every number was measured off `EN · 1f`/`1d`/`1e` on 2026-11-09 (the table is in `lib/decorate.ts`), so this
+   * block is what keeps the code and the board agreeing after the next edit.
+   */
+  const SLOTS = Object.keys(SLOT_HIT) as (keyof typeof SLOT_HIT)[];
+  check('⚠️⚠️ every one of the SIX slots has a tap zone AND an art rect',
+    SLOTS.length === 6 && SLOTS.every((s) => SLOT_ART[s] !== undefined));
+  check('⚠️ …and both fit INSIDE the 390 × 844 board — a rect that runs off it is a piece you cannot see',
+    SLOTS.every((s) => {
+      const inside = (r: { x: number; y: number; w: number; h: number }) =>
+        r.x >= 0 && r.y >= 0 && r.x + r.w <= DECOR_BOARD.w && r.y + r.h <= DECOR_BOARD.h;
+      return inside(SLOT_HIT[s]) && inside(SLOT_ART[s]);
+    }));
+  /**
+   * ⚠️⚠️ **THE ZONE MUST CONTAIN THE ART.** `1f` draws the tap targets larger than the pieces; the day one is
+   * smaller, the piece is drawn outside the thing that selects it — the defect class the owner's eye keeps finding
+   * first. ⚠️ Asserted per slot, so re-measuring one cannot quietly break another.
+   */
+  /**
+   * ⚠️⚠️ **EVERY ZONE CONTAINS ITS ART — and the one departure is BOUNDED, not exempted.** `1f` draws the tap targets
+   * larger than the pieces; the day one is smaller, the piece is drawn outside the thing that selects it.
+   * ⚠️ The background print hangs `BACKGROUND_TOP_OFFSET` above its zone's top edge (the edge the owner aligned), so a bare
+   * containment test would fail it. ⚠️ **It is allowed exactly that much and no more:** a declared allowance keeps the rule
+   * universal — the print cannot grow past its zone sideways, and cannot climb above its allowance — where skipping the
+   * slot behind a `=== 'background'` carve-out (the first cut) would have let any background change through unexamined.
+   */
+  const topAllowance: Partial<Record<DecorationSlot, number>> = {
+    background: SLOT_HIT.background.h * BACKGROUND_TOP_OFFSET,
+  };
+  /**
+   * ⚠️⚠️ **THE BANNERS GREW BY THE ASKED FACTOR, ANCHORED TOP-CENTRE** (owner, 2026-11-09: *"Make the Side banners 20%
+   * bigger. Top banner 15% bigger. maintain the top center alignment."*).
+   * ⚠️ Asserted as **size × the named factor AND top edge unmoved AND centre-x unmoved** — the three things that sentence
+   * says. ⚠️ A resize that grew about the centre would pass a size check and fail this one, which is the point: the drift was
+   * the hidden half of the previous background change.
+   */
+  const grewRight = (slot: DecorationSlot, factor: number) => {
+    const base = BOARD_ART[slot];
+    const art = SLOT_ART[slot];
+    return Math.abs(art.w - base.w * factor) < 1e-9
+      && Math.abs(art.h - base.h * factor) < 1e-9
+      && art.y === base.y
+      && Math.abs((art.x + art.w / 2) - (base.x + base.w / 2)) < 1e-9;
+  };
+  check('⚠️⚠️ the side banners are 20 % bigger and the top banner 15 %, both with their TOP edge held',
+    BANNER_GROWTH.side === 1.2 && BANNER_GROWTH.top === 1.15
+      && grewRight('side_left', BANNER_GROWTH.side) && grewRight('side_right', BANNER_GROWTH.side)
+      && grewRight('top_middle', BANNER_GROWTH.top),
+    `side ${SLOT_ART.side_left.w.toFixed(1)}×${SLOT_ART.side_left.h.toFixed(1)} · top ${SLOT_ART.top_middle.w.toFixed(1)}×${SLOT_ART.top_middle.h.toFixed(1)}`);
+
+  /**
+   * ⚠️⚠️ **NO ZONE SHRANK BELOW THE BOARD'S OWN RECT.** Zones are derived from `BOARD_HIT` now, so this is the assertion that
+   * keeps the derivation honest: widening to follow a grown banner is allowed, narrowing one is not — a zone smaller than
+   * `1f`'s own rect removes a control the board draws.
+   */
+  const shrunk = SLOTS.filter((s) => {
+    const b = BOARD_HIT[s];
+    const z = SLOT_HIT[s];
+    return z.x > b.x || z.y > b.y || z.x + z.w < b.x + b.w || z.y + z.h < b.y + b.h;
+  });
+  check('⚠️⚠️ no tap zone is smaller than the board\'s own (zones may grow to follow art, never shrink)',
+    shrunk.length === 0, shrunk.join(', '));
+
+  /** ⚠️ The screen's source, read ONCE for every assertion below — declared before its first use, because a late `const` here
+   * throws `Cannot access … before initialization`, which is a CRASH, not a red. */
+  const homeSrc = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'app', 'index.tsx'), 'utf8'));
+  const flatHome = homeSrc.replace(/\s+/g, ' ');
+
+  /**
+   * ⚠️⚠️ **A GHOST IN EVERY EMPTY SLOT — AND THE SWIPE'S DIRECTION IS A PURE FUNCTION** (owner, 2026-11-09: *"there is still a bug
+   * where i am toggling thru the same 2 sets. differentiate the swipe if its from left to right or right to left … also i noticed
+   * if i swipe to the left there is no + Ancestor UI on the left"*).
+   *
+   * ⚠️ **The toggle bug, reproduced as a test rather than described:** the first cut read `g.dx` inside a `setPage` updater, which
+   * React runs later, after RN had reset the reused `gestureState` — so `dx` read 0, the direction was always "previous", forward
+   * swipes clamped at the first tablet, and the carousel appeared to swap two tablets forever. ⚠️ `swipeStep` is pure now, and these
+   * assertions walk the sequence the owner described.
+   */
+  check('⚠️⚠️ a LEFT swipe advances and a RIGHT swipe goes back — and repeated left swipes keep advancing, never toggle',
+    swipeStep(-120, 40) === 1
+      && swipeStep(120, 40) === -1
+      && swipeStep(-10, 40) === 0
+      /** ⚠️ THE REGRESSION: four left swipes from the first tablet must reach 4, not bounce between 0 and 1. */
+      && pageAfterSwipe(0, 6, -120, 40) === 1
+      && [0, 1, 2, 3].reduce((p) => pageAfterSwipe(p, 6, -120, 40), 0) === 4
+      /** ⚠️ And backwards the same way, clamped at both ends (the ends are ends). */
+      && [4, 3, 2, 1].reduce((p) => pageAfterSwipe(p, 6, 120, 40), 5) === 1
+      && pageAfterSwipe(0, 6, 120, 40) === 0
+      && pageAfterSwipe(5, 6, -120, 40) === 5);
+
+  /**
+   * ⚠️⚠️ **AND THE SCREEN MUST NOT RE-READ `g.dx` LATE.** The source is asserted directly: the decision goes through
+   * `pageAfterSwipe(page, …)` with the release's own `g.dx`, and no updater form (`setPage((p) => …`) appears in the handler — that
+   * form is exactly what made the direction a constant.
+   */
+  check('⚠️⚠️ the swipe handler decides from the release’s dx — never inside a state updater',
+    flatHome.includes('pageAfterSwipe(page, ancestors.length, g.dx, SWIPE_COMMIT)')
+      && !flatHome.includes('setPage((p) =>'));
+
+  /**
+   * ⚠️⚠️ **THE GHOST SITS IN WHICHEVER SLOT IS EMPTY.** ⚠️ The first cut put it only in the third slot, so at the FIRST tablet — the
+   * state reached by swiping right — the left slot had nothing in it (the owner found it). ⚠️ Left is gated on `count > 1` because
+   * with one tablet BOTH sides are empty and two identical controls would be a puzzle rather than a choice.
+   */
+  const plusL = peerSlot(HOME_BANDS.addSlot, 'left');
+  const plusR = peerSlot(HOME_BANDS.addSlot, 'right');
+  const stC = carouselStage(HOME_BANDS.addSlot, 1, 3).centre;
+  const mid = (r: { x: number; w: number }) => r.x + r.w / 2;
+  check('⚠️⚠️ a ghost tablet fills each EMPTY slot, slot-sized and on the floor, clear of the current tablet’s mark',
+    flatHome.includes('testID="home-add-tablet-left"')
+      && flatHome.includes("!view.hasPrev && view.count > 1")
+      && flatHome.includes('!view.hasNext ?')
+      && Math.abs(plusL.y + plusL.h - (stC.y + stC.h)) < 1e-9
+      && Math.abs(plusR.y + plusR.h - (stC.y + stC.h)) < 1e-9
+      && mid(plusL) < stC.x && mid(plusR) > stC.x + stC.w
+      && plusL.x >= 0 && plusR.x + plusR.w <= DECOR_BOARD.w,
+    `left ${plusL.w.toFixed(1)}×${plusL.h.toFixed(1)} · right ${plusR.w.toFixed(1)}×${plusR.h.toFixed(1)}`);
+
+  /**
+   * ⚠️⚠️ **THE ＋ IS DRAWN, NOT TYPED** (owner, 2026-11-09: *"The center alignment of the + is off"*). ⚠️ A `Text` glyph is
+   * centred by its FONT metrics, and a fullwidth `＋` plus Android's font padding disagree — the mark sat up and left however the
+   * box was aligned. ⚠️ It moved into `TabletGhost` when the control became tablet-shaped, so the assertion follows it: inside
+   * that component there must be **no `fontSize`** and the mark must be `Path` strokes. Turning it back into a glyph fails here
+   * rather than on the owner's screen.
+   */
+  const ghostSrc = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'components', 'home', 'tablet.tsx'), 'utf8'))
+    .replace(/\s+/g, ' ');
+  const ghostAt = ghostSrc.indexOf('export function TabletGhost');
+  const ghostBlock = ghostAt < 0 ? '' : ghostSrc.slice(ghostAt, ghostSrc.indexOf('export function Tablet(', ghostAt));
+  check('⚠️⚠️ the ＋ inside the ghost tablet is DRAWN from two stroked paths — no font metrics to mis-centre it',
+    ghostBlock.length > 0 && !ghostBlock.includes('fontSize') && ghostBlock.includes('strokeLinecap'),
+    ghostBlock.length === 0 ? 'TabletGhost not found' : `${ghostBlock.length} chars`);
+
+  /**
+   * ⚠️⚠️ **SWIPE REPLACED THE ARROWS** (owner, 2026-11-09: *"remove the < and > buttons and instead design a swiping motion to
+   * scroll thru the tablets. Note to make a hint to user on this mechanism"*).
+   * ⚠️ **A DELIBERATE DEVIATION FROM `1b`**, which draws `nav · carousel prev/next` and a `touch · carousel next` layer — both
+   * removed at the owner's instruction, and `HOME_BANDS.carouselNext/PrevTouch` deleted with them so no dead bands survive.
+   * ⚠️ What must remain true of the replacement: the arrows are ABSENT, the swipe surface is an ANCESTOR of the tablets (so a tap
+   * still reaches the sheet and the ＋), it claims only on a MOVEMENT that is horizontal and dominant, it commits on RELEASE at the
+   * larger threshold, and it pages through `pageStep` so the ends clamp instead of wrapping.
+   */
+  /** ⚠️ Both locales, by KEY, for the hint below — a copy that exists in one language teaches a gesture only to half the users. */
+  const EN_KEYS = Object.keys(MESSAGES.en as unknown as Record<string, string>);
+  const ZH_KEYS = Object.keys(MESSAGES.zh as unknown as Record<string, string>);
+  check('⚠️⚠️ the arrows are GONE and a swipe surface wraps the tablets — claim on move, commit on release, ends clamp',
+    !homeSrc.includes('home-tablet-next')
+      && !homeSrc.includes('home-tablet-prev')
+      && !homeSrc.includes('carouselNextTouch')
+      && flatHome.includes('testID="home-tablet-stage"')
+      && flatHome.includes('{...swipe.panHandlers}')
+      && flatHome.includes('onMoveShouldSetPanResponder')
+      && flatHome.includes('onPanResponderRelease')
+      /** Claimed only for a horizontal, dominant movement — otherwise a diagonal drag on a scrolling screen turns a page. */
+      && flatHome.includes('Math.abs(g.dx) > SWIPE_CLAIM && Math.abs(g.dx) > Math.abs(g.dy) * 1.4')
+      && flatHome.includes('onMoveShouldSetPanResponderCapture')
+      /** ⚠️ The commit + clamp live in `pageAfterSwipe` now — asserted by the direction check below. */
+      && flatHome.includes('pageAfterSwipe(page, ancestors.length'),
+    `arrows=${homeSrc.includes('home-tablet-next')} stage=${flatHome.includes('testID="home-tablet-stage"')}`);
+
+  /**
+   * ⚠️⚠️ **THE SWIPE SURFACE MUST COVER ALL THREE SLOTS AND HAVE REAL AREA.** ⚠️ Every child of the stage is absolutely
+   * positioned, so a zero-size wrapper would receive no touch at all — the failure would look like "swipe does nothing".
+   * ⚠️ And it is measured over the slots that ALWAYS exist, not the neighbours that happen to: on the first and last tablet a
+   * peer is missing, yet the finger still lands where that slot is.
+   */
+  const sb = stageBounds(HOME_BANDS.addSlot);
+  const slotL = peerSlot(HOME_BANDS.addSlot, 'left');
+  const slotR = peerSlot(HOME_BANDS.addSlot, 'right');
+  const slotC = carouselStage(HOME_BANDS.addSlot, 1, 3).centre;
+  check('⚠️⚠️ the swipe surface spans the three-tablet stage with real area, not a zero-size box',
+    sb.w > 0 && sb.h > 0
+      && sb.x <= Math.min(slotL.x, slotC.x, slotR.x) + 1e-9
+      && sb.x + sb.w >= Math.max(slotL.x + slotL.w, slotC.x + slotC.w, slotR.x + slotR.w) - 1e-9
+      && sb.y <= slotC.y + 1e-9 && sb.y + sb.h >= slotC.y + slotC.h - 1e-9,
+    `${sb.w.toFixed(1)}×${sb.h.toFixed(1)} at ${sb.x.toFixed(1)},${sb.y.toFixed(1)}`);
+
+  /**
+   * ⚠️⚠️ **THE HINT IS THE BOARD'S OWN COPY, AND ONLY WHEN THERE IS SOMETHING TO SWIPE.**
+   * `EN · 1b` sets `hint · cta` to *"Swipe to bring a tablet forward"* exactly where `1a` sets *"Offer something meaningful, once a
+   * day"* — so this is a board string, not invented copy. ⚠️ With ONE tablet a swipe instruction would be a lie, which is why the
+   * count guard exists; and both locales must carry the key, or one language teaches a gesture the other does not.
+   */
+  check('⚠️⚠️ the swipe hint shows for 2+ tablets, uses the board\'s copy, and exists in both locales',
+    flatHome.includes("view.kind === 'tablet' && view.count > 1 ? 'home.swipeHint' : 'home.ctaHint'")
+      && EN_KEYS.includes('home.swipeHint') && ZH_KEYS.includes('home.swipeHint'),
+    `${EN_KEYS.includes('home.swipeHint')}/${ZH_KEYS.includes('home.swipeHint')}`);
+
+  /**
+   * ⚠️⚠️ **THE CTA'S SHAPE IS THE BOARD'S, NOT A PILL** (owner, 2026-11-09: *"the \"Begin an offering\" button style doesn't match the
+   * penpot design. the corner radius and the border"*).
+   *
+   * ⚠️ `EN · 1b`'s `btn · Make an Offering · 献供` is `20,676 350×66` with **radius 18**, fill `#c23b22`, **stroke `#1a1a1a` 2.5
+   * INNER**, plus a separate `btn · Make an Offering (shadow)` at `20,680` filled `#9a2b18` — a **solid lip 4 board px lower**.
+   * ⚠️ The app had `radius.pill` (999) and **no border**: exactly the two things the owner named. ⚠️ Asserted against the token AND
+   * the source, because the failure was a *style value*, which nothing else in the suite looks at.
+   */
+  const tokenSrc = readFileSync(join(PROJECT_ROOT, 'src', 'theme', 'tokens.ts'), 'utf8');
+  check('⚠️⚠️ the CTA is the board\'s shape: radius 18, a 2.5 inner ink stroke, and a solid lip 4 px below',
+    radius.xl === 18
+      && /\n  xl: 18,/.test(tokenSrc)
+      && flatHome.includes('const CTA_STROKE = 2.5')
+      && flatHome.includes('const CTA_LIP = 4')
+      && flatHome.includes('borderColor: brand.ink')
+      && flatHome.includes('ctaShape(s)')
+      /** ⚠️ The pill radius must be GONE from the CTA — that was the mismatch. */
+      && !flatHome.includes('radius.pill * s')
+      && flatHome.includes('styles.ctaLip')
+      /** ⚠️ The lip is the board's own `+4`, not an eyeballed offset. */
+      && flatHome.includes('HOME_BANDS.cta.y + CTA_LIP'),
+    `xl=${radius.xl} stroke=${flatHome.includes('const CTA_STROKE = 2.5')} lip=${flatHome.includes('const CTA_LIP = 4')} pillGone=${!flatHome.includes('radius.pill * s')}`);
+
+  /**
+   * ⚠️⚠️ **THE THREE-TABLET STAGE IS `EN · 1b`'s, CHECKED AGAINST THE BOARD'S OWN RECTS** (owner: *"Refer to En-1b i should
+   * see 3 tablets"*). ⚠️ The board draws `tablet · centre` `129×307`, `tablet · left/right` `93×221`, at centres `±92` apart.
+   * ⚠️ Those become ratios here — `93/129`, `221/307`, `92/129` — because this app's centre is drawn at `TABLET_SCALE` (the
+   * owner shrank it separately), so copying the board's absolute pixels would draw three tablets the SAME size and lose the
+   * hierarchy. ⚠️ Asserted against the board's numbers so the ratios cannot drift away from the source.
+   */
+  check('⚠️⚠️ the neighbour ratios ARE the board\'s (93/129 · 221/307 · 92/129)',
+    Math.abs(NEIGHBOUR_SCALE - 93 / 129) < 0.002
+      && Math.abs(NEIGHBOUR_SCALE - 221 / 307) < 0.002
+      && Math.abs(NEIGHBOUR_OFFSET - 92 / 129) < 0.002,
+    `${NEIGHBOUR_SCALE} vs ${(93 / 129).toFixed(4)}/${(221 / 307).toFixed(4)} · offset ${NEIGHBOUR_OFFSET} vs ${(92 / 129).toFixed(4)}`);
+
+  /**
+   * ⚠️ **THREE IN THE MIDDLE, TWO AT THE ENDS** — and never a ghost: a neighbour exists only where an ancestor exists.
+   */
+  const st0 = carouselStage(HOME_BANDS.addSlot, 0, 3);
+  const st1 = carouselStage(HOME_BANDS.addSlot, 1, 3);
+  const st2 = carouselStage(HOME_BANDS.addSlot, 2, 3);
+  const stOnly = carouselStage(HOME_BANDS.addSlot, 0, 1);
+  check('⚠️⚠️ the stage shows THREE tablets in the middle, TWO at the first and last, ONE when alone',
+    st0.left === null && st0.right !== null
+      && st1.left !== null && st1.right !== null
+      && st2.left !== null && st2.right === null
+      && stOnly.left === null && stOnly.right === null);
+
+  /**
+   * ⚠️ **THE PEERS ARE SMALLER, SIT ON THE SAME FLOOR, AND MIRROR** — the three facts the board draws. A peer that floated,
+   * or matched the centre's size, would not be `1b`.
+   */
+  const floorOf = (b: { y: number; h: number }) => b.y + b.h;
+  const midOfBox = (b: { x: number; w: number }) => b.x + b.w / 2;
+  check('⚠️⚠️ each peer is 0.72 of the centre, stands on the same floor, and mirrors its twin',
+    st1.left !== null && st1.right !== null
+      && Math.abs(st1.left.w - st1.centre.w * NEIGHBOUR_SCALE) < 1e-9
+      && Math.abs(st1.left.h - st1.centre.h * NEIGHBOUR_SCALE) < 1e-9
+      && Math.abs(floorOf(st1.left) - floorOf(st1.centre)) < 1e-9
+      && Math.abs(floorOf(st1.right) - floorOf(st1.centre)) < 1e-9
+      && Math.abs((midOfBox(st1.centre) - midOfBox(st1.left)) - (midOfBox(st1.right) - midOfBox(st1.centre))) < 1e-9
+      && st1.left.x >= 0 && st1.right !== null && st1.right.x + st1.right.w <= DECOR_BOARD.w,
+    `left ${st1.left?.x.toFixed(1)} · centre ${midOfBox(st1.centre).toFixed(1)} · right ${(st1.right?.x ?? 0).toFixed(1)}`);
+
+  const outsideZone = SLOTS.filter((s) => {
+    const z = SLOT_HIT[s];
+    const a = SLOT_ART[s];
+    const up = topAllowance[s] ?? 0;
+    return !(a.x >= z.x && a.y >= z.y - up && a.x + a.w <= z.x + z.w && a.y + a.h <= z.y + z.h);
+  });
+  check('⚠️⚠️ each ART rect sits INSIDE its own tap zone — a piece outside its zone cannot be tapped',
+    outsideZone.length === 0, outsideZone.join(' '));
+  /**
+   * ⚠️⚠️ **THE BACKGROUND PRINT HANGS FROM THE ZONE'S TOP-CENTRE AT `BACKGROUND_OVERSHOOT`** (owner, 2026-11-09:
+   * *"maintain top center alignment but reduce the background decoration another 20%"*).
+   * ⚠️ **The TOP EDGE is asserted as the held value, not as a number** — that is what "maintain top center alignment"
+   * means, and it is the assertion that would have caught the drift the centred shrink caused (it dropped the top ~13 px
+   * while the body rose). ⚠️ The horizontal centre is asserted the same way, as an equality, so a future size change
+   * cannot walk the print sideways either.
+   */
+  const bgArt = SLOT_ART.background;
+  const bgW = SLOT_HIT.background.w * BACKGROUND_OVERSHOOT;
+  const bgH = SLOT_HIT.background.h * BACKGROUND_OVERSHOOT;
+  const bgX = SLOT_HIT.background.x + (SLOT_HIT.background.w - bgW) / 2;
+  const bgTop = SLOT_HIT.background.y - SLOT_HIT.background.h * BACKGROUND_TOP_OFFSET;
+  // ⚠️ The constants lead the failure text on purpose: when only a knob moved, the rect follows it, so `want === got`
+  // below would read like a pass. Measured by moving each knob — see the fault test.
+  check('⚠️⚠️ the background print is aligned top-centre at 68.8 %, with no lift above its edge',
+    BACKGROUND_OVERSHOOT === 0.68816 && BACKGROUND_TOP_OFFSET === 0.028
+      && Math.abs(bgArt.w - bgW) < 1e-9 && Math.abs(bgArt.h - bgH) < 1e-9
+      && Math.abs(bgArt.x - bgX) < 1e-9 && Math.abs(bgArt.y - bgTop) < 1e-9
+      // ⚠️ Top-CENTRE, so the two side margins are equal — a left anchor would pass the width check and walk sideways.
+      && Math.abs((bgArt.x - SLOT_HIT.background.x)
+        - (SLOT_HIT.background.x + SLOT_HIT.background.w - (bgArt.x + bgArt.w))) < 1e-9,
+    `overshoot ${BACKGROUND_OVERSHOOT} · top ${BACKGROUND_TOP_OFFSET} · `
+      + `${bgArt.w.toFixed(1)}×${bgArt.h.toFixed(1)} at (${bgArt.x.toFixed(1)}, ${bgArt.y.toFixed(1)}) (want ${bgW.toFixed(1)}×${bgH.toFixed(1)} at (${bgX.toFixed(1)}, ${bgTop.toFixed(1)}))`);
+  /**
+   * ⚠️ **THE TABLET DRAWS AT 72 % OF ITS BAND** — 20 % then a further 10 % (owner). ⚠️ Bottom-anchored: it gives up the
+   * height from the TOP so its plinth stays on the table. ⚠️ The band itself must NOT shrink — it is also the ＋ slot's
+   * tap target and the carousel's anchor.
+   */
+  const tab = tabletBox(HOME_BANDS.addSlot);
+  check('⚠️⚠️ the tablet is 72 % of its band, centred, and still resting on the band floor',
+    Math.abs(tab.w - HOME_BANDS.addSlot.w * TABLET_SCALE) < 1e-9
+      && Math.abs(tab.h - HOME_BANDS.addSlot.h * TABLET_SCALE) < 1e-9
+      && Math.abs(tab.x * 2 + tab.w - HOME_BANDS.addSlot.w) < 1e-9
+      && Math.abs(tab.y + tab.h - HOME_BANDS.addSlot.h) < 1e-9
+      && TABLET_SCALE === 0.72,
+    `${tab.w.toFixed(1)}×${tab.h.toFixed(1)} in ${HOME_BANDS.addSlot.w}×${HOME_BANDS.addSlot.h}`);
+
+  /**
+   * ⚠️⚠️ **ONLY THE SLOT'S OWN CATEGORY IS OFFERED** — the acceptance line SCRUM-205 exists for. ⚠️ Asserted by
+   * CATEGORY, not by a list of codes, so a new decoration cannot silently escape it: a new BACKGROUND print still
+   * may not appear in a side slot.
+   */
+  const everyCode = DECORATIONS.map((d) => d.code);
+  check('⚠️⚠️ a slot offers ONLY its own category — a side slot never offers the background print',
+    SLOTS.every((s) => {
+      const opts = optionsForSlot(s, everyCode, null);
+      return opts.length > 0 && opts.every((o) => o.decoration.category === SLOT_CATEGORY[s]);
+    }));
+  // ⚠️ POSITIVE CONTROL — the filter is not empty-by-accident: the SIDE slots really do offer two (S14).
+  check('⚠️⚠️ the side slots offer the TWO placeable sets — and NEVER the Festive Set, which is a bundle',
+    optionsForSlot('side_left', everyCode, null).length === 2
+      && optionsForSlot('side_left', everyCode, null).every((o) => o.code !== 'festive_set')
+      && optionsForSlot('background', everyCode, null).every((o) => o.code === 'zhong_kui'));
+  /**
+   * ⚠️⚠️ **A COMPOSED DECORATION IS A SKU, NOT A CHOICE** (owner, 2026-11-09). Asserted by `composedOf` rather than by
+   * the code, so a future bundle cannot sneak into a picker: whatever the catalogue marks composed must never appear in
+   * ANY slot's options, and must draw in no slot at all.
+   */
+  const composed = DECORATIONS.filter((d) => d.composedOf !== undefined);
+  check('⚠️⚠️ every COMPOSED decoration is absent from every slot\'s options',
+    composed.length === 1 && composed[0].code === 'festive_set'
+      && SLOTS.every((s) => optionsForSlot(s, everyCode, null).every((o) => o.decoration.composedOf === undefined)));
+  check('⚠️ …and it is made of the other four — the same set `decorations_catalog.composed_of` names',
+    composed[0].composedOf?.slice().sort().join(',') === 'door_gods,lanterns,spring_couplets,zhong_kui');
+  check('⚠️ an UNOWNED item is listed but NOT selectable, and an equipped one is not re-equipable',
+    (() => {
+      const o = optionsForSlot('side_left', ['spring_couplets'], 'spring_couplets');
+      const equipped = o.find((x) => x.code === 'spring_couplets');
+      const unowned = o.find((x) => x.code === 'door_gods');
+      return equipped !== undefined && equipped.state === 'equipped' && !equipped.selectable
+        && unowned !== undefined && unowned.state === 'unowned' && !unowned.selectable;
+    })());
+
+  /**
+   * ⚠️⚠️ **THE SHEET HAS TWO HEIGHTS BECAUSE TWO BOARDS DRAW IT.** `1f2` (two options) is panel 520 with rows
+   * 598/682; `1f3`/`1f4` (three) are panel 440 with rows 518/602/686. A frozen height is wrong on the other, and a
+   * panel that stops short of 844 leaves a strip of shrine showing under the sheet.
+   */
+  const twoOpts = sheetLayout(2);
+  const threeOpts = sheetLayout(3);
+  check('⚠️⚠️ the picker sheet reproduces BOTH boards: 2 options → 520, 3 options → 440',
+    twoOpts.panel.y === 520 && threeOpts.panel.y === 440
+      && twoOpts.rows.map((r) => r.y).join(',') === '598,682'
+      && threeOpts.rows.map((r) => r.y).join(',') === '518,602,686');
+  check('⚠️ …and the panel always reaches the board bottom, with the button at the board\'s 774…826',
+    twoOpts.panel.y + twoOpts.panel.h === DECOR_BOARD.h
+      && threeOpts.panel.y + threeOpts.panel.h === DECOR_BOARD.h
+      && threeOpts.button.y === 774 && threeOpts.button.y + threeOpts.button.h === 826);
+
+  /**
+   * ⚠️⚠️ **THE DRAW PLAN** — what the shrine paints, from what the server said is equipped. ⚠️ The Festive Set is an
+   * AMALGAMATION (`EN · 1e` draws all four pieces), so equipping it must light five slots rather than squeeze four
+   * motifs into one — and an explicitly equipped piece must keep its own slot.
+   */
+  const noDecor: Record<string, null> = {
+    top_left: null, top_middle: null, top_right: null, side_left: null, side_right: null, background: null,
+  };
+  check('⚠️ nothing equipped draws NOTHING — the shrine is not decorated by default',
+    drawPlan(noDecor as never).length === 0);
+  const lanternOnly = drawPlan({ ...noDecor, top_left: 'lanterns' } as never);
+  check('⚠️⚠️ a TOP set lights BOTH corners — `1d` draws a lantern in each, from ONE equip',
+    lanternOnly.length === 2
+      && lanternOnly.map((p) => p.slot).join(',') === 'top_left,top_right'
+      && lanternOnly.every((p) => p.behind === false),
+    lanternOnly.map((p) => `${p.slot}:${p.code}`).join(' '));
+  const coupletsOnly = drawPlan({ ...noDecor, side_right: 'spring_couplets' } as never);
+  check('⚠️⚠️ a COUPLET SET is a TRIO — 横批 across the top-middle plus a scroll down each side',
+    coupletsOnly.length === 3
+      && coupletsOnly.map((p) => p.slot).join(',') === 'top_middle,side_left,side_right',
+    coupletsOnly.map((p) => p.slot).join(','));
+  const doorGodsOnly = drawPlan({ ...noDecor, side_left: 'door_gods' } as never);
+  check('⚠️ …and DOOR GODS are a trio too (assumed to share the couplets\' shape — see `SET_SLOTS`)',
+    doorGodsOnly.length === 3
+      && doorGodsOnly.map((p) => p.slot).join(',') === 'top_middle,side_left,side_right');
+  const backgroundOnly = drawPlan({ ...noDecor, background: 'zhong_kui' } as never);
+  check('⚠️ the BACKGROUND print draws BEHIND the tablet — the z-order `1e` depends on',
+    backgroundOnly.length === 1 && backgroundOnly[0].behind === true);
+  const setPlan = drawPlan({ ...noDecor, side_left: 'festive_set' } as never);
+  check('⚠️⚠️ the FESTIVE SET draws NOTHING — it is a bundle, not an altarpiece (owner, 2026-11-09)',
+    setPlan.length === 0, String(setPlan.length));
+
+  /**
+   * ⚠️⚠️ **THE CHIP IS THE EMPTY-STATE AFFORDANCE** — `SCRUM-225`, answered by the owner 2026-11-09: *"If that position
+   * is empty then show the Chip, else clicking on the decoration enters the customizing workflow too."*
+   *
+   * ⚠️ Asserted as a RULE (`chipBandClear`), not as a style flag: the chip is shown when nothing is drawn through its
+   * band, and the piece that IS there becomes the button. ⚠️ The overlap itself is asserted too — if a future decoration
+   * stops intersecting the band, this decision becomes pointless and the check should say so rather than pass quietly.
+   */
+  check('⚠️ the chip\'s band really does sit inside the top decoration band (why SCRUM-225 existed)',
+    rectsOverlap(SLOT_ART.top_left, HOME_BANDS.templeChip)
+      && rectsOverlap(SLOT_ART.top_middle, HOME_BANDS.templeChip));
+  check('⚠️⚠️ an EMPTY altar keeps the chip — it is the only way in when nothing is drawn there',
+    chipBandClear([], HOME_BANDS.templeChip) && chipBandClear(backgroundOnly, HOME_BANDS.templeChip));
+  check('⚠️⚠️ a TOP decoration HIDES the chip — the piece becomes the way in (the owner\'s rule)',
+    !chipBandClear(lanternOnly, HOME_BANDS.templeChip)
+      && !chipBandClear(coupletsOnly, HOME_BANDS.templeChip));
+  check('⚠️ …and the screen follows the rule rather than always drawing the chip or always hiding it',
+    (() => {
+      const src = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'app', 'index.tsx'), 'utf8'));
+      return src.includes('chipBandClear(plan, HOME_BANDS.templeChip)')
+        && /showChip \? \(/.test(src)
+        && src.includes('onEnter={customize ? undefined : enterCustomize}');
+    })());
+  /**
+   * ⚠️⚠️ **EVERY decoration is the way in, not only the one under the chip** (owner, 2026-11-09: *"the mode change needs
+   * to work on all components of decorations"*). ⚠️ The first cut made only the piece overlapping the chip's band
+   * tappable, so the LEFT lantern opened customising and the RIGHT one (301,210 — outside the band at 28–252) did nothing.
+   * ⚠️ Asserted on the layer's SOURCE: `piecesIn` must hand `onEnter` to every piece and must not test the band, and the
+   * testID must be unconditional — a band filter creeping back in would make this fail rather than quietly return.
+   */
+  check('⚠️⚠️ every drawn piece is pressable — the layer does not filter by the chip\'s band',
+    (() => {
+      const src = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'components', 'home', 'decor-layer.tsx'), 'utf8'));
+      return !src.includes('rectsOverlap')
+        && !src.includes('inBand')
+        && src.includes('onPress={onEnter}')
+        && src.includes('testID={onEnter === undefined ? undefined : `decor-piece-${p.slot}`}');
+    })());
+
+  /**
+   * ⚠️⚠️ **TWO MODES, ONE RECTANGLE** (owner, 2026-11-09): *"the shrine customization for the Background and the Add new
+   * tablet UI now overlaps and this is an issue… in customization mode, the add tablet interface should be hidden."*
+   *
+   * ⚠️ The background zone (`101,288 190×320`) sits ON TOP of the ＋ slot (`131,285 129×307`) — asserted here, because
+   * that overlap is the reason the split exists and a future re-measure should not silently un-justify it. ⚠️ The rest
+   * is source-level: the ＋ is not rendered while customising, the tablet stays visible but INERT (hiding the art would
+   * empty the shrine), and the carousel goes with the ＋.
+   */
+  check('⚠️ the background zone really does cover the ＋ slot (why the two modes were needed)',
+    rectsOverlap(SLOT_HIT.background, HOME_BANDS.addSlot));
+  check('⚠️⚠️ customising HIDES the add-tablet ＋ and makes the tablet inert',
+    (() => {
+      const src = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'app', 'index.tsx'), 'utf8'));
+      /** ⚠️ Whitespace-flattened so the shape is what is asserted, not the indentation. */
+      const flat = src.replace(/\s+/g, ' ');
+      /**
+       * ⚠️⚠️ **THE GUARD GOES INSIDE THE EMPTY BRANCH, AND GLASS FOUND OUT WHY.** The first cut wrote
+       * `{customize ? null : view.kind === 'empty' ? (＋) : (tablet)}` — an OUTER guard that short-circuits BOTH
+       * branches, so entering customising **deleted the tablet** instead of making it inert. ⚠️ This check passed anyway
+       * because it only matched source strings; it now pins the STRUCTURE and forbids the broken shape by name.
+       */
+      return flat.includes("{view.kind === 'empty' ? ( customize ? null : (")
+        && !flat.includes('customize ? null : view.kind === ')
+        && flat.includes('disabled={!mayEdit || customize}')
+        && flat.includes('testID="home-tablet"')
+        /**
+         * ⚠️ **Three controls must hide while customising, asserted BY SHAPE, not by a count.** This used to count the
+         * occurrences of `!customize && view.kind === 'tablet'` and expect exactly 2 (the arrows) — a number that broke the
+         * moment the add-tablet ＋ arrived, without saying anything about whether the new control was guarded. Pinning each
+         * control's own clause says *what* must be hidden and fails only if one of them loses its guard.
+         */
+        && flat.includes("!customize && view.kind === 'tablet' && mayEdit && !capReached(view.count)");
+    })());
+
+  /**
+   * ⚠️⚠️ **TAP OUTSIDE TO LEAVE** (owner, 2026-11-09): *"Tapping outside of the customization options should return me to
+   * normal mode with the tablets and tablet controls."*
+   *
+   * ⚠️ Order is the whole correctness argument: the catcher must be painted BEFORE the six zones (or a slot tap would exit
+   * instead of opening its picker), and the chip and the sheet are painted after the overlay so they stay on top. ⚠️ And
+   * leaving the SCREEN has to leave the mode too, because the CTA and the tab bar paint above the catcher — asserted here
+   * so a refactor cannot quietly drop either half.
+   */
+  check('⚠️⚠️ the tap-outside catcher exists, sits UNDER the zones, and exits customising',
+    (() => {
+      const src = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'components', 'home', 'decor-layer.tsx'), 'utf8'));
+      const catcher = src.indexOf('decor-scrim-outside');
+      const firstZone = src.indexOf('decor-slot-${slot}');
+      return catcher > 0 && firstZone > catcher && src.includes('onPress={onExit}');
+    })());
+  check('⚠️ …and leaving the screen resets the mode (the CTA and tab bar paint above the catcher)',
+    stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'app', 'index.tsx'), 'utf8')).includes('setCustomize(false)'));
+
+  /**
+   * ⚠️⚠️ **A SET'S PIECE IS NOT ALWAYS THE SET'S FACE.** The couplets' top-middle piece is the **横批 banner**, not the
+   * pair of scrolls — the owner's correction, and `1e` draws it at 141 × 40 (a squat banner, not a scroll). ⚠️ So the
+   * drawing is chosen by SLOT, and the banner has art of its own rather than the pair stretched into a wide box —
+   * which is exactly how it looked on glass before this.
+   */
+  check('⚠️⚠️ the COUPLETS\' pieces each use their OWN drawing: 横批 on top, ONE scroll per side',
+    artVariantFor('spring_couplets', 'top_middle') === 'crown'
+      && artVariantFor('spring_couplets', 'side_left') === 'scroll'
+      && artVariantFor('spring_couplets', 'side_right') === 'scroll');
+  check('⚠️⚠️ a LANTERN on the altar is ONE lantern — the pair motif is the store card\'s',
+    artVariantFor('lanterns', 'top_left') === 'single' && artVariantFor('lanterns', 'top_right') === 'single');
+  const ART_SRC_TXT = readFileSync(join(PROJECT_ROOT, 'src', 'components', 'decoration-art.tsx'), 'utf8');
+  /**
+   * ⚠️ **Re-pointed at `BOARD_ART` when the banners grew.** This asserted `SLOT_ART === the ported box`, which held only
+   * while the altar drew every piece at the board's size; the owner's +20 %/+15 % broke that equality **on purpose**, and a
+   * stretched piece is now the expected state (`preserveAspectRatio="none"`). What the check is really protecting is that
+   * the ported drawing was traced at the **board's** measurement rather than invented — so it compares against `BOARD_ART`,
+   * and the growth check above carries the rect from there.
+   */
+  check('⚠️ …and every second drawing is ported at the board\'s own box (the altar then scales it)',
+    ART_SRC_TXT.includes('box: [141, 40]') && ART_SRC_TXT.includes('box: [52, 66]')
+      && ART_SRC_TXT.includes('box: [41, 160]')
+      && BOARD_ART.top_middle.w === 141 && BOARD_ART.top_middle.h === 40
+      && BOARD_ART.top_left.w === 52 && BOARD_ART.top_left.h === 66
+      && BOARD_ART.side_left.w === 41 && BOARD_ART.side_left.h === 160,
+    `${BOARD_ART.top_middle.w}×${BOARD_ART.top_middle.h} · ${BOARD_ART.top_left.w}×${BOARD_ART.top_left.h} · ${BOARD_ART.side_left.w}×${BOARD_ART.side_left.h}`);
+  check('⚠️ …and the altar passes the variant through, so the banner is not silently replaced',
+    readFileSync(join(PROJECT_ROOT, 'src', 'components', 'home', 'decor-layer.tsx'), 'utf8').includes('art={p.art}'));
+  /**
+   * ⚠️⚠️ **THE SLOT→CATEGORY RULE IS NOT COPIED.** `domain/catalogue.ts` owns `SLOT_CATEGORY` (S14j/S14k) and
+   * `equip_decoration` enforces it; a second table in `decorate.ts` would be the "two implementations of one rule"
+   * this project keeps deleting — and the day they disagree, a slot offers what the server will refuse.
+   */
+  const DECORATE_SRC = readFileSync(join(PROJECT_ROOT, 'src', 'lib', 'decorate.ts'), 'utf8');
+  check('⚠️⚠️ `decorate.ts` IMPORTS SLOT_CATEGORY — it does not restate the slot→category map',
+    /import\s*\{[\s\S]*?SLOT_CATEGORY[\s\S]*?\}\s*from\s*'\.\.\/domain\/catalogue\.ts'/.test(DECORATE_SRC)
+      && !/SLOT_CATEGORY\s*[:=]/.test(stripComments(DECORATE_SRC)));
+  check('⚠️ …and the altar hands the art a RECT, so a piece fills its measured box',
+    readFileSync(join(PROJECT_ROOT, 'src', 'components', 'home', 'decor-layer.tsx'), 'utf8').includes('box={{')
+      && readFileSync(join(PROJECT_ROOT, 'src', 'components', 'decoration-art.tsx'), 'utf8')
+        .includes("preserveAspectRatio={box === undefined ? undefined : 'none'}"));
+
+
 
   /**
    * ⚠️⚠️ **THE SIZES MUST MATCH THE FILES ON DISK.** Since 2026-11-01 the art is five raster

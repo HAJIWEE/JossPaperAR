@@ -59,7 +59,93 @@ const C = (k: TokenKey): string =>
  * hanging cords are `#121418`, which is darker than any token; they are drawn as `ink` rather than adding a
  * one-off hex, so the art stays inside the token set.
  */
-const LANTERN: { box: readonly [number, number]; inks: readonly Ink[]; trails: readonly Trail[] } = {
+/** One drawing: a source box, its rectangles, and any traced paths. */
+interface Motif {
+  readonly box: readonly [number, number];
+  readonly inks: readonly Ink[];
+  readonly trails: readonly Trail[];
+  /**
+   * ⚠️ **Paint the traced paths BEFORE the rectangles.** The default is the opposite — `offering-art.tsx`'s reasoning,
+   * *"traces last, so a body is never covered by a later rectangle"* — which holds for a foil strip laid ON a body.
+   * The single lantern is the counter-example: its hexagon IS the body, and the rib/base/bead sit on it.
+   */
+  readonly pathsFirst?: boolean;
+}
+
+/**
+ * ⚠️ **ONE COUPLET SCROLL — what a SIDE of the altar holds** (`EN · 1d` `decor · couplet (side-left)`, 41 × 160),
+ * ported 2026-11-09.
+ *
+ * ⚠️ **`COUPLET` is the whole TRIO** — a plaque with three gold panels over two vertical strips — i.e. the STORE CARD's
+ * illustration. Drawing it into a 41 × 160 side rect (the owner, spotting it on glass: *"the side banners still show
+ * all 3 banners in the couplets"*) put the plaque and BOTH strips down each side, so one side of the altar displayed a
+ * whole set. The altar shows one object per slot: a scroll here, the 横批 at the top-middle.
+ */
+const COUPLET_SCROLL: Motif = {
+  box: [41, 160],
+  inks: [
+    { x: 19.5, y: 2.1, w: 3.1, h: 10.3, fill: 'ink' },
+    { x: 4.1, y: 10.3, w: 32.8, h: 145.6, rx: 3, fill: 'cinnabar', stroke: 'ink', sw: 3 },
+    { x: 12.3, y: 22.6, w: 16.4, h: 20.5, fill: 'goldBright', stroke: 'ink', sw: 2 },
+    { x: 12.3, y: 53.3, w: 16.4, h: 20.5, fill: 'goldBright', stroke: 'ink', sw: 2 },
+    { x: 12.3, y: 84.1, w: 16.4, h: 20.5, fill: 'goldBright', stroke: 'ink', sw: 2 },
+    { x: 12.3, y: 114.9, w: 16.4, h: 20.5, fill: 'goldBright', stroke: 'ink', sw: 2 },
+  ],
+  trails: [],
+};
+
+/**
+ * ⚠️ **THE COUPLETS' THIRD PIECE — the 横批 (horizontal banner)**, ported 2026-11-09 from `EN · 1e`'s
+ * `decor · 横批 (top-middle) @125,213 141×40`. It is a SEPARATE drawing, not the pair of scrolls: the owner's
+ * correction (*"the Spring Couplets consist of a trio of objects … one for the top middle … one for the left … one
+ * for the right"*) is what made the absence visible — the first build stretched the pair motif into 141 × 40 and it
+ * read as two squashed scrolls on glass.
+ * ⚠️ Its shape is the board's own: a cinnabar banner with **three** gold panels, which is why it is not simply the
+ * side motif rotated.
+ */
+const COUPLET_CROWN: Motif = {
+  box: [141, 40],
+  inks: [
+    { x: 4.7, y: 4.7, w: 131.6, h: 30.6, rx: 3, fill: 'cinnabar', stroke: 'ink', sw: 3 },
+    { x: 28.2, y: 12.9, w: 23.5, h: 14.1, fill: 'goldBright', stroke: 'ink', sw: 2 },
+    { x: 58.8, y: 12.9, w: 23.5, h: 14.1, fill: 'goldBright', stroke: 'ink', sw: 2 },
+    { x: 89.3, y: 12.9, w: 23.5, h: 14.1, fill: 'goldBright', stroke: 'ink', sw: 2 },
+  ],
+  trails: [],
+};
+
+/**
+ * ⚠️ **ONE LANTERN — what a corner of the altar holds** (`EN · 1d` `decor · lantern (top-left)`, 52 × 66), ported
+ * 2026-11-09. ⚠️ **NOT the same drawing as `LANTERN`:** that one is a PAIR (two lanterns side by side, 85.1 × 72) and
+ * it belongs on a STORE CARD. The owner's correction — *"the lanterns is also a pair one for each side"* — is about the
+ * SET (two objects, one per side), not about a card illustration, so the altar needs one object per corner. Before this
+ * the pair motif was drawn twice, i.e. **four** lanterns on a two-lantern set.
+ * ⚠️ The body is a hexagon PATH, and it has to be painted BEFORE the rib/base/bead — hence `pathsFirst`.
+ */
+const LANTERN_SINGLE: Motif = {
+  box: [52, 66],
+  pathsFirst: true,
+  inks: [
+    { x: 24.7, y: 1.7, w: 2.6, h: 10.4, fill: 'ink' },
+    { x: 19.1, y: 12.2, w: 13.9, h: 5.2, rx: 2, fill: 'goldDeep', stroke: 'ink', sw: 2 },
+    { x: 25.3, y: 17.4, w: 1.4, h: 24.3, fill: 'goldBright' },
+    { x: 20.8, y: 40.8, w: 10.4, h: 4.3, rx: 2, fill: 'goldDeep', stroke: 'ink', sw: 2 },
+    { x: 23.4, y: 45.2, w: 5.2, h: 5.2, rx: 2.6, fill: 'goldBright' },
+    { x: 24.7, y: 49.5, w: 2.6, h: 13.9, fill: 'goldBright' },
+  ],
+  trails: [
+    {
+      d: 'M205.6666717529297,11459.5263671875L214.3333282470703,11447.3681640625L231.6666717529297,11447.3681640625L240.3333282470703,11459.5263671875L231.6666717529297,11471.6845703125L214.3333282470703,11471.6845703125Z',
+      dx: -196.97,
+      dy: -11442.13,
+      fill: 'cinnabar',
+      stroke: 'ink',
+      sw: 3,
+    },
+  ],
+};
+
+const LANTERN: Motif = {
   box: [85.1, 72],
   inks: [
     { x: 10.5, y: 3.9, w: 64.2, h: 3.3, rx: 2.5, fill: 'goldDeep', stroke: 'ink', sw: 2 },
@@ -125,20 +211,29 @@ const COUPLET: { box: readonly [number, number]; inks: readonly Ink[]; trails: r
  * ⚠️ The board draws the small mark at (38, 36.7) as a STROKE-ONLY rect; it is a filled `ink` rect here, because
  * a no-fill shape would need a bare "none" literal and the token lookup is typed on `brand`'s keys.
  */
-const ZHONGKUI: { box: readonly [number, number]; inks: readonly Ink[]; trails: readonly Trail[] } = {
-  box: [85.1, 72],
+/**
+ * ⚠️⚠️ **RE-BASED TO ITS INK BOUNDS** (2026-11-09). As the board draws it, the group is `101,367 190×161` but the ART
+ * inside occupies only `x 35..155, y 9..139` of that group — the rest is an invisible `base-background`. Stretching the
+ * board's box therefore stretched the MARGIN: asked to fill the background zone, the print still floated in a ring of empty
+ * paper. ⚠️ So the motif's box is now the ink's own bounds (`53.7 × 62.2`, every coordinate shifted by `−15.7, −3.9`),
+ * which makes "fill the rect you are given" true rather than approximately true.
+ * ⚠️ A tight box also improves the store card and the picker row: they contain the motif in a square, so the old margin
+ * made the print look small there too.
+ */
+const ZHONGKUI: Motif = {
+  box: [53.7, 62.2],
   inks: [
-    { x: 15.7, y: 3.9, w: 53.7, h: 4.6, rx: 3, fill: 'goldDeep', stroke: 'ink', sw: 2 },
-    { x: 18.3, y: 8.5, w: 48.4, h: 57.6, rx: 3, fill: 'paper', stroke: 'ink', sw: 3 },
-    { x: 20.9, y: 11.1, w: 43.2, h: 52.4, rx: 2, fill: 'paper', stroke: 'cinnabar', sw: 2 },
-    { x: 38, y: 36.7, w: 9.2, h: 3.9, fill: 'ink' },
-    { x: 36.7, y: 25.5, w: 11.8, h: 11.8, rx: 5.9, fill: 'paper', stroke: 'ink', sw: 2.5 },
+    { x: 0, y: 0, w: 53.7, h: 4.6, rx: 3, fill: 'goldDeep', stroke: 'ink', sw: 2 },
+    { x: 2.6, y: 4.6, w: 48.4, h: 57.6, rx: 3, fill: 'paper', stroke: 'ink', sw: 3 },
+    { x: 5.2, y: 7.2, w: 43.2, h: 52.4, rx: 2, fill: 'paper', stroke: 'cinnabar', sw: 2 },
+    { x: 22.3, y: 32.8, w: 9.2, h: 3.9, fill: 'ink' },
+    { x: 21, y: 21.6, w: 11.8, h: 11.8, rx: 5.9, fill: 'paper', stroke: 'ink', sw: 2.5 },
   ],
   trails: [
-    { d: 'M4262.58447265625,639.9818115234375L4269.130859375,613.7999877929688L4273.05859375,611.1818237304688L4266.51220703125,638.6727294921875Z', dx: -4236.4, dy: -585, fill: 'goldDeep', stroke: 'ink', sw: 2 },
-    { d: 'M4266.51220703125,646.5272827148438L4291.3876953125,646.5272827148438L4288.11474609375,624.272705078125L4269.78515625,624.272705078125Z', dx: -4236.4, dy: -585, fill: 'cinnabar', stroke: 'ink', sw: 2.5 },
-    { d: 'M4273.05859375,613.1454467773438L4284.84130859375,613.1454467773438L4282.22314453125,605.9454345703125L4275.6767578125,605.9454345703125Z', dx: -4236.4, dy: -585, fill: 'ink', stroke: 'ink', sw: 2.5 },
-    { d: 'M4275.0224609375,621L4282.8779296875,621L4278.9501953125,629.5090942382812Z', dx: -4236.4, dy: -585, fill: 'ink', sw: 0 },
+    { d: 'M4262.58447265625,639.9818115234375L4269.130859375,613.7999877929688L4273.05859375,611.1818237304688L4266.51220703125,638.6727294921875Z', dx: -4252.1, dy: -588.9, fill: 'goldDeep', stroke: 'ink', sw: 2 },
+    { d: 'M4266.51220703125,646.5272827148438L4291.3876953125,646.5272827148438L4288.11474609375,624.272705078125L4269.78515625,624.272705078125Z', dx: -4252.1, dy: -588.9, fill: 'cinnabar', stroke: 'ink', sw: 2.5 },
+    { d: 'M4273.05859375,613.1454467773438L4284.84130859375,613.1454467773438L4282.22314453125,605.9454345703125L4275.6767578125,605.9454345703125Z', dx: -4252.1, dy: -588.9, fill: 'ink', stroke: 'ink', sw: 2.5 },
+    { d: 'M4275.0224609375,621L4282.8779296875,621L4278.9501953125,629.5090942382812Z', dx: -4252.1, dy: -588.9, fill: 'ink', sw: 0 },
   ],
 };
 
@@ -168,7 +263,7 @@ const DOORGODS: { box: readonly [number, number]; inks: readonly Ink[]; trails: 
   ],
 };
 
-const MOTIFS: Record<DecorationCode, { box: readonly [number, number]; inks: readonly Ink[]; trails: readonly Trail[] } | null> = {
+const MOTIFS: Record<DecorationCode, Motif | null> = {
   lanterns: LANTERN,
   spring_couplets: COUPLET,
   zhong_kui: ZHONGKUI,
@@ -222,7 +317,43 @@ const COMPOSED: Record<DecorationCode, readonly DecorationCode[] | undefined> = 
   door_gods: undefined,
 };
 
-export function DecorationArt({ code, size }: { code: DecorationCode; size: number }) {
+/**
+ * ⚠️ **A COMPOSED code draws WIDER than the `size` it is given** — the set is a row of four motifs at `0.52 × size`
+ * each, so it occupies ≈ `2.08 × size`. That is right where the caller has a wide well (the store's 220×106
+ * featured card) and **wrong in a square one**: the picker's 64 dp icon clipped the leftmost lantern on glass
+ * (2026-11-09). So a caller with a small square box asks here first rather than guessing from the code.
+ */
+/** ⚠️ A second drawing for the same code, chosen by the SLOT (see `decorate.ts#artVariantFor`). */
+export type ArtVariant = 'crown' | 'single' | 'scroll';
+
+export function isComposed(code: DecorationCode): boolean {
+  return COMPOSED[code] !== undefined;
+}
+
+
+export function DecorationArt({
+  code,
+  size,
+  box,
+  art,
+}: {
+  code: DecorationCode;
+  size: number;
+  /**
+   * ⚠️ **A RECT TO FILL, when the caller has one — used by the altar, which draws each piece at the board's own
+   * measured rect** (`decor · couplet (side-left)` is 41 × 160, not a square). ⚠️ That STRETCHES the art on
+   * purpose (`preserveAspectRatio="none"`): every motif's source box is 85.1 × 72 while the board draws couplets
+   * 41 × 160, so the board stretched them too — the rect is the design's answer to "what shape is this HERE".
+   * ⚠️ Without `box` the art is contained in a square of `size` and keeps its aspect, which is what the store
+   * cards and the picker rows want.
+   */
+  box?: { readonly w: number; readonly h: number };
+  /**
+   * ⚠️ **A SECOND DRAWING FOR THE SAME CODE** — the couplets' top-middle piece is the 横批 banner (`1e`), not the
+   * pair of scrolls the sides use. Chosen by SLOT in `decorate.ts#artVariantFor`, never by the caller guessing.
+   */
+  art?: ArtVariant;
+}) {
   const parts = COMPOSED[code];
   if (parts !== undefined) {
     // The four motifs in a row, scaled to the caller's box - the caller owns the size, the set owns the layout.
@@ -234,19 +365,44 @@ export function DecorationArt({ code, size }: { code: DecorationCode; size: numb
       </View>
     );
   }
-  const motif = MOTIFS[code];
+  const motif =
+    art === 'crown' ? COUPLET_CROWN
+      : art === 'single' ? LANTERN_SINGLE
+        : art === 'scroll' ? COUPLET_SCROLL
+          : MOTIFS[code];
   if (motif === null) {
     // ⚠️ A placeholder that LOOKS like a placeholder — never a stand-in motif.
     return (
-      <Svg width={size} height={size} viewBox="0 0 40 40">
+      <Svg width={box?.w ?? size} height={box?.h ?? size} viewBox="0 0 40 40">
         <Rect x={2} y={2} width={36} height={36} rx={6} fill="none" stroke={brand.ink} strokeWidth={2} />
       </Svg>
     );
   }
   const [bw, bh] = motif.box;
-  const scale = Math.min(size / bw, size / bh);
+  /** ⚠️ `box` wins over `size`: the caller measured this piece's rect off the board. */
+  const w = box?.w ?? bw * Math.min(size / bw, size / bh);
+  const h = box?.h ?? bh * Math.min(size / bw, size / bh);
+  /** ⚠️ Built once, so `pathsFirst` can put the SAME nodes before or after the rectangles. */
+  const paths = motif.trails.map((t, i) => (
+    <G key={`t${i}`} transform={`translate(${t.dx}, ${t.dy})`}>
+      <Path
+        d={t.d}
+        fill={t.fill === null ? 'none' : C(t.fill)}
+        stroke={t.stroke === undefined ? undefined : C(t.stroke)}
+        strokeWidth={t.sw ?? 0}
+        strokeLinejoin="round"
+      />
+    </G>
+  ));
   return (
-    <Svg width={bw * scale} height={bh * scale} viewBox={`0 0 ${bw} ${bh}`}>
+    <Svg
+      width={w}
+      height={h}
+      viewBox={`0 0 ${bw} ${bh}`}
+      preserveAspectRatio={box === undefined ? undefined : 'none'}
+    >
+      {/* ⚠️ Traces last BY DEFAULT, so a body is never covered by a later rectangle — `pathsFirst` inverts it. */}
+      {motif.pathsFirst === true ? paths : null}
       {motif.inks.map((r, i) => (
         <Rect
           key={i}
@@ -260,18 +416,7 @@ export function DecorationArt({ code, size }: { code: DecorationCode; size: numb
           strokeWidth={r.sw ?? 0}
         />
       ))}
-      {/* ⚠️ Traced paths last, so a body is never covered by a later rectangle. */}
-      {motif.trails.map((t, i) => (
-        <G key={`t${i}`} transform={`translate(${t.dx}, ${t.dy})`}>
-          <Path
-            d={t.d}
-            fill={t.fill === null ? 'none' : C(t.fill)}
-            stroke={t.stroke === undefined ? undefined : C(t.stroke)}
-            strokeWidth={t.sw ?? 0}
-            strokeLinejoin="round"
-          />
-        </G>
-      ))}
+      {motif.pathsFirst === true ? null : paths}
     </Svg>
   );
 }
