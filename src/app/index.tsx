@@ -620,9 +620,45 @@ export default function HomeShrine() {
                 ]}
                 testID="home-add-tablet"
               >
-                <Text allowFontScaling={false} style={{ color: text.gold, fontSize: 26 * s, fontWeight: '300' }}>
-                  ＋
-                </Text>
+                {/**
+                 * ⚠️⚠️ **THE ＋ IS DRAWN, NOT TYPED** (owner, 2026-11-09: *"The center alignment of the + is off"*).
+                 * ⚠️ A `Text` glyph cannot be centred reliably: the fullwidth `＋` carries side bearings and Android adds
+                 * font padding, so the mark sits up and left inside its own box no matter what `alignItems`/`justifyContent`
+                 * say. ⚠️ The empty altar's ＋ works around the same metrics with a measured `paddingTop` — a hack that has
+                 * to be re-measured per size. Two bars are centred **by construction**: both are positioned from `(side -
+                 * stroke) / 2`, so there is no font in the arithmetic at all.
+                 */}
+                {(() => {
+                  const side = 20 * s;
+                  const stroke = 2.2 * s;
+                  const inset = (side - stroke) / 2;
+                  return (
+                    <View style={{ width: side, height: side }}>
+                      <View
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          top: inset,
+                          width: side,
+                          height: stroke,
+                          borderRadius: stroke / 2,
+                          backgroundColor: text.gold,
+                        }}
+                      />
+                      <View
+                        style={{
+                          position: 'absolute',
+                          left: inset,
+                          top: 0,
+                          width: stroke,
+                          height: side,
+                          borderRadius: stroke / 2,
+                          backgroundColor: text.gold,
+                        }}
+                      />
+                    </View>
+                  );
+                })()}
               </Pressable>
             ) : null}
 

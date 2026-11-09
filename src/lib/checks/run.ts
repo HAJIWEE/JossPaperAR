@@ -3455,6 +3455,23 @@ function storeChecks(): void {
       && addBand.w >= (44 * DECOR_BOARD.w) / 360 && addBand.h >= (44 * DECOR_BOARD.w) / 360,
     coveredBy.join(', ') || `${addBand.w}×${addBand.h} at ${addBand.x},${addBand.y}`);
 
+  /**
+   * ⚠️⚠️ **THE ＋ MUST BE DRAWN, NOT TYPED** (owner, 2026-11-09: *"The center alignment of the + is off"*).
+   * ⚠️ A `Text` glyph is centred by its FONT metrics, which a fullwidth `＋` plus Android's font padding do not agree on —
+   * the mark sat up and left however the box was aligned. Two bars positioned from `(side − stroke) / 2` have no font in the
+   * arithmetic. ⚠️ Asserted as: no `fontSize` inside the add-tablet control, and the inset formula present. Turning it back
+   * into a glyph fails here rather than on the owner's screen.
+   */
+  const addSrc = stripComments(readFileSync(join(PROJECT_ROOT, 'src', 'app', 'index.tsx'), 'utf8'))
+    .replace(/\s+/g, ' ');
+  const addStart = addSrc.indexOf("!customize && view.kind === 'tablet' && !view.hasNext");
+  /** ⚠️ To the CLOSING tag, not to the testID: the testID is written before the children, so ending there would slice the
+   * mark off and the check would pass on an empty tail. */
+  const addBlock = addStart < 0 ? '' : addSrc.slice(addStart, addSrc.indexOf('</Pressable>', addStart));
+  check('⚠️⚠️ the ＋ is DRAWN from two centred bars — no font metrics, so it cannot sit off-centre',
+    addBlock.length > 0 && !addBlock.includes('fontSize') && addBlock.includes('(side - stroke) / 2'),
+    addBlock.length === 0 ? 'control not found' : `${addBlock.length} chars`);
+
   const outsideZone = SLOTS.filter((s) => {
     const z = SLOT_HIT[s];
     const a = SLOT_ART[s];
