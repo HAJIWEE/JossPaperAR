@@ -23,7 +23,9 @@ import { isLegalCreditMovement, accrualFor, PHOTO_FEE_CREDITS } from '../currenc
 import { hasQuota, remaining, dailyLimit, EMPTY_QUOTA, DAILY_PHOTO_BURNS } from '../quota.ts';
 import {
   LEAGUE_TIERS, COHORT_SIZE, PROMOTE_COUNT, DEMOTE_COUNT, BOTTOM_TIER, TOP_TIER, tierOf,
+  pointsBandOf, isNearbyBand,
 } from '../league.ts';
+import { readFileSync } from 'node:fs';
 
 let passed = 0;
 let failed = 0;
@@ -311,6 +313,40 @@ check('⚠️ award: a fractional raw is NOT reported as clamped (853.125 → 85
   (() => {
     const r = computeAward({ offsetPx: 20, cellBurns: 4 });
     return r.award === 853 && r.clamped === false;
+  })());
+
+// ── SCRUM-236 · "NEARBY" IS A POINTS BAND, NOT A GEOGRAPHIC RADIUS ───────────
+/**
+ * ⚠️ The PM's meaning (2026-11-15): competitors are "nearby" in the dimension of
+ * their ACCUMULATED POINTS, not of place. The band of record is the cohort
+ * (one league week, one tier) — `get_league_board()` already scopes to it, and
+ * `supabase/tests/league_nearby_band.sql` proves a tier-2 rival never leaves the
+ * database.
+ */
+check('band: the same league week + tier IS nearby',
+  isNearbyBand(pointsBandOf('w-2031-01-06', 2), pointsBandOf('w-2031-01-06', 2)));
+check('⚠️ band: a DIFFERENT tier is NOT nearby — the band is points, not place',
+  isNearbyBand(pointsBandOf('w-2031-01-06', 2), pointsBandOf('w-2031-01-06', 3)) === false);
+check('band: a different league WEEK is not the same band',
+  isNearbyBand(pointsBandOf('w-2031-01-06', 2), pointsBandOf('w-2031-01-13', 2)) === false);
+
+// ⚠️ The gate that keeps it that way. A future "nearby = a map" change must fail
+// HERE rather than be caught by a reviewer. An unreadable source is a RED, never
+// a silent skip — a check that cannot fail is not a check.
+check('⚠️ band: the league path reads NO location identifier',
+  (() => {
+    const LOCATION =
+      /\b(latitude|longitude|geolocation|expo-location|cell_hash|coordinates?|gps)\b/i;
+    for (const path of ['src/domain/league.ts', 'src/lib/league-api.ts']) {
+      let src: string;
+      try {
+        src = readFileSync(path, 'utf8');
+      } catch {
+        return false;
+      }
+      if (LOCATION.test(src)) return false;
+    }
+    return true;
   })());
 
 // ── verdict ──────────────────────────────────────────────────────────────────
