@@ -84,3 +84,22 @@ export function clampPanel(index: number): number {
  * this constant is the screen's own declaration of where it goes, not the boot flow's.
  */
 export const CLAN_FORK_ROUTE = '/clan';
+
+/** The screen that renders the three panels (SCRUM-171 · wired by SCRUM-169). */
+export const INTRO_ROUTE = '/onboarding';
+
+/** The shrine — the only route the intro may interrupt. */
+export const ROOT_ROUTE = '/';
+
+/**
+ * ⚠️ **THE BOOT'S ONE DECISION (SCRUM-169).** The intro is offered **once**, and
+ * **only from the root**: a deep link (`/clan`, `/league`), the sign-in wall or
+ * any other screen must never be bounced to the panels.
+ *
+ * ⚠️ This is a PURE function on purpose — `check:lib` asserts the table below,
+ * so "appears exactly once" is a tested fact rather than a boot flow nobody can
+ * observe. The screen itself deliberately does not read the flag.
+ */
+export function shouldShowIntro(pathname: string, introSeen: boolean): boolean {
+  return pathname === ROOT_ROUTE && introSeen === false;
+}

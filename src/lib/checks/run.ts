@@ -77,7 +77,7 @@ import {
   scrimRgba,
 } from '../confirm-card.ts';
 import { type UuidFactory, isValidIdempotencyKey, newIdempotencyKey } from '../idempotency.ts';
-import { CLAN_FORK_ROUTE, INTRO_PANELS, isLastPanel, nextPanel } from '../intro.ts';
+import { CLAN_FORK_ROUTE, INTRO_PANELS, isLastPanel, nextPanel, shouldShowIntro } from '../intro.ts';
 import {
   CODE_ALPHABET,
   CODE_LENGTH,
@@ -2541,6 +2541,34 @@ function itemBurnChecks(): void {
   check('⚠️ …and it records the fact on the way out', introScreenJs.includes('markIntroSeen()'));
   check('⚠️⚠️ …and it does NOT decide when it is shown — that is SCRUM-169',
     !introScreenJs.includes('readIntroSeen'));
+
+  /**
+   * ⚠️⚠️ **SCRUM-169 — "SHOWN EXACTLY ONCE" IS NOW A TESTED FACT.**
+   *
+   * The decision is a PURE function, so the table below is the specification:
+   * unseen at the root → shown; seen → never; **a deep link or the sign-in wall is
+   * never interrupted**. ⚠️ A boot that redirected from every route would drag a
+   * player who opened `/clan` back through three panels.
+   */
+  check('⚠️ intro: unseen at the ROOT is shown', shouldShowIntro('/', false));
+  check('⚠️ intro: ONCE seen, never again', shouldShowIntro('/', true) === false);
+  check('⚠️ intro: a deep link (/clan) is NEVER interrupted', shouldShowIntro('/clan', false) === false);
+  check('⚠️ intro: the sign-in wall is NEVER interrupted',
+    shouldShowIntro('/account', false) === false);
+
+  // ⚠️ And the BOOT must actually use it — a pure function nobody calls is the
+  // exact failure this ticket exists to prevent. Comments are STRIPPED so the
+  // docblock naming `readIntroSeen` cannot satisfy the check by itself.
+  const layoutJs = readFileSync(join(PROJECT_ROOT, 'src/app/_layout.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+  check('⚠️⚠️ …and the BOOT reads the flag, decides, and routes to the panels',
+    layoutJs.includes('readIntroSeen()')
+      && layoutJs.includes('shouldShowIntro(pathname, introSeen)')
+      && layoutJs.includes('router.replace(INTRO_ROUTE)'));
+  check('⚠️ …and the flag is read AFTER the sign-in decision, never before it',
+    layoutJs.indexOf('SIGN_IN_REQUIRED') >= 0
+      && layoutJs.indexOf('SIGN_IN_REQUIRED') < layoutJs.indexOf('readIntroSeen()'));
 
   const reward = readItemRewardParams({ itemCode: 'house', offsetPx: '41.5', throwNumber: '2' });
   check('the item reward hop carries the code and the SAME accuracy/throw rules',

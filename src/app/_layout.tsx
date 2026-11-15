@@ -17,6 +17,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { LocaleProvider } from '@/components/locale-provider';
 import { ACCOUNT_ROUTE } from '@/lib/account-flow';
+import { INTRO_ROUTE, shouldShowIntro } from '@/lib/intro';
+import { readIntroSeen } from '@/lib/intro-seen';
 import { SIGN_IN_REQUIRED, ensureAnonymousSession } from '@/lib/session';
 import { surface } from '@/theme/tokens';
 
@@ -91,7 +93,7 @@ function useSplashCover(): void {
  * on, which is a loop. The route is on `pathname` so the effect re-runs on every navigation: a signed-out
  * user who reaches the shrine some other way (a deep link, a back gesture) is put back on the wall.
  */
-function useIdentityGate(): void {
+function useBootGate(): void {
   const pathname = usePathname();
 
   useEffect(() => {
@@ -99,9 +101,23 @@ function useIdentityGate(): void {
     void (async () => {
       const result = await ensureAnonymousSession();
       if (!live) return;
-      if (!result.ok && result.reason === SIGN_IN_REQUIRED && pathname !== ACCOUNT_ROUTE) {
-        router.replace(ACCOUNT_ROUTE);
+
+      // ⚠️ THE WALL WINS. A device that must sign in is NEVER bounced to the
+      // intro — the sign-in decision is the stronger fact, and stacking a second
+      // redirect over it is how a boot flow starts to lie.
+      if (!result.ok && result.reason === SIGN_IN_REQUIRED) {
+        if (pathname !== ACCOUNT_ROUTE) router.replace(ACCOUNT_ROUTE);
+        return;
       }
+
+      // ⚠️ SCRUM-169 — OFFER THE INTRO ONCE, FROM THE ROOT ONLY.
+      // `shouldShowIntro` is pure and asserted by `check:lib`, so "exactly once"
+      // is a tested fact rather than a boot flow nobody can observe. ⚠️ It is
+      // read AFTER the identity outcome, so a slow bootstrap cannot pre-empt the
+      // wall, and `onboarding.tsx` still never reads the flag itself.
+      const introSeen = await readIntroSeen();
+      if (!live) return;
+      if (shouldShowIntro(pathname, introSeen)) router.replace(INTRO_ROUTE);
     })();
     return () => {
       live = false;
@@ -127,7 +143,12 @@ export default function RootLayout() {
    * They are two independent effects and neither can hold the other.
    */
   useSplashCover();
-  useIdentityGate();
+  /**
+   * ⚠️ ONE gate, not two (SCRUM-169). The identity outcome and the intro are
+   * decided together so they cannot race: a device that must sign in is never
+   * also sent to the panels.
+   */
+  useBootGate();
 
   return (
     <SafeAreaProvider>
