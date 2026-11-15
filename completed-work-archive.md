@@ -838,3 +838,14 @@ The PM merged **PR #40** (`cline/9059b-league`, 14 commits) **off-session at 202
 3. ⚠️ **Expo's dev server rewrites `tsconfig.json` on boot** (drops `.expo/types/**` and `expo-env.d.ts`) — revert it, never commit it.
 
 **Left open deliberately:** **`SCRUM-126`** (a stale `running` job — a **money** decision) and **`SCRUM-127`** (the copy half of SCRUM-124's AC 3).
+
+---
+
+## Completed follow-ups — 2026-11-15 (S81 · PR #88 `36cf667` · PR #89 `83f7203`)
+
+> Moved out of [[follow-up-items]] when they closed. ⚠️ Historical record — do not act on these lines.
+
+- ✅ **`SCRUM-169` — the boot wiring ("hand onboarding to the clan fork").** `shouldShowIntro(pathname, seen)` is a **pure** decision (root **and** unseen), folded into the **same** boot hook as the identity gate so the two cannot race, with the **sign-in wall winning**. `onboarding.tsx` still does not read the flag. `check:lib` **967 → 973**, fault-tested twice. **Seen on the release APK:** first launch showed the panels, `Skip` landed on the **clan fork**, and a relaunch opened **Home** with the intro gone.
+- ✅ **`SCRUM-172` — the splash's visual acceptance, judged on a release build.** Expo Go shows the app icon since SDK 52, so this was impossible there. EAS `preview` build `46d68f02…` (`gitCommitHash c0a6872`) on `HN615L005386`: cold start **2255 ms** first / **1718 ms** after; frames show the splash fading over an **already fully-rendered Home** — **no scaffold frame**. ⚠️ The one residual — splash `#1b1613` vs Home `#F5F0E8`, a **dark→cream crossfade** — stays open in **[[follow-up-items]]** rather than being buried here.
+- ✅ **The production-vs-`main` drift is CLOSED.** `20261115120000_delete_my_data_erases_email.sql` had been applied to hosted while the repo lagged; **PR #88 (`36cf667`)** merged it, so `main` and the deployed database agree again.
+- ✅ **`SCRUM-12`'s last three bullets closed with it** (the epic went **Done** in S81): the coarse-cell ×2.0 (**PR #88**), the "4-Block Radius" bullet redefined as a **points band** (`SCRUM-236`), and the per-cell decay (`SCRUM-237`). The **Play data-safety declaration** is *not* part of it — that is **`SCRUM-234`**, still open.

@@ -324,3 +324,20 @@
 **Total: US$0.00 = S$0.00** (Mastercard rate **1.2808**, nothing to convert).
 ⚠️ **Cumulative is unchanged** — re-derive it from the rows above rather than trusting this sentence; the last reconciled figure in this page was **US$5.43 ≈ S$6.96**.
 
+
+## 2026-11-15 · S81 — the decay, the points band, the boot gate, the seed guard — **US$0.00**
+
+⚠️ **Nothing was spent with an AI provider, and that is a result rather than an omission.** S81 shipped four tickets (SCRUM-237 · 236 · 169 · 199), merged them as PR #89, and **made no fal.ai call** — no Path C run, no cutout, no re-generation to "check" anything. The ritual's AI path was not exercised at all.
+
+| what | cost |
+|---|---|
+| `SCRUM-237` — the per-cell decay (new migration + domain curve + SQL proof) | **US$0.00** (SQL + Node only) |
+| `SCRUM-236` — the points band (definition + gates + RPC proof) | **US$0.00** |
+| `SCRUM-169` — the boot wiring | **US$0.00** |
+| `SCRUM-199` — the seed guard | **US$0.00** |
+| `SCRUM-172` — **one EAS `preview` build** (`46d68f02…`) | **US$0.00 in AI spend** — ⚠️ this is **build minutes on Expo**, not an AI charge, and it is **not** counted against the fal.ai budget |
+
+**Total: US$0.00 = S$0.00** (Mastercard **1.2808**, nothing to convert).
+⚠️ **Cumulative is unchanged** — re-derive it from the rows above rather than trusting this sentence; the last reconciled figure in this page was **US$5.43 ≈ S$6.96**.
+
+⚠️ **The thing that WOULD have cost money, and deliberately did not happen:** a real burn on the APK would have spent ≈ **US$0.091** (Path C: identify + generate + cutout). ⚠️ It was not run — the device run was a **cold-start splash check**, which never reaches the fire.

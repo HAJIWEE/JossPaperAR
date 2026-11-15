@@ -6,19 +6,17 @@
 
 ## 🎯 Immediate Actions (Next 1–2 Weeks)
 
-### 🔴 S80 (2026-11-15) — what is genuinely open after the big close-out
+### 🔴 S81 (2026-11-15) — what is genuinely open after PR #88 and PR #89
 
-> ⚠️ **Everything below was measured, not assumed.** 13 tickets closed, 2 opened, 2 moved to the backlog. `npm run check` **EXIT 0 · 2034 checks**.
+> ⚠️ **Everything below was measured, not assumed.** S80 closed **13** tickets; **S81 closed 7 more** — `12 · 147 · 169 · 172 · 199 · 236 · 237` — merged as **PR #88 (`36cf667`)** and **PR #89 (`83f7203`)**. `npm run check` **EXIT 0** · `tsc` **0** · the agent burn (1600 → 800) and the league band both **fault-tested**.
 
-- 🚪 **`SCRUM-169` is the LAST piece of the first-run chain, and it is now small.** `src/app/onboarding.tsx` renders the three boards' panels, `lib/intro-seen.ts` writes the `joss.introSeen` flag, and **nothing reads that flag yet** — by design. 169 owns the boot wiring (*"hand onboarding to the clan fork"*). ⚠️ **Do not put the "when do we show it" decision inside the screen**: there are already two opinions about first-run (`_layout`'s identity gate, `onboarded.ts`) and a third is how a boot flow starts to lie. A gate asserts the screen never calls `readIntroSeen`.
-- 🎬 **`SCRUM-155` writes SEED DATA INTO THE HOSTED PROJECT** — and its own child **`SCRUM-199`** exists to *"build the seed guard FIRST — an allow-list target check, fault-tested against the hosted project"*. ⚠️ **Do not start 155 before 199 lands**, and do not start either without the owner watching.
-- 📱 **`SCRUM-157` is the sprint's acceptance gate** and cannot run until 147 and 155 are done. Its four children are all still `To Do`.
+- 🔑 **`SCRUM-155` IS BLOCKED ON A CREDENTIAL — its guard is built, the seed is not run.** **SCRUM-199** (the allow-list seed guard) is **Done** and refuses the hosted project by default — fault-tested against the **real** ref `yercgevebxvtzkgctfai` → **exit 2**. ⚠️ **155 needs real `auth.users` rows on the HOSTED project**, and this checkout holds only the **anon** key + `FAL_KEY`: **no service-role key, no database password**. To unblock, provide a **service-role key** (preferred — the seed then goes through the Admin API) **or** the **hosted DB password**, and run with `SEED_ALLOW_TARGETS=<ref>`. ⚠️ **Nothing has been written to hosted.**
+- 📱 **`SCRUM-157` is the sprint's acceptance gate** and now waits on **155 only** — `147` is **Done**. Its four children are all still `To Do`.
 - ⚠️ **`SCRUM-224` part 2 is NOT done:** *"measure the relay's real send ceiling"* means real sends to real addresses, which can bounce `superadmin@josspaperar.app`'s sender reputation. ⚠️ **No mail was sent.** Knobs today: `rate_limit_email_sent=30` · `smtp_max_frequency=60`/min.
 - 🔒 **`SCRUM-234` (backlog) — the Play data-safety declaration** owes **two** entries on **one** form: **email** (SCRUM-219) and **approximate location** (SCRUM-12). One submission, one sitting. Blocked on Play Console access, which is why it was split out.
 - 📍 **Location hardening, deliberately NOT done:** the Android manifest still declares `ACCESS_FINE_LOCATION` (the library default) while only a **coarse** fix is ever used, so Android offers the user a **Precise/Approximate** choice it has no use for. `android.blockedPermissions` would remove it, **but that only takes effect in a real build — Expo Go's manifest is fixed and Expo Go cannot show the difference.** ⚠️ Apply it **and** re-check after an **EAS build**; never assume.
 - ✍️ **Two pieces of user-visible copy have never been through the boards** — both recorded rather than quietly shipped: the **iOS location permission string** (*"Allow Joss Paper AR to use your approximate location…"*) and the **camera-blocked pair** (`capture.cameraBlockedWhy` / `capture.cameraBlockedCta`).
-- 🌅 **The splash's visual acceptance needs a release build.** SDK 52+ Expo Go shows the app **icon** instead of the splash, so *"no flash of the scaffold"* is unproven on glass — the cover, the hide and the no-session-gating **were** proven.
-- ⚠️ **Production is AHEAD of `main`.** `20261115120000_delete_my_data_erases_email.sql` is applied and verified on hosted; the branch must merge or the repo lags the database it deployed.
+- 🌅 **The splash's visual acceptance is PROVEN on the APK — one colour caveat remains.** On `HN615L005386` a cold start was **2255 ms** (first) / **1718 ms** (after), and the frames show the splash fading over an **already fully-rendered Home** — **no scaffold frame exists**. ⚠️ **Still open:** `app.json`'s splash is **`#1b1613`** and Home is **`#F5F0E8`**, so the handover is a **dark→cream crossfade**; sharing one colour is one `app.json` line plus a rebuild (recorded on `SCRUM-172`).
 
 ### 🟡 Altar customisation — deferred fine-tuning
 
