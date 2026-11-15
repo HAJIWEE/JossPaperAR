@@ -169,7 +169,10 @@ export default function RootLayout() {
         (`key={locale}` inside the provider). That is deliberate and load-bearing: `t()` reads
         `i18n.locale` at call time and React cannot see that dependency, so nothing short of a
         remount guarantees "every visible string changes" — see the provider's header.
-        ⚠️ The cost is that a language change restarts navigation at the shrine.
+        ⚠️ The cost is that a language change re-renders the WHOLE navigator in place (it remounts the
+        tree, so every visible string is rebuilt). ⚠️ An earlier note here claimed it *"restarts
+        navigation at the shrine"* — **measured 2026-11-15 (SCRUM-203) and it does not**: the screen you
+        are on stays and re-renders. The comment was wrong; the behaviour is the better one.
       */}
       <LocaleProvider>
         <Stack
