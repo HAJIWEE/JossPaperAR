@@ -533,6 +533,95 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **SCRUM-59 was the one that changed the code**, and it was kept out of PR-3 on purpose — it edits `request_cartoonize`, which was already applied, so it belongs in its own migration + PR with its own tests. **It is built: see §12.5.**
 
+### 12.57 · S81 — the ×2.0 DECAYS, "nearby" is a POINTS band, and the splash was finally judged on an APK (2026-11-15)
+
+> **Owner, answering SCRUM-235:** *"'users can only see nearby competitors' is supposed to mean in the dimension of
+> their accumulated points range not in terms of geographic location. for the second bullet and third bullet is
+> related, per cell the first burn starts at 2x then decays per burn to a minimum of 1x so to encourage exploration.
+> the decay should be exponential in nature dropping off more at the start e.g. 0.25 for the first drop then slowly
+> reduce the rate of dropping till the multiplier is fixed at 1x for the cell."*
+
+⚠️ **The 2026-09-23 phrase *"4-Block Radius Privacy"* was a misnomer**, and SCRUM-235's first draft repeated it as a
+map. It is not geography at all — and the second and third bullets are **one mechanic**, not two.
+
+#### The curve, and why that constant
+
+```
+multiplier(n) = 1 + min(2.0 − 1, 0.75^(n−1))      n = LIFETIME burn number in that cell
+                2.000 · 1.750 · 1.563 · 1.422 · 1.316 · 1.237 … → 1.000  (fixed from n = 20)
+```
+
+⚠️ **The BONUS decays geometrically, not the DROP.** Halving the *drop* (0.25, 0.125, 0.0625 …) converges to a total
+of 0.5, so the multiplier would **stall at 1.5× forever** and never reach the 1× the PM asked for. `0.75` on the bonus
+is the constant that actually arrives; it and the epsilon live in **one place** on each side (`c_ground_decay` in SQL,
+`GROUND_DECAY_RATIO` in `award.ts`), asserted equal by `check:domain`.
+
+#### What it changed
+
+- **`20261115130000_ground_decay.sql` REPLACES `submit_burn`** (applied migrations are immutable).
+- ⚠️ **The counter is LIFETIME, per (user, cell).** `cell_burns` is keyed per **day**, so the total is
+  **`sum(burn_count)`** — **no new table**. A **daily** reset would let a user re-earn ×2.0 in one spot every day,
+  which is the exact opposite of the exploration incentive.
+- ⚠️ **`burns.new_ground` stays truthful**: it is now exactly `n = 1`, not "a bonus was paid".
+- **`MAX_AWARD` 1,650 is unchanged** — the first burn is still ×2.0, so the ceiling does not move.
+- ⚠️ **A latent receipt bug fell out:** `clamped` was `v_award < v_raw` computed **after** `::integer`, so a
+  fractional raw (853.125 → 853) was reported as clamped. It is decided **before** rounding now, in SQL **and** TS.
+- **Proof:** `supabase/tests/ground_decay.sql` **8/8** — **1600 / 1400 / 1250 / 1138 / 1053**, floor **800**, a
+  no-cell burn still 800, and exactly **one** `new_ground = true` row. Fault-tested by setting the ratio to **1.0**
+  (the old binary cliff) → **D2 red: got 1600, expected 1400**.
+
+#### "Nearby" is a points band
+
+Checked before writing code, as the ticket demanded: **`get_league_board()` was already cohort-scoped** — one league
+week, one tier, ~30 members ranked by weekly points. So the deliverable was the **definition + the gate**, not an
+invented percentage: `pointsBandOf()` / `isNearbyBand()` (same week **and** tier), plus a `check:domain` rule that
+**fails on any location identifier** entering `league.ts` / `league-api.ts` (an unreadable file is RED, never a skip),
+plus `league_nearby_band.sql` **8/8** proving a **tier-2 rival never leaves the database** (fault-tested by making
+the RPC select tier 2 → red). ⚠️ A tighter window *inside* the tier would be one new constant — but it is a product
+number, and none was invented.
+
+#### The intro: once, from the root only
+
+`shouldShowIntro(pathname, seen)` is pure, and it lives in the **SAME** boot hook as the identity gate — two
+redirecting effects race, and **the sign-in wall must win** (`readIntroSeen()` is read *after* the identity outcome).
+`/clan` and `/account` are never interrupted. `check:lib` **967 → 973**, fault-tested twice. ✅ **On the APK:** first
+launch showed the panels, `Skip` landed on the **clan fork**, and a full relaunch opened **Home** with the intro gone.
+
+#### The seed guard, and the seed it protects
+
+`supabase/checks/seed-guard.ts` refuses by default; only the local stack (`…:54322`) or a target named in
+`SEED_ALLOW_TARGETS` may be seeded. **Fault-tested against the REAL linked ref** `yercgevebxvtzkgctfai` →
+**REFUSED, exit 2**. ⚠️ **SCRUM-155 is still not run:** it needs real `auth.users` rows on the hosted project, and
+this checkout holds only the **anon** key + `FAL_KEY` — **no service-role key, no database password**. Nothing was
+written to hosted.
+
+#### The splash, judged where it can be judged
+
+Expo Go shows the app icon since SDK 52, so SCRUM-172 could only be closed on a **release APK** (EAS `preview`,
+build `46d68f02…`, `gitCommitHash c0a6872` — the merged tree). On **HN615L005386**:
+
+| | |
+|---|---|
+| cold start `am start -W` | **2255 ms** (first) · **1718 ms** (after) |
+| frames | splash → **the splash fading over an ALREADY FULLY-RENDERED Home** → Home |
+
+✅ **No scaffold frame exists** — the tree is complete *underneath* the cover before the cover leaves.
+⚠️ **Recorded caveat:** `app.json`'s splash is **`#1b1613`** and Home is **`#F5F0E8`**, so the handover is a
+**dark→cream crossfade**. There is no separate in-app splash to compare against, but the colours do differ; sharing
+one colour is one `app.json` line plus a rebuild.
+
+#### Three traps, all measured
+
+1. ⚠️ **The Expo MCP `build_run` fails with *"No repository found for appId …"*** — the EAS project has no linked
+   GitHub repo. Start builds with **`npx --yes eas-cli@24.12.1`** (the version `eas.json` requires);
+   `eas-cli@latest` dies with `Invalid Version:` in this environment.
+2. ⚠️ **`adb exec-out screencap -p > f.png` produced truncated PNGs** (*"improper image header"*). Use
+   `adb shell screencap -p /sdcard/f.png` then `adb pull`.
+3. ⚠️⚠️ **Shell commands in ONE tool call ran CONCURRENTLY and raced** — an `input tap` fired against a `force-stop`
+   in the same batch, the tap was swallowed, and the intro looked broken. **Run dependent device steps sequentially**,
+   and confirm a control with `uiautomator dump` (`intro-skip` = `[565,96][690,184]`; tapping its centre worked first
+   time).
+
 ### 12.56 · S79m — SCRUM-217's three strings decided, and one of them was a PRIVACY claim getting weaker (2026-11-08)
 
 > **Owner:** *"For 217.1 it should be ok. For 217.2 we can generalize the ZH to 信息 instead. 3. we should be able to
