@@ -849,3 +849,12 @@ The PM merged **PR #40** (`cline/9059b-league`, 14 commits) **off-session at 202
 - ✅ **`SCRUM-172` — the splash's visual acceptance, judged on a release build.** Expo Go shows the app icon since SDK 52, so this was impossible there. EAS `preview` build `46d68f02…` (`gitCommitHash c0a6872`) on `HN615L005386`: cold start **2255 ms** first / **1718 ms** after; frames show the splash fading over an **already fully-rendered Home** — **no scaffold frame**. ⚠️ The one residual — splash `#1b1613` vs Home `#F5F0E8`, a **dark→cream crossfade** — stays open in **[[follow-up-items]]** rather than being buried here.
 - ✅ **The production-vs-`main` drift is CLOSED.** `20261115120000_delete_my_data_erases_email.sql` had been applied to hosted while the repo lagged; **PR #88 (`36cf667`)** merged it, so `main` and the deployed database agree again.
 - ✅ **`SCRUM-12`'s last three bullets closed with it** (the epic went **Done** in S81): the coarse-cell ×2.0 (**PR #88**), the "4-Block Radius" bullet redefined as a **points band** (`SCRUM-236`), and the per-cell decay (`SCRUM-237`). The **Play data-safety declaration** is *not* part of it — that is **`SCRUM-234`**, still open.
+
+---
+
+## Completed — 2026-11-15 (S81 · SCRUM-224 closed by splitting its remainders)
+
+> Moved out of [[follow-up-items]] when it closed. ⚠️ Historical record — do not act on these lines.
+
+- ✅ **`SCRUM-224` — the hosted leftovers.** `site_url` → **`https://josspaperar.app`** on the **apex** (domain association is **per-host**; a subdomain would open a browser) and `uri_allow_list` → `https://josspaperar.app/** ,josspaperar://**` — applied through the **Management API** and then **independently read back**, because a PATCH echo is not proof.
+- ⚠️ **It was closed by SPLITTING, not by finishing everything.** Leaving a shipped config change open behind work that needs three different accounts is how a ticket rots. The remainders are live tickets: **`SCRUM-238`** (Play Console — App Signing fingerprint), **`SCRUM-239`** (Apple Developer console — Associated Domains), **`SCRUM-240`** (the relay's real send ceiling).
