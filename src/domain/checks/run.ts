@@ -17,7 +17,7 @@
 
 import { AIM_BANDS, deriveBand, bandMultiplier, isRethrow } from '../aim.ts';
 import { CELL_MAX_LEN, cellFor, isValidCell } from '../cell.ts';
-import { computeAward, MAX_AWARD } from '../award.ts';
+import { computeAward, groundMultiplier, MAX_AWARD } from '../award.ts';
 import { OFFERINGS, BASE_VALUE_RATIO, baseValueOf } from '../catalogue.ts';
 import { isLegalCreditMovement, accrualFor, PHOTO_FEE_CREDITS } from '../currency.ts';
 import { hasQuota, remaining, dailyLimit, EMPTY_QUOTA, DAILY_PHOTO_BURNS } from '../quota.ts';
@@ -251,6 +251,67 @@ check('⚠️ cell: refuses the null island (an unset GPS fix)', cellFor(0, 0) =
 check('isValidCell rejects junk, so it can never reach the server',
   !isValidCell('') && !isValidCell('ABC') && !isValidCell(null) && !isValidCell(undefined)
   && !isValidCell('1'.padEnd(17, 'a')));
+
+// ── SCRUM-237 · THE GROUND BONUS DECAYS PER BURN (SCRUM-235) ─────────────────
+/**
+ * ⚠️ THE PM'S CURVE: the first burn in a cell is ×2.0, then the bonus ABOVE ×1.0
+ * decays exponentially and FRONT-LOADED — the first drop is 0.25, and the rate
+ * of dropping shrinks — until it is FIXED at ×1.0. The server (`submit_burn`) is
+ * authoritative; these assert the same table so the two cannot drift.
+ */
+const GROUND_TABLE: ReadonlyArray<readonly [number, number]> = [
+  [1, 2.0], [2, 1.75], [3, 1.5625], [4, 1.421875], [5, 1.31640625],
+];
+for (const [n, expected] of GROUND_TABLE) {
+  check(`ground: burn ${n} is × ${expected}`,
+    Math.abs(groundMultiplier(n) - expected) < 1e-9, `got ${groundMultiplier(n)}`);
+}
+
+check('⚠️ ground: the FIRST drop is exactly 0.25 — the number the PM gave',
+  Math.abs(groundMultiplier(1) - groundMultiplier(2) - 0.25) < 1e-9);
+
+// ⚠️ The whole point of "front-loaded": every later drop must be SMALLER. A
+// curve that dropped by a constant 0.25 would pass the table above and fail here.
+check('⚠️ ground: each later drop is SMALLER — the decay is front-loaded',
+  (() => {
+    let prev = groundMultiplier(1) - groundMultiplier(2);
+    for (let n = 2; n < 12; n++) {
+      const drop = groundMultiplier(n) - groundMultiplier(n + 1);
+      if (!(drop < prev)) return false;
+      prev = drop;
+    }
+    return true;
+  })());
+
+check('⚠️ ground: strictly decreasing while it decays, and never below ×1.0',
+  Array.from({ length: 20 }, (_, i) => groundMultiplier(i + 1))
+    .every((m, i, all) => m >= 1 && (i === 0 || m < all[i - 1])));
+
+check('⚠️ ground: FIXED at ×1.0 once the bonus rounds away (burn 20 onwards)',
+  groundMultiplier(20) === 1 && groundMultiplier(200) === 1);
+
+check('ground: nonsense input (0, negative, NaN) is ×1.0, never a bonus',
+  groundMultiplier(0) === 1 && groundMultiplier(-3) === 1 && groundMultiplier(Number.NaN) === 1);
+
+// ⚠️ The AWARD numbers, from the bullseye base (800), so the client can show what
+// the server actually paid: 1,600 · 1,400 · 1,250 · 1,138.
+const groundAward = (n: number) => computeAward({ offsetPx: 0, cellBurns: n }).award;
+check('⚠️ award: 1,600 → 1,400 → 1,250 → 1,138 as one cell is re-burned',
+  groundAward(1) === 1600 && groundAward(2) === 1400 && groundAward(3) === 1250 && groundAward(4) === 1138,
+  `${groundAward(1)}/${groundAward(2)}/${groundAward(3)}/${groundAward(4)}`);
+check('⚠️ award: at the floor a bullseye pays 800 — the bonus is gone, not negative',
+  groundAward(20) === 800 && groundAward(999) === 800);
+check('⚠️ award: the CEILING does not move — burn 1 + streak is still 1,650',
+  computeAward({ offsetPx: 0, cellBurns: 1, streakActive: true }).award === 1650);
+check('⚠️ award: the older `newGround: true` shape is burn 1',
+  computeAward({ offsetPx: 0, newGround: true }).award === 1600);
+// ⚠️ 600 × 1.421875 = 853.125 → 853. The OLD `clamped = award < raw` would have
+// said "clamped" here, which is a receipt that lies about why the award is 853.
+check('⚠️ award: a fractional raw is NOT reported as clamped (853.125 → 853)',
+  (() => {
+    const r = computeAward({ offsetPx: 20, cellBurns: 4 });
+    return r.award === 853 && r.clamped === false;
+  })());
 
 // ── verdict ──────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(64)}`);
