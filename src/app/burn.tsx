@@ -55,6 +55,7 @@ import {
   offsetFromHeart,
   restingPoint,
 } from '@/domain/throw';
+import { primeCell } from '@/lib/cell';
 import { localized, t } from '@/lib/i18n';
 import { collectedItemCode } from '@/lib/collection';
 import { readBurnParams, readItemBurnParams, toItemRewardParams, toRewardParams } from '@/lib/route-params';
@@ -290,6 +291,23 @@ export default function BurnScreen() {
 
   /** The image to draw, or `null` — derived, never stored, so it cannot go stale. */
   const offeringUri = spriteUrl;
+
+  /**
+   * ═══ SCRUM-12 · PRIME THE COARSE CELL (SCRUM-233 option A) ════════════════
+   *
+   * ⚠️⚠️ **HERE, AND NOT INSIDE `postBurn`.** The OS permission dialog must never appear *after*
+   * the player has thrown, and the award path must never await a GPS fix. Mounting this screen is
+   * the last honest moment to ask — and it is reached by BOTH burn kinds (the photo path through
+   * `/preparing`, the item path straight from the picker), so one call here covers both.
+   *
+   * ⚠️ **FIRE-AND-FORGET, DELIBERATELY.** Nothing waits for it. If the dialog is still open, or
+   * the fix lands after the throw, the burn simply goes without a cell: a bonus missed on the
+   * first throw, never a ritual blocked. `primeCell()` is single-flight and swallows every
+   * failure, so a re-mount costs nothing and a denial is not an error.
+   */
+  useEffect(() => {
+    void primeCell();
+  }, []);
 
   /**
    * Sign the sprite so `<Image>` can load it.

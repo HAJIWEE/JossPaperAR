@@ -16,6 +16,7 @@
  */
 
 import { AIM_BANDS, deriveBand, bandMultiplier, isRethrow } from '../aim.ts';
+import { CELL_MAX_LEN, cellFor, isValidCell } from '../cell.ts';
 import { computeAward, MAX_AWARD } from '../award.ts';
 import { OFFERINGS, BASE_VALUE_RATIO, baseValueOf } from '../catalogue.ts';
 import { isLegalCreditMovement, accrualFor, PHOTO_FEE_CREDITS } from '../currency.ts';
@@ -204,6 +205,52 @@ check(
   'guard: a 1000 px throw is NOT a bullseye (a dead harness would wrongly pass this)',
   GUARD_MUST_BE_FALSE === false,
 );
+
+// ── SCRUM-12 · the COARSE CELL (SCRUM-233 option A) ──────────────────────────
+/**
+ * ⚠️⚠️ **THE ×2.0 HAD NEVER FIRED.** `submit_burn` computes `new_ground` inside
+ * `if v_cell is not null`, and `grep -rn 'cell_hash' src/` matched nothing — so the reward, the
+ * `cell_burns` table and the reward screen's `newGround` tag were all unreachable.
+ *
+ * These assert the properties that make switching it on safe. ⚠️ **COARSENESS IS THE FIRST ONE
+ * THAT MATTERS**: a fine grid would be a location pin wearing a hash — technically not raw
+ * coordinates, and still singling out a building.
+ */
+const SG_LAT = 1.3521;
+const SG_LNG = 103.8198; // Singapore
+const cellBase = cellFor(SG_LAT, SG_LNG);
+
+check('cell: deterministic — the same fix always yields the same token',
+  cellBase !== null && cellBase === cellFor(SG_LAT, SG_LNG));
+check("cell: fits submit_burn's 16-char ceiling", cellBase !== null && cellBase.length <= CELL_MAX_LEN,
+  `length ${cellBase?.length}`);
+check('cell: version-prefixed and base36 only', isValidCell(cellBase));
+
+// ⚠️ THE COARSENESS PROOF: ~10 m apart must be the SAME cell, or this is a pin.
+check('⚠️ cell: ~10 m apart is the SAME cell — coarse, not a location pin',
+  cellFor(SG_LAT + 0.00009, SG_LNG + 0.00009) === cellBase);
+
+// ⚠️ …and the opposite, or "new ground" could never trigger for anyone.
+const cellFar = cellFor(SG_LAT + 0.02, SG_LNG); // ~2.2 km away
+check('cell: ~2 km apart is a DIFFERENT cell', cellFar !== null && cellFar !== cellBase);
+
+// ⚠️ NEVER A COORDINATE — no decimal point, no punctuation, nothing that reads as lat/lng.
+check('⚠️ cell: carries no coordinate text', cellBase !== null
+  && !cellBase.includes('.') && /^[0-9a-z]+$/.test(cellBase));
+
+// ⚠️ Each of these is a REFUSAL — a `null`, never a throw.
+check('cell: refuses NaN', cellFor(Number.NaN, SG_LNG) === null);
+check('cell: refuses an out-of-range latitude', cellFor(91, SG_LNG) === null);
+check('cell: refuses an out-of-range longitude', cellFor(SG_LAT, 181) === null);
+// ⚠️ The Gulf of Guinea is what an UNFIXED GPS reports. Paying ×2.0 for it would be free money
+// for every device that simply failed to fix.
+check('⚠️ cell: refuses the null island (an unset GPS fix)', cellFor(0, 0) === null);
+
+// ⚠️ THE GUARD THAT PROTECTS THE BURN ITSELF: `submit_burn` rejects a malformed `cell_hash` by
+// raising `22023`, which kills the WHOLE burn — so a bad token must be unsendable by construction.
+check('isValidCell rejects junk, so it can never reach the server',
+  !isValidCell('') && !isValidCell('ABC') && !isValidCell(null) && !isValidCell(undefined)
+  && !isValidCell('1'.padEnd(17, 'a')));
 
 // ── verdict ──────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(64)}`);

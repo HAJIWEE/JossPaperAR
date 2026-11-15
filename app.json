@@ -59,6 +59,14 @@
         }
       ],
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Joss Paper AR to use your approximate location, so a burn on new ground earns its bonus.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isIosBackgroundLocationEnabled": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",

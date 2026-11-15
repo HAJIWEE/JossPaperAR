@@ -15,6 +15,8 @@ import {
   isUploadableCaptureSize,
   shrinkStep,
 } from './capture-size.ts';
+import { isValidCell } from '../domain/cell.ts';
+import { currentCell } from './cell.ts';
 import { nativeLoaderUriFromAnyForm, unescapeFromNativeLoader } from './native-path.ts';
 import { eventsFromResponse, outcomeFromHttpFailure, uploadAlreadyPresent, uploadFailureVerdict, type Outcome, type OrchestratorResponse } from './ritual-map.ts';
 import { captureStoragePath } from './storage-path.ts';
@@ -436,6 +438,27 @@ async function postBurn(
   }
   if (!token) return { kind: 'transient', reason: 'not_authenticated' };
 
+  /**
+   * ═══ SCRUM-12 · THE COARSE CELL ══════════════════════════════════════════
+   *
+   * ⚠️⚠️ **`currentCell()` IS SYNCHRONOUS, AND THAT IS THE WHOLE DESIGN.** It reads a cache that
+   * `primeCell()` filled when the burn screen mounted. The award path therefore cannot await the
+   * GPS, cannot time out, and cannot prompt — **a burn must never fail or stall because location
+   * did.** `null` means "no cell, no bonus", which is the state every build so far has shipped
+   * in, so the degraded path is proven rather than new.
+   *
+   * ⚠️ **`isValidCell` GUARDS THE SEND, NOT JUST THE CACHE.** `submit_burn` grades a malformed
+   * `cell_hash` by rejecting the ENTIRE burn (`22023`), so an invalid token must be dropped here
+   * rather than trusted: a bonus lost is recoverable, a refused offering is not.
+   *
+   * ⚠️ `cell_hash` is omitted entirely when unknown. `submit_burn` reads it with
+   * `nullif(..., '')`, so an empty string and an absent key both mean "no cell" — but only the
+   * absent key keeps the payload honest about what the client actually knew.
+   */
+  const cell = currentCell();
+  const outgoing: Record<string, unknown> =
+    isValidCell(cell) ? { ...payload, cell_hash: cell } : payload;
+
   let res: Response;
   try {
     res = await fetch(`${base}/functions/v1/award-service`, {
@@ -446,7 +469,7 @@ async function postBurn(
         'Idempotency-Key': idempotencyKey,
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(outgoing),
       ...(opts.signal ? { signal: opts.signal } : {}),
     });
   } catch {
