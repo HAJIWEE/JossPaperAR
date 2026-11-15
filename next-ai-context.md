@@ -2592,3 +2592,16 @@ stands, only narrower: it is the last set in the wrong category for that band.
 
 
 
+
+## 📍 2026-11-15 (S80, cont.) — PR #88's red check was the SDK patch drift, not the diff
+
+⚠️ **`App checks (typecheck · expo-doctor)` went red on a PR whose `tsc`, `check:lib` (967) and `check:copy` (19) all passed** — the one failing step was **`npx expo-doctor`**, reporting *"Check that packages match versions required by installed Expo SDK"*: expected `expo ~57.0.33` · `expo-constants ~57.0.24` · `expo-linking ~57.0.14` · `expo-router ~57.0.31` · `expo-sqlite ~57.0.5`, installed `.32` / `.23` / `.13` / `.30` / `.4`. ⚠️ **That is exactly SCRUM-120's trap**: Expo published patches, so **nothing in PR #88's diff was at fault**.
+
+**THE FIX** — `npx expo install --fix` in the PR's own worktree (`3b2cf`), then commit the lockfile. ⚠️ **`expo-constants` keeps `~57.0.20` in `package.json` on purpose**: that range already admits **57.0.24**, so `expo install --fix` leaves the RANGE alone while the **lockfile** pins the patched version — expo-doctor compares the **installed** version, not the range. Do not "tidy" it into a range bump for symmetry.
+
+✅ **Proof**: `expo-doctor` **21/21** · `npx tsc --noEmit` **0** · `check:lib` **967** · `check:copy` **19** · `npm run check` **0** · **CI run 43692377780 green on both jobs** (`d976015`).
+
+⚠️ **Read the failing STEP, not the job name** — the job is called *"typecheck · expo-doctor"* and only one of the two was red. `gh run view <run> --job <id> --log | grep -F '\tExpo doctor\t'` gets to the answer in one command; the check-run annotation only says *"Process completed with exit code 1"*.
+
+**US$0.00.**
+

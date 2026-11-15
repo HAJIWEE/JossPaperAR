@@ -314,3 +314,13 @@
 ---
 
 *Updated 2026-09-25 — page created (session 16); ClinePass + spike budget logged; first-month actual **US$2.12 = S$2.71** recorded, **next charge 2026-10-22**.*
+
+## 2026-11-15 · S80, cont. — PR #88's CI patch drift — **US$0.00**
+
+| what | cost |
+|---|---|
+| `npx expo install --fix` + lockfile bump (5 Expo SDK 57 patches) | **US$0.00** — npm registry only: no fal.ai call, no Path C run, no `FAL_KEY` use |
+
+**Total: US$0.00 = S$0.00** (Mastercard rate **1.2808**, nothing to convert).
+⚠️ **Cumulative is unchanged** — re-derive it from the rows above rather than trusting this sentence; the last reconciled figure in this page was **US$5.43 ≈ S$6.96**.
+
