@@ -33,6 +33,7 @@ import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  Linking,
   PanResponder,
   Platform,
   Pressable,
@@ -279,18 +280,48 @@ export default function CaptureScreen() {
 
   // ── permission gate ──────────────────────────────────────────────────────
   if (permission && !permission.granted) {
+    /**
+     * ⚠️⚠️ **A DENIED PERMISSION IS NOT A DEAD END (SCRUM-170).**
+     *
+     * ⚠️ **THE DEFECT:** this button called `requestPermission()` unconditionally. On Android, once
+     * the user has DENIED twice, `canAskAgain` becomes `false` and `requestPermission()` is a
+     * **silent no-op** — the OS shows no dialog at all. So the one control on the screen did
+     * nothing, and the only exit was the back circle. That is the *dead end* this ticket is named
+     * for, and it is invisible to any gate that only checks the button exists.
+     *
+     * ✅ **So when the OS will not ask again, the CTA changes JOB rather than going quiet:** it
+     * opens the app's Settings page, which is the ONLY place the grant can be restored. ⚠️ The
+     * copy changes with it — a button labelled *"Allow camera"* that opens Settings would be a lie,
+     * and the reason the user has to leave the app has to be stated, not implied.
+     *
+     * ⚠️ `permission.canAskAgain === false` is the ONLY reliable signal: it is what the OS reports
+     * after a permanent denial. Do not infer it from a failed request — a transient failure and a
+     * permanent one are different facts (the same distinction `_layout`'s identity gate makes
+     * between `SIGN_IN_REQUIRED` and every other error).
+     */
+    const cannotAsk = permission.canAskAgain === false;
     return (
       <View style={[styles.gate, { paddingTop: insets.top + space.xl }]}>
         <Text style={styles.gateTitle}>{t('capture.cameraNeeded')}</Text>
-        <Text style={styles.gateBody}>{t('capture.cameraWhy')}</Text>
+        <Text style={styles.gateBody}>
+          {cannotAsk ? t('capture.cameraBlockedWhy') : t('capture.cameraWhy')}
+        </Text>
         <Pressable
           accessibilityRole="button"
+          testID="capture-permission-cta"
           onPress={() => {
+            if (cannotAsk) {
+              /** ⚠️ The grant can only be changed in Settings — this is the way out. */
+              void Linking.openSettings();
+              return;
+            }
             void requestPermission();
           }}
           style={({ pressed }) => [styles.button, pressed && styles.pressed]}
         >
-          <Text style={styles.buttonLabel}>{t('invite.grantCamera')}</Text>
+          <Text style={styles.buttonLabel}>
+            {cannotAsk ? t('capture.cameraBlockedCta') : t('invite.grantCamera')}
+          </Text>
         </Pressable>
         {/* ⚠️ `EN · 2g Capture / camera denied` draws the back circle too — the denial is not a trap. */}
         <ScreenHud tone="dark" backTestID="capture-back" />

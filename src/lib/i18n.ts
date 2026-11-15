@@ -64,6 +64,33 @@ export const MESSAGES = {
     'capture.cameraNeeded': 'The camera is needed',
     'capture.cameraWhy':
       'The offering is the object you would like to burn. Nothing leaves this phone without your permission to photograph it.',
+    // ⚠️ SCRUM-170 — the PERMANENTLY-DENIED state. `canAskAgain === false` means the OS will
+    // never show the dialog again, so the CTA must open Settings and say why. A button labelled
+    // "Allow camera" that silently does nothing is the dead end this ticket exists to remove.
+    'capture.cameraBlockedWhy':
+      'Camera access is switched off for this app, so it cannot ask again. Turn Camera on in Settings to photograph your offering.',
+    'capture.cameraBlockedCta': 'Open Settings',
+    // ── SCRUM-171 · the three intro panels (`EN · 0b Onboarding` ×3) ──────────
+    // ⚠️ VERBATIM from the boards, 2026-11-15. Do not "improve" these — they are signed off.
+    'intro.p1.e1': 'BURIED',
+    'intro.p1.e2': 'BURNED',
+    'intro.p1.e3': 'NOW',
+    'intro.p1.title': 'Three thousand years,\none intention.',
+    'intro.p1.body':
+      'Valuables were buried, then joss paper was burned. Here the same offering continues — nothing is consumed.',
+    'intro.p2.e1': 'PHOTO',
+    'intro.p2.e2': 'JOSS STYLE',
+    'intro.p2.title': 'Offer what matters to you.',
+    'intro.p2.body':
+      "Photograph something meaningful — your home, a place, an object. It becomes an offering in the app's ink style.",
+    'intro.p3.e1': 'THROW',
+    'intro.p3.e2': 'BURN',
+    'intro.p3.title': 'Aim, and let it burn.',
+    'intro.p3.body':
+      'Throw it into the fire — a steady hand earns more. Every offering honours, and every burn counts.',
+    'intro.next': 'Next',
+    'intro.skip': 'Skip',
+    'intro.start': 'Get started',
     'capture.photoHint': 'Photograph the offering',
     'capture.failed': 'The photo was not taken — nothing has been used.',
     'capture.tryAgain': 'Try again',
@@ -587,6 +614,28 @@ export const MESSAGES = {
     'common.cancel': '取消',
     'capture.cameraNeeded': '需要使用相机',
     'capture.cameraWhy': '供品就是您想焚烧的物品。未获得您的拍照许可，任何内容都不会离开这台手机。',
+    // ⚠️ SCRUM-170 — 永久拒绝状态：`canAskAgain === false` 时系统不会再弹窗，所以按钮改为打开设置，
+    // 并且把原因说出来。一个写着「允许使用相机」却毫无反应的按钮，正是本工单要消除的死路。
+    'capture.cameraBlockedWhy': '本应用的相机权限已被关闭，系统无法再次询问。请在「设置」中开启相机，以便拍摄您的供品。',
+    'capture.cameraBlockedCta': '打开设置',
+    // ── SCRUM-171 · 三屏新手引导（`ZH · 0b 新手引导` ×3） ───────────────────────
+    // ⚠️ 逐字取自设计稿（2026-11-15），请勿改写。
+    'intro.p1.e1': '陪葬',
+    'intro.p1.e2': '焚烧',
+    'intro.p1.e3': '如今',
+    'intro.p1.title': '三千年的心意，\n未曾改变。',
+    'intro.p1.body': '从前以珍宝陪葬，后来焚烧金纸；如今，同样的心意以光影延续，不消耗一物。',
+    'intro.p2.e1': '拍摄',
+    'intro.p2.e2': '水墨成形',
+    'intro.p2.title': '献上你在意之物。',
+    'intro.p2.body': '拍下有意义的物品——家、地方、物件；它会化作水墨风格的供品。',
+    'intro.p3.e1': '投入',
+    'intro.p3.e2': '焚烧',
+    'intro.p3.title': '瞄准，投入火中。',
+    'intro.p3.body': '正中火心，功德更盛。每一次供奉，都被记下。',
+    'intro.next': '下一步',
+    'intro.skip': '跳过',
+    'intro.start': '开始',
     'capture.photoHint': '拍摄供品',
     'capture.failed': '未能拍下照片——未消耗任何内容。',
     'capture.tryAgain': '再试一次',

@@ -48,6 +48,7 @@ import { LocaleToggle } from '@/components/locale-toggle';
 import { deleteMyData, resetIdentity } from '@/lib/account-api';
 import { signOutAccount } from '@/lib/account';
 import { ACCOUNT_ROUTE } from '@/lib/account-flow';
+import { clearCell } from '@/lib/cell';
 import { clearFirstRun } from '@/lib/first-run';
 import { clearOnboarded } from '@/lib/onboarded';
 import { ScreenHud } from '@/components/screen-hud';
@@ -147,7 +148,10 @@ export default function SettingsScreen() {
        *   3. ⚠️ **forget the ONBOARDED record too** (ADR-004 · Amendment 2) — this is what reopens the
        *      anonymous window, and it MUST happen before step 4 re-mints, or the delete would sign out and
        *      then demand a sign-in from someone who has just erased their account;
-       *   4. sign out and mint a FRESH identity (the RPC cannot remove `auth.users`);
+       *   4. sign out and mint a FRESH identity — ⚠️ **NOT because the RPC "cannot remove `auth.users`":
+     *      since SCRUM-219 it does** (`20261115120000`), and `auth.sessions` cascades with it. The sign-out
+     *      is still required, because the session is also stored ON THE DEVICE and
+     *      `ensureAnonymousSession()` would otherwise reuse an identity whose row no longer exists;
        *   5. land on the shrine, which is clan-less — the first-run fork.
        * ⚠️ A failed delete stops at step 1 and says so. Nothing is half-erased.
        */
@@ -161,6 +165,13 @@ export default function SettingsScreen() {
       await clearFirstRun();
       // ⚠️ BEFORE `resetIdentity()`: this is what reopens the anonymous window it mints into.
       await clearOnboarded();
+      /**
+       * ⚠️ SCRUM-12: drop the cached coarse cell too. It is derived from THIS DEVICE's position
+       * and would otherwise be sent by the first burn of the FRESH identity — paying new-ground
+       * ×2.0 for ground the erased account already burned, and linking the two identities by
+       * accident. It lives in memory only (nothing is persisted), so this is the whole cleanup.
+       */
+      clearCell();
       await resetIdentity();
       setBusy(false);
       router.replace('/');
@@ -195,6 +206,13 @@ export default function SettingsScreen() {
         setSignOutProblem(t('settings.signOutFailed'));
         return;
       }
+      /**
+       * ⚠️ SCRUM-12: a different account may sign in on this device next, and a cached cell would
+       * let that account claim new-ground ×2.0 for ground this one already burned. ⚠️ This is NOT
+       * "erasing" anything — the cell is a position, not a record — so it belongs on the sign-out
+       * path even though `check:lib` forbids the delete's own helpers here.
+       */
+      clearCell();
       /** ⚠️ The SIGN-IN WALL, not the shrine: the device is signed out and stays that way. */
       router.replace(ACCOUNT_ROUTE);
     })();

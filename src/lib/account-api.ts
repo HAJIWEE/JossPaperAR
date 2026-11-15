@@ -6,12 +6,26 @@
  * pseudonymous `integrity_flags` rows and **verifies zero rows before returning** — and `src/` had no
  * reference to it. ADR-007's one-tap delete, the promise the privacy posture rests on, was unbuilt.
  *
- * ── ⚠️ WHAT THE RPC DOES *NOT* DO: REMOVE THE AUTH USER ──────────────────────
- * Its own payload says so — *"the auth.users row is not removed by SQL — that needs the Admin API"*.
- * So after a successful delete the session still exists with **no `profiles` row**, and
- * `ensureAnonymousSession()` would REUSE it (it only signs in when there is no session at all).
- * ⚠️ That is why `resetIdentity()` signs out first: without it, "back to first run" would leave the
- * device holding a profile-less identity, and the next write would fail on a missing row.
+ * ── ✅ SINCE SCRUM-219 THE RPC *DOES* REMOVE THE AUTH USER ────────────────────
+ * ⚠️ This block used to say the opposite, quoting the RPC's own payload: *"the auth.users row is not
+ * removed by SQL — that needs the Admin API"*. **Both are now false.** Migration
+ * `20261115120000_delete_my_data_erases_email.sql` deletes the `auth.users` row inside the RPC, so the
+ * EMAIL — the only field in this product that identifies a PERSON rather than a device (doc 13 §4) — goes
+ * with the rest of the data. ⚠️ It is SQL, not the Admin API: `postgres` holds DELETE on `auth.users`,
+ * bypasses its RLS, and every referencing FK cascades (all four measured; the migration header says how).
+ *
+ * ⚠️ **AND `resetIdentity()` BELOW IS STILL NECESSARY — for a DIFFERENT reason than it was built for.**
+ * Before: the session survived with no `profiles` row, so it had to be signed out or it would be reused.
+ * Now: the `auth.users` row is gone, so `auth.sessions` cascaded away with it and there is **nothing left
+ * to revoke** — but the session is also stored ON THE DEVICE, and `ensureAnonymousSession()` reuses
+ * whatever it finds (`session-map.ts` → `reuse`). ✅ So it must still be signed out, or the device keeps an
+ * identity whose row no longer exists and every later write answers 42501.
+ *
+ * ⚠️ **"But `signOut()` will fail now, because the user is gone" — it does not.** `auth-js`'s `_signOut`
+ * deliberately ignores **404, 401 and 403** (*"user might not exist anymore"*) and then removes the stored
+ * session regardless (`GoTrueClient.js:3441–3455`). That branch is what makes the hard delete safe for the
+ * client, and it is recorded here because it is the sort of thing a future session would otherwise
+ * re-litigate from scratch.
  */
 
 import type { ApiResult } from './clan-api.ts';
@@ -50,8 +64,11 @@ export async function deleteMyData(): Promise<ApiResult<DeleteReceipt>> {
 /**
  * Sign out and mint a FRESH anonymous identity — what "back to first run" means.
  *
- * ⚠️ The order is the point: `signOut` THEN `ensureAnonymousSession`. Reusing the old session would
- * leave the device on an identity whose `profiles` row the delete just removed.
+ * ⚠️ The order is the point: `signOut` THEN `ensureAnonymousSession`. ⚠️ **SCRUM-219 changed WHY.**
+ * It used to be *"otherwise the device keeps an identity whose `profiles` row the delete just removed"*.
+ * Now `delete_my_data()` removes the `auth.users` row itself, so what survives is the session **stored on
+ * the device** — and `ensureAnonymousSession()` would reuse it (`session-map.ts` → `reuse`) even though the
+ * row behind it is gone. Same instruction, different fact.
  *
  * ⚠️⚠️ **AND SINCE `ADR-004 · Amendment 2` (2026-11-08) THIS ALSO DEPENDS ON ITS CALLER.** The bootstrap
  * now mints an anonymous session **only while the device is still owed its demo**, so a signed-out device

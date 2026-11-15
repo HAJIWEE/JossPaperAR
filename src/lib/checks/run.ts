@@ -77,6 +77,7 @@ import {
   scrimRgba,
 } from '../confirm-card.ts';
 import { type UuidFactory, isValidIdempotencyKey, newIdempotencyKey } from '../idempotency.ts';
+import { CLAN_FORK_ROUTE, INTRO_PANELS, isLastPanel, nextPanel } from '../intro.ts';
 import {
   CODE_ALPHABET,
   CODE_LENGTH,
@@ -2417,6 +2418,129 @@ function itemBurnChecks(): void {
   check('⚠️ …and it sends the item code on the ITEM path, never a capture',
     readFileSync(join(PROJECT_ROOT, 'src/lib/ritual.ts'), 'utf8')
       .includes("{ item_code: itemCode.trim(), accuracy: accuracyPx, clan_id: clanId }"));
+
+  // ── SCRUM-12 · THE COARSE CELL IS WIRED — AND STAYS OFF THE CRITICAL PATH ───
+  /**
+   * ⚠️⚠️ **THE FOURTH GUARD.** The ×2.0 had never fired because nothing ever sent `cell_hash`
+   * (measured 2026-11-15). Switching it on adds a DEVICE dependency to the award path, so these
+   * assert the wiring exists **and** that it cannot make a burn fail, wait or prompt — the ruling
+   * in SCRUM-233 option A.
+   */
+  const ritualCellSrc = readFileSync(join(PROJECT_ROOT, 'src/lib/ritual.ts'), 'utf8');
+  check('⚠️ SCRUM-12: the burn payload carries `cell_hash`', ritualCellSrc.includes('cell_hash: cell'));
+  check('⚠️ …read from the SYNCHRONOUS cache, never awaited on the send path',
+    ritualCellSrc.includes('currentCell()'));
+  // ⚠️⚠️ THE DECISIVE ONE. `postBurn` must not be able to reach the GPS library: if it could, a
+  // device with no location service would have a throw path that can throw.
+  check('⚠️⚠️ ritual.ts never imports expo-location — the award path cannot touch the GPS',
+    !ritualCellSrc.includes('expo-location'));
+
+  const cellLibSrc = readFileSync(join(PROJECT_ROOT, 'src/lib/cell.ts'), 'utf8');
+  check('⚠️ lib/cell.ts exposes currentCell() SYNCHRONOUSLY, so nothing downstream can await it',
+    /export function currentCell\(\): string \| null/.test(cellLibSrc));
+  check('⚠️ …every failure answers null rather than throwing',
+    cellLibSrc.includes('catch') && cellLibSrc.includes('return null'));
+  // ⚠️ A cell on disk would be a LOCATION TRAIL — the one thing the schema forbids outright.
+  check('⚠️ …and it never persists the cell (no storage import)',
+    !cellLibSrc.includes('AsyncStorage') && !cellLibSrc.includes('SecureStore'));
+
+  const burnPrimeSrc = readFileSync(join(PROJECT_ROOT, 'src/app/burn.tsx'), 'utf8');
+  check('⚠️ burn.tsx primes the cell on MOUNT, so the permission dialog is never mid-ritual',
+    burnPrimeSrc.includes('void primeCell()'));
+
+  // ── SCRUM-170 · A PERMANENTLY-DENIED CAMERA IS NOT A DEAD END ───────────────
+  /**
+   * ⚠️⚠️ **THE DEFECT WAS INVISIBLE TO ANY GATE THAT CHECKED THE BUTTON EXISTED.** The gate's only
+   * control called `requestPermission()` unconditionally; once a user had denied twice, the OS
+   * stopped showing a dialog and the button became a **silent no-op**. So these assert the SIGNAL
+   * and the ROUTE OUT, not the presence of a `Pressable`.
+   */
+  const captureGateSrc = readFileSync(join(PROJECT_ROOT, 'src/app/capture.tsx'), 'utf8');
+  check('⚠️ SCRUM-170: the camera gate reads canAskAgain — a permanent denial is its own fact',
+    captureGateSrc.includes('permission.canAskAgain'));
+  check('⚠️ …a permanent denial OPENS SETTINGS instead of a button that does nothing',
+    captureGateSrc.includes('Linking.openSettings()'));
+  check('⚠️ …and the CTA copy changes with the job, so the button never lies',
+    captureGateSrc.includes('capture.cameraBlockedCta')
+      && captureGateSrc.includes('capture.cameraBlockedWhy'));
+  // ⚠️ ORDER: the Settings branch must SHORT-CIRCUIT. A request placed before it would fire a
+  // no-op first and make the branch unreachable — present-but-useless, which is the failure mode.
+  const blockedAt = captureGateSrc.indexOf('if (cannotAsk)');
+  const requestAt = captureGateSrc.indexOf('void requestPermission()');
+  check('⚠️ …the Settings branch short-circuits BEFORE the request',
+    blockedAt > -1 && requestAt > -1 && blockedAt < requestAt);
+
+  // ── SCRUM-172 · THE SPLASH COVERS THE FIRST FRAME, AND IS NOT A GATE ────────
+  /**
+   * ⚠️⚠️ **THE TICKET'S WHOLE RISK IS ONE WORD: "gate".** A splash that waits for the anonymous
+   * bootstrap would hold the screen through a slow network and hold it FOREVER on a failed one —
+   * and `ensureAnonymousSession()` is deliberately un-awaited by the identity gate for exactly that
+   * reason (ADR-004). So these assert placement and NON-coupling, not that a call exists.
+   */
+  const layoutSrc = readFileSync(join(PROJECT_ROOT, 'src/app/_layout.tsx'), 'utf8');
+  const preventAt = layoutSrc.indexOf('preventAutoHideAsync');
+  const rootFnAt = layoutSrc.indexOf('export default function RootLayout');
+  check('⚠️ SCRUM-172: the splash is held at MODULE SCOPE, before RootLayout is even declared',
+    preventAt > -1 && rootFnAt > -1 && preventAt < rootFnAt);
+  // ⚠️ The docs: call it in global scope WITHOUT awaiting, or it lands after the splash already hid.
+  check('⚠️ …and it is NOT awaited, so it cannot be skipped when the splash has already hidden',
+    !layoutSrc.includes('await SplashScreen.preventAutoHideAsync'));
+  check('…and the root layout actually installs the cover', layoutSrc.includes('useSplashCover()'));
+
+  // ⚠️ THE DECISIVE ONE — a slice, because a comment cannot be enforced.
+  const coverAt = layoutSrc.indexOf('function useSplashCover');
+  const coverEnd = coverAt > -1 ? layoutSrc.indexOf('\n}', coverAt) : -1;
+  const coverBody = coverAt > -1 && coverEnd > coverAt ? layoutSrc.slice(coverAt, coverEnd) : '';
+  check('⚠️ guard: the cover slice is non-empty, or the assertion below proves nothing',
+    coverBody.includes('hideAsync'));
+  check('⚠️⚠️ …the cover NEVER waits on the session — it hides on a frame, not on a bootstrap',
+    coverBody.length > 0 && !coverBody.includes('ensureAnonymousSession'));
+
+  // ── SCRUM-171 · THE THREE INTRO PANELS ─────────────────────────────────────
+  /**
+   * ⚠️ **THE COPY IS THE BOARDS'. These assert the SHAPE the boards actually have**, not a tidy
+   * three-of-everything: panel 1 carries a THREE-step eyebrow row and panels 2–3 carry TWO. A gate
+   * that demanded symmetry would be wrong about the design.
+   */
+  check('⚠️ SCRUM-171: three panels, in story order', INTRO_PANELS.length === 3);
+  check('⚠️ …panel 1 has THREE eyebrows (BURIED · BURNED · NOW) — the boards are not symmetrical',
+    INTRO_PANELS[0].eyebrows.length === 3);
+  check('…panels 2 and 3 have TWO each',
+    INTRO_PANELS[1].eyebrows.length === 2 && INTRO_PANELS[2].eyebrows.length === 2);
+  check("⚠️ …the last panel's CTA is `Get started`, and the earlier ones are `Next`",
+    INTRO_PANELS[0].ctaKey === 'intro.next'
+      && INTRO_PANELS[1].ctaKey === 'intro.next'
+      && INTRO_PANELS[2].ctaKey === 'intro.start');
+  // ⚠️ No wrap: the last panel must not step back to the first, or `Get started` re-shows the intro.
+  check('⚠️ …and the flow CLAMPS at the last panel rather than wrapping',
+    isLastPanel(nextPanel(2)) && nextPanel(2) === 2);
+  // ⚠️ Option A — BOTH exits go to the clan fork, never the shrine.
+  check('⚠️ SCRUM-171: both exits hand to the CLAN FORK (owner, option A)',
+    CLAN_FORK_ROUTE === '/clan');
+
+  // ⚠️ Every panel key must exist in BOTH locales. Counting occurrences in the source is blunt but
+  // it is the one check that catches a key added to EN and forgotten in ZH — which renders as the
+  // raw key on a Chinese screen.
+  const i18nSrc = readFileSync(join(PROJECT_ROOT, 'src/lib/i18n.ts'), 'utf8');
+  const panelKeys = INTRO_PANELS.flatMap((p) => [...p.eyebrows, p.titleKey, p.bodyKey, p.ctaKey]);
+  const everyKeyTwice = panelKeys.every((k) => i18nSrc.split(`'${k}'`).length - 1 === 2);
+  check('⚠️⚠️ …every panel key exists in exactly TWO locales (EN + ZH)', everyKeyTwice);
+  check('…and the shared chrome keys do too',
+    ['intro.skip'].every((k) => i18nSrc.split(`'${k}'`).length - 1 === 2));
+
+  // ⚠️ The screen must OFFER the skip on every panel, and record before it leaves.
+  // ⚠️ STRIPPED, not raw: the first cut asserted on the raw text and my own docblock — which names
+  // `readIntroSeen` while explaining that SCRUM-169 owns it — tripped the check. A gate must read
+  // CODE, not prose, or it punishes documentation. ⚠️ The stripper is INLINE on purpose: the
+  // `stripComments` helper in this file lives in another function's scope, and reaching for it threw
+  // `ReferenceError: stripComments is not defined` at runtime — which `tsc` did not catch.
+  const introScreenJs = readFileSync(join(PROJECT_ROOT, 'src/app/onboarding.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+  check('⚠️ …the screen renders a Skip control', introScreenJs.includes('testID="intro-skip"'));
+  check('⚠️ …and it records the fact on the way out', introScreenJs.includes('markIntroSeen()'));
+  check('⚠️⚠️ …and it does NOT decide when it is shown — that is SCRUM-169',
+    !introScreenJs.includes('readIntroSeen'));
 
   const reward = readItemRewardParams({ itemCode: 'house', offsetPx: '41.5', throwNumber: '2' });
   check('the item reward hop carries the code and the SAME accuracy/throw rules',

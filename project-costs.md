@@ -295,4 +295,32 @@
 
 
 
+## 2026-11-15 · S80 — **US$0.00**
+
+⚠️ **Nothing was spent, and that is a real result rather than an omission.** S80 closed 13 tickets, shipped two database changes and three first-run screens, and **made no AI provider call at all** — no Path C generation, no `cartoonize` probe, no re-generation to "check" anything.
+
+| what | cost |
+|---|---|
+| `SCRUM-219` — `delete_my_data()` erases `auth.users` | **US$0.00** (SQL only) |
+| `SCRUM-12` — the coarse cell / `×2.0` | **US$0.00** on the server; the device run used a **local** Metro and a **hosted** burn-free path |
+| `SCRUM-224` — `site_url` / `uri_allow_list` | **US$0.00** (Management API) |
+| `SCRUM-170`/`171`/`172` — first-run screens | **US$0.00** |
+
+**Total: US$0.00 = S$0.00** (Mastercard rate **1.2808**, nothing to convert).
+⚠️ **Cumulative is unchanged** — re-derive it from the rows above rather than from this sentence; the last reconciled figure in this page was **US$5.43 ≈ S$6.96**.
+
+⚠️ **The one thing that WOULD have cost money, and deliberately did not happen:** a full ritual burn on the device would have spent ≈ **US$0.091** (Path C). ⚠️ It was not run because the phone cannot be aimed at a subject from here — so the server half was proved by `supabase/tests/new_ground_cell.sql` (**800 → 1600**) instead, which is both free and repeatable.
+
+---
+
 *Updated 2026-09-25 — page created (session 16); ClinePass + spike budget logged; first-month actual **US$2.12 = S$2.71** recorded, **next charge 2026-10-22**.*
+
+## 2026-11-15 · S80, cont. — PR #88's CI patch drift — **US$0.00**
+
+| what | cost |
+|---|---|
+| `npx expo install --fix` + lockfile bump (5 Expo SDK 57 patches) | **US$0.00** — npm registry only: no fal.ai call, no Path C run, no `FAL_KEY` use |
+
+**Total: US$0.00 = S$0.00** (Mastercard rate **1.2808**, nothing to convert).
+⚠️ **Cumulative is unchanged** — re-derive it from the rows above rather than trusting this sentence; the last reconciled figure in this page was **US$5.43 ≈ S$6.96**.
+
