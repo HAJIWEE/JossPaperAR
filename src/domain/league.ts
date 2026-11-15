@@ -157,3 +157,39 @@ export function promotionMoment(
 /** The outcome vocabulary, as a value — so a parser and a test share one list. */
 export const LEAGUE_OUTCOMES = ['promoted', 'demoted', 'held'] as const;
 export type LeagueOutcome = (typeof LEAGUE_OUTCOMES)[number];
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * "NEARBY COMPETITORS" IS A POINTS BAND — NOT A GEOGRAPHIC RADIUS (SCRUM-236)
+ *
+ * ⚠️ SCRUM-12's original bullet read *"4-Block Radius Privacy — Users can only
+ * see nearby competitors"*, which reads as a MAP. The PM settled it on
+ * 2026-11-15: *"in the dimension of their accumulated points range not in terms
+ * of geographic location"*.
+ *
+ * The band of record is the COHORT: one league week, one tier, filled to
+ * COHORT_SIZE (~30) by accumulated weekly points. Two players are "nearby" when
+ * they compete in the same band, whatever continent they are on.
+ *
+ * ⚠️ NO LOCATION VALUE MAY ENTER THIS PATH — `check:domain` reads this file and
+ * `lib/league-api.ts` and fails on any location identifier, so a future
+ * "nearby = a map" change cannot land quietly.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+export interface PointsBand {
+  readonly weekId: string;
+  readonly tier: number;
+}
+
+/** The band a row belongs to: its league week plus its rung. */
+export function pointsBandOf(weekId: string, tier: number): PointsBand {
+  return { weekId, tier };
+}
+
+/**
+ * Same week **and** same tier = the same points band. That is the whole
+ * definition of "nearby" — deliberately a value, not prose, so the board's
+ * server-side scoping and this test cannot drift.
+ */
+export function isNearbyBand(a: PointsBand, b: PointsBand): boolean {
+  return a.weekId === b.weekId && a.tier === b.tier;
+}
