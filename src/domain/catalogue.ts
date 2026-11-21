@@ -184,6 +184,18 @@ export function getOffering(code: OfferingCode): Offering {
   return found;
 }
 
+/**
+ * The same lookup, but a miss is `undefined` rather than a throw.
+ *
+ * ⚠️ **FOR A MIXED CATALOGUE** (SCRUM-241). The store's confirm is now shared by both tabs, so the code it holds
+ * may be an OFFERING or a DECORATION and the modal cannot know which until it looks. `getOffering` would throw on
+ * a decoration code — i.e. opening the buy card for the Festive Set would crash the screen — so the modal asks with
+ * this and falls back to `findDecoration`. ⚠️ `getOffering` stays the strict one for callers that already know.
+ */
+export function findOffering(code: string): Offering | undefined {
+  return OFFERINGS.find((o) => o.code === code);
+}
+
 /** What a burn of this item is worth, before band multipliers. */
 export function redemptionBaseValue(code: OfferingCode): number {
   return baseValueOf(getOffering(code).price);
@@ -275,3 +287,13 @@ export const DECORATIONS: readonly Decoration[] = [
     // slot picker nor drawn on the shrine. `decorations_catalog.composed_of` is the SQL mirror.
     composedOf: ['lanterns', 'spring_couplets', 'zhong_kui', 'door_gods'] },
 ] as const;
+
+/**
+ * ⚠️ The decorations' twin of `findOffering` — a miss is `undefined` (SCRUM-241).
+ *
+ * The buy confirm is shared by both tabs, so it resolves a code against BOTH catalogues; the one that answers is
+ * the item's class. A throwing lookup here would turn "a decoration was bought from the store" into a crash.
+ */
+export function findDecoration(code: string): Decoration | undefined {
+  return DECORATIONS.find((d) => d.code === code);
+}

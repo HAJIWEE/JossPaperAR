@@ -308,6 +308,20 @@ export const MESSAGES = {
     'store.buyTitle': 'Buy this offering?',
     'store.buyBody': '%{name} — %{points} Store Points. It lands in your offerings, ready to burn.',
     'store.buyBodyBundle': '%{name} — %{points} Store Points. It lands as one of each standard offering, ready to burn.',
+    // ── SCRUM-241 — the decorations tab buys too, so the modal needs a DECORATION promise ──────────
+    // ⚠️ The offering body's *"lands in your offerings, ready to burn"* is a FALSE statement about a permanent
+    // decoration: it is never burned and it is not an offering. Its own title too — "Buy this offering?" asks the
+    // wrong question on that tab.
+    'store.buyTitleDecoration': 'Buy this decoration?',
+    'store.buyBodyDecoration': '%{name} — %{points} Store Points. It becomes yours to place on the shrine.',
+    // ── …and a CASH variant for every class whose card draws a cash pill (SCRUM-241) ───────────────
+    // ⚠️ The owner's review: *"the confirmation dialog only mentions the points costs not the cash cost."* The
+    // dialog was contradicting the card behind it, which shows both. ⚠️ The cash rail is still unbuilt (SCRUM-212),
+    // so the modal's own `store.cashNotOpen` note is what tells the player cash is not open yet — these strings
+    // only stop the dialog HIDING a price the card already displayed.
+    'store.buyBodyCash': '%{name} — %{points} Store Points or $%{cash}. It lands in your offerings, ready to burn.',
+    'store.buyBodyBundleCash': '%{name} — %{points} Store Points or $%{cash}. It lands as one of each standard offering, ready to burn.',
+    'store.buyBodyDecorationCash': '%{name} — %{points} Store Points or $%{cash}. It becomes yours to place on the shrine.',
     'store.buyConfirm': 'Buy',
     'store.unreachable': 'The store could not be loaded just now.',
     'collection.title': 'Collection',
@@ -799,6 +813,13 @@ export const MESSAGES = {
     'store.buyTitle': '购买这份供品？',
     'store.buyBody': '%{name} —— %{points} 功德点。它会进入你的供品，随时可以焚烧。',
     'store.buyBodyBundle': '%{name} —— %{points} 功德点。它会变成每件标准供品各一份，随时可以焚烧。',
+    // ── SCRUM-241 — 装饰同样可以购买，所以确认框需要「装饰」的说法 ──────────────────────
+    'store.buyTitleDecoration': '购买这个装饰？',
+    'store.buyBodyDecoration': '%{name} —— %{points} 功德点。它会成为你的装饰，可以放在神台上。',
+    // ── 卡片画了现金价，确认框也必须说出来 ─────────────────────────────────────────
+    'store.buyBodyCash': '%{name} —— %{points} 功德点或 $%{cash}。它会进入你的供品，随时可以焚烧。',
+    'store.buyBodyBundleCash': '%{name} —— %{points} 功德点或 $%{cash}。它会变成每件标准供品各一份，随时可以焚烧。',
+    'store.buyBodyDecorationCash': '%{name} —— %{points} 功德点或 $%{cash}。它会成为你的装饰，可以放在神台上。',
     'store.buyConfirm': '购买',
     'store.unreachable': '暂时无法载入商店。',
     'collection.title': '收藏',
