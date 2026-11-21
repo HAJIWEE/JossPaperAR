@@ -533,6 +533,76 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **SCRUM-59 was the one that changed the code**, and it was kept out of PR-3 on purpose — it edits `request_cartoonize`, which was already applied, so it belongs in its own migration + PR with its own tests. **It is built: see §12.5.**
 
+### 12.59 · S83 — DELETE EVERYTHING, measured: the erase is real, and the check most likely to be trusted is the one that cannot fail (2026-11-21)
+
+#### The erase, on glass — verified screen by screen
+
+Run on the floor device (EAS `6a9d5709`, from `d5467aa`) against the **hosted** project. `delete_my_data()`
+(ADR-007 §9) is one call over **17 public tables + the `auth.users` row** (SCRUM-219, migration `0027`),
+children-first, then a self-verifying probe and a receipt. `integrity_flags` is **pseudonymised**, not
+deleted; `grid_cells` is an aggregate and is retained.
+
+| before | after |
+|---|---|
+| clan `Gwee` · role **Clan Head** | **no clan pill** — the header is bare |
+| `1 ancestor` · tablet `Gwe` | **"Your altar is empty — tap + to add a tablet."** |
+| CTA **Begin an offering** | CTA **Clan** (offers to create one) |
+| History `2 burned · +2400` · two entries | **`0 burned · +0 tribute`** · *"Nothing here yet"* |
+| Collection `2 burned · 1 collected` | **`0 · 0`**, every slot a placeholder |
+| Points 0 · **1-day streak** | Points 0 · **0-day streak** |
+| `Hajiwee94` / `hajiwee94.11@gmail.com` | **"Add your name"** — no email shown |
+
+The flow then signs out and mints a **fresh anonymous identity**, which is why the app after the delete is
+*empty* rather than *signed out*.
+
+#### ⚠️ THE TRAP: the obvious re-check is vacuous, and it looks perfect
+
+Because SCRUM-219 deletes the `auth.users` row, a verification query that resolves the uid **by email**
+matches nothing — the CTE yields `NULL` and **every table reads `0`, including tables that are not empty.**
+A snapshot taken that way is indistinguishable from a flawless erase. ⚠️ **A check that cannot fail is not a
+check**, the same class as the Storage bulk-delete that answers `200` and removes nothing (§12.3). So a
+post-delete table must be produced with a **literal uid**, never a by-email lookup — and the uid is gone from
+the product once the row is deleted. **The one path back is a surviving Storage object** (`<uid>/…`), which
+the delete does not remove: order `storage.objects` by `created_at`, recover the uid, and re-count all 19
+tables with it **inside the SQL** — the uid never needs to leave the query.
+
+#### Storage: measured, explained, and ACCEPTED — not a bug
+
+`delete_my_data` does **not** remove Storage objects, and says so in its own receipt
+(`storage_note: "NOT purged here — the Storage API (service key) must remove these objects; a SQL row delete
+would orphan the bytes"`). ⚠️ **Measured after the delete: 28 `captures` + 26 `styled` objects remained** —
+the behaviour is real, not theoretical. **The owner has decided to leave it (2026-11-21)**, on a structural
+argument rather than a probabilistic one: the path is `<uid>/<captureId>.jpg` over a **v4 UUID** (no email in
+it, none derivable), *and* a re-signup with the same email is minted a **new uid** — so `<old-uid>/…` can
+never be re-attached through the product. ⚠️ It holds only while the `auth.users` row stays deleted; a backup
+restore would resurrect the pair, and only backups and request logs can join them. **No Edge Function, no
+service-role purge, no code change** — recorded in `follow-up-items.md` and not to be re-filed as a bug.
+
+#### Three traps measured, all worth keeping
+
+1. ⚠️ **`select … where bucket_id = 'captures'` answered "No rows returned" while `count(*)` on the same
+   table said `28`.** One of the two was wrong, and a conclusion was briefly built on the first. **Never
+   conclude from a single result when a count can be taken on the same table.**
+2. ⚠️ **`clans_founded = 3` pre-delete, but only ONE clan was visible** in the app. All three were deleted —
+   two clans existed that the user could not see and cannot now recover. Worth knowing before trusting a
+   screen as an inventory of what a delete will destroy.
+3. ⚠️ **The post-delete counts must be taken BEFORE signing back in** — a sign-in creates a new `auth.users`
+   row and pollutes any count that is not scoped to the old uid.
+
+#### The mis-attribution this exposed
+
+`follow-up-items.md` attributed the Storage gap to **`SCRUM-33`** — which is *"Design + wire: Profile, Settings
+& Collection"*, a Penpot **design** ticket `Done` since 30 Sep. ⚠️ A live gap pointed at a closed design
+ticket has **no owner**, and reads as tracked. The same line also still claimed the `auth.users` row survives,
+which SCRUM-219 had already fixed. Both corrected.
+
+#### Still owed
+
+The per-table zeroing is argued from the function's own probe and the receipt, **not yet** re-derived
+independently by uid. Until that runs, the erase is **verified at the app and identity level, and asserted
+server-side** — which is strong, but it is not the same as measured across all 19 tables.
+
+
 ### 12.58 · S82 — the demo state can be built **and** destroyed, and the acceptance gate got a script (2026-11-15)
 
 #### The seed builds through the app's own RPCs, not around them
