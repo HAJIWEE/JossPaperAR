@@ -361,3 +361,19 @@
 ⚠️ **Cumulative is unchanged** — re-derive it from the rows above; the last reconciled figure was **US$5.43 ≈ S$6.96**.
 
 ⚠️ **The spend that was deliberately NOT made:** steps 3–6 of the demo would have bought one **Path C run ≈ US$0.091** (identify + generate + cutout). It was not run — no offering could be placed in front of the camera — so the gate is recorded as **not seen**, not as passed. That is the correct trade: a $0.00 line and an honest gap beat a bill and a claim nobody observed.
+
+---
+
+## 2026-11-21 · S83 — the delete-all test, and Jira reconciled against the code — **US$0.00**
+
+| what | cost |
+|---|---|
+| `Settings → Delete Everything`, verified on glass *and* in the database | **US$0.00** — the delete is one SQL RPC; every re-count was a plain `select` |
+| `SCRUM-149`'s five children reconciled (`173`/`174`/`175`/`177` verified in code, `176` split) | **US$0.00** — reading `src/` and `supabase/`; nothing was run |
+| doc 19 §12.59/§12.60, `follow-up-items.md`, `next-ai-context.md`, Jira comments | **US$0.00** |
+
+**Total: US$0.00 = S$0.00** (Mastercard **1.2808**, nothing to convert).
+⚠️ **Cumulative is unchanged** — the last reconciled figure remains **US$5.43 ≈ S$6.96**. The **≈US$0.091** photo offering recorded above is still an **ESTIMATE, not reconciled** (`cost_micros` was never read back), and this session did **not** re-run it.
+
+⚠️ **The spend that was deliberately NOT made:** nothing here required a Path C call. Proving erasure needs no generation, and re-running one "to check" would have been a bill for information nothing asked for.
+

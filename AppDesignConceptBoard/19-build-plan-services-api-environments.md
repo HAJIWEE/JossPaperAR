@@ -533,6 +533,56 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **SCRUM-59 was the one that changed the code**, and it was kept out of PR-3 on purpose — it edits `request_cartoonize`, which was already applied, so it belongs in its own migration + PR with its own tests. **It is built: see §12.5.**
 
+### 12.60 · S83b — the board was wrong in BOTH directions: four stale children, one real gap, and a sprint that could not close (2026-11-21)
+
+#### The symptom
+
+`SCRUM-149` — *"Build item selection + the client half of a store burn"* — was **`Done`** while **all five
+of its subtasks were `To Do`.** That combination is readable two ways, and both readings were live:
+
+* the parent closed early and the children were never ticked (**bookkeeping**), or
+* the children are right and the parent is wrong (**the feature does not exist**).
+
+⚠️ **Neither can be decided from Jira.** It was decided from the **code**, child by child:
+
+| subtask | evidence | verdict |
+|---|---|---|
+| `173` | `src/lib/checks/run.ts:299-303` — prefix · determinism · freshness · the 8..200 window | built |
+| `174` | `offerings.tsx:48` — *"A failure is kept AS a failure"*; `picker-problem` vs `picker-none` | built |
+| `175` | `submitBurnItem` + key `burn:item:<code>:<throw>`, `ritual.ts:395/413` | built |
+| `177` | the picker + the `/burn?itemCode=` wire (`offerings.tsx:107`) | built, 2 caveats |
+| `176` | budgets enforced… **and its "prove one does not drain the other" AC had no test at all** | **half** |
+
+So **four were stale and one was real** — and the real one is the instructive case: the **code was there**
+(`c_photo_day := 10`, `c_store_day := 20`, `v_kind` split at line 179, two `filter` counts at 268-269) and
+the **proof was not**. `supabase/tests/` held only `ai_budget.sql` and `purchase_item_refusal.sql`.
+
+#### The rule this produced
+
+⚠️ **A ticket whose AC is "and prove X" cannot be closed on the strength of the code that does X.** `176`
+asserted a separation and **nothing demonstrated it**; ticking it would have recorded a guarantee nobody had
+ever watched be true. It was closed as a **SPLIT → `SCRUM-244`**, a standalone Task in the backlog for the
+next sprint — the same treatment `150` and `219` received. **The residual did not change; only its owner did.**
+
+⚠️ **And the split is what let the sprint close honestly.** A subtask parked `To Do` under a `Done` parent
+inside an active sprint is not a small untidiness: it is a board that cannot say whether the sprint is
+finished. Moving the residual to a backlog Task made "the sprint is done" a **true** statement instead of a
+suppressed one.
+
+#### Two traps measured while doing it
+
+1. ⚠️ **`JIRA_TRANSITION_ISSUE` rejects `transition_id` — the field is `transition_id_or_name`.** Bad param
+   names fail **cleanly** (0 of 4 applied), so a retry needs no cleanup — but a *partial* failure would, so
+   read the per-item result, not the envelope's `successful`.
+2. ⚠️ **`git status` in parallel with `git commit` collides on `index.lock`.** It happened here; the guard
+   mattered more than the fix — **check for a live git process before removing a lock**, because deleting a
+   live one corrupts the index. The lock had already cleared on its own.
+
+⚠️ **And the button that keeps recurring: the Jira string→ADF converter.** `h2.` converts only sometimes,
+`{{…}}` stays literal, and **`(*)` becomes the star emoticon** — so `count(*)` rendered as `count⭐` inside
+what was supposed to be code. **Backticks are reliable; `h2.` is not; `(*)` is actively wrong.** Read the
+comment back before trusting it.
+
 ### 12.59 · S83 — DELETE EVERYTHING, measured: the erase is real, and the check most likely to be trusted is the one that cannot fail (2026-11-21)
 
 #### The erase, on glass — verified screen by screen
