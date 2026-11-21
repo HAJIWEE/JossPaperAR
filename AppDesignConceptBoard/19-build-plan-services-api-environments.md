@@ -596,11 +596,32 @@ service-role purge, no code change** — recorded in `follow-up-items.md` and no
 ticket has **no owner**, and reads as tracked. The same line also still claimed the `auth.users` row survives,
 which SCRUM-219 had already fixed. Both corrected.
 
-#### Still owed
+#### Verified — the owed step is measured, and its scope is stated
 
-The per-table zeroing is argued from the function's own probe and the receipt, **not yet** re-derived
-independently by uid. Until that runs, the erase is **verified at the app and identity level, and asserted
-server-side** — which is strong, but it is not the same as measured across all 19 tables.
+The re-count ran against the **owner's own uid**, recovered from a surviving Storage object (the delete does
+not purge Storage, so `<uid>/…` survives — which is the accepted limitation above doing the work) with
+**`uid_candidates = 1`**: the uid came from **one** object, so the zeros belong to the deleted identity and
+not to a bystander caught in the time window. **Result: every table `0`, `auth.users` `0`.**
+
+⚠️ **Scope, stated rather than rounded up.** The query measured **13 of the 17** public tables plus
+`auth.users` and `clans`. The four it did not measure are accounted for, not skipped:
+
+* `equipped_decorations` · `devices` · `consent_records` — **already `0` in the pre-delete baseline**, so
+  there was nothing that could survive.
+* `cartoonize_jobs` (**1** at baseline) — the function deletes it **explicitly and first**,
+  `delete from public.cartoonize_jobs where capture_id = any(v_caps)` (line 107), *before*
+  `delete from public.captures` (line 123). With `captures = 0`, an orphan job would need a capture row that
+  no longer exists.
+
+**13 measured · 4 argued — and the argument is written down so a later reader can challenge it** rather than
+having to trust a total.
+
+⚠️ **And a correction to my own claim, kept because it is the lesson:** I first said the photo *should*
+survive, then briefly concluded it *hadn't* — on a `select … where bucket_id = 'captures'` that answered
+"No rows returned" while a `count()` on the **same table** said **28**. The object survived; the single-row
+result was the lie. **A plausible-looking empty result is not evidence until a count on the same table
+agrees with it.**
+
 
 
 ### 12.58 · S82 — the demo state can be built **and** destroyed, and the acceptance gate got a script (2026-11-15)
