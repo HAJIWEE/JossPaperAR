@@ -45,7 +45,12 @@ import {
   rectsOverlap,
   sheetLayout,
 } from '../decorate.ts';
-import { CASH_IS_READABLE, FEATURED_CODE, STORE, STORE_SWITCHER, STORE_TABS, baseMetaValue, cashText, pointsPrice, storeList } from '../store.ts';
+import { CASH_IS_READABLE, FEATURED_CODE, STORE, STORE_SWITCHER, STORE_TABS, baseMetaValue, cashText, pointsPrice, refusalCopy, storeList } from '../store.ts';
+/**
+ * ⚠️ From `purchase-refusal.ts`, NOT `offerings-api.ts` — that file loads the Supabase client and importing
+ * it here **crashes this runner** (measured 2026-11-21: `react-native-url-polyfill` under plain Node).
+ */
+import { parseRefusal, type PurchaseRefusal } from '../purchase-refusal.ts';
 import { ART_BOX, artCodes, artSize, fitArt } from '../offering-art.ts';
 import { pickerGrid } from '../picker.ts';
 import {
@@ -3627,6 +3632,48 @@ function storeChecks(): void {
       && storeSrc.includes('store.buyBodyDecorationCash'));
   check("…and it reads the ITEM's OWN cashPrice — the House has none, so it keeps a Points-only body",
     /cashText\(/.test(storeSrc) && storeSrc.includes('buyingCash') && cashText(399) === '3.99' && cashText(null) === null);
+
+  /**
+   * ⚠️⚠️ **A REFUSAL IS TYPED BY THE SERVER AND WORDED BY US** (SCRUM-242).
+   *
+   * The defect was not that the message was ugly — it was that the CLIENT had no idea what happened, so it
+   * printed the database's sentence. These hold both halves of option B: the reason arrives as JSON in
+   * `DETAIL` (parsed, never prose-matched, so a reworded `raise` cannot silently degrade the copy), and the
+   * screen renders LOCALISED copy for it.
+   */
+  const refusalAt = parseRefusal('{"refusal":"insufficient_funds","needed":2000,"available":0,"short_by":2000}');
+  check('⚠️⚠️ a refusal is PARSED from DETAIL, with its numbers — no sentence is string-matched (SCRUM-242)',
+    refusalAt !== null && refusalAt.kind === 'insufficient_funds'
+      && refusalAt.needed === 2000 && refusalAt.available === 0 && refusalAt.shortBy === 2000);
+  check('⚠️ …and anything unexpected is `null`, so the UI falls back instead of inventing a cause',
+    parseRefusal(null) === null
+      && parseRefusal('') === null
+      && parseRefusal('not json') === null
+      && parseRefusal('{"refusal":"launch_codes"}') === null
+      && parseRefusal('{"refusal":"insufficient_funds"}') === null);
+  const refusalKinds: PurchaseRefusal[] = [
+    { kind: 'insufficient_funds', needed: 2000, available: 0, shortBy: 2000 },
+    { kind: 'rate_limited' },
+    { kind: 'unknown_item', itemCode: 'gold_bar' },
+    { kind: 'unpriced_item', itemCode: 'gold_bar' },
+    { kind: 'idempotency_key_reused' },
+    { kind: 'bad_idempotency_key' },
+    { kind: 'not_signed_in' },
+  ];
+  check('⚠️⚠️ every refusal kind renders COPY — and none of it is the database sentence (SCRUM-242)',
+    refusalKinds.every((r) => {
+      const copy = refusalCopy(r);
+      return copy.trim().length > 5 && !/not enough tribute|P0001|errcode/i.test(copy);
+    })
+      /** ⚠️ The UNEXPLAINED case is copy too — never an empty node, never a raw reason. */
+      && refusalCopy(null).trim().length > 5 && !/tribute/i.test(refusalCopy(null)));
+  check('…and the insufficient-funds copy quotes the number it was given',
+    refusalCopy(refusalKinds[0]).includes('2000'));
+  check('⚠️ the screen renders refusalCopy(res.refusal) — it never sets res.reason (SCRUM-242)',
+    /refusalCopy\(res\.refusal\)/.test(storeSrc) && !/setBuyIssue\(res\.reason\)/.test(storeSrc));
+  check('⚠️⚠️ …and the refusal renders ABOVE the switcher — on screen without scrolling (SCRUM-242)',
+    storeSrc.indexOf('testID="store-issue"') > 0
+      && storeSrc.indexOf('testID="store-issue"') < storeSrc.indexOf('testID="store-switcher"'));
 
   check('⚠️ the meta line is the REDEMPTION BASE (1.2×), not the price — see the board: `base 480`',
     baseMetaValue(getOffering('joss_paper_stack')) === 480,

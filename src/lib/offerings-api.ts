@@ -51,24 +51,63 @@ export interface PurchaseReceipt {
 }
 
 /**
+ * ⚠️⚠️ **A REFUSAL THE SERVER TYPED** (SCRUM-242). `purchase_item` puts a machine-readable reason in
+ * Postgres `DETAIL` as JSON, which PostgREST returns as `error.details`:
+ *
+ *   {"refusal":"insufficient_funds","needed":400,"available":0,"short_by":400}
+ *
+ * ⚠️ **The client maps THIS, never the message sentence.** That is the whole point of the migration: a
+ * reworded `raise` must not silently degrade the copy, which is exactly what string-matching the prose
+ * would do. ⚠️ The prose is still carried in `reason` for logs — it is simply never rendered.
+ */
+/**
+ * ⚠️ **`PurchaseRefusal` and `parseRefusal` MOVED to `purchase-refusal.ts`** (SCRUM-242) — a module that
+ * imports nothing, because `checks/run.ts` runs under plain Node and importing THIS file drags in the
+ * Supabase client (`react-native-url-polyfill`) and **crashes the suite**. Re-exported so callers keep one
+ * import site.
+ */
+import { parseRefusal, type PurchaseRefusal } from './purchase-refusal.ts';
+export { parseRefusal, type PurchaseRefusal };
+
+/** `PurchaseResult` — the shared `ApiResult` plus the typed refusal, which `ApiResult` has no room for. */
+export type PurchaseResult =
+  | { readonly ok: true; readonly data: PurchaseReceipt }
+  | { readonly ok: false; readonly reason: string; readonly refusal: PurchaseRefusal | null };
+
+/**
+ * ⚠️ The parser, its kind list and the `PurchaseRefusal` union all live in `purchase-refusal.ts` now — the
+ * re-export above is the only copy. Nothing here may re-implement them: two parsers is how one of them ends
+ * up not knowing a kind the server sends.
+ */
+
+/**
  * Buy one of a catalogue offering with **tribute points**.
  *
  * ⚠️ The idempotency key is required by the RPC, so a retry after a dropped response cannot charge
  * twice — the same reason `submitBurn` mints one per attempt.
  *
- * ⚠️ The server's own failure messages are surfaced as the reason rather than replaced with copy: an
- * insufficient balance and an unknown item are different facts, and the RPC already distinguishes
- * them (`P0001` for the balance, `22023` for the code).
+ * ⚠️⚠️ **THE SERVER'S PROSE IS NEVER RENDERED** (SCRUM-242). Until 2026-11-21 this returned
+ * `error.message` and the screen printed it, so a 中文 player buying with too few points read
+ * *"not enough tribute: 2000 needed, 0 available"* in red English. Now the RPC puts a typed reason in
+ * `DETAIL`, this parses it into `refusal`, and the caller renders LOCALISED copy — falling back to its
+ * own generic line when the refusal is `null`, because an unexplained database message is not copy.
  */
 export async function purchaseItem(
   itemCode: string,
   idempotencyKey: string,
-): Promise<ApiResult<PurchaseReceipt>> {
+): Promise<PurchaseResult> {
   const { data, error } = await supabase().rpc('purchase_item', {
     p_item_code: itemCode,
     p_idempotency_key: idempotencyKey,
   });
-  if (error) return { ok: false, reason: error.message ?? 'purchase_failed' };
+  if (error) {
+    return {
+      ok: false,
+      /** ⚠️ Carried for logs and diagnostics ONLY — no screen renders this string. */
+      reason: error.message ?? 'purchase_failed',
+      refusal: parseRefusal((error as { details?: unknown }).details),
+    };
+  }
 
   const row = typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : {};
   const num = (key: string): number => {

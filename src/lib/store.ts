@@ -7,6 +7,8 @@
  */
 
 import { DECORATIONS, OFFERINGS, type Offering, type OfferingCode } from '../domain/catalogue.ts';
+import { t } from './i18n.ts';
+import type { PurchaseRefusal } from './purchase-refusal.ts';
 
 /**
  * Geometry, in **board px** (`EN · 7 Store`, 390×844).
@@ -264,3 +266,39 @@ export function cashText(cashPrice: number | null): string | null {
   if (cashPrice === null || !Number.isInteger(cashPrice) || cashPrice < 0) return null;
   return (cashPrice / 100).toFixed(2);
 }
+
+/**
+ * ⚠️⚠️ **THE WORDS A REFUSED PURCHASE GETS** (SCRUM-242).
+ *
+ * The server types the reason (`parseRefusal`), and this maps it to LOCALISED copy. ⚠️ **Nothing here
+ * ever returns the server's message** — that was the defect: a 中文 player read *"not enough tribute:
+ * 2000 needed, 0 available"* in red English, because the screen rendered `error.message` directly.
+ *
+ * ⚠️ **`null` is not an error, it is the unexplained case** — a dropped connection, a constraint nobody
+ * anticipated. It gets the generic line, because inventing a cause is worse than admitting there isn't one.
+ * ⚠️ **`bad_idempotency_key` is a client bug, so it also gets the generic line** — a player cannot act on
+ * it, and naming it would leak our internals onto the screen.
+ *
+ * Pure and exported so `check:lib` can assert every kind resolves to a real string.
+ */
+export function refusalCopy(refusal: PurchaseRefusal | null): string {
+  if (refusal === null) return t('store.refused');
+  switch (refusal.kind) {
+    case 'insufficient_funds':
+      return t('store.refusedFunds', { short: String(refusal.shortBy), needed: String(refusal.needed), available: String(refusal.available) });
+    case 'rate_limited':
+      return t('store.refusedBusy');
+    case 'unknown_item':
+      return t('store.refusedUnknown');
+    case 'unpriced_item':
+      return t('store.refusedUnpriced');
+    case 'idempotency_key_reused':
+      return t('store.refusedReplayed');
+    case 'not_signed_in':
+      return t('store.refusedSignIn');
+    case 'bad_idempotency_key':
+      /** ⚠️ A client fault, not a player-visible fact — the generic line, deliberately. */
+      return t('store.refused');
+  }
+}
+
