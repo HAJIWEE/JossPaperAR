@@ -34,7 +34,7 @@ import { findDecoration, findOffering } from '@/domain/catalogue';
 import { collectedItemName } from '@/lib/collection';
 import { purchaseItem } from '@/lib/offerings-api';
 import { HUD } from '@/lib/profile';
-import { STORE, STORE_SWITCHER, STORE_TABS, baseMetaValue, cashText, decorationList, pointsPrice, storeList, type StoreTabId } from '@/lib/store';
+import { STORE, STORE_SWITCHER, STORE_TABS, baseMetaValue, cashText, decorationList, pointsPrice, refusalCopy, storeList, type StoreTabId } from '@/lib/store';
 import { DESIGN_REFERENCE_WIDTH, brand, fontSize, onColorCream, surface, text } from '@/theme/tokens';
 
 function scale(): number {
@@ -253,8 +253,12 @@ export default function StoreScreen() {
     const res = await purchaseItem(buying.code, buyKey);
     setBuying(null);
     if (!res.ok) {
-      /** ⚠️ The SERVER's reason, not invented copy: an empty balance and an unknown code differ. */
-      setBuyIssue(res.reason);
+      /**
+       * ⚠️⚠️ **LOCALISED COPY, NEVER THE SERVER'S SENTENCE** (SCRUM-242). `res.reason` is kept for logs and
+       * diagnostics; what reaches the screen is `refusalCopy(res.refusal)` — which falls back to an honest
+       * generic line when the server typed no reason, instead of printing a database message.
+       */
+      setBuyIssue(refusalCopy(res.refusal));
       return;
     }
     setBuyIssue(null);
@@ -342,6 +346,18 @@ export default function StoreScreen() {
                 </Text>
               </View>
             </View>
+
+            {/**
+             * ⚠️⚠️ **THE REFUSAL SITS WHERE THE PLAYER IS LOOKING** (SCRUM-242). It used to render AFTER the
+             * item grid, so on glass the confirm closed and *nothing visible happened* — `store-issue` was
+             * **absent from the uiautomator tree** until the page was swiped. Above the switcher it is in the
+             * first screenful. ⚠️ The text is LOCALISED (`refusalCopy`); the database's sentence never renders.
+             */}
+            {buyIssue === null ? null : (
+              <Text style={styles.issue} testID="store-issue">
+                {buyIssue}
+              </Text>
+            )}
 
             {/* ── the switcher ⚠️ Decorations is disabled, not dead ────────── */}
             {/* The pill BACKGROUND first — `switcher · category (bg)`, r19, ink 2.5. */}
@@ -518,12 +534,6 @@ export default function StoreScreen() {
               <DecorationsBlock onBuy={openBuy} />
             )}
 
-            {/** ⚠️ The SERVER's own refusal, shown as it came — not reworded into copy. */}
-            {buyIssue === null ? null : (
-              <Text style={styles.issue} testID="store-issue">
-                {buyIssue}
-              </Text>
-            )}
             <ConfirmCard
               visible={buying !== null}
               title={buyTitle}

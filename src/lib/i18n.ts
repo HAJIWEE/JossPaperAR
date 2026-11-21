@@ -322,6 +322,17 @@ export const MESSAGES = {
     'store.buyBodyCash': '%{name} — %{points} Store Points or $%{cash}. It lands in your offerings, ready to burn.',
     'store.buyBodyBundleCash': '%{name} — %{points} Store Points or $%{cash}. It lands as one of each standard offering, ready to burn.',
     'store.buyBodyDecorationCash': '%{name} — %{points} Store Points or $%{cash}. It becomes yours to place on the shrine.',
+    // ── REFUSALS (SCRUM-242) — the server types the reason; these are the words ────────────────
+    // ⚠️ Every one of these REPLACES a raw Postgres message that used to reach the screen. `refused` is
+    // the fallback for an error with no typed reason — an unexplained failure gets an honest line, never
+    // a database sentence.
+    'store.refused': 'That purchase could not be completed just now — please try again.',
+    'store.refusedFunds': 'You need %{short} more Store Points — this costs %{needed}, and your wallet has %{available}.',
+    'store.refusedBusy': 'The shrine is busy — try again in a moment.',
+    'store.refusedUnknown': 'That item is not in the store.',
+    'store.refusedUnpriced': 'That item has no price yet.',
+    'store.refusedReplayed': 'That purchase has already gone through.',
+    'store.refusedSignIn': 'Sign in to buy from the store.',
     'store.buyConfirm': 'Buy',
     'store.unreachable': 'The store could not be loaded just now.',
     'collection.title': 'Collection',
@@ -820,6 +831,14 @@ export const MESSAGES = {
     'store.buyBodyCash': '%{name} —— %{points} 功德点或 $%{cash}。它会进入你的供品，随时可以焚烧。',
     'store.buyBodyBundleCash': '%{name} —— %{points} 功德点或 $%{cash}。它会变成每件标准供品各一份，随时可以焚烧。',
     'store.buyBodyDecorationCash': '%{name} —— %{points} 功德点或 $%{cash}。它会成为你的装饰，可以放在神台上。',
+    // ── 拒绝提示（SCRUM-242）—— 原因由服务器给出，这些是给玩家看的文字 ──────────────────
+    'store.refused': '这笔购买暂时无法完成 —— 请再试一次。',
+    'store.refusedFunds': '你还需要 %{short} 功德点 —— 这件需要 %{needed}，你的钱包有 %{available}。',
+    'store.refusedBusy': '神台正忙 —— 请稍后再试。',
+    'store.refusedUnknown': '商店里没有这件物品。',
+    'store.refusedUnpriced': '这件物品还没有定价。',
+    'store.refusedReplayed': '这笔购买已经完成了。',
+    'store.refusedSignIn': '请先登录再购买。',
     'store.buyConfirm': '购买',
     'store.unreachable': '暂时无法载入商店。',
     'collection.title': '收藏',
