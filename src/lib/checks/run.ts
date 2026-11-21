@@ -3595,6 +3595,39 @@ function storeChecks(): void {
   check('⚠️ …and a COMPOSED buy gets its OWN confirm body — never one that promises a bundle OBJECT',
     storeSrc.includes('store.buyBodyBundle') && /buyingOffering\?\.composedOf/.test(storeSrc));
 
+  /**
+   * ⚠️⚠️ **NO DECORATION CARD MAY BE INERT** (SCRUM-241; owner, 2026-11-21: *"the decorations page items do not
+   * trigger the buy workflow like the offerings page items do"*).
+   *
+   * ⚠️ The SERVER was never the problem — `purchase_item` reads `decorations_catalog.price` **first** and sets
+   * `v_kind := 'decoration'` — so the tab looked built while selling nothing at all. ⚠️ Asserted STRUCTURALLY over the
+   * DECORATIONS BLOCK only: the offerings half carries no inert card, so scoping it here keeps this check about the
+   * defect rather than about the whole screen.
+   */
+  const decorAt = storeSrc.indexOf('function DecorationsBlock');
+  const decorEnd = storeSrc.indexOf('export default function StoreScreen');
+  const decorSrc = decorAt >= 0 && decorEnd > decorAt ? storeSrc.slice(decorAt, decorEnd) : '';
+  const onBuyAt = (decorSrc.match(/onBuy\(/g) ?? []).length;
+  check('⚠️⚠️ no decoration card is INERT — `onPress={() => undefined}` must not come back (SCRUM-241)',
+    decorSrc.length > 0 && !/onPress=\{\s*\(\)\s*=>\s*undefined\s*\}/.test(decorSrc),
+    decorSrc.length === 0 ? 'the DecorationsBlock source was not found — the check is blind' : '');
+  check('…and BOTH card shapes route through the shared opener — the featured one and the grid',
+    onBuyAt >= 2, `${onBuyAt} call site(s)`);
+
+  /**
+   * ⚠️ **THE CONFIRM MUST NOT HIDE A PRICE THE CARD SHOWED** (SCRUM-241; owner: *"the confirmation dialog only
+   * mentions the points costs not the cash cost"*).
+   *
+   * ⚠️ The RAIL is still Google Play Billing (SCRUM-212) and this adds no payment path — the dialog simply stops
+   * contradicting the cash pill that opened it, while `store.cashNotOpen` keeps saying the rail is closed.
+   */
+  check('⚠️ the buy confirm names the CASH price in every class whose card draws one (SCRUM-241)',
+    storeSrc.includes('store.buyBodyCash')
+      && storeSrc.includes('store.buyBodyBundleCash')
+      && storeSrc.includes('store.buyBodyDecorationCash'));
+  check("…and it reads the ITEM's OWN cashPrice — the House has none, so it keeps a Points-only body",
+    /cashText\(/.test(storeSrc) && storeSrc.includes('buyingCash') && cashText(399) === '3.99' && cashText(null) === null);
+
   check('⚠️ the meta line is the REDEMPTION BASE (1.2×), not the price — see the board: `base 480`',
     baseMetaValue(getOffering('joss_paper_stack')) === 480,
     String(baseMetaValue(getOffering('joss_paper_stack'))));

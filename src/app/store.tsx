@@ -30,7 +30,7 @@ import { ScreenHud } from '@/components/screen-hud';
 import { localized, t } from '@/lib/i18n';
 import { DecorationArt } from '@/components/decoration-art';
 import { fetchHomeSummary } from '@/lib/home-api';
-import { getOffering, type OfferingCode } from '@/domain/catalogue';
+import { findDecoration, findOffering } from '@/domain/catalogue';
 import { collectedItemName } from '@/lib/collection';
 import { purchaseItem } from '@/lib/offerings-api';
 import { HUD } from '@/lib/profile';
@@ -53,10 +53,13 @@ function scale(): number {
  * 1,200/$1.49 and the door gods 1,600/$1.99. ⚠️ The board states the pairing outright (`card · Door Gods cash`,
  * `card · Lanterns points`), in EN and ZH, and the cards on this screen now follow it.
  *
- * ⚠️⚠️ **BOTH RAILS ARE DRAWN AND NEITHER PURCHASE IS WIRED.** The prices are real — the points price is
- * `decorations_catalog.price`, which `purchase_item` charges — but the CASH rail needs Google Play Billing
- * (SCRUM-212) and these cards are still a layout: tapping one does nothing rather than pretending to sell.
- * ⚠️ That is the owner's line, verbatim: *"build out all of it to the point of the actual payments portion."*
+ * ⚠️⚠️ **THE POINTS RAIL IS WIRED HERE NOW — THE CASH RAIL IS NOT** (SCRUM-241, 2026-11-21). Until that fix every
+ * card on this tab was a LAYOUT: `onPress={() => undefined}`, so the decorations could not be bought at all while the
+ * offerings beside them could. ⚠️ The SERVER was never the obstacle — `purchase_item` reads
+ * `decorations_catalog.price` FIRST and sets `v_kind := 'decoration'` — so the tab looked finished and sold nothing.
+ * ⚠️ The CASH rail is still absent by design: it needs Google Play Billing (SCRUM-212), and no read for a cash balance
+ * exists anywhere in the RPC surface, so the cash pill is drawn and the cash action answers honestly.
+ * ⚠️ The owner's line that scoped this: *"build out all of it to the point of the actual payments portion."*
  */
 /**
  * ONE PRICE PILL, for both rails and both card sizes.
@@ -101,7 +104,7 @@ function PricePill({
 }
 
 
-function DecorationsBlock() {
+function DecorationsBlock({ onBuy }: { readonly onBuy: (code: string, price: number) => void }) {
   const { width } = useWindowDimensions();
   const s = width / DESIGN_REFERENCE_WIDTH;
   const { featured, more } = decorationList();
@@ -116,7 +119,8 @@ function DecorationsBlock() {
       <Pressable
         accessibilityRole="button"
         testID="store-decor-featured"
-        onPress={() => undefined}
+        /** ⚠️ SCRUM-241 — an UNPRICED decoration must not open a card that would quote nothing. */
+        onPress={() => (featured.price === null ? undefined : onBuy(featured.code, featured.price))}
         style={({ pressed }) => [
           styles.featured,
           {
@@ -156,7 +160,8 @@ function DecorationsBlock() {
             key={item.code}
             accessibilityRole="button"
             testID={`store-decor-${item.code}`}
-            onPress={() => undefined}
+            /** ⚠️ SCRUM-241 — the same buy path the offerings' grid uses; an unpriced piece stays inert. */
+            onPress={() => (item.price === null ? undefined : onBuy(item.code, item.price))}
             style={({ pressed }) => [
               styles.card,
               /**
@@ -197,7 +202,11 @@ export default function StoreScreen() {
   const [points, setPoints] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
   /** ⚠️ The code awaiting confirmation, or `null`. One card, not one per item. */
-  const [buying, setBuying] = useState<{ readonly code: OfferingCode; readonly price: number } | null>(null);
+  /**
+   * ⚠️ **`string`, NOT `OfferingCode`** (SCRUM-241). The same card now buys from BOTH catalogues, so the code it
+   * holds is only known to be an offering or a decoration once `findOffering`/`findDecoration` has answered.
+   */
+  const [buying, setBuying] = useState<{ readonly code: string; readonly price: number } | null>(null);
   /** ⚠️ Which half of the store is showing. The switcher is the board's, and both tabs are live. */
   const [tabId, setTabId] = useState<StoreTabId>('offerings');
   const [buyIssue, setBuyIssue] = useState<string | null>(null);
@@ -225,6 +234,17 @@ export default function StoreScreen() {
   }, [load]);
 
   /**
+   * ⚠️ **ONE OPENER FOR BOTH TABS** (SCRUM-241). The key is minted HERE — opening the card is the intent, not the tap
+   * on Confirm — so a retry after a dropped response cannot charge twice. Both the offerings' cards and the
+   * decorations' cards call this and nothing else, so the two halves cannot drift apart again.
+   */
+  const openBuy = useCallback((code: string, price: number) => {
+    setBuyKey(`buy:${code}:${Date.now()}`);
+    setBuyIssue(null);
+    setBuying({ code, price });
+  }, []);
+
+  /**
    * Buy the confirmed item, then RELOAD the balance — the server is the authority on what is left, and
    * a client-side subtraction would drift the moment a price changed.
    */
@@ -242,24 +262,39 @@ export default function StoreScreen() {
   }, [buying, buyKey, load]);
 
   /**
-   * ⚠️ **A COMPOSED item gets its OWN body.** The generic one would promise the WRONG thing: buying
-   * the Wealth Bundle grants **one of each of the other four**, never a "Wealth Bundle" object
-   * (owner, 2026-11-07). ⚠️ Each `t()` call is on ONE LINE — `check:copy` fails a call split across
-   * lines, because the extractor that hunts untranslated copy cannot follow one.
+   * ⚠️ **THE MODAL SERVES BOTH CATALOGUES NOW** (SCRUM-241), so it resolves the code against each in turn. Neither
+   * lookup throws: `getOffering` would blow up on a decoration code, i.e. opening the Festive Set's card would crash.
    */
-  const buyingOffering = buying === null ? null : getOffering(buying.code);
+  const buyingDecoration = buying === null ? undefined : findDecoration(buying.code);
+  const buyingOffering = buying === null ? undefined : findOffering(buying.code);
   /**
-   * ⚠️ **NO CASH AMOUNT YET, DELIBERATELY.** The offering cash prices are drawn on `EN · 7` and I have not read
-   * them — a made-up `$0.00` beside a real item would be an invented price, which is worse than an absent one.
-   * ⚠️ The DECORATIONS board (`EN · 7b`) gave its five prices and those ARE in `catalogue.ts`; the offerings'
-   * cash prices are the next read.
+   * ⚠️⚠️ **THE CASH PRICE IS NO LONGER OMITTED** (owner, 2026-11-21: *"the confirmation dialog only mentions the
+   * points costs not the cash cost"*). Every card that opens this dialog draws a cash pill, so a body that named only
+   * Points was contradicting the screen behind it. ⚠️ It reads the ITEM's own `cashPrice`, so the House — whose
+   * `cashPrice` is `null` because the board draws it OWNED — keeps the Points-only body rather than being handed a
+   * price the catalogue does not have. ⚠️ The RAIL is still Play Billing (SCRUM-212); `store.cashNotOpen`, on the
+   * secondary button, is the copy that says so.
    */
+  const buyingCash = cashText(buyingDecoration !== undefined ? buyingDecoration.cashPrice : buyingOffering !== undefined ? buyingOffering.cashPrice : null);
   const buyCashLabel = t('store.buyCash');
-
+  /** ⚠️ A decoration's name is the CATALOGUE's (`localized`), not the Collection's — it is never a collected item. */
+  const buyingName = buying === null ? '' : buyingDecoration !== undefined ? localized(buyingDecoration.name) : collectedItemName(buying.code) ?? '';
+  /** ⚠️ ONE arg object for all six bodies — a key whose copy has no `%{cash}` simply ignores it. */
+  const buyBodyParams = { name: buyingName, points: String(buying?.price ?? 0), cash: buyingCash ?? '' };
+  /**
+   * ⚠️ **A COMPOSED item gets its OWN body**, and a DECORATION gets one that does not promise a burn: buying the
+   * Wealth Bundle grants **one of each of the other four**, never a "Wealth Bundle" object (owner, 2026-11-07), and a
+   * decoration is permanent — *"lands in your offerings, ready to burn"* is false on both counts.
+   * ⚠️ Each `t()` call is on ONE LINE — `check:copy` fails a call split across lines.
+   */
   const buyBody =
-    buying === null ? '' : (buyingOffering?.composedOf?.length ?? 0) > 0
-      ? t('store.buyBodyBundle', { name: String(collectedItemName(buying.code)), points: String(buying.price) })
-      : t('store.buyBody', { name: String(collectedItemName(buying.code)), points: String(buying.price) });
+    buying === null ? '' : buyingDecoration !== undefined
+      ? (buyingCash === null ? t('store.buyBodyDecoration', buyBodyParams) : t('store.buyBodyDecorationCash', buyBodyParams))
+      : (buyingOffering?.composedOf?.length ?? 0) > 0
+        ? (buyingCash === null ? t('store.buyBodyBundle', buyBodyParams) : t('store.buyBodyBundleCash', buyBodyParams))
+        : (buyingCash === null ? t('store.buyBody', buyBodyParams) : t('store.buyBodyCash', buyBodyParams));
+  /** ⚠️ "Buy this offering?" asks the wrong question on the decorations tab (SCRUM-241). */
+  const buyTitle = buyingDecoration !== undefined ? t('store.buyTitleDecoration') : t('store.buyTitle');
 
   const { featured, more } = storeList();
   /** ⚠️ The decorations now have PRICES (from `EN · 7b`) and PORTED ART, so the tab is live rather than dark. */
@@ -386,12 +421,7 @@ export default function StoreScreen() {
             {tabId === 'offerings' ? (<>
             <Pressable
               accessibilityRole="button"
-              onPress={() => {
-                /** ⚠️ Mint the key HERE — opening the card is the intent, not the tap on Confirm. */
-                setBuyKey(`buy:${featured.code}:${Date.now()}`);
-                setBuyIssue(null);
-                setBuying({ code: featured.code, price: featured.price });
-              }}
+              onPress={() => openBuy(featured.code, featured.price)}
               /**
                * ⚠️ **`paddingBottom` IS THE FIX FOR THE PILL SITTING ON THE BORDER** (owner, 2026-11-09: *"the
                * wealth Bundle's points value button is also too close to the bottom border"*). The card had
@@ -446,12 +476,7 @@ export default function StoreScreen() {
                 <Pressable
                   key={item.code}
                   accessibilityRole="button"
-                  onPress={() => {
-                    /** ⚠️ Mint the key HERE — opening the card is the intent, not the tap on Confirm. */
-                    setBuyKey(`buy:${item.code}:${Date.now()}`);
-                    setBuyIssue(null);
-                    setBuying({ code: item.code, price: item.price });
-                  }}
+                  onPress={() => openBuy(item.code, item.price)}
                   style={[styles.card, { width: STORE.cardFrame.w * s, height: STORE.cardFrame.h * s, borderRadius: STORE.cardFrame.radius * s, borderWidth: STORE.cardFrame.stroke * s, paddingHorizontal: STORE.card.padH * s }]}
                   testID={`store-item-${item.code}`}
                 >
@@ -490,7 +515,7 @@ export default function StoreScreen() {
               {t('store.note')}
             </Text>
             </>) : (
-              <DecorationsBlock />
+              <DecorationsBlock onBuy={openBuy} />
             )}
 
             {/** ⚠️ The SERVER's own refusal, shown as it came — not reworded into copy. */}
@@ -501,7 +526,7 @@ export default function StoreScreen() {
             )}
             <ConfirmCard
               visible={buying !== null}
-              title={t('store.buyTitle')}
+              title={buyTitle}
               body={buyBody}
               confirmLabel={t('store.buyConfirm')}
               cancelLabel={t('common.cancel')}

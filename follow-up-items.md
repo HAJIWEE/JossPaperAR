@@ -6,6 +6,14 @@
 
 ## 🎯 Immediate Actions (Next 1–2 Weeks)
 
+### 🐛 S83 (2026-11-21) — the store sells decorations now; two things it still does not do
+
+> ⚠️ **`SCRUM-241` is built and green** (`cline/241`) but ⚠️ **NOT verified on glass** — no device run this session, so the owner's next store visit is the acceptance step.
+
+- 🏪 **`SCRUM-241` — the decorations tab buys from the SAME confirm as the offerings.** ⚠️ Every decoration card was `onPress={() => undefined}`: the tab rendered five priced cards and sold none of them, while the offerings beside it worked. ⚠️ **The server was ready the whole time** (`purchase_item` reads `decorations_catalog.price` FIRST), so the defect was one client gap, not an economy one.
+- 💵 **…and the confirm now names the CASH price**, which it had been dropping while every card behind it drew a cash pill. ⚠️ **The cash RAIL is still not built** — `SCRUM-212` (Play Billing + a native module + Play Console) — so the modal states both prices and `store.cashNotOpen` still says cash is closed. ⚠️ **Do not read "the dialog shows a cash price" as "cash can be spent."**
+- ⚠️ **Found while reading the screen, NOT fixed here — the store shows the SERVER's exception text verbatim.** `confirmBuy` does `setBuyIssue(res.reason)`, and `purchaseItem` returns `error.message` unmapped, so a refusal renders as *"not enough tribute: 400 needed, 0 available"* — ⚠️ **which breaks the demo script's own rule 4** (*"no raw error text on screen — a Postgres message is not product copy"*). ⚠️ **This is pre-existing on BOTH tabs**, not a decorations-only gap, and it is **not** in 241's scope. It deserves its own ticket before the next gate run, because step 9 of the script checks exactly this.
+
 ### 🔴 S82 (2026-11-15) — what is genuinely open after the seed, the teardown and the gate's first run
 
 > ⚠️ **Everything below was measured, not assumed.** S82 built **SCRUM-197/198** (PR #92) and **SCRUM-202** (PR #93) and **started** the acceptance gate; **nothing was merged in this block except the 224 docs (#91)**. `npm run check` **EXIT 0** · `tsc` **0** · the seed is idempotent and the teardown reaches zeros.
