@@ -8,7 +8,7 @@
 
 ### 🐛 S83 (2026-11-21) — the store sells decorations now; two things it still does not do
 
-> ⚠️ **`SCRUM-241` is built and green** (`cline/241`) but ⚠️ **NOT verified on glass** — no device run this session, so the owner's next store visit is the acceptance step.
+> ✅ **`SCRUM-241` is built, green AND VERIFIED ON GLASS** (`cline/241` · PR #95) — EAS `preview` build **`8de806f2`** (commit `19d99fc`) on **`HN615L005386`**, `lastUpdateTime` read back from the device. Tapping **Store → Decorations → Zhong Kui Print** opened the confirm with **both prices** and the decoration's own promise.
 
 - 🏪 **`SCRUM-241` — the decorations tab buys from the SAME confirm as the offerings.** ⚠️ Every decoration card was `onPress={() => undefined}`: the tab rendered five priced cards and sold none of them, while the offerings beside it worked. ⚠️ **The server was ready the whole time** (`purchase_item` reads `decorations_catalog.price` FIRST), so the defect was one client gap, not an economy one.
 - 💵 **…and the confirm now names the CASH price**, which it had been dropping while every card behind it drew a cash pill. ⚠️ **The cash RAIL is still not built** — `SCRUM-212` (Play Billing + a native module + Play Console) — so the modal states both prices and `store.cashNotOpen` still says cash is closed. ⚠️ **Do not read "the dialog shows a cash price" as "cash can be spent."**
