@@ -341,3 +341,19 @@
 ⚠️ **Cumulative is unchanged** — re-derive it from the rows above rather than trusting this sentence; the last reconciled figure in this page was **US$5.43 ≈ S$6.96**.
 
 ⚠️ **The thing that WOULD have cost money, and deliberately did not happen:** a real burn on the APK would have spent ≈ **US$0.091** (Path C: identify + generate + cutout). ⚠️ It was not run — the device run was a **cold-start splash check**, which never reaches the fire.
+
+## 2026-11-15 · S82 — the demo state, its teardown, and the gate's script — **US$0.00**
+
+⚠️ **Nothing was spent with an AI provider.** S82 built the demo seed and teardown (SCRUM-198/197) and the acceptance script (SCRUM-202), and **made no fal.ai call** — no Path C generation, no cutout, no EAS build.
+
+| what | cost |
+|---|---|
+| `SCRUM-198` — the demo seed (SQL through the app's RPCs) | **US$0.00** (local Postgres only) |
+| `SCRUM-197` — the teardown + storage sweep | **US$0.00** |
+| `SCRUM-202` — the demo run script | **US$0.00** |
+| `SCRUM-200/201/203` — the partial glass run | **US$0.00** — cold starts and screen walks; ⚠️ **no capture, no generation** |
+
+**Total: US$0.00 = S$0.00** (Mastercard **1.2808**, nothing to convert).
+⚠️ **Cumulative is unchanged** — re-derive it from the rows above; the last reconciled figure was **US$5.43 ≈ S$6.96**.
+
+⚠️ **The spend that was deliberately NOT made:** steps 3–6 of the demo would have bought one **Path C run ≈ US$0.091** (identify + generate + cutout). It was not run — no offering could be placed in front of the camera — so the gate is recorded as **not seen**, not as passed. That is the correct trade: a $0.00 line and an honest gap beat a bill and a claim nobody observed.

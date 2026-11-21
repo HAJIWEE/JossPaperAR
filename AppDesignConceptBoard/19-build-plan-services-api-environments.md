@@ -533,6 +533,70 @@ Against `yercgevebxvtzkgctfai`, 2026-10-04. Everything below was **observed**, n
 
 **SCRUM-59 was the one that changed the code**, and it was kept out of PR-3 on purpose — it edits `request_cartoonize`, which was already applied, so it belongs in its own migration + PR with its own tests. **It is built: see §12.5.**
 
+### 12.58 · S82 — the demo state can be built **and** destroyed, and the acceptance gate got a script (2026-11-15)
+
+#### The seed builds through the app's own RPCs, not around them
+
+`supabase/seed/demo_seed.sql` (SCRUM-198, behind the SCRUM-199 guard) makes a believable demo out of
+**real calls**: `save_ancestor` ×10 · `submit_burn` ×20 (8 head + 3×4 rivals) · `purchase_item` ×3,
+**paid from tribute those burns earned**. A league cohort of 5 and a second, **empty-Book** clan make
+`SCRUM-122`'s empty state reachable.
+
+⚠️ **No `ledger_events` INSERT anywhere.** The append-only rule is not suspended for demos. The only
+raw writes are `auth.users` (the Admin API's job) and the **starter inventory `grant`** — `acquired_via`
+has a `grant` value precisely for that, and a new account has no other way to hold an offering.
+
+It **asserts itself** rather than assuming, so a partial build cannot report success:
+`DEMO READY — tablets 10 · Book 19 · cohort 5 · inventory 7`.
+
+#### The teardown is scoped, ordered, and idempotent
+
+Four markers, all written by the seed: `code LIKE 'DEMZ%'` · `display_label LIKE 'DEMO ·%'` ·
+`cohort_no 99` · `email LIKE 'demo-%@example.invalid'`. ⚠️ **No name-based match** — a real clan may be
+called anything, including something with “demo” in it.
+
+⚠️ **The order is load-bearing and was found by reading the FKs, not by trying:** `clans.created_by →
+profiles` is **NO ACTION**, while *every* other FK to profiles is CASCADE. Deleting identities first
+fails on the clans they created, so **clans go first, identities last**.
+
+⚠️ **Storage is swept by PATH** (`storage_sweep.mjs`), because the bulk `{"prefixes":[…]}` call answers
+**200 and deletes nothing**. ⚠️ It is implemented but **unexercised**: the seed creates no captures, and
+there is no service-role key here to list a bucket with — so it prints `SKIPPED` rather than pretending.
+
+**Measured:** seed twice → identical counts (pre-clean removes the previous build) · teardown →
+*2 clans · 5 members · 1 cohort · 1 week · 5 identities* · teardown again → *nothing to remove* ·
+query → **all zeros**.
+
+#### The gate has a script, and was started — not passed
+
+`AppDesignConceptBoard/22-demo-run-script.md` is 14 steps, each with its **testID** and the observable
+that decides it. The run itself (`SCRUM-200/201/203`):
+
+| | |
+|---|---|
+| cold start | **2187 ms** (`COLD`) |
+| steps 1, 2, 8–13 | ✅ pass — shrine · League · Store · confirm card · Profile · Settings · back-out; **no dead ends**, no raw error text |
+| 中文 | ✅ passes on six screens — zero English except the user's own clan name and the `EN` label |
+| **steps 3–6, 7** | ⚠️ **NOT SEEN** — capture → styled → burn → reward, and the Book |
+
+⚠️ **The demo's core is the part that could not run**: it needs an offering in front of the camera and
+a **Path C spend** (≈ US$0.091), and the populated Book/league need SCRUM-155's seed, still blocked on
+the service-role key. **The sprint's acceptance gate is therefore not signed**, and the run is recorded
+as partial rather than green.
+
+#### Three schema facts that cost a rebuild each
+
+1. **Clan codes are exactly 8 chars from an alphabet that EXCLUDES `O`** — so `DEMO…` is impossible;
+   the marker is `DEMZ`.
+2. **Clan names are 2–20 chars** — `空祠 (demo · empty Book)` is 22 and is rejected.
+3. **The altar's ten slots are 0–9, not 1–10** — a `1..10` loop dies on the tenth.
+
+#### And one comment that was lying
+
+`_layout`'s `LocaleProvider` note said a language change *“restarts navigation at the shrine”*. The
+screen measured **stays where it is** and re-renders in place — better behaviour than documented. The
+comment is corrected in the same docs PR.
+
 ### 12.57 · S81 — the ×2.0 DECAYS, "nearby" is a POINTS band, and the splash was finally judged on an APK (2026-11-15)
 
 > **Owner, answering SCRUM-235:** *"'users can only see nearby competitors' is supposed to mean in the dimension of
